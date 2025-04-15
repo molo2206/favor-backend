@@ -18,7 +18,11 @@ export class CreateUserHasCompanyDto {
 
     @IsString()
     @IsOptional()
-    role?: string; // Ex: "admin", "manager", "employee"
+    role?: string; 
+
+    @IsUUID()
+    @IsNotEmpty()
+    roleId: string;
 
     @IsBoolean()
     @IsOptional()

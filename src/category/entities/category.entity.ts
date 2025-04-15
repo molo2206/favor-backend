@@ -1,0 +1,31 @@
+import { Product } from 'src/products/entities/product.entity';
+import {
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    OneToMany,
+    ManyToOne,
+    JoinColumn,
+} from 'typeorm';
+
+@Entity('category')
+export class CategoryEntity {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column()
+    name: string;
+
+    // ✅ Catégorie parente (null si c’est une catégorie racine)
+    @ManyToOne(() => CategoryEntity, (category) => category.children, { nullable: true })
+    @JoinColumn({ name: 'parent_id' })
+    parent?: CategoryEntity;
+
+    // ✅ Sous-catégories de cette catégorie
+    @OneToMany(() => CategoryEntity, (category) => category.parent)
+    children?: CategoryEntity[];
+
+    // ✅ Produits liés à cette catégorie
+    @OneToMany(() => Product, (product) => product.category)
+    products: Product[];
+}

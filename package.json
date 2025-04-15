@@ -31,6 +31,7 @@
     "@nestjs/mapped-types": "*",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/swagger": "^11.1.1",
     "@nestjs/typeorm": "^11.0.0",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
@@ -46,6 +47,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "speakeasy": "^2.0.0",
+    "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.22"
   },
   "devDependencies": {
@@ -67,6 +69,7 @@
     "@types/passport-google-oauth20": "^2.0.16",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",
+    "@types/swagger-ui-express": "^4.1.8",
     "eslint": "^9.23.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",

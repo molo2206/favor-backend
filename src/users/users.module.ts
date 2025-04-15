@@ -5,16 +5,20 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from './entities/user.entity';
 import { OtpEntity } from 'src/otp/entities/otp.entity';
+import { JwtModule } from '@nestjs/jwt'; // 👈 à ajouter
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity, OtpEntity]), // ✅ On utilise OtpEntity directement
-    // ✅ TypeORM correctement importé
+    TypeOrmModule.forFeature([UserEntity, OtpEntity]),
+    JwtModule.register({
+      secret: process.env.ACCESS_TOKEN_SECRET_KEY, // 👈 clé secrète
+      signOptions: { expiresIn: '7min' },
+    }),
     MailerModule.forRoot({
       transport: {
         host: process.env.MAILER_HOST,
         port: 587,
-        secure: false, // false pour STARTTLS
+        secure: false,
         auth: {
           user: process.env.MAILER_USER,
           pass: process.env.MAILER_PASS,
@@ -26,10 +30,10 @@ import { OtpEntity } from 'src/otp/entities/otp.entity';
       defaults: {
         from: `"No Reply" <${process.env.MAILER_USER}>`,
       },
-    })
+    }),
   ],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],
 })
-export class UsersModule { }
+export class UsersModule {}

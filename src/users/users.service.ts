@@ -19,6 +19,8 @@ import * as speakeasy from 'speakeasy';
 import * as qrcode from 'qrcode';
 import { UpdateUserDto } from './dto/update-profile';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { JwtService } from '@nestjs/jwt';
+import { UserRole } from './utility/common/user-role-enum';
 
 @Injectable()
 export class UsersService {
@@ -28,10 +30,12 @@ export class UsersService {
     private readonly mailerService: MailerService,
     @InjectRepository(OtpEntity)
     private readonly otpRepository: Repository<OtpEntity>,
+
+    private readonly jwtService: JwtService,
   ) { }
 
   async signup(createUserDto: CreateUserDto): Promise<any> {
-    const { email, otpCode, password, roles } = createUserDto;
+    const { email, otpCode, password } = createUserDto;
 
     const userExists = await this.usersRepository.findOne({ where: { email } });
     if (userExists) {
@@ -43,11 +47,7 @@ export class UsersService {
     }
 
     const otpEntry = await this.otpRepository.findOne({
-      where: {
-        email,
-        otpCode,
-        isUsed: false,
-      },
+      where: { email, otpCode, isUsed: false },
     });
 
     if (!otpEntry || new Date() > otpEntry.expiresAt) {
@@ -55,13 +55,13 @@ export class UsersService {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const userRoles = Array.isArray(roles) ? roles : ['user'];
 
+    // On affecte directement le rôle statique "USER" (par exemple UserRole.USER)
     const user = this.usersRepository.create({
       ...createUserDto,
       email,
       password: hashedPassword,
-      role: userRoles[0],
+      role: UserRole.CUSTOMER,
     });
 
     const savedUser = await this.usersRepository.save(user);
@@ -73,6 +73,7 @@ export class UsersService {
     const { password: _pw, ...userWithoutPassword } = savedUser;
     return userWithoutPassword;
   }
+
 
   async update(id: string, updateUserDto: Partial<UpdateUserDto>, currentUser: UserEntity): Promise<UserEntity> {
     const user = await this.usersRepository.findOne({ where: { id } });
@@ -104,27 +105,100 @@ export class UsersService {
   }
 
 
-  async signin(loginUserDto: LoginUserDto) {
+  // async signin(loginUserDto: LoginUserDto) {
+  //   const user = await this.usersRepository
+  //     .createQueryBuilder('users')
+  //     .addSelect('users.password')
+  //     .where('users.email = :email', { email: loginUserDto.email })
+  //     .getOne();
+
+  //   if (!user) throw new UnauthorizedException('Invalid credentials.');
+
+  //   const isPasswordValid = await bcrypt.compare(loginUserDto.password, user.password);
+  //   if (!isPasswordValid) throw new UnauthorizedException('Invalid credentials.');
+
+  //   const token = await this.accessToken(user);
+
+  //   const { password, ...userWithoutPassword } = user;
+
+  //   return {
+  //     user: userWithoutPassword,
+  //     access_token: token,
+  //   };
+  // }
+  async signin(userSignInDto: LoginUserDto): Promise<any> {
     const user = await this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
-      .where('users.email = :email', { email: loginUserDto.email })
+      .leftJoinAndSelect('users.userHasCompanies', 'userHasCompanies')
+      .leftJoinAndSelect('userHasCompanies.company', 'company')
+      .leftJoinAndSelect('company.typeCompany', 'typeCompany')
+      .leftJoinAndSelect('userHasCompanies.permissions', 'permissions')
+      .leftJoinAndSelect('permissions.permission', 'permission')
+      .where('users.email = :email', { email: userSignInDto.email })
       .getOne();
 
     if (!user) throw new UnauthorizedException('Invalid credentials.');
 
-    const isPasswordValid = await bcrypt.compare(loginUserDto.password, user.password);
-    if (!isPasswordValid) throw new UnauthorizedException('Invalid credentials.');
+    const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
+    if (!isPasswordValid)
+      throw new UnauthorizedException('Invalid credentials.');
 
     const token = await this.accessToken(user);
 
+    // Supprimer le mot de passe pour la réponse
     const { password, ...userWithoutPassword } = user;
 
+    // Construire la réponse enrichie
     return {
-      user: userWithoutPassword,
+      user: {
+        id: userWithoutPassword.id,
+        name: userWithoutPassword.fullName,
+        email: userWithoutPassword.email,
+        phone: userWithoutPassword.phone,
+        image: userWithoutPassword.image,
+        role: userWithoutPassword.role,
+        // Conversion des dates pour s'assurer qu'elles sont des objets Date
+        userHasCompany: userWithoutPassword.userHasCompanies?.map((uhc) => ({
+          id: uhc.id,
+          isOwner: uhc.isOwner,
+          company: uhc.company
+            ? {
+              id: uhc.company.id,
+              name: uhc.company.companyName || '',
+              logo: uhc.company.logo,
+              adresse: uhc.company.companyAddress || '',
+              typeCompany: uhc.company.typeCompany
+                ? {
+                  id: uhc.company.typeCompany.id,
+                  name: uhc.company.typeCompany.name,
+                }
+                : null,
+            }
+            : null,
+          permissions: uhc.permissions?.map((p) => ({
+            id: p.permission?.id,
+            name: p.permission?.name,
+            create: p.create,
+            read: p.read,
+            update: p.update,
+            delete: p.delete,
+            status: p.status,
+            createdAt:
+              p.permission?.createdAt instanceof Date
+                ? p.permission.createdAt
+                : new Date(p.permission.createdAt),
+            updatedAt:
+              p.permission?.updatedAt instanceof Date
+                ? p.permission.updatedAt
+                : new Date(p.permission.updatedAt),
+          })) ?? [],
+        })) ?? [],
+      },
       access_token: token,
     };
   }
+
 
   async updateProfileImage(userId: string, dto: UpdateUserImageDto) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
@@ -225,13 +299,17 @@ export class UsersService {
     return { message: 'Mot de passe réinitialisé avec succès.' };
   }
 
-  async accessToken(user: UserEntity) {
-    const secretKey = process.env.ACCESS_TOKEN_SECRET_KEY;
-    if (!secretKey) throw new Error('Clé secrète JWT manquante');
-    return sign({ id: user.id, email: user.email, roles: user.role }, secretKey, { expiresIn: '30m' });
-  }
-
-  generateSecret(email: string) {
+  async accessToken(user: UserEntity): Promise<string> {
+    const payload = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    };
+    return await this.jwtService.signAsync(payload, {
+      expiresIn: '1h', // durée de validité (tu peux aussi mettre '1h', '30m', etc.)
+      secret: process.env.ACCESS_TOKEN_SECRET_KEY,
+    });
+  } generateSecret(email: string) {
     return speakeasy.generateSecret({ name: `FavorApp (${email})` });
   }
 
@@ -244,7 +322,7 @@ export class UsersService {
       secret, // Le secret stocké dans la base de données
       encoding: 'base32', // L'encodage doit être 'base32'
       token, // Le token envoyé par l'utilisateur
-      window: 1, // Permet de vérifier également les tokens dans une fenêtre de 1 période (±30 secondes)
+      window: 60, // Permet de vérifier également les tokens dans une fenêtre de 1 période (±30 secondes)
     });
   }
   async findById(userId: string): Promise<UserEntity> {

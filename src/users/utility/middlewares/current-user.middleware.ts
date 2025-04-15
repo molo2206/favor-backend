@@ -1,15 +1,20 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-namespace */
 import { Injectable, NestMiddleware } from '@nestjs/common';
-import { isArray } from 'class-validator';
 import { Request, Response, NextFunction } from 'express';
 import { verify } from 'jsonwebtoken';
-import { UsersService } from '../../users.service';
+import { UsersService } from 'src/users/users.service';
+import { JwtPayload } from 'src/users/interfaces/jwt-payload.interface';
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      currentUser?: any;
+      currentUser?: {
+        id: string;
+        email: string;
+        name?: string;
+        role: string;
+      } | null;
     }
   }
 }
@@ -19,39 +24,38 @@ export class CurrentUserMiddleware implements NestMiddleware {
   constructor(private readonly usersService: UsersService) { }
 
   async use(req: Request, res: Response, next: NextFunction) {
-    try {
-      const authHeader =
-        req?.headers?.authorization || req.headers.Authorization;
+    const rawAuthHeader = req.headers.authorization || req.headers.Authorization;
+    const authHeader = Array.isArray(rawAuthHeader) ? rawAuthHeader[0] : rawAuthHeader;
 
-      if (
-        !authHeader ||
-        isArray(authHeader) ||
-        !authHeader.startsWith('Bearer ')
-      ) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      req.currentUser = null;
+      return next();
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    try {
+      const secretKey = process.env.ACCESS_TOKEN_SECRET_KEY as string;
+      const payload = verify(token, secretKey) as JwtPayload;
+
+      const user = await this.usersService.findOne(payload.id);
+
+      if (!user) {
         req.currentUser = null;
-        next();
-        return;
-      } else {
-        try {
-          const token = authHeader.split(' ')[1];
-          const secretKey = process.env.ACCESS_TOKEN_SECRET_KEY as string;
-          const { id } = <JwtPayload>verify(token, secretKey);
-          const currentUser = await this.usersService.findOne(id);
-          req.currentUser = currentUser;
-          return next();
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (err) {
-          req.currentUser = null;
-          return next();
-        }
+        return next();
       }
-    } catch (error) {
-      console.error("Erreur d'authentification:", error);
+      const role = Array.isArray(payload.role) ? payload.role[0] : payload.role;
+
+      req.currentUser = {
+        id: user.id,
+        email: user.email,
+        name: user.fullName,
+        role
+      };
+    } catch (err) {
       req.currentUser = null;
     }
+
     return next();
   }
-}
-interface JwtPayload {
-  id: string;
 }

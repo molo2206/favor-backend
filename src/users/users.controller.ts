@@ -33,6 +33,7 @@ import { UserRole } from './utility/common/user-role-enum';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { Verify2FADto } from './dto/verify2fact.dto';
 import * as speakeasy from 'speakeasy';
+import { AuthorizeRoles } from './utility/decorators/authorize.roles.decorator';
 
 @Controller('users')
 export class UsersController {
@@ -102,8 +103,9 @@ export class UsersController {
 
     return { message: '2FA activé avec succès.' };
   }
-
+  
   // ────── 🧑‍💻 Mise à jour de profil et image ──────
+
   @UseGuards(AuthentificationGuard)
   @Patch(':id')
   async updateUser(
@@ -182,9 +184,11 @@ export class UsersController {
   }
   // ────── 👥 Gestion des utilisateurs (admin) ──────
 
-  @UseGuards(AuthentificationGuard, AuthorizeGuard([UserRole.ADMIN]))
+  @UseGuards(AuthentificationGuard, AuthorizeGuard)
+  @AuthorizeRoles(UserRole.ADMIN)
   @Get('all')
-  async findAll(): Promise<UserEntity[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async findAll(): Promise<any> {
     return await this.usersService.findAll();
   }
 

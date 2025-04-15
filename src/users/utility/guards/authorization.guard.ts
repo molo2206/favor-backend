@@ -1,35 +1,38 @@
-
-import { CanActivate, ExecutionContext, UnauthorizedException, mixin } from '@nestjs/common';
-
-export const AuthorizeGuard = (allowedRoles: string[]) => {
-    class RolesGuardMixin implements CanActivate {
-        canActivate(context: ExecutionContext): boolean {
-            const request = context.switchToHttp().getRequest();
-            const userRoles = request.currentUser?.roles;
-
-            // Si aucun rôle n'est requis pour cet endpoint, autoriser l'accès
-            if (!allowedRoles || allowedRoles.length === 0) {
-                return true; // Aucun rôle spécifié = accès autorisé
-            }
-
-            if (!userRoles || !Array.isArray(userRoles) || userRoles.length === 0) {
-                throw new UnauthorizedException('Accès refusé : aucun rôle détecté.');
-            }
-
-            // Vérifie si AU MOINS un rôle de l'utilisateur est autorisé
-            const hasPermission = userRoles.some((role: string) => allowedRoles.includes(role));
-
-            if (!hasPermission) {
-                throw new UnauthorizedException(
-                    `Désolé, vous n’êtes pas autorisé. Vos rôles: ${userRoles.join(', ')}`
-                );
-            }
-
-            return true; // L'utilisateur a les rôles nécessaires
-        }
+// src/auth/guards/authorize.guard.ts
+import {
+    CanActivate,
+    ExecutionContext,
+    Injectable,
+    UnauthorizedException,
+  } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+  
+  @Injectable()
+  export class AuthorizeGuard implements CanActivate {
+    constructor(private reflector: Reflector) {}
+  
+    canActivate(context: ExecutionContext): boolean {
+      const allowedRoles = this.reflector.get<string[]>(
+        'allowedRoles',
+        context.getHandler(),
+      );
+  
+      if (!allowedRoles || allowedRoles.length === 0) {
+        return true; // Pas de rôles requis = accès autorisé
+      }
+  
+      const request = context.switchToHttp().getRequest();
+      const user = request.currentUser;
+  
+      if (!user || !user.role) {
+        throw new UnauthorizedException('Utilisateur non authentifié ou rôle manquant.');
+      }
+  
+      if (!allowedRoles.includes(user.role)) {
+        throw new UnauthorizedException(`Accès refusé pour le rôle : ${user.role}`);
+      }
+  
+      return true;
     }
-
-    // Créer et retourner le garde sous forme de mixin
-    const guard = mixin(RolesGuardMixin);
-    return guard;
-};
+  }
+  

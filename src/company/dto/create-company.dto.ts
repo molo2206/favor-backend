@@ -26,5 +26,9 @@ export class CreateCompanyDto {
   @IsUrl({}, { message: 'The logo should be a valid URL or file path.' })
   logo?: string | null;  // Permet de stocker null si le logo n'est pas présent
 
+  @IsOptional()
+  @IsString()
+  typeCompany?: string; 
+
 }
 

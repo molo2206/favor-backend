@@ -1,34 +1,35 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import {
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    ManyToOne,
+    JoinColumn,
+    OneToMany
+} from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { CompanyEntity } from 'src/company/entities/company.entity';
+import { UserHasCompanyPermissionEntity } from 'src/user_has_company_permissions/entities/user_has_company_permission.entity';
+import { RoleUser } from 'src/role_user/entities/role_user.entity';
 
 @Entity('user_has_company')
 export class UserHasCompanyEntity {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @ManyToOne(() => UserEntity)
-    @JoinColumn({ name: 'userId' })
-    user: UserEntity;
-
-    @ManyToOne(() => CompanyEntity)
-    @JoinColumn({ name: 'companyId' })
-    company: CompanyEntity;
-
     @Column({ default: false })
     isOwner: boolean;
 
-    // @ManyToOne(() => UserEntity, user => user.userHasCompanies)
-    // user_: UserEntity;
+    @ManyToOne(() => UserEntity, user => user.userHasCompanies)
+    user: UserEntity;
 
-    // @ManyToOne(() => CompanyEntity, company => company.userHasCompanies)
-    // company_: CompanyEntity;
+    @ManyToOne(() => CompanyEntity, company => company.userHasCompanies, { eager: true })
+    @JoinColumn({ name: 'companyId' })
+    company: CompanyEntity;
 
-    @ManyToOne(() => UserEntity, (user) => user.userHasCompanies, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'user_id' })
-    user_: UserEntity;
+    @OneToMany(() => UserHasCompanyPermissionEntity, (uhcPermission) => uhcPermission.userHasCompany)
+    permissions: UserHasCompanyPermissionEntity[];
 
-    @ManyToOne(() => CompanyEntity, (company) => company.userHasCompanies, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'company_id' })
-    company_: CompanyEntity;
+    @ManyToOne(() => RoleUser, { eager: true })
+    @JoinColumn({ name: 'roleId' })
+    role: RoleUser;
 }
