@@ -41,10 +41,10 @@ export class ProductController {
   }
 
   // Récupérer un produit par ID
-  @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Product> {
-    return this.productService.findOne(id);
-  }
+  // @Get(':id')
+  // findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Product> {
+  //   return this.productService.findOne(id);
+  // }
 
   // Mise à jour d'un produit
   @Patch(':id')
@@ -77,8 +77,15 @@ export class ProductController {
   }
 
   @Get('group-by-type')
+  @UseGuards(AuthentificationGuard, RolesGuard)
+  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   async groupByType(): Promise<Record<string, Product[]>> {
     return this.productService.groupByType();
+  }
+
+  @Get('group-by-type_first')
+  async groupByType_first(): Promise<Record<string, Product>> {
+    return this.productService.groupByType_First_Product();
   }
 
   // Supprimer un produit
@@ -86,4 +93,5 @@ export class ProductController {
   remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.productService.remove(id);
   }
+  
 }

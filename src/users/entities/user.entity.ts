@@ -4,6 +4,7 @@ import { VehicleType } from "../utility/common/user-vehiculetype.enum";
 import { OtpEntity } from "src/otp/entities/otp.entity";
 import { Exclude } from "class-transformer";
 import { UserHasCompanyEntity } from "src/user_has_company/entities/user_has_company.entity";
+import { OrderEntity } from "src/order/entities/order.entity";
 
 @Entity('users')
 export class UserEntity {
@@ -80,4 +81,7 @@ export class UserEntity {
 
     @OneToMany(() => UserHasCompanyEntity, (userHasCompany) => userHasCompany.user)
     userHasCompanies: UserHasCompanyEntity[];
+
+    @OneToMany(() => OrderEntity, (order) => order.user)
+    orders: OrderEntity[];
 }

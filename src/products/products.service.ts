@@ -81,15 +81,37 @@ export class ProductService {
   }
 
   async groupByType(): Promise<Record<string, Product[]>> {
-    const products = await this.productRepo.find({ relations: ['company', 'category'] });
+    const products = await this.productRepo.find({
+      relations: ['company', 'category'],
+    });
 
     const grouped = products.reduce((acc, product) => {
-      if (!acc[product.type]) {
-        acc[product.type] = [];
+      const type = product.type;
+
+      if (!acc[type]) {
+        acc[type] = [];
       }
-      acc[product.type].push(product);
+
+      acc[type].push(product);
       return acc;
     }, {} as Record<string, Product[]>);
+
+    return grouped;
+  }
+
+  async groupByType_First_Product(): Promise<Record<string, Product>> {
+    const products = await this.productRepo.find({
+      relations: ['company', 'category'],
+      order: { createdAt: 'ASC' }, // pour s'assurer que le "premier" est bien le plus ancien
+    });
+
+    const grouped: Record<string, Product> = {};
+
+    for (const product of products) {
+      if (!grouped[product.type]) {
+        grouped[product.type] = product; // ajouter seulement le premier pour chaque type
+      }
+    }
 
     return grouped;
   }

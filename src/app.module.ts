@@ -14,6 +14,9 @@ import { TypeCompanyModule } from './type_company/type_company.module';
 import { RoleUserModule } from './role_user/role_user.module';
 import { CategoryModule } from './category/category.module';
 import { ProductModule } from './products/products.module'; // 👈 importe le module
+import { OrderModule } from './order/order.module';
+import { SubOrdersModule } from './sub_orders/sub_orders.module';
+import { OrderItemsModule } from './order_items/order_items.module';
 @Module({
   imports: [
     TypeOrmModule.forRoot(dataSourceOptions),
@@ -26,7 +29,10 @@ import { ProductModule } from './products/products.module'; // 👈 importe le m
     TypeCompanyModule,
     RoleUserModule,
     CategoryModule,
-    ProductModule, // 👈 ajoute-le ici
+    ProductModule,
+    OrderModule,
+    SubOrdersModule,
+    OrderItemsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
