@@ -17,8 +17,12 @@ import { ProductModule } from './products/products.module'; // 👈 importe le m
 import { OrderModule } from './order/order.module';
 import { SubOrdersModule } from './sub_orders/sub_orders.module';
 import { OrderItemsModule } from './order_items/order_items.module';
+import { ConfigModule } from '@nestjs/config';
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true, 
+    }),
     TypeOrmModule.forRoot(dataSourceOptions),
     UsersModule,
     OtpModule,

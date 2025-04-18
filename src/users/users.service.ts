@@ -104,28 +104,6 @@ export class UsersService {
     return { message: 'Mot de passe mis à jour avec succès' };
   }
 
-
-  // async signin(loginUserDto: LoginUserDto) {
-  //   const user = await this.usersRepository
-  //     .createQueryBuilder('users')
-  //     .addSelect('users.password')
-  //     .where('users.email = :email', { email: loginUserDto.email })
-  //     .getOne();
-
-  //   if (!user) throw new UnauthorizedException('Invalid credentials.');
-
-  //   const isPasswordValid = await bcrypt.compare(loginUserDto.password, user.password);
-  //   if (!isPasswordValid) throw new UnauthorizedException('Invalid credentials.');
-
-  //   const token = await this.accessToken(user);
-
-  //   const { password, ...userWithoutPassword } = user;
-
-  //   return {
-  //     user: userWithoutPassword,
-  //     access_token: token,
-  //   };
-  // }
   async signin(userSignInDto: LoginUserDto): Promise<any> {
     const user = await this.usersRepository
       .createQueryBuilder('users')
