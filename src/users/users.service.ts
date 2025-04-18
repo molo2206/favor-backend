@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
@@ -32,6 +33,7 @@ export class UsersService {
     private readonly otpRepository: Repository<OtpEntity>,
 
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) { }
 
   async signup(createUserDto: CreateUserDto): Promise<any> {
@@ -283,11 +285,18 @@ export class UsersService {
       email: user.email,
       role: user.role,
     };
+  
+    const secretKey = this.configService.get<string>('ACCESS_TOKEN_SECRET_KEY');
+    if (!secretKey) {
+      throw new Error('ACCESS_TOKEN_SECRET_KEY is not defined!');
+    }
+  
     return await this.jwtService.signAsync(payload, {
-      expiresIn: '1h', 
-      secret: process.env.ACCESS_TOKEN_SECRET_KEY,
+      expiresIn: '1h',
+      secret: secretKey,
     });
-  } generateSecret(email: string) {
+  }
+  generateSecret(email: string) {
     return speakeasy.generateSecret({ name: `FavorApp (${email})` });
   }
 

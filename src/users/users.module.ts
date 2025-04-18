@@ -9,7 +9,6 @@ import { JwtModule } from '@nestjs/jwt'; // 👈 à ajouter
 import { ConfigModule, ConfigService } from '@nestjs/config';
 @Module({
   imports: [
-    ConfigModule, // 👈 assure l'injection
     TypeOrmModule.forFeature([UserEntity, OtpEntity]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -17,7 +16,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       useFactory: async (config: ConfigService) => {
         const secret = config.get<string>('ACCESS_TOKEN_SECRET_KEY');
         if (!secret) {
-          console.error('❌ ACCESS_TOKEN_SECRET_KEY is undefined!');
+          throw new Error('❌ ACCESS_TOKEN_SECRET_KEY is undefined!');
         }
         return {
           secret,
@@ -31,7 +30,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       useFactory: async (config: ConfigService) => ({
         transport: {
           host: config.get('MAILER_HOST'),
-          port: 465,
+          port: Number(config.get('MAILER_PORT')) || 587,
           secure: false,
           auth: {
             user: config.get('MAILER_USER'),
