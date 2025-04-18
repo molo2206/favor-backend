@@ -14,10 +14,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (config: ConfigService) => ({
-        secret: config.get<string>('ACCESS_TOKEN_SECRET_KEY'),
-        signOptions: { expiresIn: '1h' },
-      }),
+      useFactory: async (config: ConfigService) => {
+        const secret = config.get<string>('ACCESS_TOKEN_SECRET_KEY');
+        if (!secret) {
+          console.error('❌ ACCESS_TOKEN_SECRET_KEY is undefined!');
+        }
+        return {
+          secret,
+          signOptions: { expiresIn: '1h' },
+        };
+      },
     }),
     MailerModule.forRootAsync({
       imports: [ConfigModule],
@@ -45,4 +51,4 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
   providers: [UsersService],
   exports: [UsersService],
 })
- export class UsersModule {}
+export class UsersModule { }
