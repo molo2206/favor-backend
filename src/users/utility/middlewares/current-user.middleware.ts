@@ -5,6 +5,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verify } from 'jsonwebtoken';
 import { UsersService } from 'src/users/users.service';
 import { JwtPayload } from 'src/users/interfaces/jwt-payload.interface';
+import { ConfigService } from '@nestjs/config';
 
 declare global {
   namespace Express {
@@ -21,7 +22,7 @@ declare global {
 
 @Injectable()
 export class CurrentUserMiddleware implements NestMiddleware {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService, private readonly configService: ConfigService,) { }
 
   async use(req: Request, res: Response, next: NextFunction) {
     const rawAuthHeader = req.headers.authorization || req.headers.Authorization;
@@ -35,8 +36,11 @@ export class CurrentUserMiddleware implements NestMiddleware {
     const token = authHeader.split(' ')[1];
 
     try {
-      const secretKey = process.env.ACCESS_TOKEN_SECRET_KEY as string;
-      const payload = verify(token, secretKey) as JwtPayload;
+      const secretKey = this.configService.get<string>('ACCESS_TOKEN_SECRET_KEY');
+      if (!secretKey) {
+        throw new Error('ACCESS_TOKEN_SECRET_KEY is not defined in your environment variables');
+      }
+      const payload = verify(token, secretKey) as unknown as JwtPayload;
 
       const user = await this.usersService.findOne(payload.id);
 
