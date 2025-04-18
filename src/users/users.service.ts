@@ -306,7 +306,7 @@ export class UsersService {
       role: user.role,
     };
     return await this.jwtService.signAsync(payload, {
-      expiresIn: process.env.ACCESS_TOKEN_EXPIRE_TIME || '1h', // durée de validité (tu peux aussi mettre '1h', '30m', etc.)
+      expiresIn: process.env.ACCESS_TOKEN_EXPIRE_TIME || '1h', 
       secret: process.env.ACCESS_TOKEN_SECRET_KEY,
     });
   } generateSecret(email: string) {
