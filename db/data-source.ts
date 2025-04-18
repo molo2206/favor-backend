@@ -4,10 +4,10 @@ import { config } from 'dotenv';
 config();
 export const dataSourceOptions: DataSourceOptions = {
     type: 'mysql',
-    host: '127.0.0.1', // ✅ Remplace localhost par cette adresse
+    host: 'localhost',
     port: 3306,
-    username: 'root',
-    password: '',
+    username: 'admin',
+    password: 'favor@2025',
     database: 'favor_db',
     entities: ['dist/**/*.entity{.ts,.js}'],
     migrations: ['dist/db/migrations/*{.ts,.js}'],
