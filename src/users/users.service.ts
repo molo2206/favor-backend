@@ -175,7 +175,7 @@ export class UsersService {
           })) ?? [],
         })) ?? [],
       },
-      access_token: token,
+      // access_token: token,
     };
   }
 
