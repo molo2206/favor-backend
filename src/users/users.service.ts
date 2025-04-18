@@ -144,7 +144,7 @@ export class UsersService {
     if (!isPasswordValid)
       throw new UnauthorizedException('Invalid credentials.');
 
-    const token = await this.accessToken(user);
+    // const token = await this.accessToken(user);
 
     // Supprimer le mot de passe pour la réponse
     const { password, ...userWithoutPassword } = user;
@@ -195,7 +195,7 @@ export class UsersService {
           })) ?? [],
         })) ?? [],
       },
-      access_token: token,
+      // access_token: token,
     };
   }
 
@@ -306,7 +306,7 @@ export class UsersService {
       role: user.role,
     };
     return await this.jwtService.signAsync(payload, {
-      expiresIn: process.env.ACCESS_TOKEN_EXPIRE_TIME || '1h', 
+      expiresIn: '1h', 
       secret: process.env.ACCESS_TOKEN_SECRET_KEY,
     });
   } generateSecret(email: string) {
