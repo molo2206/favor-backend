@@ -7,4 +7,8 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsUUID()
   parentId?: string;
+
+  @IsOptional()
+  @IsString()
+  type?: string;
 }

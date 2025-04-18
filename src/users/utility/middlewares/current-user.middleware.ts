@@ -35,7 +35,7 @@ export class CurrentUserMiddleware implements NestMiddleware {
     const token = authHeader.split(' ')[1];
 
     try {
-      const secretKey = process.env.ACCESS_TOKEN_EXPIRE_TIME || '1h' as string;
+      const secretKey = process.env.ACCESS_TOKEN_SECRET_KEY as string;
       const payload = verify(token, secretKey) as JwtPayload;
 
       const user = await this.usersService.findOne(payload.id);

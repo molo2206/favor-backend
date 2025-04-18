@@ -16,6 +16,15 @@ export class CategoryEntity {
     @Column()
     name: string;
 
+    @Column({ nullable: true })
+    image?: string;
+
+    @Column({ unique: true })
+    slug: string;
+
+    @Column({ nullable: true })
+    type?: string;
+
     // ✅ Catégorie parente (null si c’est une catégorie racine)
     @ManyToOne(() => CategoryEntity, (category) => category.children, { nullable: true })
     @JoinColumn({ name: 'parent_id' })

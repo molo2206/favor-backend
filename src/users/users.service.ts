@@ -56,7 +56,7 @@ export class UsersService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // On affecte directement le rôle statique "USER" (par exemple UserRole.USER)
+    // On affecte directement le rôle statique "USER"
     const user = this.usersRepository.create({
       ...createUserDto,
       email,
@@ -144,7 +144,7 @@ export class UsersService {
     if (!isPasswordValid)
       throw new UnauthorizedException('Invalid credentials.');
 
-    // const token = await this.accessToken(user);
+    const token = await this.accessToken(user);
 
     // Supprimer le mot de passe pour la réponse
     const { password, ...userWithoutPassword } = user;
@@ -195,7 +195,7 @@ export class UsersService {
           })) ?? [],
         })) ?? [],
       },
-      // access_token: token,
+      access_token: token,
     };
   }
 
