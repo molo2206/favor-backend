@@ -5,22 +5,20 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { CategoryEntity } from './entities/category.entity';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { slugify } from 'src/users/utility/slug/slugify';
-import path from 'path';
+import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
 
 @Injectable()
 export class CategoryService {
   constructor(
     @InjectRepository(CategoryEntity)
     private readonly categoryRepo: Repository<CategoryEntity>,
+    private readonly cloudinary: CloudinaryService
   ) { }
 
-  async create(
-    createCategoryDto: CreateCategoryDto,
-    file?: Express.Multer.File,
-  ): Promise<CategoryEntity> {
+  async create(createCategoryDto: CreateCategoryDto, file: Express.Multer.File): Promise<CategoryEntity> {
     const { name, parentId, type } = createCategoryDto;
 
-    // Vérifier si une catégorie avec le même nom existe déjà
+    // Vérification si la catégorie existe déjà
     const existingCategory = await this.categoryRepo.findOne({ where: { name } });
     if (existingCategory) {
       throw new ConflictException('Une catégorie avec ce nom existe déjà');
@@ -29,25 +27,36 @@ export class CategoryService {
     let parent: CategoryEntity | undefined = undefined;
 
     if (parentId) {
-      const found = await this.categoryRepo.findOne({ where: { id: parentId } });
-      if (!found) {
+      // Vérification si la catégorie parente existe
+      const foundParent = await this.categoryRepo.findOne({ where: { id: parentId } });
+      if (!foundParent) {
         throw new NotFoundException('Catégorie parente non trouvée');
       }
-      parent = found;
+      parent = foundParent;
     }
 
+    // Slugification du nom pour créer un slug unique
     const slug = slugify(name);
-    const image = file ? file.filename : undefined;
 
+    // Upload de l'image via Cloudinary si elle existe
+    let imageUrl: string | undefined = undefined;
+    if (file) {
+      imageUrl = await this.cloudinary.handleUploadImage(file, 'category');
+    }
+
+    // Création de la catégorie
     const category = this.categoryRepo.create({
       name,
       slug,
       type,
       parent,
-      image,
+      image: imageUrl,
     });
-    return this.categoryRepo.save(category);
+
+    // Sauvegarde et retour de la catégorie
+    return await this.categoryRepo.save(category);
   }
+
 
   async update(
     id: string,
@@ -57,24 +66,28 @@ export class CategoryService {
     if (!updateCategoryDto && !file) {
       throw new NotFoundException('Aucune donnée fournie pour la mise à jour');
     }
-
+  
+    // Récupération de la catégorie à mettre à jour
     const category = await this.categoryRepo.findOne({ where: { id } });
-
+  
     if (!category) {
       throw new NotFoundException('Catégorie introuvable');
     }
-
+  
     const { name, parentId, type } = updateCategoryDto;
-
+  
+    // Mise à jour du nom et génération du slug automatique
     if (name) {
       category.name = name;
-      category.slug = slugify(name); // si slug auto
+      category.slug = slugify(name);
     }
-
+  
+    // Mise à jour du type si fourni
     if (type) {
       category.type = type;
     }
-
+  
+    // Mise à jour de la catégorie parente
     if (parentId) {
       const parent = await this.categoryRepo.findOne({ where: { id: parentId } });
       if (!parent) {
@@ -82,21 +95,33 @@ export class CategoryService {
       }
       category.parent = parent;
     }
-
+  
+    // Mise à jour de l'image si un fichier est fourni
     if (file) {
-      const fileName = path.basename(file.path);
-      category.image = fileName;
+      // Upload de l'image vers Cloudinary
+      const imageUrl = await this.cloudinary.handleUploadImage(file, 'category');
+      category.image = imageUrl; // Utilise l'URL d'image renvoyée par Cloudinary
     }
-
+  
+    // Sauvegarde de la catégorie mise à jour
     return this.categoryRepo.save(category);
   }
+  
 
 
-  async findAll(): Promise<CategoryEntity[]> {
-    return this.categoryRepo.find({
-      relations: ['parent', 'children'],
-    });
+  async findAll(type?: string): Promise<CategoryEntity[]> {
+    // Si le type est fourni, filtrer les catégories par type
+    const queryBuilder = this.categoryRepo.createQueryBuilder('category')
+      .leftJoinAndSelect('category.parent', 'parent')
+      .leftJoinAndSelect('category.children', 'children');
+
+    if (type) {
+      queryBuilder.where('category.type = :type', { type });
+    }
+
+    return queryBuilder.getMany();
   }
+
 
   async findOne(id: string): Promise<CategoryEntity> {
     const category = await this.categoryRepo.findOne({

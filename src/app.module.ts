@@ -18,6 +18,7 @@ import { OrderModule } from './order/order.module';
 import { SubOrdersModule } from './sub_orders/sub_orders.module';
 import { OrderItemsModule } from './order_items/order_items.module';
 import { ConfigModule } from '@nestjs/config';
+import { CloudinaryModule } from './users/utility/helpers/cloudinary.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -37,6 +38,7 @@ import { ConfigModule } from '@nestjs/config';
     OrderModule,
     SubOrdersModule,
     OrderItemsModule,
+    CloudinaryModule
   ],
   controllers: [AppController],
   providers: [AppService],
