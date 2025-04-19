@@ -16,9 +16,9 @@ export class CloudinaryService {
     const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY');
     const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET');
 
-    if (!cloudName || !apiKey || !apiSecret) {
-      throw new UnprocessableEntityException('Cloudinary credentials are missing.');
-    }
+    // if (!cloudName || !apiKey || !apiSecret) {
+    //   throw new UnprocessableEntityException('Cloudinary credentials are missing.');
+    // }
 
     cloudinary.config({
       cloud_name: cloudName,
