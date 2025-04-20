@@ -10,6 +10,6 @@ async function bootstrap() {
     prefix: '/uploads/users/',
   });
   app.setGlobalPrefix('api/v1');
-  await app.listen(3002);
+  await app.listen(3000);
 }
 bootstrap();
