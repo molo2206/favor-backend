@@ -1,78 +1,54 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe, UseGuards, ValidationPipe, UsePipes, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe, UseGuards, ValidationPipe, UsePipes, UseInterceptors, UploadedFiles, ClassSerializerInterceptor, Query } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { Product } from './entities/product.entity';
 import { ProductService } from './products.service';
 import { AuthorizeRoles } from 'src/users/utility/decorators/authorize-roles.decorator';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { RolesGuard } from 'src/users/utility/decorators/roles.guard';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { CategoryEntity } from 'src/category/entities/category.entity';
 
 @Controller('products')
 export class ProductController {
   constructor(private readonly productService: ProductService) { }
+  @UseInterceptors(ClassSerializerInterceptor)
   @Post()
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(
-    FileInterceptor('image', {
-      storage: diskStorage({
-        destination: './uploads/product',
-        filename: (req, file, cb) => {
-          const uniqueName = `${Date.now()}${extname(file.originalname)}`;
-          cb(null, uniqueName);
-        },
-      }),
-    }),
-  )
+  @UseInterceptors(FilesInterceptor('images', 10)) // plusieurs fichiers
   async create(
-    @UploadedFile() image: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
     @Body() dto: CreateProductDto,
   ) {
-    const imagePath = image ? `/uploads/product/${image.filename}` : undefined;
-    return this.productService.create(dto, imagePath);
-  }
-  // Récupérer tous les produits
-  @Get()
-  findAll(): Promise<Product[]> {
-    return this.productService.findAll();
+    return this.productService.create(dto, files);
   }
 
   // Récupérer un produit par ID
-  // @Get(':id')
-  // findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Product> {
-  //   return this.productService.findOne(id);
-  // }
+  @Get('one/:id')
+  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Product> {
+    return this.productService.findOne(id);
+  }
 
   // Mise à jour d'un produit
   @Patch(':id')
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  @UseInterceptors(ClassSerializerInterceptor)
   @UseInterceptors(
-    FileInterceptor('image', {
-      storage: diskStorage({
-        destination: './uploads/product',
-        filename: (req, file, cb) => {
-          const uniqueName = `${Date.now()}${extname(file.originalname)}`;
-          cb(null, uniqueName);
-        },
-      }),
-    }),
+    FilesInterceptor('images', 10), // Jusqu'à 10 fichiers d’un coup
   )
   async update(
     @Param('id') id: string,
-    @UploadedFile() image: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
     @Body() dto: CreateProductDto,
   ): Promise<Product> {
-    const imagePath = image ? `/uploads/product/${image.filename}` : undefined;
-    return this.productService.update(id, dto, imagePath);
+    return this.productService.update(id, dto, files);
   }
 
-  @Get('type/:type')
-  async getProductsByType(@Param('type') type: string): Promise<Product[]> {
+  @Get()
+  async getProductsByType(@Query('type') type?: string): Promise<Product[]> {
     return this.productService.findByType(type);
   }
 
@@ -88,10 +64,30 @@ export class ProductController {
     return this.productService.groupByType_First_Product();
   }
 
+  @Get('/category')
+  async getGroupedProductsByCategory(
+    @Query('categoryId') categoryId?: string,
+  ): Promise<{
+    data: (CategoryEntity & { products: Product[] })[];
+  }> {
+    return this.productService.findAllGroupedByCategory(categoryId);
+  }
+
+  @Get('company/:companyId')
+  async getProductsByCompany(
+    @Param('companyId') companyId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): Promise<{ data: any }> {
+    const result = await this.productService.findByCompany(companyId);
+    return { data: result };
+  }
+
+
+
+
   // Supprimer un produit
   @Delete(':id')
   remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.productService.remove(id);
   }
-  
 }

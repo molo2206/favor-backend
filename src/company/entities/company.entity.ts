@@ -1,3 +1,4 @@
+import { Product } from "src/products/entities/product.entity";
 import { TypeCompany } from "src/type_company/entities/type_company.entity";
 import { UserHasCompanyEntity } from "src/user_has_company/entities/user_has_company.entity";
 import { CompanyStatus } from "src/users/utility/common/company-status.enum";
@@ -38,4 +39,8 @@ export class CompanyEntity {
     @ManyToOne(() => TypeCompany, { nullable: true })
     @JoinColumn({ name: 'type_company_id' })
     typeCompany: TypeCompany | null | undefined;
+
+    @OneToMany(() => Product, product => product.company)
+    products: Product[];
+
 }

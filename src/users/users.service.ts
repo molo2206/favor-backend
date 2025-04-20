@@ -106,7 +106,7 @@ export class UsersService {
     return { message: 'Mot de passe mis à jour avec succès' };
   }
 
-  async signin(userSignInDto: LoginUserDto): Promise<any> {
+  async signin(userSignInDto: LoginUserDto): Promise<{ data: any }> {
     const user = await this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
@@ -121,24 +121,19 @@ export class UsersService {
     if (!user) throw new UnauthorizedException('Invalid credentials.');
 
     const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
-    if (!isPasswordValid)
-      throw new UnauthorizedException('Invalid credentials.');
+    if (!isPasswordValid) throw new UnauthorizedException('Invalid credentials.');
 
     const token = await this.accessToken(user);
-
-    // Supprimer le mot de passe pour la réponse
     const { password, ...userWithoutPassword } = user;
 
-    // Construire la réponse enrichie
     return {
-      user: {
+      data: {
         id: userWithoutPassword.id,
         name: userWithoutPassword.fullName,
         email: userWithoutPassword.email,
         phone: userWithoutPassword.phone,
         image: userWithoutPassword.image,
         role: userWithoutPassword.role,
-        // Conversion des dates pour s'assurer qu'elles sont des objets Date
         userHasCompany: userWithoutPassword.userHasCompanies?.map((uhc) => ({
           id: uhc.id,
           isOwner: uhc.isOwner,
@@ -174,10 +169,11 @@ export class UsersService {
                 : new Date(p.permission.updatedAt),
           })) ?? [],
         })) ?? [],
+        access_token: token,
       },
-      access_token: token,
     };
   }
+
 
 
   async updateProfileImage(userId: string, dto: UpdateUserImageDto) {
@@ -285,12 +281,12 @@ export class UsersService {
       email: user.email,
       role: user.role,
     };
-  
+
     const secretKey = this.configService.get<string>('ACCESS_TOKEN_SECRET_KEY');
     if (!secretKey) {
       throw new Error('ACCESS_TOKEN_SECRET_KEY is not defined!');
     }
-  
+
     return await this.jwtService.signAsync(payload, {
       expiresIn: '1h',
       secret: secretKey,
@@ -336,14 +332,17 @@ export class UsersService {
   }
 
   async findAll() {
-    return await this.usersRepository.find();
+    const users = await this.usersRepository.find();
+    return { data: users };
   }
 
-  async findOne(id: string): Promise<UserEntity> {
+
+  async findOne(id: string): Promise<{ data: UserEntity }> {
     const user = await this.usersRepository.findOneBy({ id });
     if (!user) throw new NotFoundException('User not found');
-    return user;
+    return { data: user };
   }
+
 
   async findUserByEmail(email: string) {
     return await this.usersRepository.findOneBy({ email });
@@ -351,7 +350,7 @@ export class UsersService {
 
   async remove(id: string) {
     const user = await this.findOne(id);
-    await this.usersRepository.remove(user);
+    await this.usersRepository.remove(user.data);
     return { message: `User #${id} removed.` };
   }
 }

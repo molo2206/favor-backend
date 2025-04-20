@@ -5,6 +5,8 @@ import { Product } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { CompanyEntity } from 'src/company/entities/company.entity';
 import { CategoryEntity } from 'src/category/entities/category.entity';
+import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
+import { ImageProductEntity } from './entities/imageProduct.entity';
 
 @Injectable()
 export class ProductService {
@@ -17,10 +19,15 @@ export class ProductService {
 
     @InjectRepository(CategoryEntity)
     private categoryRepo: Repository<CategoryEntity>,
+
+    @InjectRepository(ImageProductEntity)
+    private imageRepository: Repository<ImageProductEntity>,
+
+    private readonly cloudinary: CloudinaryService
   ) { }
 
   // Création d'un produit
-  async create(createProductDto: CreateProductDto, imagePath?: string): Promise<Product> {
+  async create(createProductDto: CreateProductDto, files: Express.Multer.File[]): Promise<Product> {
     const { companyId, categoryId, ...data } = createProductDto;
 
     // Recherche de l'entreprise
@@ -35,29 +42,44 @@ export class ProductService {
       category = foundCategory;
     }
 
-    // Création du produit avec l'image
+    let imageUrl: string | undefined = undefined;
+    if (files && files.length > 0) {
+      imageUrl = await this.cloudinary.handleUploadImage(files[0], 'product');
+    }
+
+    // Création du produit avec l'image principale
     const product = this.productRepo.create({
       ...data,
       company,
       category,
-      image: imagePath, // Si une image est téléchargée, son chemin est stocké
+      image: imageUrl,
     });
 
-    return this.productRepo.save(product);
-  }
+    await this.productRepo.save(product); // On sauvegarde ici avant d'associer les images secondaires
 
-  // Récupérer tous les produits
-  async findAll(): Promise<Product[]> {
-    return this.productRepo.find({
-      relations: ['company', 'category'], // Inclure les relations avec l'entreprise et la catégorie
-    });
-  }
+    if (files && files.length > 0) {
+      const newImages: ImageProductEntity[] = [];
 
+      for (const file of files) {
+        const uploaded = await this.cloudinary.handleUploadImage(file, 'product');
+
+        const imageEntity = new ImageProductEntity();
+        imageEntity.url = uploaded;
+        imageEntity.product = product;
+
+        newImages.push(imageEntity);
+      }
+
+      await this.imageRepository.save(newImages);
+      product.images = newImages;
+    }
+    return product;
+  }
   // Récupérer un produit par son ID
   async findOne(id: string): Promise<Product> {
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['company', 'category'], // Inclure les relations avec l'entreprise et la catégorie
+      relations: ['company', 'category', 'images'], // Inclure les relations avec l'entreprise et la catégorie
     });
 
     if (!product) {
@@ -67,22 +89,56 @@ export class ProductService {
     return product;
   }
 
-  async findByType(type: string): Promise<Product[]> {
-    const products = await this.productRepo.find({
-      where: { type },
-      relations: ['company', 'category'],
-    });
+  async findByType(type?: string): Promise<Product[]> {
+    const queryBuilder = this.productRepo.createQueryBuilder('product')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.images', 'images');
+
+    if (type) {
+      queryBuilder.where('product.type = :type', { type });
+    }
+
+    const products = await queryBuilder.getMany();
 
     if (products.length === 0) {
-      throw new NotFoundException(`Aucun produit trouvé pour le type : ${type}`);
+      throw new NotFoundException(`Aucun produit trouvé${type ? ` pour le type : ${type}` : ''}`);
     }
 
     return products;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async findByCompany(companyId: string): Promise<any> {
+    const company = await this.companyRepo.findOne({
+      where: { id: companyId },
+
+    });
+
+    if (!company) {
+      throw new NotFoundException(`Entreprise avec l'ID ${companyId} introuvable`);
+    }
+
+    const products = await this.productRepo.find({
+      where: { company: { id: companyId } },
+      relations: ['category', 'images'],
+    });
+
+    // Fusionner les champs de la company + products
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { products: _, ...companyData } = company; // exclude old `products` if exists
+    return {
+      ...companyData,
+      products,
+    };
+  }
+
+
+
+
   async groupByType(): Promise<Record<string, Product[]>> {
     const products = await this.productRepo.find({
-      relations: ['company', 'category'],
+      relations: ['company', 'category', 'images'],
     });
 
     const grouped = products.reduce((acc, product) => {
@@ -98,10 +154,41 @@ export class ProductService {
 
     return grouped;
   }
+  async findAllGroupedByCategory(categoryId?: string): Promise<{ data: (CategoryEntity & { products: Product[] })[] }> {
+    const whereCondition = categoryId ? { category: { id: categoryId } } : {};
+
+    const products = await this.productRepo.find({
+      where: whereCondition,
+      relations: ['company', 'category', 'images'],
+    });
+
+    if (products.length === 0) {
+      throw new NotFoundException('Aucun produit trouvé');
+    }
+
+    const grouped = new Map<string, CategoryEntity & { products: Product[] }>();
+
+    for (const product of products) {
+      const category = product.category || { name: 'Aucune catégorie' } as CategoryEntity;
+      const categoryKey = product.category?.id || 'no-category';
+
+      if (!grouped.has(categoryKey)) {
+        grouped.set(categoryKey, { ...category, products: [] });
+      }
+
+      grouped.get(categoryKey)!.products.push(product);
+    }
+
+    const result = Array.from(grouped.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+
+    return { data: result };
+  }
 
   async groupByType_First_Product(): Promise<Record<string, Product>> {
     const products = await this.productRepo.find({
-      relations: ['company', 'category'],
+      relations: ['company', 'category', 'images'],
       order: { createdAt: 'ASC' }, // pour s'assurer que le "premier" est bien le plus ancien
     });
 
@@ -116,38 +203,69 @@ export class ProductService {
     return grouped;
   }
 
-  // Méthode pour mettre à jour un produit
-  async update(id: string, createProductDto: CreateProductDto, imagePath?: string): Promise<Product> {
-    const { companyId, categoryId, ...data } = createProductDto;
+  async update(id: string, updateProductDto: CreateProductDto, files: Express.Multer.File[]): Promise<Product> {
+    const { companyId, categoryId, ...data } = updateProductDto;
 
-    const product = await this.productRepo.findOne({ where: { id } });
+    // Récupération du produit existant
+    const product = await this.productRepo.findOne({
+      where: { id },
+      relations: ['images'],
+    });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
-    // Recherche de l'entreprise
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
-    if (!company) throw new NotFoundException('Entreprise non trouvée');
+    // Mise à jour des champs de base
+    Object.assign(product, data);
 
-    // Recherche de la catégorie (si fournie)
-    let category: CategoryEntity | undefined = undefined;
-    if (categoryId) {
-      const foundCategory = await this.categoryRepo.findOne({ where: { id: categoryId } });
-      if (!foundCategory) throw new NotFoundException('Catégorie non trouvée');
-      category = foundCategory;
+    // Mise à jour de l'entreprise si changée
+    if (companyId) {
+      const company = await this.companyRepo.findOne({ where: { id: companyId } });
+      if (!company) throw new NotFoundException('Entreprise non trouvée');
+      product.company = company;
     }
 
-    // Mise à jour du produit
-    product.name = data.name || product.name;
-    product.description = data.description || product.description;
-    product.price = data.price || product.price;
-    product.type = data.type || product.type;
-    product.durationInMinutes = data.durationInMinutes || product.durationInMinutes;
-    product.carModel = data.carModel || product.carModel;
-    product.licensePlate = data.licensePlate || product.licensePlate;
-    product.ingredients = data.ingredients || product.ingredients;
-    product.stockQuantity = data.stockQuantity || product.stockQuantity;
-    product.company = company;
-    product.category = category;
-    product.image = imagePath || product.image;  // Met à jour l'image si une nouvelle est fournie
+    // Mise à jour de la catégorie si fournie
+    if (categoryId) {
+      const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
+      if (!category) throw new NotFoundException('Catégorie non trouvée');
+      product.category = category;
+    }
+
+    if (files && files.length > 0) {
+      // 🔥 Supprimer l'image principale précédente (si elle existe)
+      if (product.image) {
+        await this.cloudinary.handleDeleteImage(product.image);
+      }
+
+      // 🔥 Supprimer toutes les anciennes images secondaires de Cloudinary
+      if (product.images && product.images.length > 0) {
+        for (const img of product.images) {
+          await this.cloudinary.handleDeleteImage(img.url);
+        }
+      }
+
+      // 🔥 Supprimer les entrées en base liées aux anciennes images
+      await this.imageRepository.delete({ product: { id: product.id } });
+
+      // 🖼️ Upload de la nouvelle image principale
+      const uploadedMainImage = await this.cloudinary.handleUploadImage(files[0], 'product');
+      product.image = uploadedMainImage;
+
+      // 🖼️ Upload des nouvelles images secondaires (le reste)
+      const newImages: ImageProductEntity[] = [];
+
+      for (const file of files.slice(1)) {
+        const uploaded = await this.cloudinary.handleUploadImage(file, 'product');
+
+        const imageEntity = new ImageProductEntity();
+        imageEntity.url = uploaded;
+        imageEntity.product = product;
+
+        newImages.push(imageEntity);
+      }
+
+      await this.imageRepository.save(newImages);
+      product.images = newImages;
+    }
 
     return this.productRepo.save(product);
   }

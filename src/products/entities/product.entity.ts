@@ -6,9 +6,12 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     JoinColumn,
+    OneToMany,
 } from 'typeorm';
 import { CompanyEntity } from 'src/company/entities/company.entity';
 import { CategoryEntity } from 'src/category/entities/category.entity';
+import { ImageProductEntity } from './imageProduct.entity';
+import { Type } from 'class-transformer';
 
 @Entity('products')
 export class Product {
@@ -63,4 +66,8 @@ export class Product {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @OneToMany(() => ImageProductEntity, (image) => image.product, { cascade: true })
+    @Type(() => ImageProductEntity) // pour que la sérialisation fonctionne proprement
+    images: ImageProductEntity[];
 }

@@ -1,10 +1,7 @@
 import { Controller, Post, Body, UseGuards, UseInterceptors, UploadedFile, Param, UsePipes, ValidationPipe, Put, Patch, Get } from '@nestjs/common';
 import { CompanyService } from './company.service';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
-import { extname } from 'path';
-import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { CreateCompanyDto } from './dto/create-company.dto';
@@ -24,74 +21,50 @@ export class CompanyController {
   @UseGuards(AuthentificationGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   @UseInterceptors(
-    FileInterceptor('logo', {
-      storage: diskStorage({
-        destination: './uploads/company/logos',
-        filename: (req, file, cb) => {
-          const uniqueName = `${Date.now()}${extname(file.originalname)}`;
-          cb(null, uniqueName);
-        },
-      }),
-    }),
+    FileInterceptor('logo'),
   )
   async createOrUpdateCompany(
     @UploadedFile() logo: Express.Multer.File,
     @Body() dto: CreateCompanyDto,
     @CurrentUser() currentUser: UserEntity,
   ) {
-    const logoPath = logo?.path ?? null;
-    return this.companyService.createOrUpdateCompanyWithUser(dto, currentUser, logoPath);
+    // Appel à la méthode de service pour créer ou mettre à jour l'entreprise
+    return this.companyService.createOrUpdateCompanyWithUser(dto, currentUser, logo);
   }
 
   @Put(':id')
   @UseGuards(AuthentificationGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(
-    FileInterceptor('logo', {
-      storage: diskStorage({
-        destination: './uploads/company/logos',
-        filename: (req, file, cb) => {
-          const uniqueName = `${Date.now()}${extname(file.originalname)}`;
-          cb(null, uniqueName);
-        },
-      }),
-    }),
-  )
+  @UseInterceptors(FileInterceptor('logo'))  // Intercepteur pour le fichier logo
   async updateCompany(
-    @Param('id') id: string,
-    @Body() dto: UpdateCompanyDto,
-    @CurrentUser() currentUser: UserEntity,
-    @UploadedFile() file?: Express.Multer.File,
+    @Param('companyId') companyId: string,  // ID de l'entreprise à mettre à jour
+    @Body() dto: Partial<CreateCompanyDto>,  // DTO partiel pour la mise à jour
+    @UploadedFile() logoFile: Express.Multer.File,  // Le logo peut être fourni en option
+    @CurrentUser() currentUser: UserEntity,  // Utilisateur actuel pour l'association
   ) {
-    let logoPath: string | undefined = undefined;
-    if (file) {
-      logoPath = `/uploads/company/logos/${file.filename}`;
-    }
-
-    return this.companyService.updateCompanyWithUser(dto, id, currentUser.id, logoPath);
+    // Appel du service pour mettre à jour l'entreprise avec l'utilisateur et le logo
+    return this.companyService.updateCompanyWithUser(dto, companyId, currentUser.id, logoFile);
   }
 
   @Patch(':id/toggle-status')
   @UseGuards(AuthentificationGuard, AuthorizeGuard)
   @AuthorizeRoles(UserRole.ADMIN)
-  async toggleStatus(@Param('id') id: string): Promise<CompanyEntity> {
+  async toggleStatus(@Param('id') id: string): Promise<{ data: CompanyEntity }> {
     return this.companyService.toggleCompanyStatus(id);
   }
-
 
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(UserRole.ADMIN)
   @Patch(':id/toggle-status')
-  async toggleCompanyStatus(@Param('id') id: string): Promise<CompanyEntity> {
+  async toggleCompanyStatus(@Param('id') id: string): Promise<{ data: CompanyEntity }> {
     return this.companyService.toggleCompanyStatus(id);
   }
 
-  // ❌ PATCH /companies/:id/reject
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(UserRole.ADMIN)
   @Patch(':id/reject')
-  async rejectCompany(@Param('id') id: string): Promise<CompanyEntity> {
-    return this.companyService.rejectCompany(id);
+  async rejectCompany(@Param('id') id: string): Promise<{ data: CompanyEntity }> {
+    return this.companyService.rejectCompany(id);  // Retourner { data: rejectedCompany }
   }
 
   @Post('assign')
@@ -99,20 +72,26 @@ export class CompanyController {
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   async linkUserToCompany(
     @Body() dto: CreateUserHasCompanyDto,
-  ): Promise<UserHasCompanyEntity> {
+  ): Promise<{ data: UserHasCompanyEntity }> {  // Type attendu { data: UserHasCompanyEntity }
     return await this.companyService.CreateUserToCompany(dto);
+  }
+
+  @Get('type/:typeId')
+  async getCompaniesByType(
+    @Param('typeId') typeId: string,
+  ): Promise<{ data: CompanyEntity[] }> {
+    return this.companyService.findByCompany(typeId);
   }
 
   @Get()
   @UseGuards(AuthentificationGuard)
-  async getAllCompanies(): Promise<CompanyEntity[]> {
+  async getAllCompanies(): Promise<{ data: CompanyEntity[] }> {
     return this.companyService.getAllCompanies();
   }
 
-  // ✅ GET /companies/:id
   @Get(':id')
   @UseGuards(AuthentificationGuard)
-  async getCompanyById(@Param('id') id: string): Promise<CompanyEntity> {
+  async getCompanyById(@Param('id') id: string): Promise<{ data: CompanyEntity }> {
     return this.companyService.getCompanyById(id);
   }
 }

@@ -10,6 +10,7 @@ import { RoleUser } from 'src/role_user/entities/role_user.entity';
 import { CreateUserHasCompanyDto } from 'src/user_has_company/dto/create-user_has_company.dto';
 import { instanceToPlain } from 'class-transformer';
 import { TypeCompany } from 'src/type_company/entities/type_company.entity';
+import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
 
 @Injectable()
 export class CompanyService {
@@ -28,15 +29,16 @@ export class CompanyService {
 
     @InjectRepository(TypeCompany) // Ajout de l'injection du repository TypeCompany
     private readonly typeCompanyRepository: Repository<TypeCompany>, // Définition de la propriété
+
+    private readonly cloudinary: CloudinaryService
   ) { }
 
   // services/company.service.ts
   async createOrUpdateCompanyWithUser(
     dto: CreateCompanyDto,
     user: UserEntity,
-    logoPath?: string,
-  ): Promise<CompanyEntity> {
-    // 1. Vérification des données d'entrée
+    logoFile?: Express.Multer.File,
+  ): Promise<{ data: CompanyEntity }> {
     if (!dto || Object.keys(dto).length === 0) {
       throw new BadRequestException('Les données de l’entreprise sont requises');
     }
@@ -45,7 +47,6 @@ export class CompanyService {
       throw new BadRequestException('Le nom de l’entreprise est obligatoire');
     }
 
-    // 2. Chercher le type d'entreprise si fourni
     let typeCompanyEntity: TypeCompany | null = null;
     if (dto.typeCompany) {
       typeCompanyEntity = await this.typeCompanyRepository.findOne({
@@ -57,90 +58,77 @@ export class CompanyService {
       }
     }
 
-    // 3. Vérifier si l'entreprise existe déjà
+    let logoUrl: string | null = null;
+    if (logoFile) {
+      logoUrl = await this.cloudinary.handleUploadImage(logoFile, 'company');
+    }
+
     let company = await this.companyRepository.findOne({
       where: { companyName: dto.companyName },
     });
 
-    // 4. Si l'entreprise existe, mettre à jour, sinon créer une nouvelle entreprise
     if (company) {
-      // Mise à jour des champs de l'entreprise
       Object.assign(company, {
         companyAddress: dto.companyAddress ?? company.companyAddress,
         vatNumber: dto.vatNumber ?? company.vatNumber,
         registrationDocumentUrl: dto.registrationDocumentUrl ?? company.registrationDocumentUrl,
         warehouseLocation: dto.warehouseLocation ?? company.warehouseLocation,
-        logo: logoPath ?? company.logo,
+        logo: logoUrl ?? company.logo,
         typeCompany: typeCompanyEntity ?? company.typeCompany,
       });
     } else {
-      // Création d'une nouvelle entreprise
       const companyData: Partial<CompanyEntity> = {
         companyName: dto.companyName,
         companyAddress: dto.companyAddress,
         vatNumber: dto.vatNumber,
         registrationDocumentUrl: dto.registrationDocumentUrl,
         warehouseLocation: dto.warehouseLocation,
-        logo: logoPath ?? null,
+        logo: logoUrl,
         typeCompany: typeCompanyEntity,
       };
 
       company = this.companyRepository.create(companyData);
     }
 
-    // Sauvegarder l'entreprise
     const savedCompany = await this.companyRepository.save(company);
 
-    // 5. Vérifier l'association user ↔ entreprise
     let userHasCompany = await this.userHasCompanyRepository.findOne({
       where: { user: { id: user.id } },
       relations: ['user', 'company'],
     });
 
     if (!userHasCompany) {
-      // Si l'association n'existe pas, créer une nouvelle association
       userHasCompany = this.userHasCompanyRepository.create({
         user,
         company: savedCompany,
-        isOwner: true, // L'utilisateur est propriétaire
+        isOwner: true,
       });
     } else {
-      // Si l'association existe, l'actualiser
       userHasCompany.company = savedCompany;
     }
 
-    // Sauvegarder l'association user ↔ entreprise
     await this.userHasCompanyRepository.save(userHasCompany);
 
-    // 6. Retourner l'entreprise mise à jour ou créée
-    return savedCompany;
+    return { data: savedCompany };
   }
 
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async CreateUserToCompany(dto: CreateUserHasCompanyDto): Promise<any> {
-    // Recherche de l'utilisateur
+  async CreateUserToCompany(dto: CreateUserHasCompanyDto): Promise<{ data: any }> {  // Retourne 'data' dans l'objet
     const user = await this.userRepository.findOneOrFail({ where: { id: dto.userId } });
-
-    // Recherche de l'entreprise
     const company = await this.companyRepository.findOneOrFail({ where: { id: dto.companyId } });
-
-    // Recherche du rôle
     const role = await this.roleRepository.findOneOrFail({ where: { id: dto.roleId } });
 
-    // Vérification si l'association existe déjà
     let userHasCompany = await this.userHasCompanyRepository.findOne({
       where: { user: { id: dto.userId }, company: { id: dto.companyId } },
       relations: ['user', 'company', 'role'],
     });
 
     if (userHasCompany) {
-      // Mise à jour de l'association existante
       userHasCompany.company = company;
       userHasCompany.role = role;
       userHasCompany.isOwner = dto.isOwner ?? userHasCompany.isOwner;
     } else {
-      // Création de la nouvelle association si elle n'existe pas
       userHasCompany = this.userHasCompanyRepository.create({
         user,
         company,
@@ -149,39 +137,33 @@ export class CompanyService {
       });
     }
 
-    // Sauvegarde de l'association
     const saved = await this.userHasCompanyRepository.save(userHasCompany);
 
-    // Retour de la réponse en excluant le mot de passe de l'utilisateur
     const result = instanceToPlain(saved);
     delete result.user?.password;
 
-    return result;
+    return { data: result };  // Encapsule la réponse dans un objet 'data'
   }
 
   async updateCompanyWithUser(
     dto: Partial<CreateCompanyDto>,
     companyId: string,
     userId: string,
-    logoPath?: string,
-  ): Promise<CompanyEntity> {
-    // 1. Vérification de base : le DTO ne doit pas être vide
+    logoFile?: Express.Multer.File, // Modification pour prendre un fichier logo
+  ): Promise<{ data: CompanyEntity }> {  // Retourne un objet avec la clé 'data'
     if (!dto || Object.keys(dto).length === 0) {
       throw new BadRequestException("Les données de l'entreprise ne peuvent pas être vides");
     }
 
-    // 2. Récupérer l'entreprise existante
     const company = await this.companyRepository.findOne({ where: { id: companyId } });
     if (!company) {
       throw new NotFoundException(`Entreprise avec l'ID ${companyId} introuvable`);
     }
 
-    // 3. Validation : Si un nom est fourni, il ne doit pas être une chaîne vide
     if (dto.companyName !== undefined && dto.companyName.trim() === '') {
       throw new BadRequestException("Le nom de l'entreprise est requis");
     }
 
-    // 4. Mise à jour dynamique des champs de l'entreprise
     const fieldsToUpdate: (keyof CreateCompanyDto)[] = [
       'companyName',
       'companyAddress',
@@ -196,14 +178,16 @@ export class CompanyService {
       }
     }
 
-    // 5. Gestion du logo : utiliser le logo uploadé en priorité sinon celui fourni dans le DTO
-    if (logoPath) {
-      company.logo = logoPath;
+    // Si un nouveau logo est téléchargé, on utilise Cloudinary
+    let logoUrl: string | null = null;
+    if (logoFile) {
+      logoUrl = await this.cloudinary.handleUploadImage(logoFile, 'company');
+      company.logo = logoUrl;
     } else if (dto.logo !== undefined) {
       company.logo = dto.logo;
     }
 
-    // 6. Si typeCompany est présent, on récupère et on assigne l'entité
+    // Si un type d'entreprise est fourni, on le met à jour
     if (dto.typeCompany) {
       const typeCompanyEntity = await this.typeCompanyRepository.findOne({
         where: { id: dto.typeCompany },
@@ -216,10 +200,10 @@ export class CompanyService {
       company.typeCompany = typeCompanyEntity;
     }
 
-    // 7. Sauvegarde de l'entreprise mise à jour
+    // Sauvegarde de l'entreprise mise à jour
     const updatedCompany = await this.companyRepository.save(company);
 
-    // 8. Vérifier si l'association user ↔ company existe déjà
+    // Recherche et création de l'association utilisateur-entreprise
     let userHasCompany = await this.userHasCompanyRepository.findOne({
       where: {
         user: { id: userId },
@@ -227,7 +211,6 @@ export class CompanyService {
       },
     });
 
-    // 9. Création de l'association si elle n'existe pas
     if (!userHasCompany) {
       const user = await this.userRepository.findOneByOrFail({ id: userId });
 
@@ -239,28 +222,27 @@ export class CompanyService {
       await this.userHasCompanyRepository.save(userHasCompany);
     }
 
-    // 10. Retour de l'entreprise mise à jour
-    return updatedCompany;
+    return { data: updatedCompany };  // Retourne l'entreprise mise à jour dans 'data'
   }
 
 
-
-  async toggleCompanyStatus(id: string): Promise<CompanyEntity> {
+  async toggleCompanyStatus(id: string): Promise<{ data: CompanyEntity }> {
     const company = await this.companyRepository.findOne({ where: { id } });
 
     if (!company) {
       throw new NotFoundException('Entreprise non trouvée.');
     }
-    // Toggle logique : si en attente → validée, sinon → en attente
+
     company.status =
       company.status === CompanyStatus.PENDING
         ? CompanyStatus.VALIDATED
         : CompanyStatus.PENDING;
 
-    return await this.companyRepository.save(company);
+    const updatedCompany = await this.companyRepository.save(company);
+    return { data: updatedCompany };
   }
 
-  async rejectCompany(id: string): Promise<CompanyEntity> {
+  async rejectCompany(id: string): Promise<{ data: CompanyEntity }> {
     const company = await this.companyRepository.findOne({ where: { id } });
 
     if (!company) {
@@ -269,24 +251,38 @@ export class CompanyService {
 
     company.status = CompanyStatus.REJECTED;
 
-    return await this.companyRepository.save(company);
+    const rejectedCompany = await this.companyRepository.save(company);
+    return { data: rejectedCompany };  // Structure correcte avec 'data'
   }
 
-  async getAllCompanies(): Promise<CompanyEntity[]> {
-    return this.companyRepository.find({
+
+
+  async getAllCompanies(): Promise<{ data: CompanyEntity[] }> {
+    const companies = await this.companyRepository.find({
       relations: [
         'typeCompany',
+        'userHasCompanies',
+        'userHasCompanies.user',
+        'userHasCompanies.role',
+        'userHasCompanies.permissions',
+        'userHasCompanies.permissions.permission',
       ],
-      order: { companyName: 'ASC' }, // Optionnel : tri par nom
+      order: { companyName: 'ASC' },
     });
+
+    return { data: companies };
   }
 
-  // ✅ Récupérer une entreprise avec toutes ses relations
-  async getCompanyById(id: string): Promise<CompanyEntity> {
+  async getCompanyById(id: string): Promise<{ data: CompanyEntity }> {
     const company = await this.companyRepository.findOne({
       where: { id },
       relations: [
         'typeCompany',
+        'userHasCompanies',
+        'userHasCompanies.user',
+        'userHasCompanies.role',
+        'userHasCompanies.permissions',
+        'userHasCompanies.permissions.permission',
       ],
     });
 
@@ -294,6 +290,38 @@ export class CompanyService {
       throw new NotFoundException(`Entreprise avec l'ID ${id} introuvable`);
     }
 
-    return company;
+    return { data: company };
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async findByCompany(companyId: string): Promise<{ data: any }> {
+    // Récupère la compagnie avec ses relations nécessaires
+    const company = await this.companyRepository.findOne({
+      where: { id: companyId },
+      relations: ['typeCompany'], // ou d'autres relations utiles
+    });
+
+    if (!company) {
+      throw new NotFoundException(`Entreprise avec l'ID ${companyId} introuvable`);
+    }
+
+    // Récupère les produits liés à la compagnie
+    const products = await this.companyRepository.find({
+      where: {
+        company: {
+          id: companyId,
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any, // <- permet à TypeScript de comprendre que tu cibles une relation
+      relations: ['category', 'images'],
+    });
+    // Retourne tous les champs de la compagnie + les produits
+    return {
+      data: {
+        ...company, // toutes les propriétés de l'objet company à plat
+        products,   // les produits dans un tableau
+      },
+    };
+  }
+
 }

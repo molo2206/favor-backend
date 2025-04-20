@@ -10,6 +10,7 @@ import { UserHasCompanyModule } from 'src/user_has_company/user_has_company.modu
 import { RoleUser } from 'src/role_user/entities/role_user.entity';
 import { TypeCompanyModule } from 'src/type_company/type_company.module';
 import { TypeCompany } from 'src/type_company/entities/type_company.entity';
+import { CloudinaryModule } from 'src/users/utility/helpers/cloudinary.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { TypeCompany } from 'src/type_company/entities/type_company.entity';
       RoleUser,
       TypeCompany
     ]),
+    CloudinaryModule, 
     UserHasCompanyModule, // 👈 ne surtout pas oublier
     TypeCompanyModule,
   ],

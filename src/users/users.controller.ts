@@ -50,9 +50,10 @@ export class UsersController {
 
   @Post('signin')
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  async signin(@Body() loginUserDto: LoginUserDto): Promise<{ user: Omit<UserEntity, 'password'> }> {
+  async signin(@Body() loginUserDto: LoginUserDto): Promise<{ data: string }> {
     return await this.usersService.signin(loginUserDto);
   }
+
 
   // ────── 🔐 Authentification à deux facteurs ──────
 
@@ -103,7 +104,7 @@ export class UsersController {
 
     return { message: '2FA activé avec succès.' };
   }
-  
+
   // ────── 🧑‍💻 Mise à jour de profil et image ──────
 
   @UseGuards(AuthentificationGuard)
@@ -149,13 +150,13 @@ export class UsersController {
 
   @UseGuards(AuthentificationGuard)
   @Get('me')
-  async getProfile(@CurrentUser() currentUser: UserEntity) {
+  async getProfile(@CurrentUser() currentUser: UserEntity): Promise<{ data: UserEntity }> {
     if (!currentUser) {
       throw new UnauthorizedException('Utilisateur non connecté.');
     }
-    return classToPlain(currentUser);
+    return { data: currentUser };
   }
-
+  
   // ────── 🔄 Mot de passe oublié / réinitialisation ──────
 
   @Post('forgot-password')
@@ -192,10 +193,11 @@ export class UsersController {
     return await this.usersService.findAll();
   }
 
-  @Get('single/:id')
-  async findOne(@Param('id') id: string): Promise<UserEntity> {
-    return await this.usersService.findOne(id);
+  @Get(':id')
+  async findOne(@Param('id') id: string): Promise<{ data: UserEntity }> {
+    return this.usersService.findOne(id);
   }
+
 
   @Delete(':id')
   async remove(@Param('id') id: string) {

@@ -51,9 +51,9 @@ export class CurrentUserMiddleware implements NestMiddleware {
       const role = Array.isArray(payload.role) ? payload.role[0] : payload.role;
 
       req.currentUser = {
-        id: user.id,
-        email: user.email,
-        name: user.fullName,
+        id: user.data.id,
+        email: user.data.email,
+        name: user.data.fullName,
         role
       };
     } catch (err) {
