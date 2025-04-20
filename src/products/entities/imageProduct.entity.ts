@@ -1,5 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';;
-import { Exclude } from 'class-transformer';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Product } from './product.entity';
 
 @Entity()
@@ -10,7 +9,8 @@ export class ImageProductEntity {
     @Column()
     url: string; // Stocke le chemin ou l'URL de l'image
 
-    @ManyToOne(() => Product, (product) => product.images, { onDelete: 'CASCADE' })
-    @Exclude() // Empêche la boucle infinie
+    @ManyToOne(() => Product)
+    @JoinColumn({ name: 'productId' })
     product: Product;
+    
 }
