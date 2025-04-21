@@ -24,7 +24,7 @@ export class UserEntity {
     @Column()
     phone: string;
 
-    @Column()
+    @Column({ nullable: true })
     image: string;
 
     @Column({ type: 'enum', enum: UserRole })
