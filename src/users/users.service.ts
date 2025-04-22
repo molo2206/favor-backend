@@ -121,12 +121,12 @@ export class UsersService {
       .getOne();
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials.');
+     throw new UnauthorizedException("Adresse e-mail ou mot de passe incorrect.");
     }
 
     const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials.');
+      throw new UnauthorizedException("Adresse e-mail ou mot de passe incorrect.");
     }
 
     const token = await this.accessToken(user);
@@ -220,12 +220,12 @@ export class UsersService {
 
     await this.otpRepository.save(otp);
 
-    // await this.mailerService.sendMail({
-    //   to: email,
-    //   subject: 'Votre code de vérification',
-    //   text: `Votre code OTP est : ${otpCode}. Il est valide pour 10 minutes.`,
-    // });
-    await this.mailService.sendWelcomeEmail(email, 'Votre code de vérification', { name: 'Jean' });
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Votre code de vérification',
+      text: `Votre code OTP est : ${otpCode}. Il est valide pour 10 minutes.`,
+    });
+    // await this.mailService.sendWelcomeEmail(email, 'Votre code de vérification', { name: 'Jean' });
 
 
     return { message: 'OTP envoyé avec succès.', otpCode };
@@ -246,12 +246,12 @@ export class UsersService {
 
     await this.otpRepository.save(otp);
 
-    // await this.mailerService.sendMail({
-    //   to: email,
-    //   subject: 'Réinitialisation de mot de passe',
-    //   text: `Votre code de réinitialisation est : ${otpCode}. Il est valide pendant 10 minutes.`,
-    // });
-    await this.mailService.sendWelcomeEmail(email, 'Votre code de vérification', { name: 'Jean' });
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Réinitialisation de mot de passe',
+      text: `Votre code de réinitialisation est : ${otpCode}. Il est valide pendant 10 minutes.`,
+    });
+    // await this.mailService.sendWelcomeEmail(email, 'Votre code de vérification', { name: 'Jean' });
     return { message: 'OTP envoyé avec succès.' };
   }
 

@@ -13,21 +13,24 @@ export class MailService {
         private readonly configService: ConfigService,
     ) {
         this.transporter = nodemailer.createTransport({
-            service: this.configService.get<string>('MAILER_HOST'), // ou 'smtp.mailtrap.io', etc.
+            host: this.configService.get<string>('MAILER_HOST'),
+            port: this.configService.get<number>('MAILER_PORT'),
+            secure: false,
             auth: {
                 user: this.configService.get<string>('MAILER_USER'),
                 pass: this.configService.get<string>('MAILER_PASS'),
             },
         });
 
+
         this.transporter.use(
             'compile',
             hbs({
                 viewEngine: {
-                    partialsDir: join(__dirname, 'templates'),
+                    partialsDir: join(process.cwd(), 'src', 'MailService', 'templates'),
                     defaultLayout: false,
                 },
-                viewPath: join(__dirname, 'templates'),
+                viewPath: join(process.cwd(), 'src', 'MailService', 'templates'),
                 extName: '.hbs',
             }),
         );

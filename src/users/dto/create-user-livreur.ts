@@ -3,23 +3,23 @@ import { VehicleType } from '../utility/common/user-vehiculetype.enum';
 
 
 export class CreateLivreurDto {
-    @IsNotEmpty({ message: 'Full name cannot be null' })
-    @IsString({ message: 'Full name must be a string' })
+    @IsNotEmpty({ message: 'Le nom complet ne peut pas être vide.' })
+    @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
     fullName: string;
 
-    @IsNotEmpty({ message: 'Email cannot be null' })
-    @IsEmail({}, { message: 'Email must be a valid email address' })
+    @IsNotEmpty({ message: 'L’adresse e-mail ne peut pas être vide.' })
+    @IsEmail({}, { message: 'L’adresse e-mail doit être valide.' })
     email: string;
 
-    @IsNotEmpty({ message: 'Password cannot be null' })
-    @MinLength(8, { message: 'Password must be at least 8 characters long' })
+    @IsNotEmpty({ message: 'Le mot de passe ne peut pas être vide.' })
+    @MinLength(8, { message: 'Le mot de passe doit contenir au moins 8 caractères.' })
     @Matches(/(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])/, {
         message: 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.',
     })
     password: string;
 
-    @IsNotEmpty({ message: 'Phone cannot be null' })
-    @IsString({ message: 'Phone must be a string' })
+    @IsNotEmpty({ message: 'Le numéro de téléphone ne peut pas être vide.' })
+    @IsString({ message: 'Le numéro de téléphone doit être une chaîne de caractères.' })
     phone: string;
 
     @IsEnum(VehicleType) vehicleType: VehicleType;
