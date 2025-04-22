@@ -209,7 +209,7 @@ export class UsersService {
 
     // Si un fichier est uploadé
     if (file) {
-      const imageUrl = await this.cloudinary.handleUploadImage(file, 'category');
+      const imageUrl = await this.cloudinary.handleUploadImage(file, 'user');
       user.image = imageUrl;
     }
     const updatedUser = await this.usersRepository.save(user);
