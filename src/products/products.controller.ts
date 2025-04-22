@@ -76,14 +76,16 @@ export class ProductController {
   @Get('company/:companyId')
   async getProductsByCompany(
     @Param('companyId') companyId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ data: any }> {
     const result = await this.productService.findByCompany(companyId);
     return { data: result };
   }
 
-
-
+  @Get('search')
+  async search(@Query('search') search: string) {
+    return this.productService.searchProducts(search);
+  }
 
   // Supprimer un produit
   @Delete(':id')

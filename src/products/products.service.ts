@@ -270,6 +270,24 @@ export class ProductService {
     return this.productRepo.save(product);
   }
 
+  async searchProducts(search: string) {
+    const qb = this.productRepo.createQueryBuilder('product')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.images', 'images');
+
+    if (search) {
+      qb.where('product.name LIKE :search', { search: `%${search}%` })
+        .orWhere('product.type LIKE :search', { search: `%${search}%` })
+        .orWhere('category.name LIKE :search', { search: `%${search}%` })
+        .orWhere('company.companyName LIKE :search', { search: `%${search}%` });
+    }
+
+    const results = await qb.getMany();
+
+    return results;
+  }
+
   // Supprimer un produit
   async remove(id: string): Promise<void> {
     const product = await this.findOne(id);
