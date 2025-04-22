@@ -22,6 +22,7 @@ import { UpdateUserDto } from './dto/update-profile';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtService } from '@nestjs/jwt';
 import { UserRole } from './utility/common/user-role-enum';
+import { MailService } from 'src/MailService/mailService';
 
 @Injectable()
 export class UsersService {
@@ -34,6 +35,7 @@ export class UsersService {
 
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) { }
 
   async signup(createUserDto: CreateUserDto): Promise<any> {
@@ -106,7 +108,7 @@ export class UsersService {
     return { message: 'Mot de passe mis à jour avec succès' };
   }
 
-  async signin(userSignInDto: LoginUserDto): Promise<{ data: any }> {
+  async signin(userSignInDto: LoginUserDto): Promise<{ data: any; access_token: string }> {
     const user = await this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
@@ -118,13 +120,51 @@ export class UsersService {
       .where('users.email = :email', { email: userSignInDto.email })
       .getOne();
 
-    if (!user) throw new UnauthorizedException('Invalid credentials.');
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials.');
+    }
 
     const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
-    if (!isPasswordValid) throw new UnauthorizedException('Invalid credentials.');
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials.');
+    }
 
     const token = await this.accessToken(user);
     const { password, ...userWithoutPassword } = user;
+
+    const userHasCompany = userWithoutPassword.userHasCompanies?.map((uhc) => ({
+      id: uhc.id,
+      isOwner: uhc.isOwner,
+      company: uhc.company
+        ? {
+          id: uhc.company.id,
+          name: uhc.company.companyName || '',
+          logo: uhc.company.logo,
+          adresse: uhc.company.companyAddress || '',
+          typeCompany: uhc.company.typeCompany
+            ? {
+              id: uhc.company.typeCompany.id,
+              name: uhc.company.typeCompany.name,
+            }
+            : null,
+        }
+        : null,
+      permissions: uhc.permissions?.map((p) => ({
+        id: p.permission?.id,
+        name: p.permission?.name,
+        create: p.create,
+        read: p.read,
+        update: p.update,
+        delete: p.delete,
+        status: p.status,
+        createdAt: p.permission?.createdAt instanceof Date
+          ? p.permission.createdAt
+          : new Date(p.permission?.createdAt),
+        updatedAt: p.permission?.updatedAt instanceof Date
+          ? p.permission.updatedAt
+          : new Date(p.permission?.updatedAt),
+      })) ?? [],
+    })) ?? [];
 
     return {
       data: {
@@ -134,47 +174,11 @@ export class UsersService {
         phone: userWithoutPassword.phone,
         image: userWithoutPassword.image,
         role: userWithoutPassword.role,
-        userHasCompany: userWithoutPassword.userHasCompanies?.map((uhc) => ({
-          id: uhc.id,
-          isOwner: uhc.isOwner,
-          company: uhc.company
-            ? {
-              id: uhc.company.id,
-              name: uhc.company.companyName || '',
-              logo: uhc.company.logo,
-              adresse: uhc.company.companyAddress || '',
-              typeCompany: uhc.company.typeCompany
-                ? {
-                  id: uhc.company.typeCompany.id,
-                  name: uhc.company.typeCompany.name,
-                }
-                : null,
-            }
-            : null,
-          permissions: uhc.permissions?.map((p) => ({
-            id: p.permission?.id,
-            name: p.permission?.name,
-            create: p.create,
-            read: p.read,
-            update: p.update,
-            delete: p.delete,
-            status: p.status,
-            createdAt:
-              p.permission?.createdAt instanceof Date
-                ? p.permission.createdAt
-                : new Date(p.permission.createdAt),
-            updatedAt:
-              p.permission?.updatedAt instanceof Date
-                ? p.permission.updatedAt
-                : new Date(p.permission.updatedAt),
-          })) ?? [],
-        })) ?? [],
-        access_token: token,
+        userHasCompany,
       },
+      access_token: token,
     };
   }
-
-
 
   async updateProfileImage(userId: string, dto: UpdateUserImageDto) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
@@ -216,11 +220,13 @@ export class UsersService {
 
     await this.otpRepository.save(otp);
 
-    await this.mailerService.sendMail({
-      to: email,
-      subject: 'Votre code de vérification',
-      text: `Votre code OTP est : ${otpCode}. Il est valide pour 10 minutes.`,
-    });
+    // await this.mailerService.sendMail({
+    //   to: email,
+    //   subject: 'Votre code de vérification',
+    //   text: `Votre code OTP est : ${otpCode}. Il est valide pour 10 minutes.`,
+    // });
+    await this.mailService.sendWelcomeEmail(email, 'Votre code de vérification', { name: 'Jean' });
+
 
     return { message: 'OTP envoyé avec succès.', otpCode };
   }
@@ -240,12 +246,12 @@ export class UsersService {
 
     await this.otpRepository.save(otp);
 
-    await this.mailerService.sendMail({
-      to: email,
-      subject: 'Réinitialisation de mot de passe',
-      text: `Votre code de réinitialisation est : ${otpCode}. Il est valide pendant 10 minutes.`,
-    });
-
+    // await this.mailerService.sendMail({
+    //   to: email,
+    //   subject: 'Réinitialisation de mot de passe',
+    //   text: `Votre code de réinitialisation est : ${otpCode}. Il est valide pendant 10 minutes.`,
+    // });
+    await this.mailService.sendWelcomeEmail(email, 'Votre code de vérification', { name: 'Jean' });
     return { message: 'OTP envoyé avec succès.' };
   }
 

@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
-import * as hbs from 'nodemailer-express-handlebars';
+import hbs from 'nodemailer-express-handlebars';
+
 import { join } from 'path';
 
 @Injectable()
@@ -32,12 +33,12 @@ export class MailService {
         );
     }
 
-    async sendWelcomeEmail(to: string, context: { name: string }) {
+    async sendWelcomeEmail(to: string, subject: string, context: { name: string }) {
         await this.transporter.sendMail({
             from: this.configService.get<string>('ACCESS_TOKEN_SECRET_KEY'),
             to,
-            subject: 'Bienvenue sur notre application !',
-            template: 'welcome', // correspond à welcome.hbs
+            subject: subject,
+            template: 'createcount', // correspond à welcome.hbs
             context, // les variables à injecter dans le template
         });
     }

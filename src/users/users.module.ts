@@ -7,6 +7,7 @@ import { UserEntity } from './entities/user.entity';
 import { OtpEntity } from 'src/otp/entities/otp.entity';
 import { JwtModule } from '@nestjs/jwt'; // 👈 à ajouter
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MailService } from 'src/MailService/mailService';
 @Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity, OtpEntity]),
@@ -47,7 +48,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     }),
   ],
   controllers: [UsersController],
-  providers: [UsersService],
+  providers: [UsersService, MailService],
   exports: [UsersService],
 })
 export class UsersModule { }
