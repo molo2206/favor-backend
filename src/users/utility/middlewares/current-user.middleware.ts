@@ -6,6 +6,7 @@ import { verify } from 'jsonwebtoken';
 import { UsersService } from 'src/users/users.service';
 import { JwtPayload } from 'src/users/interfaces/jwt-payload.interface';
 import { ConfigService } from '@nestjs/config';
+import { VehicleType } from '../common/user-vehiculetype.enum';
 
 declare global {
   namespace Express {
@@ -15,8 +16,19 @@ declare global {
         email: string;
         name?: string;
         role: string;
+        image: string;
+        isActive: boolean;
+        country?: string;
+        city?: string;
+        address?: string;
+        preferredLanguage?: string;
+        loyaltyPoints?: number;
+        dateOfBirth?: Date;
+        vehicleType?: string;
+        plateNumber?: string;
       } | null;
     }
+    
   }
 }
 
@@ -54,6 +66,16 @@ export class CurrentUserMiddleware implements NestMiddleware {
         id: user.data.id,
         email: user.data.email,
         name: user.data.fullName,
+        image: user.data.image,
+        isActive: user.data.isActive,
+        country: user.data.country,
+        city: user.data.city,
+        address: user.data.address,
+        preferredLanguage: user.data.preferredLanguage,
+        loyaltyPoints: user.data.loyaltyPoints,
+        dateOfBirth: user.data.dateOfBirth,
+        vehicleType: user.data.vehicleType,
+        plateNumber: user.data.plateNumber,
         role
       };
     } catch (err) {

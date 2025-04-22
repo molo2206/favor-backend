@@ -15,17 +15,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { classToPlain } from 'class-transformer';
-
 import { UsersService } from './users.service';
 import { UserEntity } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { UpdateUserDto } from './dto/update-profile';
 import { ResetPasswordDto } from 'src/otp/dto/reset-password.dto';
-
 import { CurrentUser } from './utility/decorators/current-user-decorator';
 import { AuthentificationGuard } from './utility/guards/authentification.guard';
 import { AuthorizeGuard } from './utility/guards/authorization.guard';
@@ -121,29 +117,15 @@ export class UsersController {
   @UseGuards(AuthentificationGuard)
   @Patch('profile/image')
   @UseInterceptors(
-    FileInterceptor('image', {
-      storage: diskStorage({
-        destination: './uploads/users',
-        filename: (req, file, callback) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
-          const filename = `user-${uniqueSuffix}${ext}`;
-          callback(null, filename);
-        },
-      }),
-    }),
+    FileInterceptor('image'),
   )
   async updateProfileImage(
     @UploadedFile() file: Express.Multer.File,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     @CurrentUser() user: any,
   ) {
-    if (!file) {
-      throw new BadRequestException('Aucun fichier fourni.');
-    }
-
-    const imageDto = { image: `/uploads/users/${file.filename}` };
-    return this.usersService.updateProfileImage(user.id, imageDto);
+    const updatedCategory = await this.usersService.updateProfileImage(user.id, file);
+    return { data: updatedCategory };
   }
 
   // ────── 🔐 Profil personnel ──────
@@ -156,7 +138,7 @@ export class UsersController {
     }
     return { data: currentUser };
   }
-  
+
   // ────── 🔄 Mot de passe oublié / réinitialisation ──────
 
   @Post('forgot-password')

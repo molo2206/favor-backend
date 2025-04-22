@@ -23,6 +23,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtService } from '@nestjs/jwt';
 import { UserRole } from './utility/common/user-role-enum';
 import { MailService } from 'src/MailService/mailService';
+import { CloudinaryService } from './utility/helpers/cloudinary.service';
 
 @Injectable()
 export class UsersService {
@@ -36,6 +37,7 @@ export class UsersService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
+    private readonly cloudinary: CloudinaryService
   ) { }
 
   async signup(createUserDto: CreateUserDto): Promise<any> {
@@ -121,7 +123,7 @@ export class UsersService {
       .getOne();
 
     if (!user) {
-     throw new UnauthorizedException("Adresse e-mail ou mot de passe incorrect.");
+      throw new UnauthorizedException("Adresse e-mail ou mot de passe incorrect.");
     }
 
     const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
@@ -174,28 +176,48 @@ export class UsersService {
         phone: userWithoutPassword.phone,
         image: userWithoutPassword.image,
         role: userWithoutPassword.role,
+        isActive: userWithoutPassword.isActive,
+        country: userWithoutPassword.country,
+        city: userWithoutPassword.city,
+        address: userWithoutPassword.address,
+        preferredLanguage: userWithoutPassword.preferredLanguage,
+        loyaltyPoints: userWithoutPassword.loyaltyPoints,
+        dateOfBirth: userWithoutPassword.dateOfBirth,
+        vehicleType: userWithoutPassword.vehicleType,
+        plateNumber: userWithoutPassword.plateNumber,
         userHasCompany,
       },
       access_token: token,
     };
   }
 
-  async updateProfileImage(userId: string, dto: UpdateUserImageDto) {
+  async updateProfileImage(userId: string, file?: Express.Multer.File) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
 
     if (!user) {
       throw new NotFoundException('Utilisateur non trouvé.');
     }
 
-    if (!dto.image) {
+    if (!file) {
       throw new BadRequestException('Image invalide.');
     }
 
-    user.image = dto.image;
+    // Supprimer l'ancienne image sur Cloudinary s'il y en a une
+    if (user.image) {
+      await this.cloudinary.handleDeleteImage(user.image);
+    }
+
+    // Si un fichier est uploadé
+    if (file) {
+      const imageUrl = await this.cloudinary.handleUploadImage(file, 'category');
+      user.image = imageUrl;
+    }
     const updatedUser = await this.usersRepository.save(user);
     const { password, ...userWithoutPassword } = updatedUser;
+
     return userWithoutPassword;
   }
+
 
   async sendOtp(email: string): Promise<any> {
     const dto = plainToInstance(VerifyOtpDto, { email, otpCode: '000000' });
