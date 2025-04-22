@@ -14,7 +14,8 @@ declare global {
       currentUser?: {
         id: string;
         email: string;
-        name?: string;
+        fullName?: string;
+        phone?: string;
         role: string;
         image: string;
         isActive: boolean;
@@ -28,7 +29,7 @@ declare global {
         plateNumber?: string;
       } | null;
     }
-    
+
   }
 }
 
@@ -64,8 +65,9 @@ export class CurrentUserMiddleware implements NestMiddleware {
 
       req.currentUser = {
         id: user.data.id,
+        fullName: user.data.fullName,
         email: user.data.email,
-        name: user.data.fullName,
+        phone: user.data.phone,
         image: user.data.image,
         isActive: user.data.isActive,
         country: user.data.country,
