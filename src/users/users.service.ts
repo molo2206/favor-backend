@@ -171,7 +171,11 @@ export class UsersService {
     return {
       data: {
         id: userWithoutPassword.id,
+<<<<<<< HEAD
         fullName: userWithoutPassword.fullName,
+=======
+        name: userWithoutPassword.fullName,
+>>>>>>> 27eef81eee8ba5e9b62d3d977a880ee9668cd43a
         email: userWithoutPassword.email,
         phone: userWithoutPassword.phone,
         image: userWithoutPassword.image,
@@ -239,7 +243,10 @@ export class UsersService {
       otpCode,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     });
+<<<<<<< HEAD
     
+=======
+>>>>>>> 27eef81eee8ba5e9b62d3d977a880ee9668cd43a
 
     await this.otpRepository.save(otp);
 
