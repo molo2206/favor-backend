@@ -25,6 +25,22 @@ export class TypeCompanyController {
     return await this.typeCompanyService.create(dto, file);
   }
 
+  @Patch(':id')
+  @UseGuards(AuthentificationGuard)
+  @AuthorizeRoles(UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('image'))
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async update(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateTypeCompanyDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ): Promise<{ message: string; data: TypeCompany }> {
+    const updatedType = await this.typeCompanyService.update(id, updateDto, file);
+    return updatedType;  // Renvoie directement la réponse du service
+  }
+
+
+
   @Get()
   async findAll(): Promise<{ data: TypeCompany[] }> {
     const typeCompanies = await this.typeCompanyService.findAll();
@@ -37,20 +53,7 @@ export class TypeCompanyController {
     return { data: typeCompany };
   }
 
-  @Patch(':id')
-  @UseGuards(AuthentificationGuard)
-  @AuthorizeRoles(UserRole.ADMIN)
-  @UseInterceptors(FileInterceptor('image'))
-  @UsePipes(new ValidationPipe({ whitelist: true }))
-  async update(
-    @Param('id') id: string,
-    @Body() updateDto: UpdateTypeCompanyDto,
-    @UploadedFile() file?: Express.Multer.File,
-  ): Promise<{ data: TypeCompany }> {
-    const updatedType = await this.typeCompanyService.update(id, updateDto, file);
-    return { data: updatedType };
-  }
-  
+
 
   @Delete(':id')
   async remove(@Param('id') id: string): Promise<{ message: string }> {

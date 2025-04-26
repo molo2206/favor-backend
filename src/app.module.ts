@@ -19,6 +19,9 @@ import { SubOrdersModule } from './sub_orders/sub_orders.module';
 import { OrderItemsModule } from './order_items/order_items.module';
 import { ConfigModule } from '@nestjs/config';
 import { CloudinaryModule } from './users/utility/helpers/cloudinary.module';
+import { DeliveryModule } from './delivery/delivery.module';
+import { SignatureModule } from './signature/signature.module';
+import { TrackingModule } from './tracking/tracking.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -38,7 +41,10 @@ import { CloudinaryModule } from './users/utility/helpers/cloudinary.module';
     OrderModule,
     SubOrdersModule,
     OrderItemsModule,
-    CloudinaryModule
+    CloudinaryModule,
+    DeliveryModule,
+    SignatureModule,
+    TrackingModule
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -40,7 +40,46 @@ export class UsersService {
     private readonly cloudinary: CloudinaryService
   ) { }
 
-  async signup(createUserDto: CreateUserDto): Promise<any> {
+  // async signup(createUserDto: CreateUserDto): Promise<any> {
+  //   const { email, otpCode, password } = createUserDto;
+
+  //   const userExists = await this.usersRepository.findOne({ where: { email } });
+  //   if (userExists) {
+  //     throw new BadRequestException('Un compte avec cet email existe déjà.');
+  //   }
+
+  //   if (!otpCode) {
+  //     return this.sendOtp(email);
+  //   }
+
+  //   const otpEntry = await this.otpRepository.findOne({
+  //     where: { email, otpCode, isUsed: false },
+  //   });
+
+  //   if (!otpEntry || new Date() > otpEntry.expiresAt) {
+  //     throw new BadRequestException('OTP invalide ou expiré.');
+  //   }
+
+  //   const hashedPassword = await bcrypt.hash(password, 10);
+
+  //   // On affecte directement le rôle statique "USER"
+  //   const user = this.usersRepository.create({
+  //     ...createUserDto,
+  //     email,
+  //     password: hashedPassword,
+  //     role: UserRole.CUSTOMER,
+  //   });
+
+  //   const savedUser = await this.usersRepository.save(user);
+
+  //   otpEntry.isUsed = true;
+  //   otpEntry.user = savedUser;
+  //   await this.otpRepository.save(otpEntry);
+
+  //   const { password: _pw, ...userWithoutPassword } = savedUser;
+  //   return userWithoutPassword;
+  // }
+  async signup(createUserDto: CreateUserDto): Promise<{ message: string; data: any }> {
     const { email, otpCode, password } = createUserDto;
 
     const userExists = await this.usersRepository.findOne({ where: { email } });
@@ -63,32 +102,43 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // On affecte directement le rôle statique "USER"
-    const user = this.usersRepository.create({
+    const data = this.usersRepository.create({
       ...createUserDto,
       email,
       password: hashedPassword,
       role: UserRole.CUSTOMER,
     });
 
-    const savedUser = await this.usersRepository.save(user);
+    const savedUser = await this.usersRepository.save(data);
 
     otpEntry.isUsed = true;
     otpEntry.user = savedUser;
     await this.otpRepository.save(otpEntry);
 
     const { password: _pw, ...userWithoutPassword } = savedUser;
-    return userWithoutPassword;
+
+    return {
+      message: 'Inscription réussie. Bienvenue !',
+      data: userWithoutPassword,
+    };
   }
 
-
-  async update(id: string, updateUserDto: Partial<UpdateUserDto>, currentUser: UserEntity): Promise<UserEntity> {
+  async update(id: string, updateUserDto: Partial<UpdateUserDto>, currentUser: UserEntity): Promise<{ message: string; data: UserEntity }> {
     const user = await this.usersRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`);
     }
+
     Object.assign(user, updateUserDto);
-    return await this.usersRepository.save(user);
+
+    const updatedUser = await this.usersRepository.save(user);
+
+    return {
+      message: 'Utilisateur mis à jour avec succès.',
+      data: updatedUser,
+    };
   }
+
 
   async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<{ message: string }> {
     const { currentPassword, newPassword } = changePasswordDto;
@@ -110,7 +160,7 @@ export class UsersService {
     return { message: 'Mot de passe mis à jour avec succès' };
   }
 
-  async signin(userSignInDto: LoginUserDto): Promise<{ data: any; access_token: string }> {
+  async signin(userSignInDto: LoginUserDto): Promise<{ message: string; data: any; access_token: string }> {
     const user = await this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
@@ -121,19 +171,19 @@ export class UsersService {
       .leftJoinAndSelect('permissions.permission', 'permission')
       .where('users.email = :email', { email: userSignInDto.email })
       .getOne();
-
+  
     if (!user) {
       throw new UnauthorizedException("Adresse e-mail ou mot de passe incorrect.");
     }
-
+  
     const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException("Adresse e-mail ou mot de passe incorrect.");
     }
-
+  
     const token = await this.accessToken(user);
     const { password, ...userWithoutPassword } = user;
-
+  
     const userHasCompany = userWithoutPassword.userHasCompanies?.map((uhc) => ({
       id: uhc.id,
       isOwner: uhc.isOwner,
@@ -167,12 +217,12 @@ export class UsersService {
           : new Date(p.permission?.updatedAt),
       })) ?? [],
     })) ?? [];
-
+  
     return {
+      message: 'Connexion réussie !',
       data: {
         id: userWithoutPassword.id,
         fullName: userWithoutPassword.fullName,
-        name: userWithoutPassword.fullName,
         email: userWithoutPassword.email,
         phone: userWithoutPassword.phone,
         image: userWithoutPassword.image,
@@ -191,33 +241,38 @@ export class UsersService {
       access_token: token,
     };
   }
-
+  
   async updateProfileImage(userId: string, file?: Express.Multer.File) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
-
+  
     if (!user) {
       throw new NotFoundException('Utilisateur non trouvé.');
     }
-
+  
     if (!file) {
       throw new BadRequestException('Image invalide.');
     }
-
+  
     // Supprimer l'ancienne image sur Cloudinary s'il y en a une
     if (user.image) {
       await this.cloudinary.handleDeleteImage(user.image);
     }
-
+  
     // Si un fichier est uploadé
-    if (file) {
-      const imageUrl = await this.cloudinary.handleUploadImage(file, 'user');
-      user.image = imageUrl;
-    }
+    const imageUrl = await this.cloudinary.handleUploadImage(file, 'user');
+    user.image = imageUrl;
+  
+    // Sauvegarder l'utilisateur avec la nouvelle image
     const updatedUser = await this.usersRepository.save(user);
     const { password, ...userWithoutPassword } = updatedUser;
-
-    return userWithoutPassword;
+  
+    // Retourner la réponse avec un message de succès
+    return {
+      message: 'Image de profil mise à jour avec succès',
+      data: userWithoutPassword,
+    };
   }
+  
 
 
   async sendOtp(email: string): Promise<any> {

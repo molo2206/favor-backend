@@ -39,9 +39,9 @@ export class UsersController {
 
   @Post('signup')
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  async signup(@Body() createUserDto: CreateUserDto): Promise<{ user: Omit<UserEntity, 'password'> }> {
-    const user = await this.usersService.signup(createUserDto);
-    return { user };
+  async signup(@Body() createUserDto: CreateUserDto): Promise<{ message: string; data: Omit<UserEntity, 'password'> }> {
+    const { message, data } = await this.usersService.signup(createUserDto);
+    return { message, data };
   }
 
   @Post('signin')
@@ -49,8 +49,6 @@ export class UsersController {
   async signin(@Body() loginUserDto: LoginUserDto): Promise<{ data: string }> {
     return await this.usersService.signin(loginUserDto);
   }
-
-
   // ────── 🔐 Authentification à deux facteurs ──────
 
   @UseGuards(AuthentificationGuard)

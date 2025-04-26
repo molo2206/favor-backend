@@ -17,7 +17,7 @@ export class TypeCompanyService {
   async create(
     createTypeCompanyDto: CreateTypeCompanyDto,
     file?: Express.Multer.File,
-  ): Promise<{ data: TypeCompany }> {
+  ): Promise<{ message: string; data: TypeCompany }> {
     const existing = await this.typeCompanyRepository.findOne({
       where: { name: createTypeCompanyDto.name },
     });
@@ -34,29 +34,28 @@ export class TypeCompanyService {
     const newType = this.typeCompanyRepository.create(createTypeCompanyDto);
     const savedType = await this.typeCompanyRepository.save(newType);
 
-    return { data: savedType };
+    return { message: 'Type d\'entreprise créé avec succès', data: savedType };
   }
 
   async update(
     id: string,
     updateDto: UpdateTypeCompanyDto,
     file?: Express.Multer.File,
-  ): Promise<TypeCompany> {
-    // Vérifie si le type existe
+  ): Promise<{ message: string; data: TypeCompany }> {
     const type = await this.findOne(id);
     if (!type) {
       throw new NotFoundException(`Le type d'entreprise avec l'ID ${id} n'existe pas.`);
     }
-    // Si un fichier est fourni, on l'upload et on met à jour l'image
     if (file) {
       const imageUrl = await this.cloudinary.handleUploadImage(file, 'type-company');
       updateDto.image = imageUrl;
     }
-    // Mise à jour des propriétés du type
+
     Object.assign(type, updateDto);
-    // Sauvegarde et retourne le type mis à jour
-    return await this.typeCompanyRepository.save(type);
+    const updatedType = await this.typeCompanyRepository.save(type);
+    return { message: 'Type d\'entreprise mis à jour avec succès', data: updatedType };
   }
+
 
   async findAll(): Promise<TypeCompany[]> {
     return await this.typeCompanyRepository.find();

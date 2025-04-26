@@ -56,15 +56,16 @@ export class CategoryController {
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(UserRole.ADMIN)
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  @UseInterceptors(FileInterceptor('image'))  // Permet l'upload de fichiers d'image
+  @UseInterceptors(FileInterceptor('image'))
   async update(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
     @UploadedFile() file?: Express.Multer.File,
-  ): Promise<{ data: CategoryEntity }> {  // Retourne un objet avec "data"
-    const updatedCategory = await this.categoryService.update(id, updateCategoryDto, file);
-    return { data: updatedCategory };  // Retourne la catégorie mise à jour encapsulée dans "data"
+  ): Promise<{ message: string; data: CategoryEntity }> {
+    const { message, data } = await this.categoryService.update(id, updateCategoryDto, file);
+    return { message, data };
   }
+  
 
   @Get('/by-type/:type')
   async findByTypeCompany(@Param('type') type: string): Promise<{ data: CategoryEntity[] }> {

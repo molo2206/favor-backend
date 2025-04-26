@@ -11,13 +11,20 @@ import { UserRole } from 'src/users/utility/common/user-role-enum';
 @Controller('roles')
 export class RoleUserController {
   constructor(private readonly roleUserService: RoleUserService) { }
-
   @Post()
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(UserRole.ADMIN)
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  create(@Body() dto: CreateRoleUserDto): Promise<RoleUser> {
+  async create(@Body() dto: CreateRoleUserDto): Promise<{ message: string; data: RoleUser }> {
     return this.roleUserService.create(dto);
+  }
+
+  @Put(':id')
+  @UseGuards(AuthentificationGuard)
+  @AuthorizeRoles(UserRole.ADMIN)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async update(@Param('id') id: string, @Body() dto: UpdateRoleUserDto): Promise<{ message: string; data: RoleUser }> {
+    return this.roleUserService.update(id, dto);
   }
 
   @Get()
@@ -30,10 +37,7 @@ export class RoleUserController {
     return this.roleUserService.findOne(id);
   }
 
-  @Put(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateRoleUserDto): Promise<RoleUser> {
-    return this.roleUserService.update(id, dto);
-  }
+
 
   @Delete(':id')
   remove(@Param('id') id: string): Promise<void> {

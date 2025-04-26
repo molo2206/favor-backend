@@ -1,4 +1,4 @@
-import {  ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -16,60 +16,49 @@ export class CategoryService {
     private readonly cloudinary: CloudinaryService
   ) { }
 
-  async create(createCategoryDto: CreateCategoryDto, file: Express.Multer.File): Promise<{ data: CategoryEntity }> {
+  async create(createCategoryDto: CreateCategoryDto, file: Express.Multer.File): Promise<{ message: string, data: CategoryEntity }> {
     const { name, parentId, type } = createCategoryDto;
 
-    // Vérifie si une catégorie avec le même nom existe déjà
-    const existingCategory = await this.categoryRepo.findOne({ where: { name } });
+    const existingCategory = await this.categoryRepo.findOne({ where: { name, type }, });
     if (existingCategory) {
-      throw new ConflictException('Une catégorie avec ce nom existe déjà');
+      throw new ConflictException('Une catégorie avec ce nom et ce type existe déjà');
     }
-
-    // On définit parent comme undefined par défaut
     let parent: CategoryEntity | undefined = undefined;
 
     if (parentId) {
-      // Recherche de la catégorie parente
       const foundParent = await this.categoryRepo.findOne({ where: { id: parentId } });
 
-      // Si la catégorie parente n'est pas trouvée, on l'assigne à undefined
       if (!foundParent) {
         throw new NotFoundException('Catégorie parente non trouvée');
       }
 
-      parent = foundParent;  // parent est assigné à l'entité trouvée ou reste undefined
+      parent = foundParent;
     }
 
-    // Création du slug à partir du nom de la catégorie
     const slug = slugify(name);
 
-    // Gestion de l'image via Cloudinary si elle existe
     let imageUrl: string | undefined;
     if (file) {
       imageUrl = await this.cloudinary.handleUploadImage(file, 'category');
     }
 
-    // Création de la nouvelle catégorie
     const category = this.categoryRepo.create({
       name,
       slug,
       type,
-      parent,  // parent peut être soit une instance de CategoryEntity, soit undefined
+      parent,
       image: imageUrl,
     });
 
-    // Sauvegarde de la catégorie
     const savedCategory = await this.categoryRepo.save(category);
-
-    // Retour de la catégorie sauvegardée dans un format de réponse attendu
-    return { data: savedCategory };
+    return { message: 'Catégorie enregistrée avec succès', data: savedCategory };
   }
 
   async update(
     id: string,
     updateCategoryDto: UpdateCategoryDto,
     file?: Express.Multer.File
-  ): Promise<CategoryEntity> {  // Retourne directement la catégorie mise à jour
+  ): Promise<{ message: string; data: CategoryEntity }> { // <- attention ici
     const category = await this.categoryRepo.findOne({ where: { id } });
 
     if (!category) {
@@ -78,10 +67,17 @@ export class CategoryService {
 
     const { name, parentId, type } = updateCategoryDto;
 
-    // Mise à jour des propriétés de la catégorie
+    const existingCategory = await this.categoryRepo.findOne({
+      where: { name, type },
+    });
+
+    if (existingCategory && existingCategory.id !== id) {  // pour éviter de se bloquer soi-même
+      throw new ConflictException('Une catégorie avec ce nom et ce type existe déjà');
+    }
+
     if (name) {
       category.name = name;
-      category.slug = slugify(name);  // Mise à jour du slug
+      category.slug = slugify(name);
     }
 
     if (type) {
@@ -96,14 +92,17 @@ export class CategoryService {
       category.parent = parent;
     }
 
-    // Si un fichier est uploadé
     if (file) {
       const imageUrl = await this.cloudinary.handleUploadImage(file, 'category');
       category.image = imageUrl;
     }
 
     const updatedCategory = await this.categoryRepo.save(category);
-    return updatedCategory;  // Retourne directement la catégorie mise à jour
+
+    return {
+      message: 'Catégorie mise à jour avec succès',
+      data: updatedCategory,
+    };
   }
 
   async findAll(type?: string): Promise<CategoryEntity[]> {
@@ -149,11 +148,11 @@ export class CategoryService {
     options?: { page?: number; limit?: number }
   ): Promise<CategoryWithPagination> {
     const { page = 1, limit = 10 } = options || {};
-  
+
     const whereClause = parentId
       ? { parent: { id: parentId } }
       : { parent: IsNull() };
-  
+
     // Effectuer la recherche des catégories avec pagination
     const [categories, total] = await this.categoryRepo.findAndCount({
       where: whereClause,
@@ -161,19 +160,19 @@ export class CategoryService {
       take: limit, // Limiter le nombre de catégories récupérées
       skip: (page - 1) * limit, // Décaler les résultats selon la page
     });
-  
+
     if (!categories.length) {
       throw new NotFoundException(
         `Aucune catégorie trouvée avec le parent "${parentId ?? 'null'}"`
       );
     }
-  
+
     // Enrichir les catégories : ajouter le nombre d'enfants pour chaque catégorie
     const enrichedCategories = categories.map(category => ({
       ...category,
       numberOfChildren: category.children.length,
     }));
-  
+
     // Retourner les catégories enrichies avec les informations de pagination
     return {
       categories: enrichedCategories,
@@ -185,7 +184,7 @@ export class CategoryService {
       },
     };
   }
-  
+
   async remove(id: string): Promise<{ data: string }> {
     // Récupère la catégorie à supprimer
     const category = await this.findOne(id);

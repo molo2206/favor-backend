@@ -38,7 +38,7 @@ export class CompanyService {
     dto: CreateCompanyDto,
     user: UserEntity,
     logoFile?: Express.Multer.File,
-  ): Promise<{ data: CompanyEntity }> {
+  ): Promise<{ message: string, data: CompanyEntity }> {
     if (!dto || Object.keys(dto).length === 0) {
       throw new BadRequestException('Les données de l’entreprise sont requises');
     }
@@ -109,12 +109,12 @@ export class CompanyService {
 
     await this.userHasCompanyRepository.save(userHasCompany);
 
-    return { data: savedCompany };
+    return { message: "Companie enregistrée avec succès", data: savedCompany };
   }
 
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async CreateUserToCompany(dto: CreateUserHasCompanyDto): Promise<{ data: any }> {  // Retourne 'data' dans l'objet
+  async CreateUserToCompany(dto: CreateUserHasCompanyDto): Promise<{ message: string, data: any }> {  // Retourne 'data' dans l'objet
     const user = await this.userRepository.findOneOrFail({ where: { id: dto.userId } });
     const company = await this.companyRepository.findOneOrFail({ where: { id: dto.companyId } });
     const role = await this.roleRepository.findOneOrFail({ where: { id: dto.roleId } });
@@ -142,7 +142,7 @@ export class CompanyService {
     const result = instanceToPlain(saved);
     delete result.user?.password;
 
-    return { data: result };  // Encapsule la réponse dans un objet 'data'
+    return { message: "Enregistrée avec succès", data: result };  // Encapsule la réponse dans un objet 'data'
   }
 
   async updateCompanyWithUser(
@@ -150,7 +150,7 @@ export class CompanyService {
     companyId: string,
     userId: string,
     logoFile?: Express.Multer.File, // Modification pour prendre un fichier logo
-  ): Promise<{ data: CompanyEntity }> {  // Retourne un objet avec la clé 'data'
+  ): Promise<{ message: string, data: CompanyEntity }> {  // Retourne un objet avec la clé 'data'
     if (!dto || Object.keys(dto).length === 0) {
       throw new BadRequestException("Les données de l'entreprise ne peuvent pas être vides");
     }
@@ -222,7 +222,7 @@ export class CompanyService {
       await this.userHasCompanyRepository.save(userHasCompany);
     }
 
-    return { data: updatedCompany };  // Retourne l'entreprise mise à jour dans 'data'
+    return { message: 'Companie mise à jour avec succès', data: updatedCompany };  // Retourne l'entreprise mise à jour dans 'data'
   }
 
 

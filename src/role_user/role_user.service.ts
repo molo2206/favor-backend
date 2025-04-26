@@ -10,12 +10,29 @@ export class RoleUserService {
   constructor(
     @InjectRepository(RoleUser)
     private readonly roleUserRepository: Repository<RoleUser>,
-  ) {}
+  ) { }
 
-  async create(dto: CreateRoleUserDto): Promise<RoleUser> {
+  async create(dto: CreateRoleUserDto): Promise<{ message: string; data: RoleUser }> {
     const role = this.roleUserRepository.create(dto);
-    return this.roleUserRepository.save(role);
+    const savedRole = await this.roleUserRepository.save(role);
+
+    return {
+      message: 'Rôle utilisateur créé avec succès',
+      data: savedRole,
+    };
   }
+
+  async update(id: string, dto: UpdateRoleUserDto): Promise<{ message: string; data: RoleUser }> {
+    const role = await this.findOne(id);
+    Object.assign(role, dto);
+    const updatedRole = await this.roleUserRepository.save(role);
+
+    return {
+      message: 'Rôle utilisateur mis à jour avec succès',
+      data: updatedRole,
+    };
+  }
+
 
   async findAll(): Promise<RoleUser[]> {
     return this.roleUserRepository.find();
@@ -25,12 +42,6 @@ export class RoleUserService {
     const role = await this.roleUserRepository.findOne({ where: { id } });
     if (!role) throw new NotFoundException('Rôle non trouvé');
     return role;
-  }
-
-  async update(id: string, dto: UpdateRoleUserDto): Promise<RoleUser> {
-    const role = await this.findOne(id);
-    Object.assign(role, dto);
-    return this.roleUserRepository.save(role);
   }
 
   async remove(id: string): Promise<void> {

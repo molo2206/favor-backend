@@ -29,7 +29,7 @@ export class OrderService {
     userId: string,
     user: UserEntity,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<any> {
+  ): Promise<{ message: string; data: any }> {  // <- ici
     const { subOrders = [], orderItems = [], ...orderData } = orderDto;
 
     const order = this.orderRepo.create({
@@ -108,15 +108,19 @@ export class OrderService {
       })),
     };
 
-    return formatted;
+    return {
+      message: 'Commande enregistrée avec succès',
+      data: formatted,
+    };
   }
+
 
   async update(
     orderId: string,
     orderDto: UpdateOrderDto,
     user: UserEntity,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<any> {
+  ): Promise<{ message: string; data: any }> {
     const existingOrder = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: ['orderItems', 'subOrders', 'subOrders.subOrderItems'],
@@ -126,60 +130,53 @@ export class OrderService {
       throw new NotFoundException('Commande introuvable');
     }
 
-    // 🧹 1. Supprimer les anciens items
-    await this.orderItemService.removeByOrderId(orderId);
-    for (const subOrder of existingOrder.subOrders) {
-      await this.subOrderItemService.removeBySubOrderId(subOrder.id);
-    }
-    await this.subOrderService.removeByOrderId(orderId);
+    // 🧹 1. Supprimer les anciens items (en parallèle)
+    await Promise.all([
+      this.orderItemService.removeByOrderId(orderId),
+      ...existingOrder.subOrders.map(sub => this.subOrderItemService.removeBySubOrderId(sub.id)),
+      this.subOrderService.removeByOrderId(orderId),
+    ]);
 
-    // 🛠️ 2. Mettre à jour la commande
+    // 🛠️ 2. Mettre à jour la commande principale
     const updatedOrder = { ...existingOrder, ...orderDto };
     await this.orderRepo.save(updatedOrder);
 
-    // 🔁 3. Recréer les items et sous-commandes
     const { subOrders = [], orderItems = [] } = orderDto;
 
+    // 🔁 3. Recréer les items et sous-commandes
     const order = await this.orderRepo.findOneOrFail({ where: { id: orderId } });
 
-    if (orderItems.length > 0) {
-      await Promise.all(
-        orderItems.map((item) =>
-          this.orderItemService.create({
+    const createPromises = [
+      ...orderItems.map(item =>
+        this.orderItemService.create({
+          productId: item.productId,
+          quantity: item.quantity,
+          orderId: order.id,
+        })
+      ),
+      ...subOrders.map(async (subOrderDto) => {
+        const { items = [], ...subOrderInfo } = subOrderDto;
+        const savedSubOrder = await this.subOrderService.create(
+          { ...subOrderInfo, orderId: order.id, items },
+          user
+        );
+
+        const subOrderItemPromises = items.map(item =>
+          this.subOrderItemService.create({
             productId: item.productId,
             quantity: item.quantity,
-            orderId: order.id,
-          }),
-        ),
-      );
-    }
-
-    const savedSubOrders: SubOrderEntity[] = [];
-
-    for (const { items = [], ...subOrderInfo } of subOrders) {
-      const subOrderPayload: CreateSubOrderDto = {
-        ...subOrderInfo,
-        orderId: order.id,
-        items,
-      };
-
-      const savedSubOrder = await this.subOrderService.create(subOrderPayload, user);
-      savedSubOrders.push(savedSubOrder);
-
-      if (items.length > 0) {
-        await Promise.all(
-          items.map((item) =>
-            this.subOrderItemService.create({
-              productId: item.productId,
-              quantity: item.quantity,
-              subOrderId: savedSubOrder.id,
-              price: item.price,
-            }),
-          ),
+            subOrderId: savedSubOrder.id,
+            price: item.price,
+          })
         );
-      }
-    }
 
+        await Promise.all(subOrderItemPromises);
+      }),
+    ];
+
+    await Promise.all(createPromises);
+
+    // 📦 4. Charger la commande complète mise à jour
     const fullOrder = await this.orderRepo.findOne({
       where: { id: order.id },
       relations: [
@@ -212,8 +209,12 @@ export class OrderService {
       })),
     };
 
-    return formatted;
+    return {
+      message: 'Commande mise à jour avec succès',
+      data: formatted,
+    };
   }
+
 
   async findAll(): Promise<OrderEntity[]> {
     return this.orderRepo.find({
@@ -223,6 +224,9 @@ export class OrderService {
         'subOrders',
         'subOrders.subOrderItems',
         'subOrders.subOrderItems.product',
+        'deliveryCompany',
+        'livreur',
+        'trackings',
         'user',
       ],
     });
@@ -240,6 +244,9 @@ export class OrderService {
         'subOrders',
         'subOrders.subOrderItems',
         'subOrders.subOrderItems.product',
+        'deliveryCompany',
+        'livreur',
+        'trackings',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -254,6 +261,9 @@ export class OrderService {
         'subOrders',
         'subOrders.subOrderItems',
         'subOrders.subOrderItems.product',
+        'deliveryCompany',
+        'livreur',
+        'trackings',
         'user',
       ],
       order: { createdAt: 'DESC' }, // Optionnel : tri des commandes par date de création
