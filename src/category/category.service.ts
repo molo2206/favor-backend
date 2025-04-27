@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -19,10 +19,11 @@ export class CategoryService {
   async create(createCategoryDto: CreateCategoryDto, file: Express.Multer.File): Promise<{ message: string, data: CategoryEntity }> {
     const { name, parentId, type } = createCategoryDto;
 
-    const existingCategory = await this.categoryRepo.findOne({ where: { name, type }, });
+    const existingCategory = await this.categoryRepo.findOne({ where: { name, type } });
     if (existingCategory) {
       throw new ConflictException('Une catégorie avec ce nom et ce type existe déjà');
     }
+
     let parent: CategoryEntity | undefined = undefined;
 
     if (parentId) {
@@ -37,10 +38,12 @@ export class CategoryService {
 
     const slug = slugify(name);
 
-    let imageUrl: string | undefined;
-    if (file) {
-      imageUrl = await this.cloudinary.handleUploadImage(file, 'category');
+    // Vérification : image obligatoire
+    if (!file) {
+      throw new BadRequestException('Une image est requise pour créer une catégorie.');
     }
+
+    const imageUrl = await this.cloudinary.handleUploadImage(file, 'category');
 
     const category = this.categoryRepo.create({
       name,

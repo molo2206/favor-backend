@@ -95,14 +95,14 @@
             <img src="https://favorhelp.com/logo.png" alt="FavorHelp Logo">
         </div>
 
-        <div class="header">Bienvenue, {{ userWithoutPassword.name }} ! 🎉</div>
+        <div class="header">Bienvenue, {{ userWithoutPassword.fullName }} ! 🎉</div>
 
         <div class="subheader">
             Votre compte a été créé avec succès sur FavorHelp.
         </div>
 
         <div class="details">
-            <p><strong>Nom :</strong> {{ userWithoutPassword.name }}</p>
+            <p><strong>Nom :</strong> {{ userWithoutPassword.fullName }}</p>
             <p><strong>Email :</strong> {{ userWithoutPassword.email }}</p>
             <p><strong>Date de création :</strong> {{ userWithoutPassword.createdAt }}</p>
             <p><strong>Rôle :</strong> Client (CUSTOMER)</p>

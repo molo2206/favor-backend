@@ -16,11 +16,20 @@ export class MailService {
         const htmlPath = path.join(basePath, htmlPageName);
         let htmlContent = fs.readFileSync(htmlPath, 'utf-8');
 
-        // Ici on remplace dynamiquement les variables {{ variable }}
-        for (const key in context) {
-            const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-            htmlContent = htmlContent.replace(regex, context[key]);
-        }
+        // Remplacer {{ variable }} ou {{ object.property }}
+        htmlContent = htmlContent.replace(/{{\s*([\w.]+)\s*}}/g, (_, match) => {
+            const keys = match.split('.');
+            let value = context;
+            for (const key of keys) {
+                if (value && key in value) {
+                    value = value[key];
+                } else {
+                    value = undefined;
+                    break;
+                }
+            }
+            return value !== undefined ? value : '';
+        });
 
         await this.mailerService.sendMail({
             to,
@@ -28,5 +37,4 @@ export class MailService {
             html: htmlContent,
         });
     }
-
 }

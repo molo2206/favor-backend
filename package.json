@@ -24,7 +24,6 @@
     "migration-revert": "npm run typeorm -- migration:revert",
     "db:drop": "npm run typeorm schema:drop",
     "copy-templates": "copyfiles -u 1 src/templates/**/* dist/src/templates"
-
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -44,6 +43,7 @@
     "file-type": "^20.4.1",
     "handlebars": "^4.7.8",
     "jsonwebtoken": "^9.0.2",
+    "lodash": "^4.17.21",
     "mysql2": "^3.14.0",
     "nodemailer-express-handlebars": "^7.0.0",
     "passport": "^0.7.0",
@@ -72,6 +72,7 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.9",
+    "@types/lodash": "^4.17.16",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.7",
     "@types/nodemailer": "^6.4.17",
