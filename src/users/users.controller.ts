@@ -30,13 +30,16 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { Verify2FADto } from './dto/verify2fact.dto';
 import * as speakeasy from 'speakeasy';
 import { AuthorizeRoles } from './utility/decorators/authorize.roles.decorator';
+import { MailService } from 'src/email/email.service';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly mailService: MailService
+  ) { }
 
   // ────── 🟢 Authentification / Inscription ──────
-
   @Post('signup')
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   async signup(@Body() createUserDto: CreateUserDto): Promise<{ message: string; data: Omit<UserEntity, 'password'> }> {
@@ -102,13 +105,12 @@ export class UsersController {
   // ────── 🧑‍💻 Mise à jour de profil et image ──────
 
   @UseGuards(AuthentificationGuard)
-  @Patch(':id')
+  @Patch('me')
   async updateUser(
-    @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
     @CurrentUser() currentUser: UserEntity,
   ) {
-    const user = await this.usersService.update(id, updateUserDto, currentUser);
+    const user = await this.usersService.update(updateUserDto, currentUser);
     return classToPlain(user);
   }
 
@@ -183,5 +185,11 @@ export class UsersController {
   async remove(@Param('id') id: string) {
     await this.usersService.remove(id);
     return { message: 'Utilisateur supprimé avec succès.' };
+  }
+
+  @Post('send')
+  async sendEmail() {
+    await this.mailService.sendHtmlEmail('devmolomolo@gmail.com', 'Bienvenue sur notre plateforme', 'welcome.html');
+    return { message: 'Email envoyé' };
   }
 }

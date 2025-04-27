@@ -7,8 +7,8 @@ import { UserEntity } from './entities/user.entity';
 import { OtpEntity } from 'src/otp/entities/otp.entity';
 import { JwtModule } from '@nestjs/jwt'; // 👈 à ajouter
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MailService } from 'src/MailService/mailService';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
+import { MailModule } from 'src/email/email.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity, OtpEntity]),
@@ -26,6 +26,7 @@ import { CloudinaryService } from './utility/helpers/cloudinary.service';
         };
       },
     }),
+
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -47,9 +48,10 @@ import { CloudinaryService } from './utility/helpers/cloudinary.service';
         },
       }),
     }),
+    MailModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService, MailService,CloudinaryService],
+  providers: [UsersService, CloudinaryService],
   exports: [UsersService],
 })
 export class UsersModule { }

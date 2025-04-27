@@ -22,8 +22,8 @@ import { UpdateUserDto } from './dto/update-profile';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtService } from '@nestjs/jwt';
 import { UserRole } from './utility/common/user-role-enum';
-import { MailService } from 'src/MailService/mailService';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
+import { MailService } from 'src/email/email.service';
 
 @Injectable()
 export class UsersService {
@@ -36,49 +36,10 @@ export class UsersService {
 
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly mailService: MailService,
-    private readonly cloudinary: CloudinaryService
+    private readonly cloudinary: CloudinaryService,
+    private readonly mailService: MailService
   ) { }
 
-  // async signup(createUserDto: CreateUserDto): Promise<any> {
-  //   const { email, otpCode, password } = createUserDto;
-
-  //   const userExists = await this.usersRepository.findOne({ where: { email } });
-  //   if (userExists) {
-  //     throw new BadRequestException('Un compte avec cet email existe déjà.');
-  //   }
-
-  //   if (!otpCode) {
-  //     return this.sendOtp(email);
-  //   }
-
-  //   const otpEntry = await this.otpRepository.findOne({
-  //     where: { email, otpCode, isUsed: false },
-  //   });
-
-  //   if (!otpEntry || new Date() > otpEntry.expiresAt) {
-  //     throw new BadRequestException('OTP invalide ou expiré.');
-  //   }
-
-  //   const hashedPassword = await bcrypt.hash(password, 10);
-
-  //   // On affecte directement le rôle statique "USER"
-  //   const user = this.usersRepository.create({
-  //     ...createUserDto,
-  //     email,
-  //     password: hashedPassword,
-  //     role: UserRole.CUSTOMER,
-  //   });
-
-  //   const savedUser = await this.usersRepository.save(user);
-
-  //   otpEntry.isUsed = true;
-  //   otpEntry.user = savedUser;
-  //   await this.otpRepository.save(otpEntry);
-
-  //   const { password: _pw, ...userWithoutPassword } = savedUser;
-  //   return userWithoutPassword;
-  // }
   async signup(createUserDto: CreateUserDto): Promise<{ message: string; data: any }> {
     const { email, otpCode, password } = createUserDto;
 
@@ -117,16 +78,23 @@ export class UsersService {
 
     const { password: _pw, ...userWithoutPassword } = savedUser;
 
+    await this.mailService.sendHtmlEmail(
+      email,
+      'Vous avez déjà un compte dans FavorHelp',
+      'createCount.html',
+      { userWithoutPassword, year: new Date().getFullYear() } // envoi otpCode + année
+    );
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: userWithoutPassword,
     };
   }
 
-  async update(id: string, updateUserDto: Partial<UpdateUserDto>, currentUser: UserEntity): Promise<{ message: string; data: UserEntity }> {
-    const user = await this.usersRepository.findOne({ where: { id } });
+  async update(updateUserDto: Partial<UpdateUserDto>, currentUser: UserEntity): Promise<{ message: string; data: UserEntity }> {
+    const user = await this.usersRepository.findOne({ where: { id: currentUser.id } });
+
     if (!user) {
-      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`);
+      throw new NotFoundException(`Utilisateur avec l'ID ${currentUser.id} non trouvé`);
     }
 
     Object.assign(user, updateUserDto);
@@ -171,19 +139,19 @@ export class UsersService {
       .leftJoinAndSelect('permissions.permission', 'permission')
       .where('users.email = :email', { email: userSignInDto.email })
       .getOne();
-  
+
     if (!user) {
       throw new UnauthorizedException("Adresse e-mail ou mot de passe incorrect.");
     }
-  
+
     const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException("Adresse e-mail ou mot de passe incorrect.");
     }
-  
+
     const token = await this.accessToken(user);
     const { password, ...userWithoutPassword } = user;
-  
+
     const userHasCompany = userWithoutPassword.userHasCompanies?.map((uhc) => ({
       id: uhc.id,
       isOwner: uhc.isOwner,
@@ -217,7 +185,7 @@ export class UsersService {
           : new Date(p.permission?.updatedAt),
       })) ?? [],
     })) ?? [];
-  
+
     return {
       message: 'Connexion réussie !',
       data: {
@@ -241,39 +209,37 @@ export class UsersService {
       access_token: token,
     };
   }
-  
+
   async updateProfileImage(userId: string, file?: Express.Multer.File) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
-  
+
     if (!user) {
       throw new NotFoundException('Utilisateur non trouvé.');
     }
-  
+
     if (!file) {
       throw new BadRequestException('Image invalide.');
     }
-  
+
     // Supprimer l'ancienne image sur Cloudinary s'il y en a une
     if (user.image) {
       await this.cloudinary.handleDeleteImage(user.image);
     }
-  
+
     // Si un fichier est uploadé
     const imageUrl = await this.cloudinary.handleUploadImage(file, 'user');
     user.image = imageUrl;
-  
+
     // Sauvegarder l'utilisateur avec la nouvelle image
     const updatedUser = await this.usersRepository.save(user);
     const { password, ...userWithoutPassword } = updatedUser;
-  
+
     // Retourner la réponse avec un message de succès
     return {
       message: 'Image de profil mise à jour avec succès',
       data: userWithoutPassword,
     };
   }
-  
-
 
   async sendOtp(email: string): Promise<any> {
     const dto = plainToInstance(VerifyOtpDto, { email, otpCode: '000000' });
@@ -297,15 +263,13 @@ export class UsersService {
     });
     await this.otpRepository.save(otp);
 
-    await this.mailerService.sendMail({
-      to: email,
-      subject: 'Votre code de vérification',
-      text: `Votre code OTP est : ${otpCode}. Il est valide pour 10 minutes.`,
-    });
-    // await this.mailService.sendWelcomeEmail(email, 'Votre code de vérification', { name: 'Jean' });
-
-
-    return { message: 'OTP envoyé avec succès.', otpCode };
+    await this.mailService.sendHtmlEmail(
+      email,
+      'Réinitialisation de mot de passe',
+      'sendOtp.html',
+      { otpCode, year: new Date().getFullYear() } // envoi otpCode + année
+    );
+    return { message: 'OTP envoyé avec succès.' };
   }
 
   async sendResetPasswordOtp(email: string): Promise<any> {
@@ -323,12 +287,12 @@ export class UsersService {
 
     await this.otpRepository.save(otp);
 
-    await this.mailerService.sendMail({
-      to: email,
-      subject: 'Réinitialisation de mot de passe',
-      text: `Votre code de réinitialisation est : ${otpCode}. Il est valide pendant 10 minutes.`,
-    });
-    // await this.mailService.sendWelcomeEmail(email, 'Votre code de vérification', { name: 'Jean' });
+    await this.mailService.sendHtmlEmail(
+      email,
+      'Réinitialisation de mot de passe',
+      'sendOtp.html',
+      { otpCode, year: new Date().getFullYear() } // envoi otpCode + année
+    );
     return { message: 'OTP envoyé avec succès.' };
   }
 

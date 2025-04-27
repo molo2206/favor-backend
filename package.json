@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && npm run copy-templates",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -23,7 +23,8 @@
     "migration:run": "npm run typeorm -- migration:run",
     "migration-revert": "npm run typeorm -- migration:revert",
     "db:drop": "npm run typeorm schema:drop",
-    "copy-templates": "copyfiles -u 1 src/**/*.hbs dist"
+    "copy-templates": "copyfiles -u 1 src/templates/**/* dist/src/templates"
+
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
