@@ -124,18 +124,14 @@ export class UsersController {
 
   @UseGuards(AuthentificationGuard)
   @Patch('profile/image')
-  @UseInterceptors(
-    FileInterceptor('image'),
-  )
+  @UseInterceptors(FileInterceptor('image'))
   async updateProfileImage(
     @UploadedFile() file: Express.Multer.File,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     @CurrentUser() user: any,
   ) {
-    const updatedCategory = await this.usersService.updateProfileImage(user.id, file);
-    return { updatedCategory };
+    return this.usersService.updateProfileImage(user.id, file);
   }
-
   // ────── 🔐 Profil personnel ──────
 
   @UseGuards(AuthentificationGuard)
