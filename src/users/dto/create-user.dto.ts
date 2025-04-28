@@ -27,18 +27,21 @@ export class CreateUserDto {
     })
     password: string;
 
-    @IsNotEmpty({ message: 'Le pays est requis.' })
-    @IsString({ message: 'Le pays doit être une chaîne de caractères.' })
+    @IsOptional()
+    @IsString() 
     country: string;
 
-    @IsNotEmpty({ message: 'La ville est requise.' })
-    @IsString({ message: 'La ville doit être une chaîne de caractères.' })
+    @IsOptional()
+    @IsString() 
     city: string;
 
     @IsOptional()
-    @IsString() address?: string;
+    @IsString() 
+    address?: string;
 
-    @IsOptional() @IsString() otpCode?: string;
+    @IsOptional() 
+    @IsString() 
+    otpCode?: string;
 
     @IsOptional() @IsEnum(UserRole, { each: true }) roles?: UserRole;
 }

@@ -24,6 +24,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole } from './utility/common/user-role-enum';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
 import { MailService } from 'src/email/email.service';
+import { UsersGateway } from './users.gateway';
 
 @Injectable()
 export class UsersService {
@@ -37,7 +38,8 @@ export class UsersService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly cloudinary: CloudinaryService,
-    private readonly mailService: MailService
+    private readonly mailService: MailService,
+    private readonly usersGateway: UsersGateway
   ) { }
 
   async signup(createUserDto: CreateUserDto): Promise<{ message: string; data: any }> {
@@ -408,5 +410,25 @@ export class UsersService {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user.data);
     return { message: `User #${id} removed.` };
+  }
+
+  // Exemple de méthode pour notifier tous les utilisateurs en temps réel
+  async notifyAllUsersAboutEvent() {
+    const data = { message: 'Un événement a eu lieu!' };
+
+    // Utiliser le Gateway pour envoyer l'événement à tous les utilisateurs
+    this.usersGateway.emitToAllUsers('notificationEvent', data);
+
+    return { status: 'Success', message: 'Notification envoyée à tous les utilisateurs' };
+  }
+
+  // Exemple pour envoyer un message privé à un utilisateur spécifique
+  async sendMessageToUser(socketId: string, message: string) {
+    const data = { socketId, message };
+
+    // Envoyer le message privé à l'utilisateur spécifié
+    this.usersGateway.sendMessageToUser(socketId, message);
+
+    return { status: 'Success', message: 'Message envoyé à l\'utilisateur' };
   }
 }

@@ -9,6 +9,7 @@ import { JwtModule } from '@nestjs/jwt'; // 👈 à ajouter
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
 import { MailModule } from 'src/email/email.module';
+import { UsersGateway } from './users.gateway';
 @Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity, OtpEntity]),
@@ -51,7 +52,7 @@ import { MailModule } from 'src/email/email.module';
     MailModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService, CloudinaryService],
+  providers: [UsersService, CloudinaryService, UsersGateway],
   exports: [UsersService],
 })
 export class UsersModule { }
