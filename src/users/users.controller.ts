@@ -13,6 +13,7 @@ import {
   ValidationPipe,
   BadRequestException,
   UnauthorizedException,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { classToPlain } from 'class-transformer';
@@ -52,8 +53,15 @@ export class UsersController {
   async signin(@Body() loginUserDto: LoginUserDto): Promise<{ data: string }> {
     return await this.usersService.signin(loginUserDto);
   }
-  // ────── 🔐 Authentification à deux facteurs ──────
 
+  @UseGuards(AuthentificationGuard)
+  @Post('refresh')
+  async refreshToken(@CurrentUser() currentUser: UserEntity) {
+    const newAccessToken = await this.usersService.accessToken(currentUser);
+    return { accessToken: newAccessToken };
+  }
+
+  // ────── 🔐 Authentification à deux facteurs ──────
   @UseGuards(AuthentificationGuard)
   @Get('generate-2fa')
   async generate2FA(@CurrentUser() currentUser: UserEntity) {
@@ -171,8 +179,8 @@ export class UsersController {
   @AuthorizeRoles(UserRole.ADMIN)
   @Get('all')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async findAll(): Promise<any> {
-    return await this.usersService.findAll();
+  async findAll(@Query('role') role?: string): Promise<any> {
+    return await this.usersService.findAll(role);
   }
 
   @Get(':id')

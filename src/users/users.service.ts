@@ -339,6 +339,7 @@ export class UsersService {
       secret: secretKey,
     });
   }
+
   generateSecret(email: string) {
     return speakeasy.generateSecret({ name: `FavorApp (${email})` });
   }
@@ -378,12 +379,20 @@ export class UsersService {
     await this.usersRepository.save(user);
   }
 
-  async findAll() {
+  async findAll(role?: string) {
+    const roles = Object.values(UserRole);
+  
+    if (role && roles.includes(role as UserRole)) {
+      const usersByRole = await this.usersRepository.find({ where: { role: role as UserRole } });
+  
+      return { data: usersByRole }; // NE PAS faire un deuxième find() ici
+    }
+  
+    // Si aucun role demandé, on retourne tout
     const users = await this.usersRepository.find();
     return { data: users };
   }
-
-
+  
   async findOne(id: string): Promise<{ data: UserEntity }> {
     const user = await this.usersRepository.findOneBy({ id });
     if (!user) throw new NotFoundException('User not found');
