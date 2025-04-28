@@ -21,7 +21,7 @@ export class UserEntity {
     @Exclude()
     password: string;
 
-    @Column()
+    @Column({ unique: true })
     phone: string;
 
     @Column({ nullable: true })
@@ -30,10 +30,10 @@ export class UserEntity {
     @Column({ type: 'enum', enum: UserRole })
     role: UserRole;
 
-    @Column()
+    @Column({ nullable: true })
     country: string;
 
-    @Column()
+    @Column({ nullable: true })
     city: string;
 
     @Column({ default: true })
@@ -84,4 +84,7 @@ export class UserEntity {
 
     @OneToMany(() => OrderEntity, (order) => order.user)
     orders: OrderEntity[];
+
+    @Column({ nullable: true })
+    socketId?: string;  // Champ pour suivre le socketId de l'utilisateur
 }

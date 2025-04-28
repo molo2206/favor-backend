@@ -37,7 +37,7 @@ import { MailService } from 'src/email/email.service';
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
-    private readonly mailService: MailService
+    private readonly mailService: MailService,
   ) { }
 
   // ────── 🟢 Authentification / Inscription ──────
@@ -133,7 +133,7 @@ export class UsersController {
     @CurrentUser() user: any,
   ) {
     const updatedCategory = await this.usersService.updateProfileImage(user.id, file);
-    return { data: updatedCategory };
+    return { updatedCategory };
   }
 
   // ────── 🔐 Profil personnel ──────
@@ -199,20 +199,5 @@ export class UsersController {
   async sendEmail() {
     await this.mailService.sendHtmlEmail('devmolomolo@gmail.com', 'Bienvenue sur notre plateforme', 'welcome.html');
     return { message: 'Email envoyé' };
-  }
-
-  // Endpoint pour notifier tous les utilisateurs
-  @Get('notify')
-  async notifyUsers() {
-    return await this.usersService.notifyAllUsersAboutEvent();
-  }
-
-  // Endpoint pour envoyer un message privé à un utilisateur spécifique
-  @Get('message/:socketId')
-  async sendMessageToUser(
-    @Param('socketId') socketId: string,
-    @Query('message') message: string
-  ) {
-    return await this.usersService.sendMessageToUser(socketId, message);
   }
 }

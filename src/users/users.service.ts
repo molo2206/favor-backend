@@ -24,8 +24,6 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole } from './utility/common/user-role-enum';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
 import { MailService } from 'src/email/email.service';
-import { UsersGateway } from './users.gateway';
-
 @Injectable()
 export class UsersService {
   constructor(
@@ -39,7 +37,6 @@ export class UsersService {
     private readonly configService: ConfigService,
     private readonly cloudinary: CloudinaryService,
     private readonly mailService: MailService,
-    private readonly usersGateway: UsersGateway
   ) { }
 
   async signup(createUserDto: CreateUserDto): Promise<{ message: string; data: any }> {
@@ -267,7 +264,7 @@ export class UsersService {
 
     await this.mailService.sendHtmlEmail(
       email,
-      'Réinitialisation de mot de passe',
+      'Votre OTP de connexion',
       'sendOtp.html',
       { otpCode, year: new Date().getFullYear() } // envoi otpCode + année
     );
@@ -383,18 +380,18 @@ export class UsersService {
 
   async findAll(role?: string) {
     const roles = Object.values(UserRole);
-  
+
     if (role && roles.includes(role as UserRole)) {
       const usersByRole = await this.usersRepository.find({ where: { role: role as UserRole } });
-  
+
       return { data: usersByRole }; // NE PAS faire un deuxième find() ici
     }
-  
+
     // Si aucun role demandé, on retourne tout
     const users = await this.usersRepository.find();
     return { data: users };
   }
-  
+
   async findOne(id: string): Promise<{ data: UserEntity }> {
     const user = await this.usersRepository.findOneBy({ id });
     if (!user) throw new NotFoundException('User not found');
@@ -405,30 +402,10 @@ export class UsersService {
   async findUserByEmail(email: string) {
     return await this.usersRepository.findOneBy({ email });
   }
-
+  
   async remove(id: string) {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user.data);
     return { message: `User #${id} removed.` };
-  }
-
-  // Exemple de méthode pour notifier tous les utilisateurs en temps réel
-  async notifyAllUsersAboutEvent() {
-    const data = { message: 'Un événement a eu lieu!' };
-
-    // Utiliser le Gateway pour envoyer l'événement à tous les utilisateurs
-    this.usersGateway.emitToAllUsers('notificationEvent', data);
-
-    return { status: 'Success', message: 'Notification envoyée à tous les utilisateurs' };
-  }
-
-  // Exemple pour envoyer un message privé à un utilisateur spécifique
-  async sendMessageToUser(socketId: string, message: string) {
-    const data = { socketId, message };
-
-    // Envoyer le message privé à l'utilisateur spécifié
-    this.usersGateway.sendMessageToUser(socketId, message);
-
-    return { status: 'Success', message: 'Message envoyé à l\'utilisateur' };
   }
 }
