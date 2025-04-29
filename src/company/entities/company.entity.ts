@@ -45,7 +45,7 @@ export class CompanyEntity {
     @Column({ nullable: true })
     email: string;
 
-    @Column({ unique: true })
+    @Column()
     phone: string;
 
     @Column({ nullable: true })

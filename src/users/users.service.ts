@@ -89,7 +89,10 @@ export class UsersService {
     };
   }
 
-  async update(updateUserDto: Partial<UpdateUserDto>, currentUser: UserEntity): Promise<{ message: string; data: UserEntity }> {
+  async update(
+    updateUserDto: Partial<UpdateUserDto>,
+    currentUser: UserEntity,
+  ): Promise<{ message: string; data: any }> {
     const user = await this.usersRepository.findOne({ where: { id: currentUser.id } });
 
     if (!user) {
@@ -97,15 +100,75 @@ export class UsersService {
     }
 
     Object.assign(user, updateUserDto);
+    await this.usersRepository.save(user);
 
-    const updatedUser = await this.usersRepository.save(user);
+    // Rechargement de l'utilisateur enrichi avec toutes les relations
+    const fullUser = await this.usersRepository.findOne({
+      where: { id: user.id },
+      relations: [
+        'activeCompany',
+        'userHasCompanies',
+        'userHasCompanies.company',
+        'userHasCompanies.permissions',
+        'userHasCompanies.permissions.permission',
+      ],
+    });
+    if (!fullUser) {
+      throw new NotFoundException("Utilisateur enrichi introuvable après la mise à jour.");
+    }
+    // Formatage du résultat comme dans `signin`
+    const userHasCompany = fullUser.userHasCompanies?.map((uhc) => ({
+      id: uhc.id,
+      isOwner: uhc.isOwner,
+      company: uhc.company
+        ? {
+          id: uhc.company.id,
+          name: uhc.company.companyName || '',
+          logo: uhc.company.logo,
+          adresse: uhc.company.companyAddress || '',
+          typeCompany: uhc.company.typeCompany,
+        }
+        : null,
+      permissions: uhc.permissions?.map((p) => ({
+        id: p.permission?.id,
+        name: p.permission?.name,
+        create: p.create,
+        read: p.read,
+        update: p.update,
+        delete: p.delete,
+        status: p.status,
+        createdAt: p.permission?.createdAt instanceof Date
+          ? p.permission.createdAt
+          : new Date(p.permission?.createdAt),
+        updatedAt: p.permission?.updatedAt instanceof Date
+          ? p.permission.updatedAt
+          : new Date(p.permission?.updatedAt),
+      })) ?? [],
+    })) ?? [];
 
     return {
       message: 'Utilisateur mis à jour avec succès.',
-      data: updatedUser,
+      data: {
+        id: fullUser.id,
+        fullName: fullUser.fullName,
+        email: fullUser.email,
+        phone: fullUser.phone,
+        image: fullUser.image,
+        role: fullUser.role,
+        isActive: fullUser.isActive,
+        country: fullUser.country,
+        city: fullUser.city,
+        address: fullUser.address,
+        preferredLanguage: fullUser.preferredLanguage,
+        loyaltyPoints: fullUser.loyaltyPoints,
+        dateOfBirth: fullUser.dateOfBirth,
+        vehicleType: fullUser.vehicleType,
+        plateNumber: fullUser.plateNumber,
+        activeCompany: fullUser.activeCompany,
+        userHasCompany,
+      },
     };
   }
-
 
   async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<{ message: string }> {
     const { currentPassword, newPassword } = changePasswordDto;
@@ -127,7 +190,12 @@ export class UsersService {
     return { message: 'Mot de passe mis à jour avec succès' };
   }
 
-  async signin(userSignInDto: LoginUserDto): Promise<{ message: string; data: any; access_token: string, refresh_token: string }> {
+  async signin(userSignInDto: LoginUserDto): Promise<{
+    message: string;
+    data: any;
+    access_token: string;
+    refresh_token: string;
+  }> {
     const user = await this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
@@ -139,12 +207,12 @@ export class UsersService {
       .getOne();
 
     if (!user) {
-      throw new UnauthorizedException("Adresse e-mail ou mot de passe incorrect.");
+      throw new UnauthorizedException('Adresse e-mail ou mot de passe incorrect.');
     }
 
     const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException("Adresse e-mail ou mot de passe incorrect.");
+      throw new UnauthorizedException('Adresse e-mail ou mot de passe incorrect.');
     }
 
     const token = await this.accessToken(user);
@@ -160,25 +228,39 @@ export class UsersService {
           name: uhc.company.companyName || '',
           logo: uhc.company.logo,
           adresse: uhc.company.companyAddress || '',
-          typeCompany: uhc.company.typeCompany
+          typeCompany: uhc.company.typeCompany,
+          phone: uhc.company.phone,
+          vatNumber: uhc.company.vatNumber,
+          registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+          warehouseLocation: uhc.company.warehouseLocation,
+          email: uhc.company.email,
+          website: uhc.company.website,
+
         }
         : null,
-      permissions: uhc.permissions?.map((p) => ({
-        id: p.permission?.id,
-        name: p.permission?.name,
-        create: p.create,
-        read: p.read,
-        update: p.update,
-        delete: p.delete,
-        status: p.status,
-        createdAt: p.permission?.createdAt instanceof Date
-          ? p.permission.createdAt
-          : new Date(p.permission?.createdAt),
-        updatedAt: p.permission?.updatedAt instanceof Date
-          ? p.permission.updatedAt
-          : new Date(p.permission?.updatedAt),
-      })) ?? [],
+      permissions:
+        uhc.permissions?.map((p) => ({
+          id: p.permission?.id,
+          name: p.permission?.name,
+          create: p.create,
+          read: p.read,
+          update: p.update,
+          delete: p.delete,
+          status: p.status,
+          createdAt:
+            p.permission?.createdAt instanceof Date
+              ? p.permission.createdAt
+              : new Date(p.permission?.createdAt),
+          updatedAt:
+            p.permission?.updatedAt instanceof Date
+              ? p.permission.updatedAt
+              : new Date(p.permission?.updatedAt),
+        })) ?? [],
     })) ?? [];
+
+    const activeCompany = userHasCompany.find(
+      (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId
+    )?.company;
 
     return {
       message: 'Connexion réussie !',
@@ -192,6 +274,7 @@ export class UsersService {
         isActive: userWithoutPassword.isActive,
         country: userWithoutPassword.country,
         city: userWithoutPassword.city,
+        activeCompanyId: userWithoutPassword.activeCompanyId,
         address: userWithoutPassword.address,
         preferredLanguage: userWithoutPassword.preferredLanguage,
         loyaltyPoints: userWithoutPassword.loyaltyPoints,
@@ -199,14 +282,23 @@ export class UsersService {
         vehicleType: userWithoutPassword.vehicleType,
         plateNumber: userWithoutPassword.plateNumber,
         userHasCompany,
+        activeCompany,
       },
       access_token: token,
       refresh_token: refresh_t,
     };
   }
-
   async updateProfileImage(userId: string, file?: Express.Multer.File) {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: [
+        'activeCompany',
+        'userHasCompanies',
+        'userHasCompanies.company',
+        'userHasCompanies.permissions',
+        'userHasCompanies.permissions.permission',
+      ],
+    });
 
     if (!user) {
       throw new NotFoundException('Utilisateur non trouvé.');
@@ -227,12 +319,51 @@ export class UsersService {
 
     // Sauvegarder l'utilisateur avec la nouvelle image
     const updatedUser = await this.usersRepository.save(user);
+
+    // Formater l'objet utilisateur pour l'inclure dans la réponse
     const { password, ...userWithoutPassword } = updatedUser;
 
-    // Retourner la réponse avec un message de succès
+    // Enrichir l'utilisateur avec ses entreprises, permissions, etc.
+    const userHasCompany = userWithoutPassword.userHasCompanies?.map((uhc) => ({
+      id: uhc.id,
+      isOwner: uhc.isOwner,
+      company: uhc.company
+        ? {
+          id: uhc.company.id,
+          name: uhc.company.companyName || '',
+          logo: uhc.company.logo,
+          adresse: uhc.company.companyAddress || '',
+          typeCompany: uhc.company.typeCompany,
+        }
+        : null,
+      permissions: uhc.permissions?.map((p) => ({
+        id: p.permission?.id,
+        name: p.permission?.name,
+        create: p.create,
+        read: p.read,
+        update: p.update,
+        delete: p.delete,
+        status: p.status,
+        createdAt: p.permission?.createdAt instanceof Date
+          ? p.permission.createdAt
+          : new Date(p.permission?.createdAt),
+        updatedAt: p.permission?.updatedAt instanceof Date
+          ? p.permission.updatedAt
+          : new Date(p.permission?.updatedAt),
+      })) ?? [],
+    })) ?? [];
+
+    // Ajouter 'activeCompany' pour compléter la réponse
+    const responseUser = {
+      ...userWithoutPassword,
+      userHasCompany,
+      activeCompany: userWithoutPassword.activeCompany,
+    };
+
+    // Retourner la réponse avec le message et les données enrichies
     return {
-      message: 'Image de profil mise à jour avec succès',
-      data: userWithoutPassword,
+      message: 'Image de profil mise à jour avec succès.',
+      data: responseUser,
     };
   }
 
@@ -316,6 +447,26 @@ export class UsersService {
 
     return { message: 'Mot de passe réinitialisé avec succès.' };
   }
+
+  async getFullProfile(userId: string): Promise<UserEntity> {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: [
+        'activeCompany',
+        'userHasCompanies',
+        'userHasCompanies.company',
+        'userHasCompanies.permissions',
+        'userHasCompanies.permissions.permission',
+      ],
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable.');
+    }
+
+    return user;
+  }
+
 
   async accessToken(user: UserEntity): Promise<string> {
     const payload = {

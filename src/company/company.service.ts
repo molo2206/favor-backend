@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException,ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CompanyEntity } from './entities/company.entity';
@@ -40,37 +40,26 @@ export class CompanyService {
     dto: CreateCompanyDto,
     user: UserEntity,
     logoFile?: Express.Multer.File,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ message: string, data: any }> {
     if (!dto || Object.keys(dto).length === 0) {
       throw new BadRequestException('Les données de l’entreprise sont requises');
     }
-  
+
     if (!dto.companyName || dto.companyName.trim() === '') {
       throw new BadRequestException('Le nom de l’entreprise est obligatoire');
     }
-  
+
     let logoUrl: string | null = null;
     if (logoFile) {
       logoUrl = await this.cloudinary.handleUploadImage(logoFile, 'company');
     }
-  
-    // Vérification de la duplication du numéro de téléphone
-    if (dto.phone) {
-      const existingCompanyWithPhone = await this.companyRepository.findOne({
-        where: { phone: dto.phone },
-      });
-  
-      if (existingCompanyWithPhone) {
-        throw new ConflictException('Le numéro de téléphone est déjà utilisé par une autre entreprise');
-      }
-    }
-  
+
     // Vérifier si l'entreprise existe déjà
     let company = await this.companyRepository.findOne({
       where: { companyName: dto.companyName },
     });
-  
+
     if (company) {
       // Si l'entreprise existe, mettre à jour les champs
       Object.assign(company, {
@@ -80,7 +69,7 @@ export class CompanyService {
         warehouseLocation: dto.warehouseLocation ?? company.warehouseLocation,
         logo: logoUrl ?? company.logo,
         typeCompany: company.typeCompany,
-        phone: dto.phone ?? company.phone, // Mise à jour ou conservation de l'ancien phone
+        phone: dto.phone ?? company.phone,
       });
     } else {
       // Sinon, créer une nouvelle entreprise
@@ -92,20 +81,20 @@ export class CompanyService {
         warehouseLocation: dto.warehouseLocation,
         logo: logoUrl,
         typeCompany: dto.typeCompany!,
-        phone: dto.phone, // Assigner le phone si il est dans le DTO
+        phone: dto.phone,
       };
       company = this.companyRepository.create(companyData);
     }
-  
+
     // Sauvegarde de l'entreprise
     const savedCompany = await this.companyRepository.save(company);
-  
+
     // Vérifier et créer l'association utilisateur-entreprise si nécessaire
     let userHasCompany = await this.userHasCompanyRepository.findOne({
       where: { user: { id: user.id } },
       relations: ['user', 'company'],
     });
-  
+
     if (!userHasCompany) {
       userHasCompany = this.userHasCompanyRepository.create({
         user,
@@ -115,39 +104,29 @@ export class CompanyService {
     } else {
       userHasCompany.company = savedCompany;
     }
-  
+
     await this.userHasCompanyRepository.save(userHasCompany);
-  
+
     // Mise à jour de l'utilisateur avec la nouvelle entreprise active
     user.activeCompany = savedCompany;
     user.activeCompanyId = savedCompany.id;
     const updatedUser = await this.userRepository.save(user);
-  
-    // Désintégration des données inutiles (userHasCompanies)
+
+    // Désintégration des données inutiles
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { userHasCompanies, ...userClean } = updatedUser;
-  
-    // Vérification de l'existence du phone et ajout d'un message
-    let phoneMessage = '';
-    if (dto.phone) {
-      phoneMessage = 'Le numéro de téléphone existe';
-    } else {
-      phoneMessage = 'Le numéro de téléphone n\'existe pas';
-    }
-  
-    // Retourner l'objet avec la company et l'utilisateur, sans 'userHasCompanies'
+
+    const fullUser = await this.userRepository.findOne({
+      where: { id: updatedUser.id },
+      relations: ['activeCompany'],
+    });
+
     return {
-      message: `Companie enregistrée avec succès. ${phoneMessage}`,
-      data: {
-        ...savedCompany, // Champs de l’entreprise à plat
-        user: {
-          ...userClean,
-          activeCompany: savedCompany, // Inclure l'entreprise active dans l'utilisateur
-        },
-      },
+      message: `Companie enregistrée avec succès.`,
+      data: fullUser!,
     };
   }
-  
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async CreateUserToCompany(dto: CreateUserHasCompanyDto): Promise<{ message: string, data: any }> {  // Retourne 'data' dans l'objet
     const user = await this.userRepository.findOneOrFail({ where: { id: dto.userId } });

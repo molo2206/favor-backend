@@ -140,12 +140,17 @@ export class UsersController {
 
   @UseGuards(AuthentificationGuard)
   @Get('me')
-  async getProfile(@CurrentUser() currentUser: UserEntity): Promise<{ data: UserEntity }> {
+  async getProfile(
+    @CurrentUser() currentUser: UserEntity,
+  ): Promise<{ data: UserEntity }> {
     if (!currentUser) {
       throw new UnauthorizedException('Utilisateur non connecté.');
     }
-    return { data: currentUser };
+
+    const fullUser = await this.usersService.getFullProfile(currentUser.id);
+    return { data: fullUser };
   }
+
 
   // ────── 🔄 Mot de passe oublié / réinitialisation ──────
 
