@@ -46,6 +46,17 @@ export class CompanyController {
     return this.companyService.updateCompanyWithUser(dto, companyId, currentUser.id, logoFile);
   }
 
+  @Patch('me/active-company/:companyId')
+  @UseGuards(AuthentificationGuard)
+  async setMyActiveCompany(
+    @CurrentUser() user: UserEntity,
+    @Param('companyId') companyId: string,
+  ) {
+    const updated = await this.companyService.setActiveCompany(user.id, companyId);
+    return { message: 'Entreprise active mise à jour', data: updated };
+  }
+
+
   @Patch(':id/toggle-status')
   @UseGuards(AuthentificationGuard, AuthorizeGuard)
   @AuthorizeRoles(UserRole.ADMIN)

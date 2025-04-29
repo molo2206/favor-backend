@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsUrl, IsNotEmpty } from 'class-validator';
+import { IsOptional, IsString, IsUrl, IsNotEmpty, IsEnum } from 'class-validator';
+import { CompanyType } from 'src/users/utility/common/type.company.enum';
 
 export class CreateCompanyDto {
   @IsNotEmpty()
@@ -27,8 +28,16 @@ export class CreateCompanyDto {
   logo?: string | null;  // Permet de stocker null si le logo n'est pas présent
 
   @IsOptional()
-  @IsString()
-  typeCompany?: string; 
+  @IsEnum(CompanyType, {
+    message: `Le type d'entreprise doit être l'une des valeurs suivantes : ${Object.values(CompanyType).join(', ')}`,
+  })
+  typeCompany?: CompanyType;
 
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
 }
 

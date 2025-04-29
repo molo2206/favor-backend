@@ -127,13 +127,12 @@ export class UsersService {
     return { message: 'Mot de passe mis à jour avec succès' };
   }
 
-  async signin(userSignInDto: LoginUserDto): Promise<{ message: string; data: any; access_token: string }> {
+  async signin(userSignInDto: LoginUserDto): Promise<{ message: string; data: any; access_token: string, refresh_token: string }> {
     const user = await this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
       .leftJoinAndSelect('users.userHasCompanies', 'userHasCompanies')
       .leftJoinAndSelect('userHasCompanies.company', 'company')
-      .leftJoinAndSelect('company.typeCompany', 'typeCompany')
       .leftJoinAndSelect('userHasCompanies.permissions', 'permissions')
       .leftJoinAndSelect('permissions.permission', 'permission')
       .where('users.email = :email', { email: userSignInDto.email })
@@ -149,6 +148,7 @@ export class UsersService {
     }
 
     const token = await this.accessToken(user);
+    const refresh_t = await this.refreshToken(user);
     const { password, ...userWithoutPassword } = user;
 
     const userHasCompany = userWithoutPassword.userHasCompanies?.map((uhc) => ({
@@ -161,11 +161,6 @@ export class UsersService {
           logo: uhc.company.logo,
           adresse: uhc.company.companyAddress || '',
           typeCompany: uhc.company.typeCompany
-            ? {
-              id: uhc.company.typeCompany.id,
-              name: uhc.company.typeCompany.name,
-            }
-            : null,
         }
         : null,
       permissions: uhc.permissions?.map((p) => ({
@@ -206,6 +201,7 @@ export class UsersService {
         userHasCompany,
       },
       access_token: token,
+      refresh_token: refresh_t,
     };
   }
 
@@ -338,6 +334,49 @@ export class UsersService {
       secret: secretKey,
     });
   }
+  async refreshToken(user: UserEntity): Promise<string> {
+    const payload = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const secretKey = this.configService.get<string>('REFRESH_TOKEN_SECRET_KEY');
+    if (!secretKey) {
+      throw new Error('REFRESH_TOKEN_SECRET_KEY is not defined!');
+    }
+
+    return await this.jwtService.signAsync(payload, {
+      expiresIn: '7d',
+      secret: secretKey,
+    });
+  }
+
+  async refreshTokenWithValidation(refresh_token: string): Promise<string> {
+    if (!refresh_token) {
+      throw new BadRequestException('Le refresh_token est requis.');
+    }
+
+    let decoded: any;
+    const secret = this.configService.get<string>('REFRESH_TOKEN_SECRET_KEY'); // Utilise la bonne clé ici
+
+    if (!secret) {
+      throw new Error('REFRESH_TOKEN_SECRET_KEY is not défini dans .env');
+    }
+
+    try {
+      decoded = await this.jwtService.verifyAsync(refresh_token, { secret });
+    } catch (err) {
+      throw new UnauthorizedException('Refresh token invalide ou expiré.');
+    }
+
+    const user = await this.usersRepository.findOne({ where: { id: decoded.id } });
+    if (!user) {
+      throw new UnauthorizedException('Utilisateur introuvable.');
+    }
+
+    return this.accessToken(user); // Génère un nouveau access_token
+  }
 
   generateSecret(email: string) {
     return speakeasy.generateSecret({ name: `FavorApp (${email})` });
@@ -402,7 +441,7 @@ export class UsersService {
   async findUserByEmail(email: string) {
     return await this.usersRepository.findOneBy({ email });
   }
-  
+
   async remove(id: string) {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user.data);

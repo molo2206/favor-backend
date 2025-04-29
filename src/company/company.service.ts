@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CompanyEntity } from './entities/company.entity';
@@ -11,6 +11,7 @@ import { CreateUserHasCompanyDto } from 'src/user_has_company/dto/create-user_ha
 import { instanceToPlain } from 'class-transformer';
 import { TypeCompany } from 'src/type_company/entities/type_company.entity';
 import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
+import { CompanyType } from 'src/users/utility/common/type.company.enum';
 
 @Injectable()
 export class CompanyService {
@@ -30,7 +31,8 @@ export class CompanyService {
     @InjectRepository(TypeCompany) // Ajout de l'injection du repository TypeCompany
     private readonly typeCompanyRepository: Repository<TypeCompany>, // Définition de la propriété
 
-    private readonly cloudinary: CloudinaryService
+    private readonly cloudinary: CloudinaryService,
+
   ) { }
 
   // services/company.service.ts
@@ -38,45 +40,50 @@ export class CompanyService {
     dto: CreateCompanyDto,
     user: UserEntity,
     logoFile?: Express.Multer.File,
-  ): Promise<{ message: string, data: CompanyEntity }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): Promise<{ message: string, data: any }> {
     if (!dto || Object.keys(dto).length === 0) {
       throw new BadRequestException('Les données de l’entreprise sont requises');
     }
-
+  
     if (!dto.companyName || dto.companyName.trim() === '') {
       throw new BadRequestException('Le nom de l’entreprise est obligatoire');
     }
-
-    let typeCompanyEntity: TypeCompany | null = null;
-    if (dto.typeCompany) {
-      typeCompanyEntity = await this.typeCompanyRepository.findOne({
-        where: { id: dto.typeCompany },
-      });
-
-      if (!typeCompanyEntity) {
-        throw new NotFoundException(`TypeCompany avec l'id ${dto.typeCompany} introuvable`);
-      }
-    }
-
+  
     let logoUrl: string | null = null;
     if (logoFile) {
       logoUrl = await this.cloudinary.handleUploadImage(logoFile, 'company');
     }
-
+  
+    // Vérification de la duplication du numéro de téléphone
+    if (dto.phone) {
+      const existingCompanyWithPhone = await this.companyRepository.findOne({
+        where: { phone: dto.phone },
+      });
+  
+      if (existingCompanyWithPhone) {
+        throw new ConflictException('Le numéro de téléphone est déjà utilisé par une autre entreprise');
+      }
+    }
+  
+    // Vérifier si l'entreprise existe déjà
     let company = await this.companyRepository.findOne({
       where: { companyName: dto.companyName },
     });
-
+  
     if (company) {
+      // Si l'entreprise existe, mettre à jour les champs
       Object.assign(company, {
         companyAddress: dto.companyAddress ?? company.companyAddress,
         vatNumber: dto.vatNumber ?? company.vatNumber,
         registrationDocumentUrl: dto.registrationDocumentUrl ?? company.registrationDocumentUrl,
         warehouseLocation: dto.warehouseLocation ?? company.warehouseLocation,
         logo: logoUrl ?? company.logo,
-        typeCompany: typeCompanyEntity ?? company.typeCompany,
+        typeCompany: company.typeCompany,
+        phone: dto.phone ?? company.phone, // Mise à jour ou conservation de l'ancien phone
       });
     } else {
+      // Sinon, créer une nouvelle entreprise
       const companyData: Partial<CompanyEntity> = {
         companyName: dto.companyName,
         companyAddress: dto.companyAddress,
@@ -84,19 +91,21 @@ export class CompanyService {
         registrationDocumentUrl: dto.registrationDocumentUrl,
         warehouseLocation: dto.warehouseLocation,
         logo: logoUrl,
-        typeCompany: typeCompanyEntity,
+        typeCompany: dto.typeCompany!,
+        phone: dto.phone, // Assigner le phone si il est dans le DTO
       };
-
       company = this.companyRepository.create(companyData);
     }
-
+  
+    // Sauvegarde de l'entreprise
     const savedCompany = await this.companyRepository.save(company);
-
+  
+    // Vérifier et créer l'association utilisateur-entreprise si nécessaire
     let userHasCompany = await this.userHasCompanyRepository.findOne({
       where: { user: { id: user.id } },
       relations: ['user', 'company'],
     });
-
+  
     if (!userHasCompany) {
       userHasCompany = this.userHasCompanyRepository.create({
         user,
@@ -106,13 +115,39 @@ export class CompanyService {
     } else {
       userHasCompany.company = savedCompany;
     }
-
+  
     await this.userHasCompanyRepository.save(userHasCompany);
-
-    return { message: "Companie enregistrée avec succès", data: savedCompany };
+  
+    // Mise à jour de l'utilisateur avec la nouvelle entreprise active
+    user.activeCompany = savedCompany;
+    user.activeCompanyId = savedCompany.id;
+    const updatedUser = await this.userRepository.save(user);
+  
+    // Désintégration des données inutiles (userHasCompanies)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { userHasCompanies, ...userClean } = updatedUser;
+  
+    // Vérification de l'existence du phone et ajout d'un message
+    let phoneMessage = '';
+    if (dto.phone) {
+      phoneMessage = 'Le numéro de téléphone existe';
+    } else {
+      phoneMessage = 'Le numéro de téléphone n\'existe pas';
+    }
+  
+    // Retourner l'objet avec la company et l'utilisateur, sans 'userHasCompanies'
+    return {
+      message: `Companie enregistrée avec succès. ${phoneMessage}`,
+      data: {
+        ...savedCompany, // Champs de l’entreprise à plat
+        user: {
+          ...userClean,
+          activeCompany: savedCompany, // Inclure l'entreprise active dans l'utilisateur
+        },
+      },
+    };
   }
-
-
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async CreateUserToCompany(dto: CreateUserHasCompanyDto): Promise<{ message: string, data: any }> {  // Retourne 'data' dans l'objet
     const user = await this.userRepository.findOneOrFail({ where: { id: dto.userId } });
@@ -189,17 +224,11 @@ export class CompanyService {
 
     // Si un type d'entreprise est fourni, on le met à jour
     if (dto.typeCompany) {
-      const typeCompanyEntity = await this.typeCompanyRepository.findOne({
-        where: { id: dto.typeCompany },
-      });
-
-      if (!typeCompanyEntity) {
-        throw new NotFoundException(`TypeCompany avec l'ID ${dto.typeCompany} introuvable`);
+      if (!Object.values(CompanyType).includes(dto.typeCompany as CompanyType)) {
+        throw new BadRequestException(`TypeCompany invalide: ${dto.typeCompany}`);
       }
-
-      company.typeCompany = typeCompanyEntity;
+      company.typeCompany = dto.typeCompany as CompanyType;
     }
-
     // Sauvegarde de l'entreprise mise à jour
     const updatedCompany = await this.companyRepository.save(company);
 
@@ -322,6 +351,33 @@ export class CompanyService {
         products,   // les produits dans un tableau
       },
     };
+  }
+
+  async setActiveCompany(userId: string, companyId: string): Promise<UserEntity> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    const company = await this.companyRepository.findOne({ where: { id: companyId } });
+    if (!company) {
+      throw new NotFoundException('Entreprise introuvable');
+    }
+
+    const userHasCompany = await this.userHasCompanyRepository.findOne({
+      where: {
+        user: { id: userId },
+        company: { id: companyId },
+      },
+    });
+
+    if (!userHasCompany) {
+      throw new ForbiddenException("Cet utilisateur n'est pas lié à cette entreprise");
+    }
+
+    user.activeCompany = company;
+    user.activeCompanyId = company.id;
+    return await this.userRepository.save(user);
   }
 
 }

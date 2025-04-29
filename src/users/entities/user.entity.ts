@@ -1,10 +1,11 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, Timestamp, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, Timestamp, UpdateDateColumn } from "typeorm";
 import { UserRole } from "../utility/common/user-role-enum";
 import { VehicleType } from "../utility/common/user-vehiculetype.enum";
 import { OtpEntity } from "src/otp/entities/otp.entity";
 import { Exclude } from "class-transformer";
 import { UserHasCompanyEntity } from "src/user_has_company/entities/user_has_company.entity";
 import { OrderEntity } from "src/order/entities/order.entity";
+import { CompanyEntity } from "src/company/entities/company.entity";
 
 @Entity('users')
 export class UserEntity {
@@ -86,5 +87,12 @@ export class UserEntity {
     orders: OrderEntity[];
 
     @Column({ nullable: true })
-    socketId?: string;  // Champ pour suivre le socketId de l'utilisateur
+    socketId?: string;
+
+    @ManyToOne(() => CompanyEntity, { nullable: true })
+    @JoinColumn({ name: 'activeCompanyId' })
+    activeCompany?: CompanyEntity;
+    
+    @Column({ nullable: true })
+    activeCompanyId?: string;
 }

@@ -54,12 +54,16 @@ export class UsersController {
     return await this.usersService.signin(loginUserDto);
   }
 
-  @UseGuards(AuthentificationGuard)
-  @Post('refresh')
-  async refreshToken(@CurrentUser() currentUser: UserEntity) {
-    const newAccessToken = await this.usersService.accessToken(currentUser);
-    return { accessToken: newAccessToken };
+  @Post('refresh-token')
+  async refresh(@Body('refresh_token') refreshToken: string) {
+    const accessToken = await this.usersService.refreshTokenWithValidation(refreshToken);
+    return {
+      message: 'Nouveau token généré',
+      access_token: accessToken,
+    };
   }
+
+
 
   // ────── 🔐 Authentification à deux facteurs ──────
   @UseGuards(AuthentificationGuard)

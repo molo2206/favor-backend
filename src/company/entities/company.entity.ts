@@ -1,8 +1,8 @@
 import { Product } from "src/products/entities/product.entity";
-import { TypeCompany } from "src/type_company/entities/type_company.entity";
 import { UserHasCompanyEntity } from "src/user_has_company/entities/user_has_company.entity";
 import { CompanyStatus } from "src/users/utility/common/company-status.enum";
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { CompanyType } from "src/users/utility/common/type.company.enum";
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 @Entity('company')
 export class CompanyEntity {
@@ -36,11 +36,18 @@ export class CompanyEntity {
     @OneToMany(() => UserHasCompanyEntity, (userHasCompany) => userHasCompany.company)
     userHasCompanies: UserHasCompanyEntity[];
 
-    @ManyToOne(() => TypeCompany, { nullable: true })
-    @JoinColumn({ name: 'type_company_id' })
-    typeCompany: TypeCompany | null | undefined;
+    @Column({ type: 'enum', enum: CompanyType })
+    typeCompany: CompanyType;
 
     @OneToMany(() => Product, product => product.company)
     products: Product[];
 
+    @Column({ nullable: true })
+    email: string;
+
+    @Column({ unique: true })
+    phone: string;
+
+    @Column({ nullable: true })
+    website: string;
 }
