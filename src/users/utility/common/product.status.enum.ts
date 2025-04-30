@@ -1,6 +1,6 @@
-export enum CompanyStatus {
+export enum ProductStatus {
     PENDING = 'PENDING',
-    VALIDATED = 'VALIDATED',
     REJECTED = 'REJECTED',
+    PUBLISHED = 'PUBLISHED',
   }
   

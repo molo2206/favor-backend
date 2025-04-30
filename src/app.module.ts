@@ -24,6 +24,7 @@ import { SignatureModule } from './signature/signature.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { join } from 'path';
+import { TravelReservationModule } from './travel_reservation/travel_reservation.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { join } from 'path';
     DeliveryModule,
     SignatureModule,
     TrackingModule,
+    TravelReservationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

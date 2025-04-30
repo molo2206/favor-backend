@@ -29,7 +29,6 @@ export class UsersService {
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
-    private readonly mailerService: MailerService,
     @InjectRepository(OtpEntity)
     private readonly otpRepository: Repository<OtpEntity>,
 
@@ -40,11 +39,16 @@ export class UsersService {
   ) { }
 
   async signup(createUserDto: CreateUserDto): Promise<{ message: string; data: any }> {
-    const { email, otpCode, password } = createUserDto;
+    const { email, phone, otpCode, password } = createUserDto;
 
-    const userExists = await this.usersRepository.findOne({ where: { email } });
-    if (userExists) {
+    const emailExists = await this.usersRepository.findOne({ where: { email } });
+    if (emailExists) {
       throw new BadRequestException('Un compte avec cet email existe déjà.');
+    }
+
+    const phoneExists = await this.usersRepository.findOne({ where: { phone } });
+    if (phoneExists) {
+      throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
     }
 
     if (!otpCode) {
@@ -61,10 +65,10 @@ export class UsersService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // On affecte directement le rôle statique "USER"
     const data = this.usersRepository.create({
       ...createUserDto,
       email,
+      phone,
       password: hashedPassword,
       role: UserRole.CUSTOMER,
     });
@@ -81,8 +85,9 @@ export class UsersService {
       email,
       'Vous avez déjà un compte dans FavorHelp',
       'createCount.html',
-      { userWithoutPassword, year: new Date().getFullYear() } // envoi otpCode + année
+      { userWithoutPassword, year: new Date().getFullYear() }
     );
+
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: userWithoutPassword,
@@ -123,7 +128,7 @@ export class UsersService {
       company: uhc.company
         ? {
           id: uhc.company.id,
-          name: uhc.company.companyName || '',
+          companyName: uhc.company.companyName || '',
           logo: uhc.company.logo,
           adresse: uhc.company.companyAddress || '',
           typeCompany: uhc.company.typeCompany,
@@ -232,7 +237,7 @@ export class UsersService {
       company: uhc.company
         ? {
           id: uhc.company.id,
-          name: uhc.company.companyName || '',
+          companyName: uhc.company.companyName || '',
           logo: uhc.company.logo,
           adresse: uhc.company.companyAddress || '',
           typeCompany: uhc.company.typeCompany,
@@ -337,7 +342,7 @@ export class UsersService {
       company: uhc.company
         ? {
           id: uhc.company.id,
-          name: uhc.company.companyName || '',
+          companyName: uhc.company.companyName || '',
           logo: uhc.company.logo,
           adresse: uhc.company.companyAddress || '',
           typeCompany: uhc.company.typeCompany,

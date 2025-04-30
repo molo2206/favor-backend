@@ -25,11 +25,11 @@ import { MailModule } from 'src/email/email.module';
           signOptions: { expiresIn: '1h' },
         };
       },
-    }),   
+    }),
     MailModule,
   ],
   controllers: [UsersController],
   providers: [UsersService, CloudinaryService],
-  exports: [UsersService],
+  exports: [UsersService, TypeOrmModule],
 })
-export class UsersModule {}
+export class UsersModule { }

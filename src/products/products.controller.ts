@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe, UseGuards, ValidationPipe, UsePipes, UseInterceptors, UploadedFiles, ClassSerializerInterceptor, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe, UseGuards, ValidationPipe, UsePipes, UseInterceptors, UploadedFiles, ClassSerializerInterceptor, Query, BadRequestException } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { Product } from './entities/product.entity';
 import { ProductService } from './products.service';
@@ -7,6 +7,8 @@ import { AuthentificationGuard } from 'src/users/utility/guards/authentification
 import { RolesGuard } from 'src/users/utility/decorators/roles.guard';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { CategoryEntity } from 'src/category/entities/category.entity';
+import { CurrentUser } from '../users/utility/decorators/current-user-decorator';
+import { UserEntity } from 'src/users/entities/user.entity';
 
 @Controller('products')
 export class ProductController {
@@ -16,13 +18,47 @@ export class ProductController {
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(FilesInterceptor('images', 10)) // plusieurs fichiers
+  @UseInterceptors(FilesInterceptor('images', 10))
   async create(
     @UploadedFiles() files: Express.Multer.File[],
     @Body() dto: CreateProductDto,
+    @CurrentUser() user: UserEntity,
   ) {
-    return this.productService.create(dto, files);
+    // Ajoutez un log pour vérifier l'entreprise active
+    console.log('Entreprise active de l\'utilisateur :', user.activeCompany);
+  
+    // Vérifiez si l'utilisateur a une entreprise active
+    if (!user.activeCompanyId) {
+      throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
+    }
+  
+    const result = await this.productService.create(dto, files, user);
+    return {
+      message: result.message,
+      data: result.data,
+    };
   }
+
+
+  @Patch(':id')
+  @UseGuards(AuthentificationGuard, RolesGuard)
+  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  @UseInterceptors(ClassSerializerInterceptor)
+  @UseInterceptors(FilesInterceptor('images', 10))
+  async update(
+    @Param('id') id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() dto: CreateProductDto,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const result = await this.productService.update(id, dto, files, user);
+    return {
+      message: result.message,
+      data: result.data,
+    };
+  }
+
 
   // Récupérer un produit par ID
   @Get('one/:id')
@@ -30,22 +66,7 @@ export class ProductController {
     return this.productService.findOne(id);
   }
 
-  // Mise à jour d'un produit
-  @Patch(':id')
-  @UseGuards(AuthentificationGuard, RolesGuard)
-  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(ClassSerializerInterceptor)
-  @UseInterceptors(
-    FilesInterceptor('images', 10), // Jusqu'à 10 fichiers d’un coup
-  )
-  async update(
-    @Param('id') id: string,
-    @UploadedFiles() files: Express.Multer.File[],
-    @Body() dto: CreateProductDto,
-  ): Promise<Product> {
-    return this.productService.update(id, dto, files);
-  }
+
 
   @Get()
   async getProductsByType(@Query('type') type?: string): Promise<Product[]> {

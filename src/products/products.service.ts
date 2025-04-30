@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
@@ -7,6 +7,8 @@ import { CompanyEntity } from 'src/company/entities/company.entity';
 import { CategoryEntity } from 'src/category/entities/category.entity';
 import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
 import { ImageProductEntity } from './entities/imageProduct.entity';
+import { UserEntity } from 'src/users/entities/user.entity';
+import { ProductStatus } from 'src/users/utility/common/product.status.enum';
 
 @Injectable()
 export class ProductService {
@@ -27,54 +29,72 @@ export class ProductService {
   ) { }
 
   // Création d'un produit
-  async create(createProductDto: CreateProductDto, files: Express.Multer.File[]): Promise<Product> {
-    const { companyId, categoryId, ...data } = createProductDto;
+  async create(
+    createProductDto: CreateProductDto,
+    files: Express.Multer.File[],
+    user: UserEntity,
+  ): Promise<{ message: string; data: Product }> {
+    const { categoryId, status, ...data } = createProductDto;
 
-    // Recherche de l'entreprise
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
-    if (!company) throw new NotFoundException('Entreprise non trouvée');
+    if (!user.activeCompanyId) {
+      throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
+    }
 
-    // Recherche de la catégorie (si fournie)
-    let category: CategoryEntity | undefined = undefined;
+    const company = await this.companyRepo.findOne({
+      where: { id: user.activeCompanyId },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Entreprise active introuvable');
+    }
+
+    let category: CategoryEntity | null | undefined = undefined;
     if (categoryId) {
-      const foundCategory = await this.categoryRepo.findOne({ where: { id: categoryId } });
-      if (!foundCategory) throw new NotFoundException('Catégorie non trouvée');
-      category = foundCategory;
+      category = await this.categoryRepo.findOne({ where: { id: categoryId } });
+      if (!category) throw new NotFoundException('Catégorie non trouvée');
     }
 
     let imageUrl: string | undefined = undefined;
-    if (files && files.length > 0) {
+    if (files?.length > 0) {
       imageUrl = await this.cloudinary.handleUploadImage(files[0], 'product');
     }
 
-    // Création du produit avec l'image principale
+    const productStatus = status || ProductStatus.PENDING; // Utiliser `PENDING` par défaut
+
     const product = this.productRepo.create({
       ...data,
       company,
       category,
       image: imageUrl,
+      type: company.typeCompany,
+      status: productStatus,
     });
 
-    await this.productRepo.save(product); // On sauvegarde ici avant d'associer les images secondaires
+    await this.productRepo.save(product);
 
-    if (files && files.length > 0) {
-      const newImages: ImageProductEntity[] = [];
+    if (files?.length > 0) {
+      const secondaryImages: ImageProductEntity[] = [];
 
       for (const file of files) {
         const uploaded = await this.cloudinary.handleUploadImage(file, 'product');
-
         const imageEntity = new ImageProductEntity();
         imageEntity.url = uploaded;
         imageEntity.product = product;
-
-        newImages.push(imageEntity);
+        secondaryImages.push(imageEntity);
       }
 
-      await this.imageRepository.save(newImages);
-      product.images = newImages;
+      await this.imageRepository.save(secondaryImages);
+      product.images = secondaryImages;
     }
-    return product;
+
+    return {
+      message: 'Produit créé avec succès',
+      data: product,
+    };
   }
+
+
+
   // Récupérer un produit par son ID
   async findOne(id: string): Promise<Product> {
     const product = await this.productRepo.findOne({
@@ -132,9 +152,6 @@ export class ProductService {
       products,
     };
   }
-
-
-
 
   async groupByType(): Promise<Record<string, Product[]>> {
     const products = await this.productRepo.find({
@@ -203,63 +220,64 @@ export class ProductService {
     return grouped;
   }
 
-  async update(id: string, updateProductDto: CreateProductDto, files: Express.Multer.File[]): Promise<Product> {
-    const { companyId, categoryId, ...data } = updateProductDto;
+  async update(
+    id: string,
+    updateProductDto: CreateProductDto,
+    files: Express.Multer.File[],
+    user: UserEntity,
+  ): Promise<{ message: string; data: Product }> {
+    const { categoryId, status, ...data } = updateProductDto;  // Extraction du statut
 
-    // Récupération du produit existant
     const product = await this.productRepo.findOne({
       where: { id },
       relations: ['images'],
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
-    // Mise à jour des champs de base
-    Object.assign(product, data);
-
-    // Mise à jour de l'entreprise si changée
-    if (companyId) {
-      const company = await this.companyRepo.findOne({ where: { id: companyId } });
-      if (!company) throw new NotFoundException('Entreprise non trouvée');
-      product.company = company;
+    // Mise à jour des données, y compris le statut si fourni
+    if (status) {
+      product.status = status;
     }
 
-    // Mise à jour de la catégorie si fournie
+    Object.assign(product, data);
+
+    const company = await this.companyRepo.findOne({
+      where: { id: user.activeCompanyId },
+    });
+    if (!company) throw new NotFoundException('Entreprise active non trouvée');
+    product.company = company;
+    product.type = company.typeCompany;
+
     if (categoryId) {
       const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
       if (!category) throw new NotFoundException('Catégorie non trouvée');
       product.category = category;
+    } else {
+      product.category = undefined;
     }
 
     if (files && files.length > 0) {
-      // 🔥 Supprimer l'image principale précédente (si elle existe)
       if (product.image) {
         await this.cloudinary.handleDeleteImage(product.image);
       }
 
-      // 🔥 Supprimer toutes les anciennes images secondaires de Cloudinary
-      if (product.images && product.images.length > 0) {
+      if (product.images?.length) {
         for (const img of product.images) {
           await this.cloudinary.handleDeleteImage(img.url);
         }
       }
 
-      // 🔥 Supprimer les entrées en base liées aux anciennes images
       await this.imageRepository.delete({ product: { id: product.id } });
 
-      // 🖼️ Upload de la nouvelle image principale
       const uploadedMainImage = await this.cloudinary.handleUploadImage(files[0], 'product');
       product.image = uploadedMainImage;
 
-      // 🖼️ Upload des nouvelles images secondaires (le reste)
       const newImages: ImageProductEntity[] = [];
-
       for (const file of files.slice(1)) {
         const uploaded = await this.cloudinary.handleUploadImage(file, 'product');
-
         const imageEntity = new ImageProductEntity();
         imageEntity.url = uploaded;
         imageEntity.product = product;
-
         newImages.push(imageEntity);
       }
 
@@ -267,8 +285,17 @@ export class ProductService {
       product.images = newImages;
     }
 
-    return this.productRepo.save(product);
+    const updatedProduct = await this.productRepo.save(product);
+
+    return {
+      message: 'Produit mis à jour avec succès',
+      data: updatedProduct,
+    };
   }
+
+
+
+
 
   async searchProducts(search: string) {
     const qb = this.productRepo.createQueryBuilder('product')

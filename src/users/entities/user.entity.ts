@@ -6,6 +6,7 @@ import { Exclude } from "class-transformer";
 import { UserHasCompanyEntity } from "src/user_has_company/entities/user_has_company.entity";
 import { OrderEntity } from "src/order/entities/order.entity";
 import { CompanyEntity } from "src/company/entities/company.entity";
+import { TravelReservationEntity } from "src/travel_reservation/entities/travel_reservation.entity";
 
 @Entity('users')
 export class UserEntity {
@@ -92,7 +93,10 @@ export class UserEntity {
     @ManyToOne(() => CompanyEntity, { nullable: true })
     @JoinColumn({ name: 'activeCompanyId' })
     activeCompany?: CompanyEntity;
-    
+
     @Column({ nullable: true })
     activeCompanyId?: string;
+
+    @OneToMany(() => TravelReservationEntity, (reservation) => reservation.client)
+    travelReservations: TravelReservationEntity[];
 }

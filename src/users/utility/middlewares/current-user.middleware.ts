@@ -27,6 +27,7 @@ declare global {
         dateOfBirth?: Date;
         vehicleType?: string;
         plateNumber?: string;
+        activeCompanyId?: string;
       } | null;
     }
 
@@ -78,6 +79,7 @@ export class CurrentUserMiddleware implements NestMiddleware {
         dateOfBirth: user.data.dateOfBirth,
         vehicleType: user.data.vehicleType,
         plateNumber: user.data.plateNumber,
+        activeCompanyId: user.data.activeCompanyId,
         role
       };
     } catch (err) {
