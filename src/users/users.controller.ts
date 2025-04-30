@@ -142,7 +142,8 @@ export class UsersController {
   @Get('me')
   async getProfile(
     @CurrentUser() currentUser: UserEntity,
-  ): Promise<{ data: UserEntity }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): Promise<{ data: Record<string, any> }> {
     if (!currentUser) {
       throw new UnauthorizedException('Utilisateur non connecté.');
     }

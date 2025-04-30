@@ -12,7 +12,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { MailerService } from '@nestjs-modules/mailer';
 import { LoginUserDto } from './dto/login-user.dto';
 import { validate } from 'class-validator';
-import { plainToInstance } from 'class-transformer';
+import { instanceToPlain, plainToInstance } from 'class-transformer';
 import { VerifyOtpDto } from 'src/otp/dto/verify-otp.dto';
 import { ResetPasswordDto } from 'src/otp/dto/reset-password.dto';
 import { UpdateUserImageDto } from './dto/update-user.dto';
@@ -107,17 +107,17 @@ export class UsersService {
       where: { id: user.id },
       relations: [
         'activeCompany',
-        'userHasCompanies',
-        'userHasCompanies.company',
-        'userHasCompanies.permissions',
-        'userHasCompanies.permissions.permission',
+        'userHasCompany',
+        'userHasCompany.company',
+        'userHasCompany.permissions',
+        'userHasCompany.permissions.permission',
       ],
     });
     if (!fullUser) {
       throw new NotFoundException("Utilisateur enrichi introuvable après la mise à jour.");
     }
     // Formatage du résultat comme dans `signin`
-    const userHasCompany = fullUser.userHasCompanies?.map((uhc) => ({
+    const userHasCompany = fullUser.userHasCompany?.map((uhc) => ({
       id: uhc.id,
       isOwner: uhc.isOwner,
       company: uhc.company
@@ -127,6 +127,12 @@ export class UsersService {
           logo: uhc.company.logo,
           adresse: uhc.company.companyAddress || '',
           typeCompany: uhc.company.typeCompany,
+          phone: uhc.company.phone,
+          vatNumber: uhc.company.vatNumber,
+          registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+          warehouseLocation: uhc.company.warehouseLocation,
+          email: uhc.company.email,
+          website: uhc.company.website,
         }
         : null,
       permissions: uhc.permissions?.map((p) => ({
@@ -199,9 +205,9 @@ export class UsersService {
     const user = await this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
-      .leftJoinAndSelect('users.userHasCompanies', 'userHasCompanies')
-      .leftJoinAndSelect('userHasCompanies.company', 'company')
-      .leftJoinAndSelect('userHasCompanies.permissions', 'permissions')
+      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('userHasCompany.company', 'company')
+      .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
       .leftJoinAndSelect('permissions.permission', 'permission')
       .where('users.email = :email', { email: userSignInDto.email })
       .getOne();
@@ -219,7 +225,7 @@ export class UsersService {
     const refresh_t = await this.refreshToken(user);
     const { password, ...userWithoutPassword } = user;
 
-    const userHasCompany = userWithoutPassword.userHasCompanies?.map((uhc) => ({
+    const userHasCompany = userWithoutPassword.userHasCompany?.map((uhc) => ({
       id: uhc.id,
       isOwner: uhc.isOwner,
       company: uhc.company
@@ -293,10 +299,10 @@ export class UsersService {
       where: { id: userId },
       relations: [
         'activeCompany',
-        'userHasCompanies',
-        'userHasCompanies.company',
-        'userHasCompanies.permissions',
-        'userHasCompanies.permissions.permission',
+        'userHasCompany',
+        'userHasCompany.company',
+        'userHasCompany.permissions',
+        'userHasCompany.permissions.permission',
       ],
     });
 
@@ -324,7 +330,7 @@ export class UsersService {
     const { password, ...userWithoutPassword } = updatedUser;
 
     // Enrichir l'utilisateur avec ses entreprises, permissions, etc.
-    const userHasCompany = userWithoutPassword.userHasCompanies?.map((uhc) => ({
+    const userHasCompany = userWithoutPassword.userHasCompany?.map((uhc) => ({
       id: uhc.id,
       isOwner: uhc.isOwner,
       company: uhc.company
@@ -334,6 +340,12 @@ export class UsersService {
           logo: uhc.company.logo,
           adresse: uhc.company.companyAddress || '',
           typeCompany: uhc.company.typeCompany,
+          phone: uhc.company.phone,
+          vatNumber: uhc.company.vatNumber,
+          registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+          warehouseLocation: uhc.company.warehouseLocation,
+          email: uhc.company.email,
+          website: uhc.company.website,
         }
         : null,
       permissions: uhc.permissions?.map((p) => ({
@@ -359,11 +371,12 @@ export class UsersService {
       userHasCompany,
       activeCompany: userWithoutPassword.activeCompany,
     };
+    const sanitizedUser = instanceToPlain(responseUser)
 
     // Retourner la réponse avec le message et les données enrichies
     return {
       message: 'Image de profil mise à jour avec succès.',
-      data: responseUser,
+      data: sanitizedUser,
     };
   }
 
@@ -448,23 +461,23 @@ export class UsersService {
     return { message: 'Mot de passe réinitialisé avec succès.' };
   }
 
-  async getFullProfile(userId: string): Promise<UserEntity> {
+  async getFullProfile(userId: string): Promise<Record<string, any>> {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
       relations: [
         'activeCompany',
-        'userHasCompanies',
-        'userHasCompanies.company',
-        'userHasCompanies.permissions',
-        'userHasCompanies.permissions.permission',
+        'userHasCompany',
+        'userHasCompany.company',
+        'userHasCompany.permissions',
+        'userHasCompany.permissions.permission',
       ],
     });
 
     if (!user) {
       throw new NotFoundException('Utilisateur introuvable.');
     }
-
-    return user;
+    const sanitizedUser = instanceToPlain(user);
+    return sanitizedUser;
   }
 
 

@@ -1,5 +1,6 @@
 import { Product } from "src/products/entities/product.entity";
 import { UserHasCompanyEntity } from "src/user_has_company/entities/user_has_company.entity";
+import { CompanyActivity } from "src/users/utility/common/activity.company.enum";
 import { CompanyStatus } from "src/users/utility/common/company-status.enum";
 import { CompanyType } from "src/users/utility/common/type.company.enum";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
@@ -50,4 +51,11 @@ export class CompanyEntity {
 
     @Column({ nullable: true })
     website: string;
+
+    @Column({
+        type: 'enum',
+        enum: CompanyActivity,
+        default: CompanyActivity.RETAILER,
+    })
+    companyActivity: CompanyActivity;
 }

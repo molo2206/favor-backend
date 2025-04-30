@@ -24,8 +24,22 @@ export class Product {
     @Column({ type: 'text', nullable: true })
     description?: string;
 
-    @Column({ type: 'decimal', precision: 10, scale: 2 })
+    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
     price: number;
+
+    // Prix originaux
+    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    detail_price_original?: number;
+
+    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    gros_price_original?: number;
+
+    // Prix actuels
+    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    detail?: number;
+
+    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    gros?: number;
 
     @Column()
     type: string;

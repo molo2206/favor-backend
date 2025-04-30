@@ -90,22 +90,22 @@ export class CompanyService {
     const savedCompany = await this.companyRepository.save(company);
 
     // Vérifier et créer l'association utilisateur-entreprise si nécessaire
-    let userHasCompany = await this.userHasCompanyRepository.findOne({
+    let userHasCompanies = await this.userHasCompanyRepository.findOne({
       where: { user: { id: user.id } },
       relations: ['user', 'company'],
     });
 
-    if (!userHasCompany) {
-      userHasCompany = this.userHasCompanyRepository.create({
+    if (!userHasCompanies) {
+      userHasCompanies = this.userHasCompanyRepository.create({
         user,
         company: savedCompany,
         isOwner: true,
       });
     } else {
-      userHasCompany.company = savedCompany;
+      userHasCompanies.company = savedCompany;
     }
 
-    await this.userHasCompanyRepository.save(userHasCompany);
+    await this.userHasCompanyRepository.save(userHasCompanies);
 
     // Mise à jour de l'utilisateur avec la nouvelle entreprise active
     user.activeCompany = savedCompany;
@@ -114,11 +114,11 @@ export class CompanyService {
 
     // Désintégration des données inutiles
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { userHasCompanies, ...userClean } = updatedUser;
+    const { userHasCompany, ...userClean } = updatedUser;
 
     const fullUser = await this.userRepository.findOne({
       where: { id: updatedUser.id },
-      relations: ['activeCompany'],
+      relations: ['activeCompany','userHasCompany.company'],
     });
 
     return {
@@ -269,11 +269,11 @@ export class CompanyService {
     const companies = await this.companyRepository.find({
       relations: [
         'typeCompany',
-        'userHasCompanies',
-        'userHasCompanies.user',
-        'userHasCompanies.role',
-        'userHasCompanies.permissions',
-        'userHasCompanies.permissions.permission',
+        'userHasCompany',
+        'userHasCompany.user',
+        'userHasCompany.role',
+        'userHasCompany.permissions',
+        'userHasCompany.permissions.permission',
       ],
       order: { companyName: 'ASC' },
     });
@@ -286,11 +286,11 @@ export class CompanyService {
       where: { id },
       relations: [
         'typeCompany',
-        'userHasCompanies',
-        'userHasCompanies.user',
-        'userHasCompanies.role',
-        'userHasCompanies.permissions',
-        'userHasCompanies.permissions.permission',
+        'userHasCompany',
+        'userHasCompany.user',
+        'userHasCompany.role',
+        'userHasCompany.permissions',
+        'userHasCompany.permissions.permission',
       ],
     });
 

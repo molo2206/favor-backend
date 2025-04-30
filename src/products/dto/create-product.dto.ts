@@ -44,4 +44,21 @@ export class CreateProductDto {
   @IsOptional()
   @IsUUID()
   categoryId?: string;
+
+  // Nouveaux champs pour les prix
+  @IsOptional()
+  @IsNumber()
+  detail_price_original?: number;
+
+  @IsOptional()
+  @IsNumber()
+  gros_price_original?: number;
+
+  @IsOptional()
+  @IsNumber()
+  detail?: number;
+
+  @IsOptional()
+  @IsNumber()
+  gros?: number;
 }

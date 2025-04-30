@@ -81,7 +81,7 @@ export class UserEntity {
     twoFASecret: string;
 
     @OneToMany(() => UserHasCompanyEntity, (userHasCompany) => userHasCompany.user)
-    userHasCompanies: UserHasCompanyEntity[];
+    userHasCompany: UserHasCompanyEntity[];
 
     @OneToMany(() => OrderEntity, (order) => order.user)
     orders: OrderEntity[];

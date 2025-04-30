@@ -19,7 +19,7 @@ export class UserHasCompanyEntity {
     @Column({ default: false })
     isOwner: boolean;
 
-    @ManyToOne(() => UserEntity, user => user.userHasCompanies)
+    @ManyToOne(() => UserEntity, user => user.userHasCompany)
     user: UserEntity;
 
     @ManyToOne(() => CompanyEntity, company => company.userHasCompanies, { eager: true })
