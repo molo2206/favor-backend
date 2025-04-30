@@ -1,4 +1,5 @@
 import { IsOptional, IsString, IsUrl, IsNotEmpty, IsEnum } from 'class-validator';
+import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
 import { CompanyType } from 'src/users/utility/common/type.company.enum';
 
 export class CreateCompanyDto {
@@ -39,5 +40,11 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsString()
   email?: string;
+
+  @IsOptional()
+  @IsEnum(CompanyActivity, {
+    message: `L'activité doit être : ${Object.values(CompanyActivity).join(', ')}`,
+  })
+  companyActivity?: CompanyActivity;
 }
 
