@@ -78,21 +78,14 @@ export class CompanyController {
     return await this.companyService.CreateUserToCompany(dto);
   }
 
-  @Get('type/:typeId')
-  async getCompaniesByType(
-    @Param('typeId') typeId: string,
-  ): Promise<{ data: CompanyEntity[] }> {
-    return this.companyService.findByCompany(typeId);
-  }
 
   @Get()
   @UseGuards(AuthentificationGuard)
-  async getCompaniesByStatus(
-    @Query('status') status?: string,
+  async getCompaniesByType(
+    @Query('type') type?: string,
   ): Promise<{ message: string; data: CompanyEntity[] }> {
-    return this.companyService.findByStatus(status);
+    return this.companyService.findByType(type);
   }
-
 
   @Get(':id')
   @UseGuards(AuthentificationGuard)
