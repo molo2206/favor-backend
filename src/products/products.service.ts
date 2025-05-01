@@ -104,23 +104,35 @@ export class ProductService {
     };
   }
 
-  async findOne(id: string): Promise<Product> {
+  async findOne(id: string): Promise<{ message: string; data: Product }> {
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['company', 'category', 'images'], // Inclure les relations avec l'entreprise et la catégorie
+      relations: [
+        'company',
+        'category',
+        'category.parent',
+        'category.children',
+        'images',
+        'measure',
+      ],
     });
 
     if (!product) {
       throw new NotFoundException(`Produit introuvable avec l'ID: ${id}`);
     }
 
-    return product;
+    return {
+      message: `Produit trouvé avec l'ID: ${id}`,
+      data: product,
+    };
   }
 
   async findByType(type?: string): Promise<{ message: string; data: Product[] }> {
     const queryBuilder = this.productRepo.createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('category.parent', 'categoryParent')
+      .leftJoinAndSelect('category.children', 'categoryChildren')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure');
 
@@ -237,15 +249,14 @@ export class ProductService {
 
   async update(
     id: string,
-    updateProductDto: CreateProductDto,
-    files: Express.Multer.File[],
+    dto: CreateProductDto,
     user: UserEntity,
-  ): Promise<{ message: string; data: Product }> {
-    const { categoryId, status, measureId, ...data } = updateProductDto;  // Extraction du statut et de measureId
+  ) {
+    const { categoryId, status, measureId, ...data } = dto;
 
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['images'],
+      relations: ['images'], 
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
@@ -278,42 +289,12 @@ export class ProductService {
       product.measure = undefined;
     }
 
-    if (files && files.length > 0) {
-      if (product.image) {
-        await this.cloudinary.handleDeleteImage(product.image);
-      }
-
-      if (product.images?.length) {
-        for (const img of product.images) {
-          await this.cloudinary.handleDeleteImage(img.url);
-        }
-      }
-
-      await this.imageRepository.delete({ product: { id: product.id } });
-
-      const uploadedMainImage = await this.cloudinary.handleUploadImage(files[0], 'product');
-      product.image = uploadedMainImage;
-
-      const newImages: ImageProductEntity[] = [];
-      for (const file of files.slice(1)) {
-        const uploaded = await this.cloudinary.handleUploadImage(file, 'product');
-        const imageEntity = new ImageProductEntity();
-        imageEntity.url = uploaded;
-        imageEntity.product = product;
-        newImages.push(imageEntity);
-      }
-
-      await this.imageRepository.save(newImages);
-      product.images = newImages;
-    }
-
     const updatedProduct = await this.productRepo.save(product);
 
     return {
       message: 'Produit mis à jour avec succès',
       data: updatedProduct,
     };
-
   }
 
   async searchProducts(search: string): Promise<{ message: string; data: Product[] }> {
@@ -321,29 +302,29 @@ export class ProductService {
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.images', 'images');
-  
+
     if (search) {
       qb.where('product.name LIKE :search', { search: `%${search}%` })
         .orWhere('product.type LIKE :search', { search: `%${search}%` })
         .orWhere('category.name LIKE :search', { search: `%${search}%` })
         .orWhere('company.companyName LIKE :search', { search: `%${search}%` });
     }
-  
+
     const results = await qb.getMany();
-  
+
     if (results.length === 0) {
       throw new NotFoundException(`Aucun produit correspondant à la recherche : "${search}"`);
     }
-  
+
     return {
       message: `Produits correspondant à la recherche : "${search}"`,
       data: results,
     };
   }
-  
+
   // Supprimer un produit
-  async remove(id: string): Promise<void> {
-    const product = await this.findOne(id);
-    await this.productRepo.remove(product);
-  }
+  // async remove(id: string): Promise<void> {
+  //   const product = await this.findOne(id);
+  //   await this.productRepo.remove(product);
+  // }
 }

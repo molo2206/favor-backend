@@ -1,11 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe, UseGuards, ValidationPipe, UsePipes, UseInterceptors, UploadedFiles, ClassSerializerInterceptor, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, ValidationPipe, UsePipes, UseInterceptors, UploadedFiles, ClassSerializerInterceptor, Query, BadRequestException } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { Product } from './entities/product.entity';
 import { ProductService } from './products.service';
 import { AuthorizeRoles } from 'src/users/utility/decorators/authorize-roles.decorator';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { RolesGuard } from 'src/users/utility/decorators/roles.guard';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { AnyFilesInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { CategoryEntity } from 'src/category/entities/category.entity';
 import { CurrentUser } from '../users/utility/decorators/current-user-decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
@@ -48,28 +48,21 @@ export class ProductController {
   @Patch(':id')
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(ClassSerializerInterceptor)
-  @UseInterceptors(FilesInterceptor('images', 10))
+  @UseInterceptors(AnyFilesInterceptor()) // ou FileInterceptor selon le cas
   async update(
     @Param('id') id: string,
-    @UploadedFiles() files: Express.Multer.File[],
     @Body() dto: CreateProductDto,
     @CurrentUser() user: UserEntity,
   ) {
-    const result = await this.productService.update(id, dto, files, user);
-    return {
-      message: result.message,
-      data: result.data,
-    };
+    const result = await this.productService.update(id, dto, user);
+    return result;
   }
-
-
   // Récupérer un produit par ID
   @Get('one/:id')
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Product> {
+  async getProductById(@Param('id') id: string): Promise<{ message: string; data: Product }> {
     return this.productService.findOne(id);
   }
+
 
   @Get()
   async getProductsByType(
@@ -113,8 +106,8 @@ export class ProductController {
   }
 
   // Supprimer un produit
-  @Delete(':id')
-  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    return this.productService.remove(id);
-  }
+  // @Delete(':id')
+  // remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+  //   return this.productService.remove(id);
+  // }
 }
