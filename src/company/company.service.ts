@@ -67,6 +67,7 @@ export class CompanyService {
       logo: logoUrl,
       typeCompany: dto.typeCompany!,
       phone: dto.phone,
+      email: dto.email
     });
 
     const savedCompany = await this.companyRepository.save(company);
@@ -311,35 +312,34 @@ export class CompanyService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async setActiveCompany(userId: string, companyId: string): Promise<any> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user)
-    {
+    if (!user) {
       throw new NotFoundException('Utilisateur introuvable');
     }
-  
+
     const company = await this.companyRepository.findOne({ where: { id: companyId } });
     if (!company) {
       throw new NotFoundException('Entreprise introuvable');
     }
-  
+
     if (company.status !== CompanyStatus.VALIDATED) {
       throw new ForbiddenException("L'entreprise n'est pas validée.");
     }
-  
+
     const userHasCompany = await this.userHasCompanyRepository.findOne({
       where: {
         user: { id: userId },
         company: { id: companyId },
       },
     });
-  
+
     if (!userHasCompany) {
       throw new ForbiddenException("Cet utilisateur n'est pas lié à cette entreprise.");
     }
-  
+
     user.activeCompany = company;
     user.activeCompanyId = company.id;
     await this.userRepository.save(user);
-  
+
     // Charger l'utilisateur enrichi comme dans `signin`
     const enrichedUser = await this.userRepository
       .createQueryBuilder('users')
@@ -349,31 +349,31 @@ export class CompanyService {
       .leftJoinAndSelect('permissions.permission', 'permission')
       .where('users.id = :id', { id: userId })
       .getOne();
-  
+
     if (!enrichedUser) {
       throw new NotFoundException('Utilisateur enrichi introuvable après la mise à jour.');
     }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = enrichedUser;
-  
+
     const userHasCompanyList = userWithoutPassword.userHasCompany?.map((uhc) => ({
       id: uhc.id,
       isOwner: uhc.isOwner,
       company: uhc.company
         ? {
-            id: uhc.company.id,
-            companyName: uhc.company.companyName || '',
-            logo: uhc.company.logo,
-            companyAddress: uhc.company.companyAddress || '',
-            typeCompany: uhc.company.typeCompany,
-            phone: uhc.company.phone,
-            vatNumber: uhc.company.vatNumber,
-            registrationDocumentUrl: uhc.company.registrationDocumentUrl,
-            warehouseLocation: uhc.company.warehouseLocation,
-            email: uhc.company.email,
-            website: uhc.company.website,
-            status: uhc.company.status,
-          }
+          id: uhc.company.id,
+          companyName: uhc.company.companyName || '',
+          logo: uhc.company.logo,
+          companyAddress: uhc.company.companyAddress || '',
+          typeCompany: uhc.company.typeCompany,
+          phone: uhc.company.phone,
+          vatNumber: uhc.company.vatNumber,
+          registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+          warehouseLocation: uhc.company.warehouseLocation,
+          email: uhc.company.email,
+          website: uhc.company.website,
+          status: uhc.company.status,
+        }
         : null,
       permissions:
         uhc.permissions?.map((p) => ({
@@ -392,11 +392,11 @@ export class CompanyService {
             : null,
         })) ?? [],
     })) ?? [];
-  
+
     const activeCompany = userHasCompanyList.find(
       (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
     )?.company;
-  
+
     return {
       message: 'Entreprise active définie avec succès.',
       data: {
@@ -421,7 +421,7 @@ export class CompanyService {
       },
     };
   }
-  
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async findAllByUser(userId: string): Promise<Record<string, any>> {
     const user = await this.userRepository.findOne({
@@ -431,11 +431,11 @@ export class CompanyService {
         'userHasCompany.company',
       ],
     });
-  
+
     if (!user) {
       throw new NotFoundException('Utilisateur introuvable.');
     }
-  
+
     // Extraire les entreprises depuis les relations
     const companies = user.userHasCompany?.map((uhc) => ({
       ...uhc.company,
@@ -445,14 +445,14 @@ export class CompanyService {
       })),
       isOwner: uhc.isOwner,
     })) || [];
-  
+
     const sanitizedUser = instanceToPlain(user);
     delete sanitizedUser.userHasCompany; // enlever si pas besoin brut
-  
+
     return {
       ...sanitizedUser,
       companies,
     };
   }
-  
+
 }

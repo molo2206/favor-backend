@@ -3,7 +3,7 @@ import { Type } from 'class-transformer';
 import { ProductStatus } from 'src/users/utility/common/product.status.enum';
 
 export class CreateProductDto {
-
+  @IsString()
   name: string;
 
   @IsOptional()
