@@ -41,7 +41,6 @@ export class CreateCompanyDto {
   @IsString()
   email?: string;
 
-  @IsOptional()
   @IsEnum(CompanyActivity, {
     message: `L'activité doit être : ${Object.values(CompanyActivity).join(', ')}`,
   })

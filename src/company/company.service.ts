@@ -67,7 +67,8 @@ export class CompanyService {
       logo: logoUrl,
       typeCompany: dto.typeCompany!,
       phone: dto.phone,
-      email: dto.email
+      email: dto.email,
+      companyActivity: dto.companyActivity
     });
 
     const savedCompany = await this.companyRepository.save(company);
@@ -93,7 +94,6 @@ export class CompanyService {
       data: fullUser!,
     };
   }
-
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async CreateUserToCompany(dto: CreateUserHasCompanyDto): Promise<{ message: string, data: any }> {  // Retourne 'data' dans l'objet
@@ -373,7 +373,7 @@ export class CompanyService {
           email: uhc.company.email,
           website: uhc.company.website,
           status: uhc.company.status,
-          companyActivity:uhc.company.companyActivity
+          companyActivity: uhc.company.companyActivity
         }
         : null,
       permissions:
