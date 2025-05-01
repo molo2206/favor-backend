@@ -169,7 +169,13 @@ export class ProductService {
 
     const products = await this.productRepo.find({
       where: { company: { id: user.activeCompanyId } },
-      relations: ['category', 'images', 'measure'],
+      relations: [
+        'category',
+        'category.parent',
+        'category.children',
+        'images',
+        'measure',
+      ],
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
@@ -180,10 +186,15 @@ export class ProductService {
       products,
     };
   }
-
   async groupByType(): Promise<Record<string, Product[]>> {
     const products = await this.productRepo.find({
-      relations: ['company', 'category', 'images'],
+      relations: [
+        'category',
+        'category.parent',
+        'category.children',
+        'images',
+        'measure',
+      ],
     });
 
     const grouped = products.reduce((acc, product) => {
@@ -257,7 +268,13 @@ export class ProductService {
 
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['images'],
+      relations: [
+        'category',
+        'category.parent',
+        'category.children',
+        'images',
+        'measure',
+      ],
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 

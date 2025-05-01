@@ -87,6 +87,7 @@ export class CompanyController {
     return this.companyService.findByType(type);
   }
 
+
   @Get(':id')
   @UseGuards(AuthentificationGuard)
   async getCompanyById(@Param('id') id: string): Promise<{ data: CompanyEntity }> {

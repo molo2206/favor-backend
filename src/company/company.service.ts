@@ -244,7 +244,6 @@ export class CompanyService {
     return { data: updatedCompany };
   }
 
-
   async findByType(type?: string): Promise<{ message: string; data: CompanyEntity[] }> {
     const query = this.companyRepository
       .createQueryBuilder('company')
@@ -254,23 +253,24 @@ export class CompanyService {
       .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
       .leftJoinAndSelect('permissions.permission', 'permission')
       .orderBy('company.companyName', 'ASC');
-  
+
     if (type) {
-      query.where('company.type = :type', { type });
+      query.where('company.typeCompany = :type', { type });
     }
-  
+
     const companies = await query.getMany();
-  
+
     if (companies.length === 0) {
       throw new NotFoundException(`Aucune entreprise trouvée${type ? ` pour le type : ${type}` : ''}`);
     }
-  
+
     return {
       message: `Entreprises récupérées avec succès${type ? ` pour le type : ${type}` : ''}.`,
       data: companies,
     };
   }
-  
+
+
 
 
   async getCompanyById(id: string): Promise<{ data: CompanyEntity }> {
