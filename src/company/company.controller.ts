@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, UseInterceptors, UploadedFile, Param, UsePipes, ValidationPipe, Put, Patch, Get } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, UseInterceptors, UploadedFile, Param, UsePipes, ValidationPipe, Put, Patch, Get, Query } from '@nestjs/common';
 import { CompanyService } from './company.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
@@ -87,9 +87,12 @@ export class CompanyController {
 
   @Get()
   @UseGuards(AuthentificationGuard)
-  async getAllCompanies(): Promise<{ data: CompanyEntity[] }> {
-    return this.companyService.getAllCompanies();
+  async getCompaniesByStatus(
+    @Query('status') status?: string,
+  ): Promise<{ message: string; data: CompanyEntity[] }> {
+    return this.companyService.findByStatus(status);
   }
+
 
   @Get(':id')
   @UseGuards(AuthentificationGuard)

@@ -9,6 +9,7 @@ import { AnyFilesInterceptor, FilesInterceptor } from '@nestjs/platform-express'
 import { CategoryEntity } from 'src/category/entities/category.entity';
 import { CurrentUser } from '../users/utility/decorators/current-user-decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 
 @Controller('products')
 export class ProductController {
@@ -57,6 +58,16 @@ export class ProductController {
     const result = await this.productService.update(id, dto, user);
     return result;
   }
+  @Patch(':id/status')
+  @UseGuards(AuthentificationGuard)
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateProductStatusDto,
+    @CurrentUser() user: UserEntity,
+  ) {
+    return this.productService.updateStatus(id, dto, user);
+  }
+
   // Récupérer un produit par ID
   @Get('one/:id')
   async getProductById(@Param('id') id: string): Promise<{ message: string; data: Product }> {

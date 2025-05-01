@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsUUID, IsEnum } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsUUID, IsEnum, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProductStatus } from 'src/users/utility/common/product.status.enum';
 
@@ -35,32 +35,32 @@ export class CreateProductDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  stockQuantity?: number;
+  quantity?: number;
 
   @IsUUID()
   categoryId?: string;
 
   // Nouveaux champs pour les prix
-  @IsOptional()
+  @ValidateIf(o => o.detail_price_original !== undefined && o.detail_price_original !== '')
   @Type(() => Number)
   @IsNumber()
   detail_price_original?: number;
 
-  @IsOptional()
+  @ValidateIf(o => o.gros_price_original !== undefined && o.gros_price_original !== '')
   @Type(() => Number)
   @IsNumber()
   gros_price_original?: number;
 
-  @IsOptional()
+  @ValidateIf(o => o.detail !== undefined && o.detail !== '')
   @Type(() => Number)
   @IsNumber()
   detail?: number;
 
-  @IsOptional()
+  @ValidateIf(o => o.gros !== undefined && o.gros !== '')
   @Type(() => Number)
   @IsNumber()
   gros?: number;
-
+  
   @IsEnum(ProductStatus)
   @IsOptional()
   status?: ProductStatus;

@@ -60,7 +60,7 @@ export class Product {
     ingredients?: string;
 
     @Column({ nullable: true })
-    stockQuantity?: number;
+    quantity?: number;
 
     @Column({ nullable: true })
     image?: string;

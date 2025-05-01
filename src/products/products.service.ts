@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
@@ -10,6 +10,7 @@ import { ImageProductEntity } from './entities/imageProduct.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { ProductStatus } from 'src/users/utility/common/product.status.enum';
 import { MeasureEntity } from 'src/measure/entities/measure.entity';
+import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 
 @Injectable()
 export class ProductService {
@@ -256,7 +257,7 @@ export class ProductService {
 
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['images'], 
+      relations: ['images'],
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
@@ -321,6 +322,50 @@ export class ProductService {
       data: results,
     };
   }
+
+  async updateStatus(
+    id: string,
+    dto: UpdateProductStatusDto,
+    user: UserEntity,
+  ): Promise<{ message: string; data: Product }> {
+    const product = await this.productRepo.findOne({
+      where: { id },
+      relations: ['company'],
+    });
+
+    if (!product) {
+      throw new NotFoundException('Produit non trouvé');
+    }
+
+    if (product.company.id !== user.activeCompanyId) {
+      throw new ForbiddenException("Vous n'êtes pas autorisé à modifier ce produit");
+    }
+
+    product.status = dto.status;
+    await this.productRepo.save(product);
+
+    // Recharger le produit avec toutes ses relations
+    const updated = await this.productRepo.findOne({
+      where: { id },
+      relations: [
+        'company',
+        'category',
+        'category.parent',
+        'category.children',
+        'images',
+        'measure',
+      ],
+    });
+    if (!updated) {
+      throw new NotFoundException('Produit mis à jour introuvable');
+    }
+    return {
+      message: 'Statut du produit mis à jour avec succès',
+      data: updated,
+    };
+  }
+
+
 
   // Supprimer un produit
   // async remove(id: string): Promise<void> {

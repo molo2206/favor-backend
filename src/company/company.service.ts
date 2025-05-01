@@ -245,20 +245,31 @@ export class CompanyService {
   }
 
 
-  async getAllCompanies(): Promise<{ data: CompanyEntity[] }> {
-    const companies = await this.companyRepository.find({
-      relations: [
-        'userHasCompany',
-        'userHasCompany.user',
-        'userHasCompany.role',
-        'userHasCompany.permissions',
-        'userHasCompany.permissions.permission',
-      ],
-      order: { companyName: 'ASC' },
-    });
+  async findByStatus(status?: string): Promise<{ message: string; data: CompanyEntity[] }> {
+    const query = this.companyRepository
+      .createQueryBuilder('company')
+      .leftJoinAndSelect('company.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('userHasCompany.user', 'user')
+      .leftJoinAndSelect('userHasCompany.role', 'role')
+      .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
+      .leftJoinAndSelect('permissions.permission', 'permission')
+      .orderBy('company.companyName', 'ASC');
+    if (status) {
+      query.where('company.status = :status', { status });
+    }
 
-    return { data: companies };
+    const companies = await query.getMany();
+
+    if (companies.length === 0) {
+      throw new NotFoundException(`Aucune entreprise trouvée${status ? ` avec le statut : ${status}` : ''}`);
+    }
+
+    return {
+      message: `Entreprises récupérées avec succès${status ? ` avec le statut : ${status}` : ''}.`,
+      data: companies,
+    };
   }
+
 
   async getCompanyById(id: string): Promise<{ data: CompanyEntity }> {
     const company = await this.companyRepository.findOne({
