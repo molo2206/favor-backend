@@ -40,12 +40,10 @@ export class ProductService {
   ): Promise<{ message: string; data: Product }> {
     const { categoryId, status, measureId, ...data } = createProductDto;
 
-    // ✅ Vérification du nombre d'images (obligatoire : min 2, max 4)
     if (!files || files.length < 2 || files.length > 4) {
       throw new BadRequestException('Vous devez fournir entre 2 et 4 images');
     }
 
-    // Vérification de l'entreprise active de l'utilisateur
     if (!user.activeCompanyId) {
       throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
     }
@@ -65,19 +63,16 @@ export class ProductService {
       if (!category) throw new NotFoundException('Catégorie non trouvée');
     }
 
-    // Gestion de la mesure
     let measure: MeasureEntity | null | undefined = undefined;
     if (measureId) {
       measure = await this.measureRepo.findOne({ where: { id: measureId } });
       if (!measure) throw new NotFoundException('Mesure non trouvée');
     }
 
-    // ✅ Téléchargement de la première image (image principale)
     const mainImage = await this.cloudinary.handleUploadImage(files[0], 'product');
 
     const productStatus = status || ProductStatus.PENDING;
 
-    // Création du produit
     const product = this.productRepo.create({
       ...data,
       company,
@@ -90,7 +85,6 @@ export class ProductService {
 
     await this.productRepo.save(product);
 
-    // ✅ Téléchargement des images secondaires (y compris la principale à nouveau si souhaité)
     const secondaryImages: ImageProductEntity[] = [];
 
     for (const file of files) {
@@ -110,8 +104,6 @@ export class ProductService {
     };
   }
 
-
-  // Récupérer un produit par son ID
   async findOne(id: string): Promise<Product> {
     const product = await this.productRepo.findOne({
       where: { id },
@@ -125,7 +117,7 @@ export class ProductService {
     return product;
   }
 
-  async findByType(type?: string): Promise<Product[]> {
+  async findByType(type?: string): Promise<{ message: string; data: Product[] }> {
     const queryBuilder = this.productRepo.createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('product.category', 'category')
@@ -142,7 +134,10 @@ export class ProductService {
       throw new NotFoundException(`Aucun produit trouvé${type ? ` pour le type : ${type}` : ''}`);
     }
 
-    return products;
+    return {
+      message: `Produits récupérés avec succès${type ? ` pour le type : ${type}` : ''}.`,
+      data: products,
+    };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -254,12 +249,10 @@ export class ProductService {
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
-    // Mise à jour du statut si fourni
     if (status) {
       product.status = status;
     }
 
-    // Mise à jour des autres données du produit
     Object.assign(product, data);
 
     const company = await this.companyRepo.findOne({
@@ -269,7 +262,6 @@ export class ProductService {
     product.company = company;
     product.type = company.typeCompany;
 
-    // Mise à jour de la catégorie si fournie
     if (categoryId) {
       const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
       if (!category) throw new NotFoundException('Catégorie non trouvée');
@@ -278,16 +270,14 @@ export class ProductService {
       product.category = undefined;
     }
 
-    // Mise à jour de la mesure si un measureId est fourni
     if (measureId) {
       const measure = await this.measureRepo.findOne({ where: { id: measureId } });
       if (!measure) throw new NotFoundException('Mesure non trouvée');
       product.measure = measure;
     } else {
-      product.measure = undefined;  // Si aucun measureId n'est fourni, on supprime la mesure
+      product.measure = undefined;
     }
 
-    // Gestion des fichiers et des images
     if (files && files.length > 0) {
       if (product.image) {
         await this.cloudinary.handleDeleteImage(product.image);
@@ -317,33 +307,40 @@ export class ProductService {
       product.images = newImages;
     }
 
-    // Sauvegarder les modifications du produit
     const updatedProduct = await this.productRepo.save(product);
 
     return {
       message: 'Produit mis à jour avec succès',
       data: updatedProduct,
     };
+
   }
 
-  async searchProducts(search: string) {
+  async searchProducts(search: string): Promise<{ message: string; data: Product[] }> {
     const qb = this.productRepo.createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.images', 'images');
-
+  
     if (search) {
       qb.where('product.name LIKE :search', { search: `%${search}%` })
         .orWhere('product.type LIKE :search', { search: `%${search}%` })
         .orWhere('category.name LIKE :search', { search: `%${search}%` })
         .orWhere('company.companyName LIKE :search', { search: `%${search}%` });
     }
-
+  
     const results = await qb.getMany();
-
-    return results;
+  
+    if (results.length === 0) {
+      throw new NotFoundException(`Aucun produit correspondant à la recherche : "${search}"`);
+    }
+  
+    return {
+      message: `Produits correspondant à la recherche : "${search}"`,
+      data: results,
+    };
   }
-
+  
   // Supprimer un produit
   async remove(id: string): Promise<void> {
     const product = await this.findOne(id);

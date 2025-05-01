@@ -25,7 +25,7 @@ export class ProductController {
     @Body() dto: CreateProductDto,
     @CurrentUser() user: UserEntity,
   ) {
-  
+
     if (!files || files.length === 0) {
       throw new BadRequestException('Vous devez fournir au moins deux images');
     }
@@ -71,10 +71,10 @@ export class ProductController {
     return this.productService.findOne(id);
   }
 
-
-
   @Get()
-  async getProductsByType(@Query('type') type?: string): Promise<Product[]> {
+  async getProductsByType(
+    @Query('type') type?: string,
+  ): Promise<{ message: string; data: Product[] }> {
     return this.productService.findByType(type);
   }
 
@@ -106,10 +106,10 @@ export class ProductController {
     const result = await this.productService.findByActiveCompanyForUser(user);
     return { data: result };
   }
-  
+
   @Get('search')
-  async search(@Query('search') search: string) {
-    return this.productService.searchProducts(search);
+  async search(@Query('search') query: string): Promise<{ message: string; data: Product[] }> {
+    return this.productService.searchProducts(query);
   }
 
   // Supprimer un produit
