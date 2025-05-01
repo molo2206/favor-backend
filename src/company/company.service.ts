@@ -308,42 +308,120 @@ export class CompanyService {
     };
   }
 
-  async setActiveCompany(userId: string, companyId: string): Promise<UserEntity> {
-    // Récupérer l'utilisateur
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async setActiveCompany(userId: string, companyId: string): Promise<any> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
+    if (!user)
+    {
       throw new NotFoundException('Utilisateur introuvable');
     }
-
-    // Récupérer l'entreprise
+  
     const company = await this.companyRepository.findOne({ where: { id: companyId } });
     if (!company) {
       throw new NotFoundException('Entreprise introuvable');
     }
-
-    // Vérifier si le statut de l'entreprise est "VALIDATED"
+  
     if (company.status !== CompanyStatus.VALIDATED) {
-      throw new ForbiddenException('L\'entreprise n\'est pas validée. Impossible de définir cette entreprise comme active.');
+      throw new ForbiddenException("L'entreprise n'est pas validée.");
     }
-
-    // Vérifier si l'utilisateur est lié à cette entreprise
+  
     const userHasCompany = await this.userHasCompanyRepository.findOne({
       where: {
         user: { id: userId },
         company: { id: companyId },
       },
     });
-
+  
     if (!userHasCompany) {
-      throw new ForbiddenException("Cet utilisateur n'est pas lié à cette entreprise");
+      throw new ForbiddenException("Cet utilisateur n'est pas lié à cette entreprise.");
     }
-
-    // Mettre à jour l'entreprise active pour l'utilisateur
+  
     user.activeCompany = company;
     user.activeCompanyId = company.id;
-
-    return await this.userRepository.save(user);
+    await this.userRepository.save(user);
+  
+    // Charger l'utilisateur enrichi comme dans `signin`
+    const enrichedUser = await this.userRepository
+      .createQueryBuilder('users')
+      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('userHasCompany.company', 'company')
+      .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
+      .leftJoinAndSelect('permissions.permission', 'permission')
+      .where('users.id = :id', { id: userId })
+      .getOne();
+  
+    if (!enrichedUser) {
+      throw new NotFoundException('Utilisateur enrichi introuvable après la mise à jour.');
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userWithoutPassword } = enrichedUser;
+  
+    const userHasCompanyList = userWithoutPassword.userHasCompany?.map((uhc) => ({
+      id: uhc.id,
+      isOwner: uhc.isOwner,
+      company: uhc.company
+        ? {
+            id: uhc.company.id,
+            companyName: uhc.company.companyName || '',
+            logo: uhc.company.logo,
+            companyAddress: uhc.company.companyAddress || '',
+            typeCompany: uhc.company.typeCompany,
+            phone: uhc.company.phone,
+            vatNumber: uhc.company.vatNumber,
+            registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+            warehouseLocation: uhc.company.warehouseLocation,
+            email: uhc.company.email,
+            website: uhc.company.website,
+            status: uhc.company.status,
+          }
+        : null,
+      permissions:
+        uhc.permissions?.map((p) => ({
+          id: p.permission?.id,
+          name: p.permission?.name,
+          create: p.create,
+          read: p.read,
+          update: p.update,
+          delete: p.delete,
+          status: p.status,
+          createdAt: p.permission?.createdAt
+            ? new Date(p.permission.createdAt)
+            : null,
+          updatedAt: p.permission?.updatedAt
+            ? new Date(p.permission.updatedAt)
+            : null,
+        })) ?? [],
+    })) ?? [];
+  
+    const activeCompany = userHasCompanyList.find(
+      (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
+    )?.company;
+  
+    return {
+      message: 'Entreprise active définie avec succès.',
+      data: {
+        id: userWithoutPassword.id,
+        fullName: userWithoutPassword.fullName,
+        email: userWithoutPassword.email,
+        phone: userWithoutPassword.phone,
+        image: userWithoutPassword.image,
+        role: userWithoutPassword.role,
+        isActive: userWithoutPassword.isActive,
+        country: userWithoutPassword.country,
+        city: userWithoutPassword.city,
+        activeCompanyId: userWithoutPassword.activeCompanyId,
+        address: userWithoutPassword.address,
+        preferredLanguage: userWithoutPassword.preferredLanguage,
+        loyaltyPoints: userWithoutPassword.loyaltyPoints,
+        dateOfBirth: userWithoutPassword.dateOfBirth,
+        vehicleType: userWithoutPassword.vehicleType,
+        plateNumber: userWithoutPassword.plateNumber,
+        userHasCompany: userHasCompanyList,
+        activeCompany,
+      },
+    };
   }
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async findAllByUser(userId: string): Promise<Record<string, any>> {
     const user = await this.userRepository.findOne({

@@ -58,7 +58,7 @@ export class CompanyController {
     @Param('companyId') companyId: string,
   ) {
     const updated = await this.companyService.setActiveCompany(user.id, companyId);
-    return { message: 'Entreprise active mise à jour', data: updated };
+    return updated;
   }
 
   @Patch(':id/status')
@@ -97,7 +97,7 @@ export class CompanyController {
     return this.companyService.getCompanyById(id);
   }
 
-  @Post('my-companies')
+  @Get('my/companies')
   @UseGuards(AuthentificationGuard)
   async getMyCompanies(@CurrentUser() user: UserEntity) {
     const companies = await this.companyService.findAllByUser(user.id);

@@ -18,7 +18,7 @@ export class MeasureEntity {
   name: string; // Ex : Kilogramme
 
   @Column()
-  symbol: string; // Ex : kg
+  abbreviation: string; // Ex : kg
 
   @ManyToOne(() => CompanyEntity, (company) => company.measures, {
     nullable: false,
