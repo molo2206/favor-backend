@@ -9,6 +9,7 @@ import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service'
 import { ImageProductEntity } from './entities/imageProduct.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { ProductStatus } from 'src/users/utility/common/product.status.enum';
+import { MeasureEntity } from 'src/measure/entities/measure.entity';
 
 @Injectable()
 export class ProductService {
@@ -25,7 +26,10 @@ export class ProductService {
     @InjectRepository(ImageProductEntity)
     private imageRepository: Repository<ImageProductEntity>,
 
-    private readonly cloudinary: CloudinaryService
+    private readonly cloudinary: CloudinaryService,
+
+    @InjectRepository(MeasureEntity)
+    private readonly measureRepo: Repository<MeasureEntity>
   ) { }
 
   // Création d'un produit
@@ -34,8 +38,14 @@ export class ProductService {
     files: Express.Multer.File[],
     user: UserEntity,
   ): Promise<{ message: string; data: Product }> {
-    const { categoryId, status, ...data } = createProductDto;
+    const { categoryId, status, measureId, ...data } = createProductDto;
 
+    // ✅ Vérification du nombre d'images (obligatoire : min 2, max 4)
+    if (!files || files.length < 2 || files.length > 4) {
+      throw new BadRequestException('Vous devez fournir entre 2 et 4 images');
+    }
+
+    // Vérification de l'entreprise active de l'utilisateur
     if (!user.activeCompanyId) {
       throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
     }
@@ -48,51 +58,57 @@ export class ProductService {
       throw new NotFoundException('Entreprise active introuvable');
     }
 
+    // Gestion de la catégorie
     let category: CategoryEntity | null | undefined = undefined;
     if (categoryId) {
       category = await this.categoryRepo.findOne({ where: { id: categoryId } });
       if (!category) throw new NotFoundException('Catégorie non trouvée');
     }
 
-    let imageUrl: string | undefined = undefined;
-    if (files?.length > 0) {
-      imageUrl = await this.cloudinary.handleUploadImage(files[0], 'product');
+    // Gestion de la mesure
+    let measure: MeasureEntity | null | undefined = undefined;
+    if (measureId) {
+      measure = await this.measureRepo.findOne({ where: { id: measureId } });
+      if (!measure) throw new NotFoundException('Mesure non trouvée');
     }
 
-    const productStatus = status || ProductStatus.PENDING; // Utiliser `PENDING` par défaut
+    // ✅ Téléchargement de la première image (image principale)
+    const mainImage = await this.cloudinary.handleUploadImage(files[0], 'product');
 
+    const productStatus = status || ProductStatus.PENDING;
+
+    // Création du produit
     const product = this.productRepo.create({
       ...data,
       company,
       category,
-      image: imageUrl,
+      measure,
+      image: mainImage,
       type: company.typeCompany,
       status: productStatus,
     });
 
     await this.productRepo.save(product);
 
-    if (files?.length > 0) {
-      const secondaryImages: ImageProductEntity[] = [];
+    // ✅ Téléchargement des images secondaires (y compris la principale à nouveau si souhaité)
+    const secondaryImages: ImageProductEntity[] = [];
 
-      for (const file of files) {
-        const uploaded = await this.cloudinary.handleUploadImage(file, 'product');
-        const imageEntity = new ImageProductEntity();
-        imageEntity.url = uploaded;
-        imageEntity.product = product;
-        secondaryImages.push(imageEntity);
-      }
-
-      await this.imageRepository.save(secondaryImages);
-      product.images = secondaryImages;
+    for (const file of files) {
+      const uploaded = await this.cloudinary.handleUploadImage(file, 'product');
+      const imageEntity = new ImageProductEntity();
+      imageEntity.url = uploaded;
+      imageEntity.product = product;
+      secondaryImages.push(imageEntity);
     }
+
+    await this.imageRepository.save(secondaryImages);
+    product.images = secondaryImages;
 
     return {
       message: 'Produit créé avec succès',
       data: product,
     };
   }
-
 
 
   // Récupérer un produit par son ID
@@ -113,7 +129,8 @@ export class ProductService {
     const queryBuilder = this.productRepo.createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('product.category', 'category')
-      .leftJoinAndSelect('product.images', 'images');
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.measure', 'measure');
 
     if (type) {
       queryBuilder.where('product.type = :type', { type });
@@ -129,24 +146,27 @@ export class ProductService {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async findByCompany(companyId: string): Promise<any> {
-    const company = await this.companyRepo.findOne({
-      where: { id: companyId },
+  async findByActiveCompanyForUser(user: UserEntity): Promise<any> {
+    if (!user.activeCompanyId) {
+      throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
+    }
 
+    const company = await this.companyRepo.findOne({
+      where: { id: user.activeCompanyId },
     });
 
     if (!company) {
-      throw new NotFoundException(`Entreprise avec l'ID ${companyId} introuvable`);
+      throw new NotFoundException(`Entreprise avec l'ID ${user.activeCompanyId} introuvable`);
     }
 
     const products = await this.productRepo.find({
-      where: { company: { id: companyId } },
-      relations: ['category', 'images'],
+      where: { company: { id: user.activeCompanyId } },
+      relations: ['category', 'images', 'measure'],
     });
 
-    // Fusionner les champs de la company + products
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { products: _, ...companyData } = company; // exclude old `products` if exists
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+    const { products: _, ...companyData } = company as any;
+
     return {
       ...companyData,
       products,
@@ -226,7 +246,7 @@ export class ProductService {
     files: Express.Multer.File[],
     user: UserEntity,
   ): Promise<{ message: string; data: Product }> {
-    const { categoryId, status, ...data } = updateProductDto;  // Extraction du statut
+    const { categoryId, status, measureId, ...data } = updateProductDto;  // Extraction du statut et de measureId
 
     const product = await this.productRepo.findOne({
       where: { id },
@@ -234,11 +254,12 @@ export class ProductService {
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
-    // Mise à jour des données, y compris le statut si fourni
+    // Mise à jour du statut si fourni
     if (status) {
       product.status = status;
     }
 
+    // Mise à jour des autres données du produit
     Object.assign(product, data);
 
     const company = await this.companyRepo.findOne({
@@ -248,6 +269,7 @@ export class ProductService {
     product.company = company;
     product.type = company.typeCompany;
 
+    // Mise à jour de la catégorie si fournie
     if (categoryId) {
       const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
       if (!category) throw new NotFoundException('Catégorie non trouvée');
@@ -256,6 +278,16 @@ export class ProductService {
       product.category = undefined;
     }
 
+    // Mise à jour de la mesure si un measureId est fourni
+    if (measureId) {
+      const measure = await this.measureRepo.findOne({ where: { id: measureId } });
+      if (!measure) throw new NotFoundException('Mesure non trouvée');
+      product.measure = measure;
+    } else {
+      product.measure = undefined;  // Si aucun measureId n'est fourni, on supprime la mesure
+    }
+
+    // Gestion des fichiers et des images
     if (files && files.length > 0) {
       if (product.image) {
         await this.cloudinary.handleDeleteImage(product.image);
@@ -285,6 +317,7 @@ export class ProductService {
       product.images = newImages;
     }
 
+    // Sauvegarder les modifications du produit
     const updatedProduct = await this.productRepo.save(product);
 
     return {
@@ -292,10 +325,6 @@ export class ProductService {
       data: updatedProduct,
     };
   }
-
-
-
-
 
   async searchProducts(search: string) {
     const qb = this.productRepo.createQueryBuilder('product')

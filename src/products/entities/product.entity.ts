@@ -13,6 +13,7 @@ import { CategoryEntity } from 'src/category/entities/category.entity';
 import { ImageProductEntity } from './imageProduct.entity';
 import { Expose, Type } from 'class-transformer';
 import { ProductStatus } from 'src/users/utility/common/product.status.enum';
+import { MeasureEntity } from 'src/measure/entities/measure.entity';
 
 @Entity('products')
 export class Product {
@@ -85,4 +86,7 @@ export class Product {
     // Utilisation du ProductStatus au lieu du CompanyStatus
     @Column({ type: 'enum', enum: ProductStatus, default: ProductStatus.PENDING })
     status: ProductStatus;
+
+    @ManyToOne(() => MeasureEntity, (measure) => measure.products, { nullable: true })
+    measure?: MeasureEntity;
 }

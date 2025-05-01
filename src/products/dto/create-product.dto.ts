@@ -10,6 +10,7 @@ export class CreateProductDto {
   @IsString()
   description?: string;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   price: number;
@@ -41,18 +42,22 @@ export class CreateProductDto {
   categoryId?: string;
 
   // Nouveaux champs pour les prix
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   detail_price_original?: number;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   gros_price_original?: number;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   detail?: number;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   gros?: number;
@@ -60,4 +65,8 @@ export class CreateProductDto {
   @IsEnum(ProductStatus)
   @IsOptional()
   status?: ProductStatus;
+
+  @IsOptional()
+  @IsString()
+  measureId?: string;
 }

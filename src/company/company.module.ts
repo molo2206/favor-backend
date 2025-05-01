@@ -11,6 +11,7 @@ import { RoleUser } from 'src/role_user/entities/role_user.entity';
 import { TypeCompanyModule } from 'src/type_company/type_company.module';
 import { TypeCompany } from 'src/type_company/entities/type_company.entity';
 import { CloudinaryModule } from 'src/users/utility/helpers/cloudinary.module';
+import { MailModule } from 'src/email/email.module';
 
 @Module({
   imports: [
@@ -19,11 +20,12 @@ import { CloudinaryModule } from 'src/users/utility/helpers/cloudinary.module';
       UserEntity,
       UserHasCompanyEntity,
       RoleUser,
-      TypeCompany
+      TypeCompany,
     ]),
-    CloudinaryModule, 
-    UserHasCompanyModule, // 👈 ne surtout pas oublier
+    CloudinaryModule,
+    UserHasCompanyModule,
     TypeCompanyModule,
+    MailModule,  // 👈 ajoute MailModule ici
   ],
   controllers: [CompanyController],
   providers: [CompanyService],

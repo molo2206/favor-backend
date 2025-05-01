@@ -13,32 +13,37 @@ import { UserEntity } from 'src/users/entities/user.entity';
 @Controller('products')
 export class ProductController {
   constructor(private readonly productService: ProductService) { }
+
   @UseInterceptors(ClassSerializerInterceptor)
   @Post()
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(FilesInterceptor('images', 10))
+  @UseInterceptors(FilesInterceptor('images', 4)) // Limite max à 4
   async create(
     @UploadedFiles() files: Express.Multer.File[],
     @Body() dto: CreateProductDto,
     @CurrentUser() user: UserEntity,
   ) {
-    // Ajoutez un log pour vérifier l'entreprise active
-    console.log('Entreprise active de l\'utilisateur :', user.activeCompany);
   
-    // Vérifiez si l'utilisateur a une entreprise active
+    if (!files || files.length === 0) {
+      throw new BadRequestException('Vous devez fournir au moins deux images');
+    }
+
+    if (files.length < 2 || files.length > 4) {
+      throw new BadRequestException('Le nombre d\'images doit être compris entre 2 et 4');
+    }
+
     if (!user.activeCompanyId) {
       throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
     }
-  
+
     const result = await this.productService.create(dto, files, user);
     return {
       message: result.message,
       data: result.data,
     };
   }
-
 
   @Patch(':id')
   @UseGuards(AuthentificationGuard, RolesGuard)
@@ -94,15 +99,14 @@ export class ProductController {
     return this.productService.findAllGroupedByCategory(categoryId);
   }
 
-  @Get('company/:companyId')
-  async getProductsByCompany(
-    @Param('companyId') companyId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<{ data: any }> {
-    const result = await this.productService.findByCompany(companyId);
+  @Get('by-active-company')
+  @UseGuards(AuthentificationGuard)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async getProductsByActiveCompany(@CurrentUser() user: UserEntity): Promise<{ data: any }> {
+    const result = await this.productService.findByActiveCompanyForUser(user);
     return { data: result };
   }
-
+  
   @Get('search')
   async search(@Query('search') search: string) {
     return this.productService.searchProducts(search);

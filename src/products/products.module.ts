@@ -6,6 +6,8 @@ import { CompanyEntity } from 'src/company/entities/company.entity';
 import { CategoryEntity } from 'src/category/entities/category.entity';
 import { CloudinaryModule } from 'src/users/utility/helpers/cloudinary.module';
 import { ImageProductEntity } from './entities/imageProduct.entity';
+import { MeasureService } from 'src/measure/measure.service';
+import { MeasureEntity } from 'src/measure/entities/measure.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -13,10 +15,11 @@ import { ImageProductEntity } from './entities/imageProduct.entity';
       CompanyEntity,   // 👈 Requis pour @InjectRepository(CompanyEntity)
       CategoryEntity,  // 👈 Requis pour @InjectRepository(CategoryEntity)
       ImageProductEntity,
+      MeasureEntity
     ]),
     CloudinaryModule,
   ],
   controllers: [ProductController],
-  providers: [ProductService],
+  providers: [ProductService, MeasureService],
 })
 export class ProductModule { }

@@ -1,3 +1,4 @@
+import { MeasureEntity } from "src/measure/entities/measure.entity";
 import { Product } from "src/products/entities/product.entity";
 import { UserHasCompanyEntity } from "src/user_has_company/entities/user_has_company.entity";
 import { CompanyActivity } from "src/users/utility/common/activity.company.enum";
@@ -35,7 +36,7 @@ export class CompanyEntity {
     status: CompanyStatus;
 
     @OneToMany(() => UserHasCompanyEntity, (userHasCompany) => userHasCompany.company)
-    userHasCompanies: UserHasCompanyEntity[];
+    userHasCompany: UserHasCompanyEntity[];
 
     @Column({ type: 'enum', enum: CompanyType })
     typeCompany: CompanyType;
@@ -58,4 +59,7 @@ export class CompanyEntity {
         default: CompanyActivity.RETAILER,
     })
     companyActivity: CompanyActivity;
+
+    @OneToMany(() => MeasureEntity, (measure) => measure.company)
+    measures: MeasureEntity[];
 }

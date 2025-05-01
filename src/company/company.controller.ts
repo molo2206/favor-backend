@@ -6,30 +6,35 @@ import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator
 import { UserEntity } from 'src/users/entities/user.entity';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { CompanyEntity } from './entities/company.entity';
-import { AuthorizeRoles } from 'src/users/utility/decorators/authorize.roles.decorator';
-import { AuthorizeGuard } from 'src/users/utility/guards/authorization.guard';
-import { UserRole } from 'src/users/utility/common/user-role-enum';
 import { CreateUserHasCompanyDto } from 'src/user_has_company/dto/create-user_has_company.dto';
 import { UserHasCompanyEntity } from 'src/user_has_company/entities/user_has_company.entity';
 import { UserHasCompanyService } from 'src/user_has_company/user_has_company.service';
+import { UpdateCompanyStatusDto } from './dto/update-company-status.dto';
+import { MailService } from 'src/email/email.service';
 
 @Controller('company')
 export class CompanyController {
-  constructor(private readonly companyService: CompanyService, private readonly userHasCompanyService: UserHasCompanyService) { }
+  constructor(private readonly companyService: CompanyService, private readonly userHasCompanyService: UserHasCompanyService,
+    private readonly mailService: MailService,
+  ) { }
 
   @Post()
   @UseGuards(AuthentificationGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(
-    FileInterceptor('logo'),
-  )
-  async createOrUpdateCompany(
+  @UseInterceptors(FileInterceptor('logo'))
+  async createCompany(
     @UploadedFile() logo: Express.Multer.File,
     @Body() dto: CreateCompanyDto,
     @CurrentUser() currentUser: UserEntity,
   ) {
-    // Appel à la méthode de service pour créer ou mettre à jour l'entreprise
-    return this.companyService.createOrUpdateCompanyWithUser(dto, currentUser, logo);
+    const result = await this.companyService.createCompanyWithUser(dto, currentUser, logo);
+    await this.mailService.sendHtmlEmail(
+      currentUser.email,
+      'Votre entreprise a été créée avec succès',
+      'company-status-update.html',
+      { companyName: dto.companyName, status: 'PENDING', year: new Date().getFullYear() }
+    );
+    return result;
   }
 
   @Put(':id')
@@ -56,26 +61,12 @@ export class CompanyController {
     return { message: 'Entreprise active mise à jour', data: updated };
   }
 
-
-  @Patch(':id/toggle-status')
-  @UseGuards(AuthentificationGuard, AuthorizeGuard)
-  @AuthorizeRoles(UserRole.ADMIN)
-  async toggleStatus(@Param('id') id: string): Promise<{ data: CompanyEntity }> {
-    return this.companyService.toggleCompanyStatus(id);
-  }
-
-  @UseGuards(AuthentificationGuard)
-  @AuthorizeRoles(UserRole.ADMIN)
-  @Patch(':id/toggle-status')
-  async toggleCompanyStatus(@Param('id') id: string): Promise<{ data: CompanyEntity }> {
-    return this.companyService.toggleCompanyStatus(id);
-  }
-
-  @UseGuards(AuthentificationGuard)
-  @AuthorizeRoles(UserRole.ADMIN)
-  @Patch(':id/reject')
-  async rejectCompany(@Param('id') id: string): Promise<{ data: CompanyEntity }> {
-    return this.companyService.rejectCompany(id);  // Retourner { data: rejectedCompany }
+  @Patch(':id/status')
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateCompanyStatusDto,
+  ) {
+    return this.companyService.updateCompanyStatus(id, dto);
   }
 
   @Post('assign')
@@ -104,5 +95,12 @@ export class CompanyController {
   @UseGuards(AuthentificationGuard)
   async getCompanyById(@Param('id') id: string): Promise<{ data: CompanyEntity }> {
     return this.companyService.getCompanyById(id);
+  }
+
+  @Post('my-companies')
+  @UseGuards(AuthentificationGuard)
+  async getMyCompanies(@CurrentUser() user: UserEntity) {
+    const companies = await this.companyService.findAllByUser(user.id);
+    return { data: companies };
   }
 }

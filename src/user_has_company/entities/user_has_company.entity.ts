@@ -22,7 +22,7 @@ export class UserHasCompanyEntity {
     @ManyToOne(() => UserEntity, user => user.userHasCompany)
     user: UserEntity;
 
-    @ManyToOne(() => CompanyEntity, company => company.userHasCompanies, { eager: true })
+    @ManyToOne(() => CompanyEntity, company => company.userHasCompany, { eager: true })
     @JoinColumn({ name: 'companyId' })
     company: CompanyEntity;
 

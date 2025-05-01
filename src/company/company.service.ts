@@ -1,17 +1,19 @@
-import { BadRequestException,ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CompanyEntity } from './entities/company.entity';
 import { Repository } from 'typeorm';
 import { UserHasCompanyEntity } from 'src/user_has_company/entities/user_has_company.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { CompanyStatus } from 'src/users/utility/common/company-status.enum';
 import { RoleUser } from 'src/role_user/entities/role_user.entity';
 import { CreateUserHasCompanyDto } from 'src/user_has_company/dto/create-user_has_company.dto';
 import { instanceToPlain } from 'class-transformer';
 import { TypeCompany } from 'src/type_company/entities/type_company.entity';
 import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
 import { CompanyType } from 'src/users/utility/common/type.company.enum';
+import { UpdateCompanyStatusDto } from './dto/update-company-status.dto';
+import { MailService } from 'src/email/email.service';
+import { CompanyStatus } from 'src/users/utility/common/company-status.enum';
 
 @Injectable()
 export class CompanyService {
@@ -32,16 +34,17 @@ export class CompanyService {
     private readonly typeCompanyRepository: Repository<TypeCompany>, // Définition de la propriété
 
     private readonly cloudinary: CloudinaryService,
+    private readonly mailService: MailService,
 
   ) { }
 
   // services/company.service.ts
-  async createOrUpdateCompanyWithUser(
+  async createCompanyWithUser(
     dto: CreateCompanyDto,
     user: UserEntity,
     logoFile?: Express.Multer.File,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<{ message: string, data: any }> {
+  ): Promise<{ message: string; data: any }> {
     if (!dto || Object.keys(dto).length === 0) {
       throw new BadRequestException('Les données de l’entreprise sont requises');
     }
@@ -55,77 +58,41 @@ export class CompanyService {
       logoUrl = await this.cloudinary.handleUploadImage(logoFile, 'company');
     }
 
-    // Vérifier si l'entreprise existe déjà
-    let company = await this.companyRepository.findOne({
-      where: { companyName: dto.companyName },
+    const company = this.companyRepository.create({
+      companyName: dto.companyName,
+      companyAddress: dto.companyAddress,
+      vatNumber: dto.vatNumber,
+      registrationDocumentUrl: dto.registrationDocumentUrl,
+      warehouseLocation: dto.warehouseLocation,
+      logo: logoUrl,
+      typeCompany: dto.typeCompany!,
+      phone: dto.phone,
     });
 
-    if (company) {
-      // Si l'entreprise existe, mettre à jour les champs
-      Object.assign(company, {
-        companyAddress: dto.companyAddress ?? company.companyAddress,
-        vatNumber: dto.vatNumber ?? company.vatNumber,
-        registrationDocumentUrl: dto.registrationDocumentUrl ?? company.registrationDocumentUrl,
-        warehouseLocation: dto.warehouseLocation ?? company.warehouseLocation,
-        logo: logoUrl ?? company.logo,
-        typeCompany: company.typeCompany,
-        phone: dto.phone ?? company.phone,
-      });
-    } else {
-      // Sinon, créer une nouvelle entreprise
-      const companyData: Partial<CompanyEntity> = {
-        companyName: dto.companyName,
-        companyAddress: dto.companyAddress,
-        vatNumber: dto.vatNumber,
-        registrationDocumentUrl: dto.registrationDocumentUrl,
-        warehouseLocation: dto.warehouseLocation,
-        logo: logoUrl,
-        typeCompany: dto.typeCompany!,
-        phone: dto.phone,
-      };
-      company = this.companyRepository.create(companyData);
-    }
-
-    // Sauvegarde de l'entreprise
     const savedCompany = await this.companyRepository.save(company);
 
-    // Vérifier et créer l'association utilisateur-entreprise si nécessaire
-    let userHasCompanies = await this.userHasCompanyRepository.findOne({
-      where: { user: { id: user.id } },
-      relations: ['user', 'company'],
+    const userHasCompany = this.userHasCompanyRepository.create({
+      user,
+      company: savedCompany,
+      isOwner: true,
     });
+    await this.userHasCompanyRepository.save(userHasCompany);
 
-    if (!userHasCompanies) {
-      userHasCompanies = this.userHasCompanyRepository.create({
-        user,
-        company: savedCompany,
-        isOwner: true,
-      });
-    } else {
-      userHasCompanies.company = savedCompany;
-    }
-
-    await this.userHasCompanyRepository.save(userHasCompanies);
-
-    // Mise à jour de l'utilisateur avec la nouvelle entreprise active
     user.activeCompany = savedCompany;
     user.activeCompanyId = savedCompany.id;
-    const updatedUser = await this.userRepository.save(user);
-
-    // Désintégration des données inutiles
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { userHasCompany, ...userClean } = updatedUser;
+    await this.userRepository.save(user);
 
     const fullUser = await this.userRepository.findOne({
-      where: { id: updatedUser.id },
-      relations: ['activeCompany','userHasCompany.company'],
+      where: { id: user.id },
+      relations: ['activeCompany', 'userHasCompany.company'],
     });
 
     return {
-      message: `Companie enregistrée avec succès.`,
+      message: 'Entreprise créée avec succès.',
       data: fullUser!,
     };
   }
+
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async CreateUserToCompany(dto: CreateUserHasCompanyDto): Promise<{ message: string, data: any }> {  // Retourne 'data' dans l'objet
@@ -233,42 +200,53 @@ export class CompanyService {
     return { message: 'Companie mise à jour avec succès', data: updatedCompany };  // Retourne l'entreprise mise à jour dans 'data'
   }
 
-
-  async toggleCompanyStatus(id: string): Promise<{ data: CompanyEntity }> {
+  async updateCompanyStatus(
+    id: string,
+    dto: UpdateCompanyStatusDto,
+  ): Promise<{ data: CompanyEntity }> {
     const company = await this.companyRepository.findOne({ where: { id } });
 
     if (!company) {
       throw new NotFoundException('Entreprise non trouvée.');
     }
 
-    company.status =
-      company.status === CompanyStatus.PENDING
-        ? CompanyStatus.VALIDATED
-        : CompanyStatus.PENDING;
-
+    // Mettre à jour le statut
+    company.status = dto.status;
     const updatedCompany = await this.companyRepository.save(company);
+
+    // Récupérer l'utilisateur lié (propriétaire ou lié à cette entreprise)
+    const userHasCompany = await this.userHasCompanyRepository.findOne({
+      where: { company: { id: company.id } },
+      relations: ['user'],
+    });
+
+    if (userHasCompany && userHasCompany.user?.email) {
+      const user = userHasCompany.user;
+
+      // Supprimer le mot de passe pour ne pas l’envoyer dans l’email
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...userWithoutPassword } = user;
+
+      await this.mailService.sendHtmlEmail(
+        user.email,
+        'Mise à jour du statut de votre entreprise sur FavorHelp',
+        'company-status-update.html', // Ton template d’email HTML
+        {
+          user: userWithoutPassword,
+          companyName: company.companyName,
+          status: company.status,
+          year: new Date().getFullYear(),
+        }
+      );
+    }
+
     return { data: updatedCompany };
   }
-
-  async rejectCompany(id: string): Promise<{ data: CompanyEntity }> {
-    const company = await this.companyRepository.findOne({ where: { id } });
-
-    if (!company) {
-      throw new NotFoundException('Entreprise non trouvée.');
-    }
-
-    company.status = CompanyStatus.REJECTED;
-
-    const rejectedCompany = await this.companyRepository.save(company);
-    return { data: rejectedCompany };  // Structure correcte avec 'data'
-  }
-
 
 
   async getAllCompanies(): Promise<{ data: CompanyEntity[] }> {
     const companies = await this.companyRepository.find({
       relations: [
-        'typeCompany',
         'userHasCompany',
         'userHasCompany.user',
         'userHasCompany.role',
@@ -285,7 +263,6 @@ export class CompanyService {
     const company = await this.companyRepository.findOne({
       where: { id },
       relations: [
-        'typeCompany',
         'userHasCompany',
         'userHasCompany.user',
         'userHasCompany.role',
@@ -305,8 +282,7 @@ export class CompanyService {
   async findByCompany(companyId: string): Promise<{ data: any }> {
     // Récupère la compagnie avec ses relations nécessaires
     const company = await this.companyRepository.findOne({
-      where: { id: companyId },
-      relations: ['typeCompany'], // ou d'autres relations utiles
+      where: { id: companyId }
     });
 
     if (!company) {
@@ -333,16 +309,24 @@ export class CompanyService {
   }
 
   async setActiveCompany(userId: string, companyId: string): Promise<UserEntity> {
+    // Récupérer l'utilisateur
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('Utilisateur introuvable');
     }
 
+    // Récupérer l'entreprise
     const company = await this.companyRepository.findOne({ where: { id: companyId } });
     if (!company) {
       throw new NotFoundException('Entreprise introuvable');
     }
 
+    // Vérifier si le statut de l'entreprise est "VALIDATED"
+    if (company.status !== CompanyStatus.VALIDATED) {
+      throw new ForbiddenException('L\'entreprise n\'est pas validée. Impossible de définir cette entreprise comme active.');
+    }
+
+    // Vérifier si l'utilisateur est lié à cette entreprise
     const userHasCompany = await this.userHasCompanyRepository.findOne({
       where: {
         user: { id: userId },
@@ -354,9 +338,43 @@ export class CompanyService {
       throw new ForbiddenException("Cet utilisateur n'est pas lié à cette entreprise");
     }
 
+    // Mettre à jour l'entreprise active pour l'utilisateur
     user.activeCompany = company;
     user.activeCompanyId = company.id;
+
     return await this.userRepository.save(user);
   }
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async findAllByUser(userId: string): Promise<Record<string, any>> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: [
+        'activeCompany',
+        'userHasCompany.company',
+      ],
+    });
+  
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable.');
+    }
+  
+    // Extraire les entreprises depuis les relations
+    const companies = user.userHasCompany?.map((uhc) => ({
+      ...uhc.company,
+      role: uhc.role,
+      permissions: uhc.permissions?.map((perm) => ({
+        ...perm.permission,
+      })),
+      isOwner: uhc.isOwner,
+    })) || [];
+  
+    const sanitizedUser = instanceToPlain(user);
+    delete sanitizedUser.userHasCompany; // enlever si pas besoin brut
+  
+    return {
+      ...sanitizedUser,
+      companies,
+    };
+  }
+  
 }
