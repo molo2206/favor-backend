@@ -138,7 +138,8 @@ export class UsersService {
           warehouseLocation: uhc.company.warehouseLocation,
           email: uhc.company.email,
           website: uhc.company.website,
-          status: uhc.company.status
+          status: uhc.company.status,
+          companyActivity:uhc.company.companyActivity
         }
         : null,
       permissions: uhc.permissions?.map((p) => ({
@@ -247,7 +248,8 @@ export class UsersService {
           warehouseLocation: uhc.company.warehouseLocation,
           email: uhc.company.email,
           website: uhc.company.website,
-          status: uhc.company.status
+          status: uhc.company.status,
+          companyActivity:uhc.company.companyActivity
         }
         : null,
       permissions:
@@ -352,7 +354,8 @@ export class UsersService {
           warehouseLocation: uhc.company.warehouseLocation,
           email: uhc.company.email,
           website: uhc.company.website,
-          status: uhc.company.status
+          status: uhc.company.status,
+          companyActivity:uhc.company.companyActivity
         }
         : null,
       permissions: uhc.permissions?.map((p) => ({

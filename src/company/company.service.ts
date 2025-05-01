@@ -373,6 +373,7 @@ export class CompanyService {
           email: uhc.company.email,
           website: uhc.company.website,
           status: uhc.company.status,
+          companyActivity:uhc.company.companyActivity
         }
         : null,
       permissions:
@@ -454,5 +455,4 @@ export class CompanyService {
       companies,
     };
   }
-
 }
