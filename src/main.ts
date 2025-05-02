@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as bodyParser from 'body-parser';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -24,7 +25,13 @@ async function bootstrap() {
 
   // Préfixe global pour tes routes
   app.setGlobalPrefix('api/v1');
-
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true, // Permet la conversion automatique des types
+      whitelist: true, // Ignore les propriétés non définies dans le DTO
+      forbidNonWhitelisted: true, // Lève une erreur si des propriétés non attendues sont envoyées
+    }),
+  );
   await app.listen(3000);
 }
 bootstrap();

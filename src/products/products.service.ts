@@ -82,6 +82,7 @@ export class ProductService {
       image: mainImage,
       type: company.typeCompany,
       status: productStatus,
+      companyActivity: company?.companyActivity
     });
 
     await this.productRepo.save(product);
@@ -152,6 +153,33 @@ export class ProductService {
       data: products,
     };
   }
+
+  async findProductPublishedByType(type?: string): Promise<{ message: string; data: Product[] }> {
+    const queryBuilder = this.productRepo.createQueryBuilder('product')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('category.parent', 'categoryParent')
+      .leftJoinAndSelect('category.children', 'categoryChildren')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .where('product.status = :status', { status: ProductStatus.PUBLISHED}); // ✅ filtrage par statut
+  
+    if (type) {
+      queryBuilder.andWhere('product.type = :type', { type });
+    }
+  
+    const products = await queryBuilder.getMany();
+  
+    if (products.length === 0) {
+      throw new NotFoundException(`Aucun produit PUBLIÉ trouvé${type ? ` pour le type : ${type}` : ''}`);
+    }
+  
+    return {
+      message: `Produits PUBLIÉS récupérés avec succès${type ? ` pour le type : ${type}` : ''}.`,
+      data: products,
+    };
+  }
+  
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async findByActiveCompanyForUser(user: UserEntity): Promise<any> {
@@ -354,8 +382,8 @@ export class ProductService {
       throw new NotFoundException('Produit non trouvé');
     }
 
-    if (product.company.id !== user.activeCompanyId) {
-      throw new ForbiddenException("Vous n'êtes pas autorisé à modifier ce produit");
+    if (!user) {
+      throw new ForbiddenException("Vous n'êtes pas connecter");
     }
 
     product.status = dto.status;

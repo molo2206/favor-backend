@@ -59,7 +59,8 @@ export class ProductController {
     return result;
   }
   @Patch(':id/status')
-  @UseGuards(AuthentificationGuard)
+  @UseGuards(AuthentificationGuard,RolesGuard)
+  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateProductStatusDto,
@@ -80,6 +81,13 @@ export class ProductController {
     @Query('type') type?: string,
   ): Promise<{ message: string; data: Product[] }> {
     return this.productService.findByType(type);
+  }
+
+  @Get('published')
+  async getProductsPublishedByType(
+    @Query('type') type?: string,
+  ): Promise<{ message: string; data: Product[] }> {
+    return this.productService.findProductPublishedByType(type);
   }
 
   @Get('group-by-type')

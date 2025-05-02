@@ -1,24 +1,16 @@
-import { IsString, IsNumber, IsOptional, IsUUID, IsEnum, ValidateIf } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsUUID, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProductStatus } from 'src/users/utility/common/product.status.enum';
 
 export class CreateProductDto {
+  // Obligatoire
   @IsString()
   name: string;
 
+  // Optionnels - Texte
   @IsOptional()
   @IsString()
   description?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  price: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  durationInMinutes?: number;
 
   @IsOptional()
   @IsString()
@@ -32,40 +24,54 @@ export class CreateProductDto {
   @IsString()
   ingredients?: string;
 
+  // Optionnels - Nombres
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  price?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  durationInMinutes?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   quantity?: number;
 
-  @IsUUID()
-  categoryId?: string;
-
-  // Nouveaux champs pour les prix
-  @ValidateIf(o => o.detail_price_original !== undefined && o.detail_price_original !== '')
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   detail_price_original?: number;
 
-  @ValidateIf(o => o.gros_price_original !== undefined && o.gros_price_original !== '')
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   gros_price_original?: number;
 
-  @ValidateIf(o => o.detail !== undefined && o.detail !== '')
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   detail?: number;
 
-  @ValidateIf(o => o.gros !== undefined && o.gros !== '')
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   gros?: number;
-  
-  @IsEnum(ProductStatus)
+
+  // Optionnels - Relations
   @IsOptional()
-  status?: ProductStatus;
+  @IsUUID()
+  categoryId?: string;
 
   @IsOptional()
   @IsString()
   measureId?: string;
+
+  // Statut du produit
+  @IsOptional()
+  @IsEnum(ProductStatus)
+  status?: ProductStatus;
+
 }

@@ -14,6 +14,7 @@ import { ImageProductEntity } from './imageProduct.entity';
 import { Expose, Type } from 'class-transformer';
 import { ProductStatus } from 'src/users/utility/common/product.status.enum';
 import { MeasureEntity } from 'src/measure/entities/measure.entity';
+import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
 
 @Entity('products')
 export class Product {
@@ -89,4 +90,11 @@ export class Product {
 
     @ManyToOne(() => MeasureEntity, (measure) => measure.products, { nullable: true })
     measure?: MeasureEntity;
+
+    @Column({
+        type: 'enum',
+        enum: CompanyActivity,
+        default: CompanyActivity.RETAILER,
+    })
+    companyActivity: CompanyActivity;
 }
