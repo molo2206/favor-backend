@@ -162,24 +162,24 @@ export class ProductService {
       .leftJoinAndSelect('category.children', 'categoryChildren')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
-      .where('product.status = :status', { status: ProductStatus.PUBLISHED}); // ✅ filtrage par statut
-  
+      .where('product.status = :status', { status: ProductStatus.PUBLISHED }); // ✅ filtrage par statut
+
     if (type) {
       queryBuilder.andWhere('product.type = :type', { type });
     }
-  
+
     const products = await queryBuilder.getMany();
-  
+
     if (products.length === 0) {
       throw new NotFoundException(`Aucun produit PUBLIÉ trouvé${type ? ` pour le type : ${type}` : ''}`);
     }
-  
+
     return {
       message: `Produits PUBLIÉS récupérés avec succès${type ? ` pour le type : ${type}` : ''}.`,
       data: products,
     };
   }
-  
+
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async findByActiveCompanyForUser(user: UserEntity): Promise<any> {
@@ -409,8 +409,6 @@ export class ProductService {
       data: updated,
     };
   }
-
-
 
   // Supprimer un produit
   // async remove(id: string): Promise<void> {

@@ -9,7 +9,7 @@ export class CreateMeasureDto
 
     @IsNotEmpty()
     @IsString()
-    symbol: string;
+    abbreviation: string;
 
     @IsNotEmpty()
     @IsUUID()
