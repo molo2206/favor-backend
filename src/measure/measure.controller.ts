@@ -7,29 +7,27 @@ import {
   Param,
   Delete,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { MeasureService } from './measure.service';
 import { CreateMeasureDto } from './dto/create-measure.dto';
 import { UpdateMeasureDto } from './dto/update-measure.dto';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 
 @Controller('measures')
 export class MeasureController {
   constructor(private readonly measureService: MeasureService) { }
 
   @Post()
-  async create(
-    @Body() createMeasureDto: CreateMeasureDto,
+  @UseGuards(AuthentificationGuard)
+  async createMeasure(
+    @Body() dto: CreateMeasureDto,
     @CurrentUser() user: UserEntity,
   ) {
-    if (!user.activeCompanyId) {
-      throw new BadRequestException('Aucune entreprise active n’est associée à cet utilisateur');
-    }
-
-    return await this.measureService.create(createMeasureDto, user.activeCompanyId);
+    return this.measureService.create(dto, user);
   }
-
 
   @Get()
   async findAll(@CurrentUser() user: UserEntity) {
@@ -50,18 +48,16 @@ export class MeasureController {
 
     return await this.measureService.findOne(id, user.activeCompanyId);
   }
-
   @Patch(':id')
-  async update(
+  @UseGuards(AuthentificationGuard)
+  async updateMeasure(
     @Param('id') id: string,
-    @Body() updateMeasureDto: UpdateMeasureDto,
+    @Body() dto: UpdateMeasureDto,
     @CurrentUser() user: UserEntity,
   ) {
-    if (!user.activeCompanyId) {
-      throw new BadRequestException('Aucune entreprise active n’est associée à cet utilisateur');
-    }
-    return await this.measureService.update(id, updateMeasureDto, user.activeCompanyId);
+    return this.measureService.update(id, dto, user);
   }
+
 
   @Delete(':id')
   async remove(

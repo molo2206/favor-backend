@@ -9,6 +9,7 @@ import { MeasureEntity } from './entities/measure.entity';
 import { CreateMeasureDto } from './dto/create-measure.dto';
 import { UpdateMeasureDto } from './dto/update-measure.dto';
 import { CompanyEntity } from 'src/company/entities/company.entity';
+import { UserEntity } from 'src/users/entities/user.entity';
 
 @Injectable()
 export class MeasureService {
@@ -22,23 +23,27 @@ export class MeasureService {
 
   async create(
     createMeasureDto: CreateMeasureDto,
-    companyId: string,
+    user: UserEntity,
   ): Promise<{ message: string; data: MeasureEntity }> {
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
-    if (!company) {
-      throw new BadRequestException('Entreprise introuvable');
+    if (!user.activeCompanyId) {
+      throw new BadRequestException("Aucune entreprise active trouvée pour l'utilisateur.");
     }
-
+  
+    const company = await this.companyRepo.findOne({ where: { id: user.activeCompanyId } });
+    if (!company) {
+      throw new BadRequestException('Entreprise active introuvable');
+    }
+  
     const existing = await this.measureRepo.findOne({
       where: { name: createMeasureDto.name, company },
     });
-
+  
     if (existing) {
       throw new BadRequestException(
         'Cette unité de mesure existe déjà pour cette entreprise',
       );
     }
-
+  
     const measure = this.measureRepo.create({ ...createMeasureDto, company });
     const saved = await this.measureRepo.save(measure);
     return {
@@ -46,6 +51,7 @@ export class MeasureService {
       data: saved,
     };
   }
+  
 
   async findAll(
     companyId: string,
@@ -93,15 +99,19 @@ export class MeasureService {
   async update(
     id: string,
     updateMeasureDto: UpdateMeasureDto,
-    companyId: string,
+    user: UserEntity,
   ): Promise<{ message: string; data: MeasureEntity }> {
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
-    if (!company) {
-      throw new BadRequestException('Entreprise introuvable');
+    if (!user.activeCompanyId) {
+      throw new BadRequestException("Aucune entreprise active trouvée pour l'utilisateur.");
     }
-
-    const measure = await this.findOne(id, companyId).then((res) => res.data);
-
+  
+    const company = await this.companyRepo.findOne({ where: { id: user.activeCompanyId } });
+    if (!company) {
+      throw new BadRequestException('Entreprise active introuvable');
+    }
+  
+    const measure = await this.findOne(id, user.activeCompanyId).then((res) => res.data);
+  
     if (
       updateMeasureDto.name &&
       updateMeasureDto.name !== measure.name
@@ -109,23 +119,23 @@ export class MeasureService {
       const existing = await this.measureRepo.findOne({
         where: { name: updateMeasureDto.name, company },
       });
-
+  
       if (existing) {
         throw new BadRequestException(
           'Une unité de mesure avec ce nom existe déjà pour cette entreprise',
         );
       }
     }
-
+  
     Object.assign(measure, updateMeasureDto);
     const updated = await this.measureRepo.save(measure);
-
+  
     return {
       message: 'Unité de mesure mise à jour avec succès',
       data: updated,
     };
   }
-
+  
   async remove(
     id: string,
     companyId: string,

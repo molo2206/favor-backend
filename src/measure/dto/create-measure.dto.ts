@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 export class CreateMeasureDto 
 {
@@ -10,8 +10,4 @@ export class CreateMeasureDto
     @IsNotEmpty()
     @IsString()
     abbreviation: string;
-
-    @IsNotEmpty()
-    @IsUUID()
-    companyId: string;
 }
