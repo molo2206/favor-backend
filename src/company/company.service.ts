@@ -270,9 +270,6 @@ export class CompanyService {
     };
   }
 
-
-
-
   async getCompanyById(id: string): Promise<{ data: CompanyEntity }> {
     const company = await this.companyRepository.findOne({
       where: { id },
@@ -466,6 +463,44 @@ export class CompanyService {
     return {
       ...sanitizedUser,
       companies,
+    };
+  }
+
+  async findCompanyValidatedByType(
+    type?: string,
+    page = 1,
+    limit = 10,
+  ): Promise<{ message: string; data: CompanyEntity[]; total: number; page: number; limit: number }> {
+    const query = this.companyRepository
+      .createQueryBuilder('company')
+      .leftJoinAndSelect('company.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('userHasCompany.user', 'user')
+      .leftJoinAndSelect('userHasCompany.role', 'role')
+      .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
+      .leftJoinAndSelect('permissions.permission', 'permission')
+      .where('company.status = :status', { status: 'VALIDATED' })
+      .orderBy('company.companyName', 'ASC');
+
+    if (type) {
+      query.andWhere('company.typeCompany = :type', { type });
+    }
+
+    query.skip((page - 1) * limit).take(limit);
+
+    const [companies, total] = await query.getManyAndCount();
+
+    if (companies.length === 0) {
+      throw new NotFoundException(
+        `Aucune entreprise validée trouvée${type ? ` pour le type : ${type}` : ''}`,
+      );
+    }
+
+    return {
+      message: `Entreprises validées récupérées avec succès${type ? ` pour le type : ${type}` : ''}.`,
+      data: companies,
+      total,
+      page,
+      limit,
     };
   }
 }

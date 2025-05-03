@@ -59,7 +59,7 @@ export class ProductController {
     return result;
   }
   @Patch(':id/status')
-  @UseGuards(AuthentificationGuard,RolesGuard)
+  @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
   updateStatus(
     @Param('id') id: string,
@@ -88,6 +88,16 @@ export class ProductController {
     @Query('type') type?: string,
   ): Promise<{ message: string; data: Product[] }> {
     return this.productService.findProductPublishedByType(type);
+  }
+
+  @Get('published/public')
+  async getPublishedProducts(
+    @Query('type') type?: string,
+    @Query('companyId') companyId?: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
+    return this.productService.findProductPublishedByTypeByCompany(type, companyId, Number(page), Number(limit));
   }
 
   @Get('group-by-type')

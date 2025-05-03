@@ -78,6 +78,15 @@ export class CompanyController {
     return await this.companyService.CreateUserToCompany(dto);
   }
 
+  @Get('validated')
+  async getValidatedCompanies(
+    @Query('type') type?: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
+    return this.companyService.findCompanyValidatedByType(type, Number(page), Number(limit));
+  }
+
 
   @Get()
   @UseGuards(AuthentificationGuard)
