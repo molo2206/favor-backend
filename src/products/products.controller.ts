@@ -113,6 +113,7 @@ export class ProductController {
   }
 
   @Get('/category')
+  @UseGuards(AuthentificationGuard)
   async getGroupedProductsByCategory(
     @Query('categoryId') categoryId?: string,
   ): Promise<{
