@@ -291,7 +291,7 @@ export class ProductService {
 
     const products = await this.productRepo.find({
       where: whereCondition,
-      relations: ['category', 'category.parent', 'category.children', 'images']
+      relations: [ 'category.parent', 'category.children', 'images']
     });
 
     if (products.length === 0) {
