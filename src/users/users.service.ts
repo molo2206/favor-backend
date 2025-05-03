@@ -251,7 +251,10 @@ export class UsersService {
           email: uhc.company.email,
           website: uhc.company.website,
           status: uhc.company.status,
-          companyActivity: uhc.company.companyActivity
+          companyActivity: uhc.company.companyActivity,
+          open_time: uhc.company.open_time,
+          delivery_minutes: uhc.company.delivery_minutes,
+          distance_km: uhc.company.distance_km
         }
         : null,
       permissions:
@@ -324,22 +327,18 @@ export class UsersService {
       throw new BadRequestException('Image invalide.');
     }
 
-    // Supprimer l'ancienne image sur Cloudinary s'il y en a une
     if (user.image) {
       await this.cloudinary.handleDeleteImage(user.image);
     }
 
-    // Si un fichier est uploadé
     const imageUrl = await this.cloudinary.handleUploadImage(file, 'user');
     user.image = imageUrl;
 
-    // Sauvegarder l'utilisateur avec la nouvelle image
     const updatedUser = await this.usersRepository.save(user);
 
-    // Formater l'objet utilisateur pour l'inclure dans la réponse
     const { password, ...userWithoutPassword } = updatedUser;
 
-    // Enrichir l'utilisateur avec ses entreprises, permissions, etc.
+   
     const userHasCompany = userWithoutPassword.userHasCompany?.map((uhc) => ({
       id: uhc.id,
       isOwner: uhc.isOwner,
@@ -358,7 +357,10 @@ export class UsersService {
           email: uhc.company.email,
           website: uhc.company.website,
           status: uhc.company.status,
-          companyActivity: uhc.company.companyActivity
+          companyActivity: uhc.company.companyActivity,
+          open_time: uhc.company.open_time,
+          delivery_minutes: uhc.company.delivery_minutes,
+          distance_km: uhc.company.distance_km
         }
         : null,
       permissions: uhc.permissions?.map((p) => ({
@@ -378,7 +380,6 @@ export class UsersService {
       })) ?? [],
     })) ?? [];
 
-    // Ajouter 'activeCompany' pour compléter la réponse
     const responseUser = {
       ...userWithoutPassword,
       userHasCompany,
@@ -386,7 +387,6 @@ export class UsersService {
     };
     const sanitizedUser = instanceToPlain(responseUser)
 
-    // Retourner la réponse avec le message et les données enrichies
     return {
       message: 'Image de profil mise à jour avec succès.',
       data: sanitizedUser,

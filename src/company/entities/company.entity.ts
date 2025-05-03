@@ -66,5 +66,12 @@ export class CompanyEntity {
     @OneToMany(() => MeasureEntity, (measure) => measure.company)
     measures: MeasureEntity[];
 
+    @Column({ nullable: true })
+    delivery_minutes: string
 
+    @Column({ nullable: true })
+    distance_km: string
+
+    @Column({ nullable: true })
+    open_time: string
 }

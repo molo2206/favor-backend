@@ -29,13 +29,25 @@ export class UpdateCompanyDto {
     @IsOptional()
     @IsString()
     typeCompany?: string;
-    
+
     @IsOptional()
     @IsString()
     phone?: string;
-  
+
     @IsOptional()
     @IsString()
     email?: string;
+
+    @IsOptional()
+    @IsString()
+    delivery_minutes?: string;
+
+    @IsOptional()
+    @IsString()
+    distance_km?: string;
+
+    @IsOptional()
+    @IsString()
+    open_time?: string;
 }
 

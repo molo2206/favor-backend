@@ -44,6 +44,17 @@ export class CreateCompanyDto {
   @IsString()
   website?: string;
 
+  @IsOptional()
+  @IsString()
+  delivery_minutes?: string;
+
+  @IsOptional()
+  @IsString()
+  distance_km?: string;
+
+  @IsOptional()
+  @IsString()
+  open_time?: string;
 
   @IsOptional()
   @IsString()

@@ -75,7 +75,10 @@ export class CompanyService {
       typeCompany: dto.typeCompany!,
       phone: dto.phone,
       email: dto.email,
-      companyActivity: dto.companyActivity
+      companyActivity: dto.companyActivity,
+      open_time: dto.open_time,
+      delivery_minutes: dto.delivery_minutes,
+      distance_km: dto.distance_km
     });
 
     const savedCompany = await this.companyRepository.save(company);
@@ -164,6 +167,9 @@ export class CompanyService {
       'email',
       'website',
       'banner',
+      'open_time',
+      'delivery_minutes',
+      'distance_km',
       'companyActivity',
     ];
 
