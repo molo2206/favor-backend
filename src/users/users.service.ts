@@ -130,6 +130,7 @@ export class UsersService {
           id: uhc.company.id,
           companyName: uhc.company.companyName || '',
           logo: uhc.company.logo,
+          banner: uhc.company.banner,
           companyAddress: uhc.company.companyAddress || '',
           typeCompany: uhc.company.typeCompany,
           phone: uhc.company.phone,
@@ -139,7 +140,7 @@ export class UsersService {
           email: uhc.company.email,
           website: uhc.company.website,
           status: uhc.company.status,
-          companyActivity:uhc.company.companyActivity
+          companyActivity: uhc.company.companyActivity
         }
         : null,
       permissions: uhc.permissions?.map((p) => ({
@@ -240,6 +241,7 @@ export class UsersService {
           id: uhc.company.id,
           companyName: uhc.company.companyName || '',
           logo: uhc.company.logo,
+          banner: uhc.company.banner,
           companyAddress: uhc.company.companyAddress || '',
           typeCompany: uhc.company.typeCompany,
           phone: uhc.company.phone,
@@ -249,7 +251,7 @@ export class UsersService {
           email: uhc.company.email,
           website: uhc.company.website,
           status: uhc.company.status,
-          companyActivity:uhc.company.companyActivity
+          companyActivity: uhc.company.companyActivity
         }
         : null,
       permissions:
@@ -346,6 +348,7 @@ export class UsersService {
           id: uhc.company.id,
           companyName: uhc.company.companyName || '',
           logo: uhc.company.logo,
+          banner: uhc.company.banner,
           companyAddress: uhc.company.companyAddress || '',
           typeCompany: uhc.company.typeCompany,
           phone: uhc.company.phone,
@@ -355,7 +358,7 @@ export class UsersService {
           email: uhc.company.email,
           website: uhc.company.website,
           status: uhc.company.status,
-          companyActivity:uhc.company.companyActivity
+          companyActivity: uhc.company.companyActivity
         }
         : null,
       permissions: uhc.permissions?.map((p) => ({

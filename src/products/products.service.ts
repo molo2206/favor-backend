@@ -185,7 +185,15 @@ export class ProductService {
     companyId?: string,
     page = 1,
     limit = 10,
-  ): Promise<{ message: string; data: Product[]; total: number; page: number; limit: number }> {
+  ): Promise<{
+    message: string;
+    data: {
+      data: Product[];
+      total: number;
+      page: number;
+      limit: number;
+    };
+  }> {
     const queryBuilder = this.productRepo.createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('category.parent', 'categoryParent')
@@ -212,10 +220,12 @@ export class ProductService {
 
     return {
       message: `Produits PUBLIÉS récupérés avec succès${type ? ` pour le type : ${type}` : ''}${companyId ? ` pour l'entreprise ${companyId}` : ''}.`,
-      data: products,
-      total,
-      page,
-      limit,
+      data: {
+        data: products,
+        total,
+        page,
+        limit,
+      }
     };
   }
 

@@ -40,6 +40,15 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsString()
   email?: string;
+  @IsOptional()
+  @IsString()
+  website?: string;
+
+
+  @IsOptional()
+  @IsString()
+  @IsUrl({}, { message: 'The banner should be a valid URL or file path.' })
+  banner?: string | null
 
   @IsEnum(CompanyActivity, {
     message: `L'activité doit être : ${Object.values(CompanyActivity).join(', ')}`,

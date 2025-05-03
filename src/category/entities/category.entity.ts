@@ -25,15 +25,16 @@ export class CategoryEntity {
     @Column({ nullable: true })
     type?: string;
 
+    @Column({ nullable: true })
+    color?: string;
+
     @ManyToOne(() => CategoryEntity, (category) => category.children)
     @JoinColumn({ name: 'parent_id' })
     parent: CategoryEntity;
 
-    // ✅ Sous-catégories de cette catégorie
     @OneToMany(() => CategoryEntity, (category) => category.parent)
     children: CategoryEntity[];
 
-    // ✅ Produits liés à cette catégorie
     @OneToMany(() => Product, (product) => product.category)
     products: Product[];
 }

@@ -1,6 +1,6 @@
-import { Controller, Post, Body, UseGuards, UseInterceptors, UploadedFile, Param, UsePipes, ValidationPipe, Put, Patch, Get, Query } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, UseInterceptors, Param, UsePipes, ValidationPipe, Put, Patch, Get, Query, UploadedFiles } from '@nestjs/common';
 import { CompanyService } from './company.service';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
@@ -21,34 +21,41 @@ export class CompanyController {
   @Post()
   @UseGuards(AuthentificationGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(FileInterceptor('logo'))
+  @UseInterceptors(AnyFilesInterceptor())
   async createCompany(
-    @UploadedFile() logo: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
     @Body() dto: CreateCompanyDto,
     @CurrentUser() currentUser: UserEntity,
   ) {
-    const result = await this.companyService.createCompanyWithUser(dto, currentUser, logo);
+    const logo = files.find(file => file.fieldname === 'logo');
+    const banner = files.find(file => file.fieldname === 'banner');
+
+    const result = await this.companyService.createCompanyWithUser(dto, currentUser, logo, banner);
+
     await this.mailService.sendHtmlEmail(
       currentUser.email,
       'Votre entreprise a été créée avec succès',
       'company-status-update.html',
       { companyName: dto.companyName, status: 'PENDING', year: new Date().getFullYear() }
     );
+
     return result;
   }
 
-  @Put(':id')
+  @Put(':companyId')
   @UseGuards(AuthentificationGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(FileInterceptor('logo'))  // Intercepteur pour le fichier logo
+  @UseInterceptors(AnyFilesInterceptor())
   async updateCompany(
-    @Param('companyId') companyId: string,  // ID de l'entreprise à mettre à jour
-    @Body() dto: Partial<CreateCompanyDto>,  // DTO partiel pour la mise à jour
-    @UploadedFile() logoFile: Express.Multer.File,  // Le logo peut être fourni en option
-    @CurrentUser() currentUser: UserEntity,  // Utilisateur actuel pour l'association
+    @Param('companyId') companyId: string,
+    @Body() dto: Partial<CreateCompanyDto>,
+    @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() currentUser: UserEntity,
   ) {
-    // Appel du service pour mettre à jour l'entreprise avec l'utilisateur et le logo
-    return this.companyService.updateCompanyWithUser(dto, companyId, currentUser.id, logoFile);
+    const logo = files.find(file => file.fieldname === 'logo');
+    const banner = files.find(file => file.fieldname === 'banner');
+
+    return this.companyService.updateCompanyWithUser(dto, companyId, currentUser.id, logo, banner);
   }
 
   @Patch('me/active-company/:companyId')

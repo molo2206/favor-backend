@@ -10,4 +10,8 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsString()
   type?: string;
+
+  @IsOptional()
+  @IsString()
+  color?: string;
 }

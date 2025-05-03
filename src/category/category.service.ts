@@ -17,7 +17,7 @@ export class CategoryService {
   ) { }
 
   async create(createCategoryDto: CreateCategoryDto, file: Express.Multer.File): Promise<{ message: string, data: CategoryEntity }> {
-    const { name, parentId, type } = createCategoryDto;
+    const { name, parentId, type, color } = createCategoryDto;
 
     const existingCategory = await this.categoryRepo.findOne({ where: { name, type } });
     if (existingCategory) {
@@ -36,7 +36,7 @@ export class CategoryService {
       parent = foundParent;
     }
 
-    const slug = slugify(name);
+    const slug = slugify(name, { lower: true, strict: true });
 
     // Vérification : image obligatoire
     if (!file) {
@@ -49,6 +49,7 @@ export class CategoryService {
       name,
       slug,
       type,
+      color,
       parent,
       image: imageUrl,
     });
@@ -80,7 +81,7 @@ export class CategoryService {
 
     if (name) {
       category.name = name;
-      category.slug = slugify(name);
+      category.slug = slugify(name, { lower: true, strict: true });
     }
 
     if (type) {

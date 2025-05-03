@@ -43,6 +43,7 @@ export class CompanyService {
     dto: CreateCompanyDto,
     user: UserEntity,
     logoFile?: Express.Multer.File,
+    bannerFile?: Express.Multer.File,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ message: string; data: any }> {
     if (!dto || Object.keys(dto).length === 0) {
@@ -58,6 +59,11 @@ export class CompanyService {
       logoUrl = await this.cloudinary.handleUploadImage(logoFile, 'company');
     }
 
+    let bannerUrl: string | null = null;
+    if (bannerFile) {
+      bannerUrl = await this.cloudinary.handleUploadImage(bannerFile, 'company/banner');
+    }
+
     const company = this.companyRepository.create({
       companyName: dto.companyName,
       companyAddress: dto.companyAddress,
@@ -65,6 +71,7 @@ export class CompanyService {
       registrationDocumentUrl: dto.registrationDocumentUrl,
       warehouseLocation: dto.warehouseLocation,
       logo: logoUrl,
+      banner: bannerUrl,
       typeCompany: dto.typeCompany!,
       phone: dto.phone,
       email: dto.email,
@@ -131,8 +138,9 @@ export class CompanyService {
     dto: Partial<CreateCompanyDto>,
     companyId: string,
     userId: string,
-    logoFile?: Express.Multer.File, // Modification pour prendre un fichier logo
-  ): Promise<{ message: string, data: CompanyEntity }> {  // Retourne un objet avec la clé 'data'
+    logoFile?: Express.Multer.File,
+    bannerFile?: Express.Multer.File,
+  ): Promise<{ message: string, data: CompanyEntity }> {
     if (!dto || Object.keys(dto).length === 0) {
       throw new BadRequestException("Les données de l'entreprise ne peuvent pas être vides");
     }
@@ -152,7 +160,13 @@ export class CompanyService {
       'vatNumber',
       'registrationDocumentUrl',
       'warehouseLocation',
+      'phone',
+      'email',
+      'website',
+      'banner',
+      'companyActivity',
     ];
+
     for (const field of fieldsToUpdate) {
       if (dto[field] !== undefined) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -160,26 +174,27 @@ export class CompanyService {
       }
     }
 
-    // Si un nouveau logo est téléchargé, on utilise Cloudinary
-    let logoUrl: string | null = null;
     if (logoFile) {
-      logoUrl = await this.cloudinary.handleUploadImage(logoFile, 'company');
-      company.logo = logoUrl;
+      company.logo = await this.cloudinary.handleUploadImage(logoFile, 'company/logo');
     } else if (dto.logo !== undefined) {
       company.logo = dto.logo;
     }
 
-    // Si un type d'entreprise est fourni, on le met à jour
+    if (bannerFile) {
+      company.banner = await this.cloudinary.handleUploadImage(bannerFile, 'company/banner');
+    } else if (dto.banner !== undefined) {
+      company.banner = dto.banner;
+    }
+
     if (dto.typeCompany) {
       if (!Object.values(CompanyType).includes(dto.typeCompany as CompanyType)) {
         throw new BadRequestException(`TypeCompany invalide: ${dto.typeCompany}`);
       }
       company.typeCompany = dto.typeCompany as CompanyType;
     }
-    // Sauvegarde de l'entreprise mise à jour
+
     const updatedCompany = await this.companyRepository.save(company);
 
-    // Recherche et création de l'association utilisateur-entreprise
     let userHasCompany = await this.userHasCompanyRepository.findOne({
       where: {
         user: { id: userId },
@@ -198,8 +213,12 @@ export class CompanyService {
       await this.userHasCompanyRepository.save(userHasCompany);
     }
 
-    return { message: 'Companie mise à jour avec succès', data: updatedCompany };  // Retourne l'entreprise mise à jour dans 'data'
+    return {
+      message: 'Companie mise à jour avec succès',
+      data: updatedCompany,
+    };
   }
+
 
   async updateCompanyStatus(
     id: string,
@@ -470,7 +489,15 @@ export class CompanyService {
     type?: string,
     page = 1,
     limit = 10,
-  ): Promise<{ message: string; data: CompanyEntity[]; total: number; page: number; limit: number }> {
+  ): Promise<{
+    message: string;
+    data: {
+      data: CompanyEntity[];
+      total: number;
+      page: number;
+      limit: number;
+    };
+  }> {
     const query = this.companyRepository
       .createQueryBuilder('company')
       .leftJoinAndSelect('company.userHasCompany', 'userHasCompany')
@@ -497,10 +524,12 @@ export class CompanyService {
 
     return {
       message: `Entreprises validées récupérées avec succès${type ? ` pour le type : ${type}` : ''}.`,
-      data: companies,
-      total,
-      page,
-      limit,
+      data: {
+        data: companies,
+        total,
+        page,
+        limit,
+      }
     };
   }
 }

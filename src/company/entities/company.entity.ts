@@ -28,6 +28,9 @@ export class CompanyEntity {
     @Column({ nullable: true })
     warehouseLocation?: string;
 
+    @Column({ nullable: true, type: 'varchar', length: 255 })
+    banner: string | null
+
     // Modifié le type de la colonne logo en varchar
     @Column({ nullable: true, type: 'varchar', length: 255 })
     logo: string | null;  // Permet de stocker l'URL ou le chemin du logo
@@ -62,4 +65,6 @@ export class CompanyEntity {
 
     @OneToMany(() => MeasureEntity, (measure) => measure.company)
     measures: MeasureEntity[];
+
+
 }
