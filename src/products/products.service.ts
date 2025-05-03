@@ -286,29 +286,42 @@ export class ProductService {
 
     return grouped;
   }
-  async findAllGroupedByCategory(categoryId?: string): Promise<{ data: (CategoryEntity & { products: Product[] })[] }> {
+
+  async findAllGroupedByCategory(categoryId?: string): Promise<{
+    data: (Omit<CategoryEntity, 'products'> & { products: Product[] })[];
+  }> {
     const whereCondition = categoryId ? { category: { id: categoryId } } : {};
 
     const products = await this.productRepo.find({
       where: whereCondition,
-      relations: [ 'category.parent', 'category.children', 'images']
+      relations: ['category.parent', 'category.children', 'images'],
     });
 
     if (products.length === 0) {
       throw new NotFoundException('Aucun produit trouvé');
     }
 
-    const grouped = new Map<string, CategoryEntity & { products: Product[] }>();
+    const grouped = new Map<
+      string,
+      Omit<CategoryEntity, 'products'> & { products: Product[] }
+    >();
 
     for (const product of products) {
-      const category = product.category || { name: 'Aucune catégorie' } as CategoryEntity;
+      const category = product.category || { name: 'Aucune catégorie', id: 'no-category' } as CategoryEntity;
       const categoryKey = product.category?.id || 'no-category';
 
       if (!grouped.has(categoryKey)) {
-        grouped.set(categoryKey, { ...category, products: [] });
+        // On exclut le champ "products" de la catégorie pour éviter une boucle
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { products: _, ...categoryWithoutProducts } = category as CategoryEntity;
+        grouped.set(categoryKey, { ...categoryWithoutProducts, products: [] });
       }
 
-      grouped.get(categoryKey)!.products.push(product);
+      // Supprimer la redondance dans chaque produit
+      const cleanProduct = { ...product };
+      delete cleanProduct.category;
+
+      grouped.get(categoryKey)!.products.push(cleanProduct);
     }
 
     const result = Array.from(grouped.values()).sort((a, b) =>
@@ -317,6 +330,7 @@ export class ProductService {
 
     return { data: result };
   }
+
 
   async groupByType_First_Product(): Promise<Record<string, Product>> {
     const products = await this.productRepo.find({
