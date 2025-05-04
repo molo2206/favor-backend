@@ -45,6 +45,14 @@ export class CategoryController {
     return { data: categories };  // Encapsule le tableau de catégories dans "data"
   }
 
+  @Get('parents')
+  async findAllParents(
+    @Query('type') type?: string,  
+  ): Promise<{ data: CategoryEntity[] }> {  
+    const categories = await this.categoryService.findAllParent(type);
+    return { data: categories }; 
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<{ data: CategoryEntity }> {  // Retourne un objet avec "data"
     const category = await this.categoryService.findOne(id);
@@ -65,7 +73,7 @@ export class CategoryController {
     const { message, data } = await this.categoryService.update(id, updateCategoryDto, file);
     return { message, data };
   }
-  
+
 
   @Get('/by-type/:type')
   async findByTypeCompany(@Param('type') type: string): Promise<{ data: CategoryEntity[] }> {
