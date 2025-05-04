@@ -69,7 +69,7 @@ export class CategoryService {
       throw new NotFoundException('Catégorie introuvable');
     }
 
-    const { name, parentId, type } = updateCategoryDto;
+    const { name, parentId, type, color } = updateCategoryDto;
 
     const existingCategory = await this.categoryRepo.findOne({
       where: { name, type },
@@ -86,6 +86,10 @@ export class CategoryService {
 
     if (type) {
       category.type = type;
+    }
+
+    if (color) {
+      category.color = color;
     }
 
     if (parentId) {
@@ -130,7 +134,7 @@ export class CategoryService {
     const categories = await queryBuilder.getMany();
     return categories;
   }
-  
+
   async findOne(id: string): Promise<CategoryEntity> {
     const category = await this.categoryRepo.findOne({
       where: { id },
