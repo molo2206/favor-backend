@@ -144,10 +144,6 @@ export class ProductService {
 
     const products = await queryBuilder.getMany();
 
-    if (products.length === 0) {
-      throw new NotFoundException(`Aucun produit trouvé${type ? ` pour le type : ${type}` : ''}`);
-    }
-
     return {
       message: `Produits récupérés avec succès${type ? ` pour le type : ${type}` : ''}.`,
       data: products,
@@ -169,10 +165,6 @@ export class ProductService {
     }
 
     const products = await queryBuilder.getMany();
-
-    if (products.length === 0) {
-      throw new NotFoundException(`Aucun produit PUBLIÉ trouvé${type ? ` pour le type : ${type}` : ''}`);
-    }
 
     return {
       message: `Produits PUBLIÉS récupérés avec succès${type ? ` pour le type : ${type}` : ''}.`,
@@ -235,10 +227,6 @@ export class ProductService {
       where: { id: user.activeCompanyId },
     });
 
-    if (!company) {
-      throw new NotFoundException(`Entreprise avec l'ID ${user.activeCompanyId} introuvable`);
-    }
-
     const products = await this.productRepo.find({
       where: { company: { id: user.activeCompanyId } },
       relations: [
@@ -292,10 +280,6 @@ export class ProductService {
       where: whereCondition,
       relations: ['category.parent', 'category.children', 'images'],
     });
-
-    if (products.length === 0) {
-      throw new NotFoundException('Aucun produit trouvé');
-    }
 
     const grouped = new Map<
       string,
