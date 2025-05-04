@@ -109,8 +109,28 @@ export class CategoryService {
     };
   }
 
+  async findAll(type?: string): Promise<CategoryEntity[]> {
+    const queryBuilder = this.categoryRepo.createQueryBuilder('category')
+      .leftJoinAndSelect('category.parent', 'parent')
+      .leftJoinAndSelect('category.children', 'children');
 
+    if (type) {
+      queryBuilder.where('category.type = :type', { type });
+    }
+    const categories = await queryBuilder.getMany();
+    return categories;
+  }
 
+  async findAllParent(type?: string): Promise<CategoryEntity[]> {
+    const queryBuilder = this.categoryRepo.createQueryBuilder('category')
+      .where('category.parent IS NULL');
+    if (type) {
+      queryBuilder.andWhere('category.type = :type', { type });
+    }
+    const categories = await queryBuilder.getMany();
+    return categories;
+  }
+  
   async findOne(id: string): Promise<CategoryEntity> {
     const category = await this.categoryRepo.findOne({
       where: { id },
@@ -137,28 +157,6 @@ export class CategoryService {
     return categories;
   }
 
-  async findAll(type?: string): Promise<CategoryEntity[]> {
-    const queryBuilder = this.categoryRepo.createQueryBuilder('category')
-      .leftJoinAndSelect('category.children', 'children') // seulement les enfants
-      .where('category.parent IS NULL'); // filtrer les parents seulement
-
-    if (type) {
-      queryBuilder.andWhere('category.type = :type', { type });
-    }
-
-    const categories = await queryBuilder.getMany();
-    return categories;
-  }
-
-  async findAllParent(type?: string): Promise<CategoryEntity[]> {
-    const queryBuilder = this.categoryRepo.createQueryBuilder('category')
-      .where('category.parent IS NULL');
-    if (type) {
-      queryBuilder.andWhere('category.type = :type', { type });
-    }
-    const categories = await queryBuilder.getMany();
-    return categories;
-  }
 
   async findByParentId(
     parentId: string | null,
