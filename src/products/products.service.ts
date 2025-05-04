@@ -201,23 +201,19 @@ export class ProductService {
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
-
+  
     if (type) {
       queryBuilder.andWhere('product.type = :type', { type });
     }
-
+  
     if (companyId) {
       queryBuilder.andWhere('product.companyId = :companyId', { companyId });
     }
-
+  
     queryBuilder.skip((page - 1) * limit).take(limit);
-
+  
     const [products, total] = await queryBuilder.getManyAndCount();
-
-    if (products.length === 0) {
-      throw new NotFoundException(`Aucun produit PUBLIÉ trouvé${type ? ` pour le type : ${type}` : ''}${companyId ? ` pour l'entreprise ${companyId}` : ''}`);
-    }
-
+  
     return {
       message: `Produits PUBLIÉS récupérés avec succès${type ? ` pour le type : ${type}` : ''}${companyId ? ` pour l'entreprise ${companyId}` : ''}.`,
       data: {
