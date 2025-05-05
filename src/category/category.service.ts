@@ -111,6 +111,7 @@ export class CategoryService {
       message: 'Catégorie mise à jour avec succès',
       data: updatedCategory,
     };
+    
   }
 
   async findAll(type?: string): Promise<CategoryEntity[]> {

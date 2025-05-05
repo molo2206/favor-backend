@@ -130,6 +130,20 @@ export class ProductController {
     return { data: result };
   }
 
+  @Get('published/public/bycategory')
+  async getPublishedProductByCategory(
+    @Query('categoryId') categoryId?: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
+    return this.productService.findProductPublishedByCategory(
+      categoryId,
+      Number(page),
+      Number(limit),
+    );
+  }
+
+
   @Get('search')
   async search(@Query('search') query: string): Promise<{ message: string; data: Product[] }> {
     return this.productService.searchProducts(query);
