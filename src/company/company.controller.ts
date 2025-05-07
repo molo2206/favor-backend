@@ -42,20 +42,19 @@ export class CompanyController {
     return result;
   }
 
-  @Put(':companyId')
+  @Put()
   @UseGuards(AuthentificationGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   @UseInterceptors(AnyFilesInterceptor())
   async updateCompany(
-    @Param('companyId') companyId: string,
     @Body() dto: Partial<CreateCompanyDto>,
     @UploadedFiles() files: Express.Multer.File[],
-    @CurrentUser() currentUser: UserEntity,
+    @CurrentUser() current_user: UserEntity,
   ) {
     const logo = files.find(file => file.fieldname === 'logo');
     const banner = files.find(file => file.fieldname === 'banner');
 
-    return this.companyService.updateCompanyWithUser(dto, companyId, currentUser.id, logo, banner);
+    return this.companyService.updateCompanyWithUser(dto, current_user, logo, banner);
   }
 
   @Patch('me/active-company/:companyId')

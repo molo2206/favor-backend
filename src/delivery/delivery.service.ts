@@ -10,6 +10,7 @@ import { OrderEntity } from 'src/order/entities/order.entity';
 import { DeliveryStatus } from './enums/delivery.enum.status';
 import { TrackingEntity } from 'src/tracking/entities/tracking.entity';
 import { CreateTrackingDto } from 'src/tracking/dto/create-tracking.dto';
+import { EventsGateway } from 'src/events/events.gateway';
 
 @Injectable()
 export class DeliveryService {
@@ -28,7 +29,9 @@ export class DeliveryService {
 
     @InjectRepository(TrackingEntity)
     private readonly trackingRepository: Repository<TrackingEntity>,
-    
+
+    private readonly eventsGateway: EventsGateway
+
   ) { }
 
   async create(createDeliveryDto: CreateDeliveryDto): Promise<{ message: string; data: DeliveryEntity }> {
@@ -97,7 +100,7 @@ export class DeliveryService {
       throw new NotFoundException("La livraison n'a pas pu être retrouvée après sa création.");
     }
 
-    return {message:"Traitement réussi avec succès", data: fullDelivery };
+    return { message: "Traitement réussi avec succès", data: fullDelivery };
   }
 
   async addTrackingToDelivery(
@@ -116,8 +119,7 @@ export class DeliveryService {
       ...dto,
       delivery,
     });
-    
-
+    this.eventsGateway.broadcastEvent('order.created', { deliveryId });
     return this.trackingRepository.save(tracking);
   }
 

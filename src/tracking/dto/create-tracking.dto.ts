@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DeliveryStatus } from 'src/delivery/enums/delivery.enum.status';
 
@@ -31,13 +31,13 @@ export class CreateTrackingDto {
         description: 'ID de la livraison concernée',
         example: 'bd6d57ea-3034-4d6e-8b49-4a9e5c08a2a1',
     })
-    @IsUUID()
+
     deliveryId: string;
 
     @ApiProperty({
         description: 'ID du client lié au tracking',
         example: 'd3bb7e7e-52e4-4adf-933b-c8d1fcecf21e',
     })
-    @IsUUID()
+
     userId: string;
 }

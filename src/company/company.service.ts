@@ -142,8 +142,7 @@ export class CompanyService {
 
   async updateCompanyWithUser(
     dto: Partial<CreateCompanyDto>,
-    companyId: string,
-    userId: string,
+    current_user: UserEntity,
     logoFile?: Express.Multer.File,
     bannerFile?: Express.Multer.File,
   ): Promise<{ message: string, data: CompanyEntity }> {
@@ -151,9 +150,9 @@ export class CompanyService {
       throw new BadRequestException("Les données de l'entreprise ne peuvent pas être vides");
     }
 
-    const company = await this.companyRepository.findOne({ where: { id: companyId } });
+    const company = await this.companyRepository.findOne({ where: { id: current_user.activeCompany?.id } });
     if (!company) {
-      throw new NotFoundException(`Entreprise avec l'ID ${companyId} introuvable`);
+      throw new NotFoundException(`Entreprise avec l'ID ${current_user.activeCompany?.id} introuvable`);
     }
     const requiredFields: (keyof CreateCompanyDto)[] = ['address', 'latitude', 'longitude'];
 
@@ -217,13 +216,13 @@ export class CompanyService {
 
     let userHasCompany = await this.userHasCompanyRepository.findOne({
       where: {
-        user: { id: userId },
-        company: { id: companyId },
+        user: { id: current_user.id },
+        company: { id: current_user.activeCompany?.id },
       },
     });
 
     if (!userHasCompany) {
-      const user = await this.userRepository.findOneByOrFail({ id: userId });
+      const user = await this.userRepository.findOneByOrFail({ id: current_user.id });
 
       userHasCompany = this.userHasCompanyRepository.create({
         user,
