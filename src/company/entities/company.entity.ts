@@ -74,4 +74,13 @@ export class CompanyEntity {
 
     @Column({ nullable: true })
     open_time: string
+
+    @Column({ nullable: true })
+    address: string;
+
+    @Column({ nullable: true })
+    latitude: string;
+
+    @Column({ nullable: true })
+    longitude: string;
 }

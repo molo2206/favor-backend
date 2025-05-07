@@ -34,4 +34,13 @@ export class OrderEntity {
     @ManyToOne(() => Product)
     @JoinColumn({ name: 'productId' })
     product: Product;
+
+    @Column({ nullable: true })
+    address: string;
+
+    @Column({ nullable: true })
+    latitude: string;
+
+    @Column({ nullable: true })
+    longitude: string;
 }

@@ -140,7 +140,10 @@ export class UsersService {
           email: uhc.company.email,
           website: uhc.company.website,
           status: uhc.company.status,
-          companyActivity: uhc.company.companyActivity
+          companyActivity: uhc.company.companyActivity,
+          latitude: uhc.company.latitude,
+          longitude: uhc.company.longitude,
+          address: uhc.company.address
         }
         : null,
       permissions: uhc.permissions?.map((p) => ({
@@ -254,7 +257,10 @@ export class UsersService {
           companyActivity: uhc.company.companyActivity,
           open_time: uhc.company.open_time,
           delivery_minutes: uhc.company.delivery_minutes,
-          distance_km: uhc.company.distance_km
+          distance_km: uhc.company.distance_km,
+          latitude: uhc.company.latitude,
+          longitude: uhc.company.longitude,
+          address: uhc.company.address
         }
         : null,
       permissions:
@@ -360,7 +366,10 @@ export class UsersService {
           companyActivity: uhc.company.companyActivity,
           open_time: uhc.company.open_time,
           delivery_minutes: uhc.company.delivery_minutes,
-          distance_km: uhc.company.distance_km
+          distance_km: uhc.company.distance_km,
+          latitude: uhc.company.latitude,
+          longitude: uhc.company.longitude,
+          address: uhc.company.address
         }
         : null,
       permissions: uhc.permissions?.map((p) => ({

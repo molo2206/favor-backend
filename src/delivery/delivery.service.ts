@@ -28,6 +28,7 @@ export class DeliveryService {
 
     @InjectRepository(TrackingEntity)
     private readonly trackingRepository: Repository<TrackingEntity>,
+    
   ) { }
 
   async create(createDeliveryDto: CreateDeliveryDto): Promise<{ message: string; data: DeliveryEntity }> {
@@ -115,6 +116,7 @@ export class DeliveryService {
       ...dto,
       delivery,
     });
+    
 
     return this.trackingRepository.save(tracking);
   }

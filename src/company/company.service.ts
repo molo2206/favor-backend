@@ -78,7 +78,10 @@ export class CompanyService {
       companyActivity: dto.companyActivity,
       open_time: dto.open_time,
       delivery_minutes: dto.delivery_minutes,
-      distance_km: dto.distance_km
+      distance_km: dto.distance_km,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      address: dto.address
     });
 
     const savedCompany = await this.companyRepository.save(company);
@@ -152,6 +155,14 @@ export class CompanyService {
     if (!company) {
       throw new NotFoundException(`Entreprise avec l'ID ${companyId} introuvable`);
     }
+    const requiredFields: (keyof CreateCompanyDto)[] = ['address', 'latitude', 'longitude'];
+
+    for (const field of requiredFields) {
+      const value = dto[field];
+      if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+        throw new BadRequestException(`Le champ '${field}' est obligatoire`);
+      }
+    }
 
     if (dto.companyName !== undefined && dto.companyName.trim() === '') {
       throw new BadRequestException("Le nom de l'entreprise est requis");
@@ -171,6 +182,9 @@ export class CompanyService {
       'delivery_minutes',
       'distance_km',
       'companyActivity',
+      'latitude',
+      'longitude',
+      'address'
     ];
 
     for (const field of fieldsToUpdate) {
@@ -408,7 +422,10 @@ export class CompanyService {
           email: uhc.company.email,
           website: uhc.company.website,
           status: uhc.company.status,
-          companyActivity: uhc.company.companyActivity
+          companyActivity: uhc.company.companyActivity,
+          latitude: uhc.company.latitude,
+          longitude: uhc.company.longitude,
+          address: uhc.company.address
         }
         : null,
       permissions:

@@ -279,7 +279,6 @@ export class ProductService {
         'measure',
       ],
     });
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
     const { products: _, ...companyData } = company as any;
 

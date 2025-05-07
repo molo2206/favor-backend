@@ -58,6 +58,18 @@ export class CreateCompanyDto {
 
   @IsOptional()
   @IsString()
+  address: string;
+
+  @IsOptional()
+  @IsString()
+  latitude: string;
+
+  @IsOptional()
+  @IsString()
+  longitude: string;
+
+  @IsOptional()
+  @IsString()
   @IsUrl({}, { message: 'The banner should be a valid URL or file path.' })
   banner?: string | null
 

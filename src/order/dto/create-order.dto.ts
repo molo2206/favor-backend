@@ -1,4 +1,4 @@
-import { IsArray, IsEnum, IsNumber, IsOptional } from 'class-validator';
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateSubOrderDto } from 'src/sub_orders/dto/create-sub_order.dto';
 import { CreateOrderItemDto } from 'src/order_items/dto/create-order_item.dto';
@@ -18,4 +18,13 @@ export class CreateOrderDto {
     @IsArray()
     @Type(() => CreateSubOrderDto)  // Assurez-vous que SubOrderDto est bien défini
     subOrders?: CreateSubOrderDto[];
+
+    @IsNotEmpty({ message: 'L’adresse est obligatoire.' })
+    address: string;
+
+    @IsNotEmpty({ message: 'La latitude est obligatoire.' })
+    latitude: string;
+
+    @IsNotEmpty({ message: 'La longitude est obligatoire.' })
+    longitude: string;
 }
