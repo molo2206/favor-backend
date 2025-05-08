@@ -20,7 +20,9 @@ export class AddressUserService {
     createDto: CreateAddressUserDto,
     user: UserEntity,
   ): Promise<{ data: AddressUser; message: string }> {
-    if (createDto.isDefault) {
+    const isDefault = createDto.isDefault === true;
+
+    if (isDefault) {
       // Désactiver les anciennes adresses par défaut
       await this.addressUserRepo.update(
         { user: { id: user.id }, isDefault: true },
@@ -28,22 +30,27 @@ export class AddressUserService {
       );
     }
 
-    // Créer l'entité en mémoire
+    // Créer et sauvegarder l’adresse
     const address = this.addressUserRepo.create({
       ...createDto,
+      isDefault, // toujours défini (true/false)
       user,
       latitude: Number(createDto.latitude),
       longitude: Number(createDto.longitude),
     });
 
-    // Sauvegarder en base
     const savedAddress = await this.addressUserRepo.save(address);
 
-    // Si l'adresse est par défaut, mettre à jour le user
-    if (createDto.isDefault) {
+    // Mettre à jour l'utilisateur si cette adresse est par défaut
+    if (isDefault) {
       await this.userRepo.update(user.id, {
-        defaultAddress: savedAddress,
         defaultAddressId: savedAddress.id,
+      });
+
+      // Optionnel : si tu veux aussi mettre la relation (non seulement l'id)
+      await this.userRepo.save({
+        ...user,
+        defaultAddress: savedAddress,
       });
     }
 
@@ -52,6 +59,7 @@ export class AddressUserService {
       data: savedAddress,
     };
   }
+
 
   async updateDefaultAddress(user: UserEntity, addressId: string): Promise<AddressUser> {
     const address = await this.addressUserRepo.findOne({
@@ -100,19 +108,40 @@ export class AddressUserService {
       throw new NotFoundException('Adresse non trouvée pour cet utilisateur');
     }
 
-    // Si l'utilisateur veut que cette adresse devienne la nouvelle par défaut
-    if (updateDto.isDefault) {
-      await this.addressUserRepo.update(
-        { user: { id: user.id }, isDefault: true },
-        { isDefault: false },
-      );
-      address.isDefault = true;
-      user.defaultAddress = address;
-      user.defaultAddressId = address.id;
-      await this.userRepo.save(user);
+    const isDefault = updateDto.isDefault;
+
+    if (typeof isDefault === 'boolean') {
+      if (isDefault) {
+        // Définir cette adresse comme par défaut → désactiver les autres
+        await this.addressUserRepo.update(
+          { user: { id: user.id }, isDefault: true },
+          { isDefault: false },
+        );
+        address.isDefault = true;
+
+        // Mettre à jour le user
+        await this.userRepo.update(user.id, {
+          defaultAddressId: address.id,
+        });
+
+        // Facultatif : mettre aussi la relation
+        await this.userRepo.save({ ...user, defaultAddress: address });
+      } else {
+        // Supprimer le statut par défaut
+        address.isDefault = false;
+
+        // Si cette adresse était celle du user, on nettoie
+        if (user.defaultAddressId === address.id) {
+          await this.userRepo.update(user.id, {
+            defaultAddressId: undefined,
+          });
+
+          await this.userRepo.save({ ...user, defaultAddress: undefined });
+        }
+      }
     }
 
-    // Mise à jour des champs de l'adresse
+    // Mise à jour des autres champs (firstName, phone, etc.)
     Object.assign(address, updateDto);
     return this.addressUserRepo.save(address);
   }
