@@ -22,7 +22,7 @@ export class UpdateAddressUserDto {
 
     @IsString()
     @IsOptional()
-    addresss: string;
+    address: string;
 
     @IsEnum(Address)
     @IsOptional()

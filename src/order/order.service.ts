@@ -113,10 +113,8 @@ export class OrderService {
       group.total += product.price * item.quantity;
     }
 
-    // 3. Sauvegarde des OrderItems
     await this.orderItemRepo.save(orderItemEntities);
 
-    // 4. Création des SubOrders et association des SubOrderItems
     for (const [, group] of groupedByCompany) {
       const subOrder = this.subOrderRepo.create({
         order,
@@ -186,5 +184,5 @@ export class OrderService {
       order: { createdAt: 'DESC' },
     });
   }
-
+  
 }
