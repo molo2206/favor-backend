@@ -1,318 +1,190 @@
+// order.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreateOrderDto } from './dto/create-order.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OrderEntity } from './entities/order.entity';
-import { SubOrderService } from 'src/sub_orders/sub_orders.service';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { plainToClass } from 'class-transformer';
-import { OrderItemsService } from 'src/order_items/order_items.service';
-import { SubOrderItemService } from 'src/sub_order_items/sub_order_items.service';
-import { CreateSubOrderDto } from 'src/sub_orders/dto/create-sub_order.dto';
-import { SubOrderEntity } from 'src/sub_orders/entities/sub_order.entity';
-import { UpdateOrderDto } from './dto/update-order.dto';
-import { OrderStatus } from './enum/orderstatus.enum';
+import { CreateOrderDto } from './dto/create-order.dto';
+import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
+import { SubOrderEntity } from 'src/sub-order/entities/sub-order.entity';
+import { SubOrderItemEntity } from 'src/sub-order-item/entities/sub-order-item.entity';
+import { Product } from 'src/products/entities/product.entity';
+import { AddressUser } from 'src/address-user/entities/address-user.entity';
 
 @Injectable()
 export class OrderService {
   constructor(
     @InjectRepository(OrderEntity)
     private readonly orderRepo: Repository<OrderEntity>,
-    private readonly orderItemService: OrderItemsService,
-    private readonly subOrderService: SubOrderService,
-    private readonly subOrderItemService: SubOrderItemService,
+
+    @InjectRepository(OrderItemEntity)
+    private readonly orderItemRepo: Repository<OrderItemEntity>,
+
+    @InjectRepository(SubOrderEntity)
+    private readonly subOrderRepo: Repository<SubOrderEntity>,
+
+    @InjectRepository(SubOrderItemEntity)
+    private readonly subOrderItemRepo: Repository<SubOrderItemEntity>,
+
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
+
+    @InjectRepository(AddressUser)
+    private readonly addressUserRepo: Repository<AddressUser>,
   ) { }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async create(
-    orderDto: CreateOrderDto,
-    userId: string,
+  async createOrder(
+    createOrderDto: CreateOrderDto,
     user: UserEntity,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<{ message: string; data: any }> {  // <- ici
-    const { subOrders = [], orderItems = [], ...orderData } = orderDto;
+  ): Promise<OrderEntity> {
+    const {
+      totalAmount,
+      shippingCost,
+      latitude,
+      longitude,
+      currency,
+      orderItems,
+    } = createOrderDto;
 
+    const addressUser = await this.addressUserRepo.findOne({
+      where: { id: createOrderDto.addressUserId },
+    });
+    if (!addressUser) {
+      throw new NotFoundException('Address not found');
+    }
+
+    const grandTotal = totalAmount + shippingCost;
     const order = this.orderRepo.create({
-      ...orderData,
-      userId,
+      user,
+      totalAmount,
+      shippingCost,
+      latitude,
+      longitude,
+      currency,
+      grandTotal,
+      addressUser,
     });
-    const savedOrder = await this.orderRepo.save(order);
+    await this.orderRepo.save(order);
 
-    if (orderItems.length > 0) {
-      await Promise.all(
-        orderItems.map((item) => {
-          return this.orderItemService.create({
-            productId: item.productId,
-            quantity: item.quantity,
-            orderId: savedOrder.id,
-          });
-        }),
-      );
-    }
-
-    const savedSubOrders: SubOrderEntity[] = [];
-
-    for (const { items = [], ...subOrderInfo } of subOrders) {
-      const subOrderPayload: CreateSubOrderDto = {
-        ...subOrderInfo,
-        orderId: savedOrder.id,
-        items,
-      };
-
-      const savedSubOrder = await this.subOrderService.create(subOrderPayload, user);
-      savedSubOrders.push(savedSubOrder);
-
-      if (items.length > 0) {
-        await Promise.all(
-          items.map((item) => {
-            return this.subOrderItemService.create({
-              productId: item.productId,
-              quantity: item.quantity,
-              subOrderId: savedSubOrder.id,
-              price: item.price,
-            });
-          }),
-        );
+    const orderItemEntities: OrderItemEntity[] = [];
+    const groupedByCompany = new Map<
+      string,
+      {
+        companyId: string;
+        items: SubOrderItemEntity[];
+        total: number;
       }
+    >();
+
+    for (const item of orderItems) {
+      const product = await this.productRepo.findOne({
+        where: { id: item.productId },
+        relations: ['company'],
+      });
+      if (!product) throw new NotFoundException(`Product not found: ${item.productId}`);
+
+      // Création de l'OrderItem (lié à la commande principale)
+      const orderItem = this.orderItemRepo.create({
+        order,
+        product,
+        quantity: item.quantity,
+      });
+      orderItemEntities.push(orderItem);
+
+      // Groupe par entreprise
+      const companyId = product.company.id;
+      if (!groupedByCompany.has(companyId)) {
+        groupedByCompany.set(companyId, {
+          companyId,
+          items: [],
+          total: 0,
+        });
+      }
+
+      const group = groupedByCompany.get(companyId)!;
+
+      // Création du SubOrderItem (pas encore de subOrder, sera lié ensuite)
+      const subOrderItem = this.subOrderItemRepo.create({
+        product,
+        quantity: item.quantity,
+      });
+
+      group.items.push(subOrderItem);
+      group.total += product.price * item.quantity;
     }
 
-    const fullOrder = await this.orderRepo.findOne({
-      where: { id: savedOrder.id },
-      relations: [
-        'orderItems',
-        'orderItems.product',
-        'subOrders',
-        'subOrders.subOrderItems',
-        'subOrders.subOrderItems.product',
-        'user',
-      ],
-    });
+    // 3. Sauvegarde des OrderItems
+    await this.orderItemRepo.save(orderItemEntities);
 
-    if (!fullOrder) {
-      throw new Error('Commande non trouvée après création');
+    // 4. Création des SubOrders et association des SubOrderItems
+    for (const [, group] of groupedByCompany) {
+      const subOrder = this.subOrderRepo.create({
+        order,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        company: { id: group.companyId } as any,
+        totalAmount: group.total,
+      });
+
+      await this.subOrderRepo.save(subOrder);
+
+      for (const item of group.items) {
+        item.subOrder = subOrder;
+      }
+
+      await this.subOrderItemRepo.save(group.items);
     }
 
-    const formatted = {
-      ...fullOrder,
-      user: plainToClass(UserEntity, user),
-      orderItems: (fullOrder.orderItems || []).map((item) => ({
-        ...item,
-        productName: item.product?.name || null,
-      })),
-      subOrders: (fullOrder.subOrders || []).map((sub) => ({
-        ...sub,
-        subOrderItems: (sub.subOrderItems || []).map((item) => ({
-          ...item,
-          productName: item.product?.name || null,
-        })),
-      })),
-    };
-
-    return {
-      message: 'Commande enregistrée avec succès',
-      data: formatted,
-    };
-  }
-
-
-  async update(
-    orderId: string,
-    orderDto: UpdateOrderDto,
-    user: UserEntity,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<{ message: string; data: any }> {
-    const existingOrder = await this.orderRepo.findOne({
-      where: { id: orderId },
-      relations: ['orderItems', 'subOrders', 'subOrders.subOrderItems'],
-    });
-
-    if (!existingOrder) {
-      throw new NotFoundException('Commande introuvable');
-    }
-
-    // 🧹 1. Supprimer les anciens items (en parallèle)
-    await Promise.all([
-      this.orderItemService.removeByOrderId(orderId),
-      ...existingOrder.subOrders.map(sub => this.subOrderItemService.removeBySubOrderId(sub.id)),
-      this.subOrderService.removeByOrderId(orderId),
-    ]);
-
-    // 🛠️ 2. Mettre à jour la commande principale
-    const updatedOrder = { ...existingOrder, ...orderDto };
-    await this.orderRepo.save(updatedOrder);
-
-    const { subOrders = [], orderItems = [] } = orderDto;
-
-    // 🔁 3. Recréer les items et sous-commandes
-    const order = await this.orderRepo.findOneOrFail({ where: { id: orderId } });
-
-    const createPromises = [
-      ...orderItems.map(item =>
-        this.orderItemService.create({
-          productId: item.productId,
-          quantity: item.quantity,
-          orderId: order.id,
-        })
-      ),
-      ...subOrders.map(async (subOrderDto) => {
-        const { items = [], ...subOrderInfo } = subOrderDto;
-        const savedSubOrder = await this.subOrderService.create(
-          { ...subOrderInfo, orderId: order.id, items },
-          user
-        );
-
-        const subOrderItemPromises = items.map(item =>
-          this.subOrderItemService.create({
-            productId: item.productId,
-            quantity: item.quantity,
-            subOrderId: savedSubOrder.id,
-            price: item.price,
-          })
-        );
-
-        await Promise.all(subOrderItemPromises);
-      }),
-    ];
-
-    await Promise.all(createPromises);
-
-    // 📦 4. Charger la commande complète mise à jour
-    const fullOrder = await this.orderRepo.findOne({
+    const finalOrder = await this.orderRepo.findOne({
       where: { id: order.id },
       relations: [
         'orderItems',
-        'orderItems.product',
         'subOrders',
-        'subOrders.subOrderItems',
-        'subOrders.subOrderItems.product',
-        'user',
+        'subOrders.items',
+        'subOrders.company',
+        'orderItems.product',
+        'addressUser'
       ],
     });
 
-    if (!fullOrder) {
-      throw new Error('Commande non trouvée après mise à jour');
+    if (!finalOrder) {
+      throw new NotFoundException('Order not found after creation');
     }
 
-    const formatted = {
-      ...fullOrder,
-      user: plainToClass(UserEntity, user),
-      orderItems: (fullOrder.orderItems || []).map((item) => ({
-        ...item,
-        productName: item.product?.name || null,
-      })),
-      subOrders: (fullOrder.subOrders || []).map((sub) => ({
-        ...sub,
-        subOrderItems: (sub.subOrderItems || []).map((item) => ({
-          ...item,
-          productName: item.product?.name || null,
-        })),
-      })),
-    };
-
-    return {
-      message: 'Commande mise à jour avec succès',
-      data: formatted,
-    };
+    return finalOrder;
   }
 
+  async getOrdersByUser(userId: string): Promise<OrderEntity[]> {
+    return this.orderRepo.find({
+      where: { user: { id: userId } },
+      relations: [
+        'orderItems',
+        'orderItems.product',
+        'subOrders',
+        'subOrders.items',
+        'subOrders.items.product',
+        'subOrders.company',
+        'addressUser'
+      ],
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  async findOne(orderId: string): Promise<OrderEntity> {
+    const order = await this.orderRepo.findOne({
+      where: { id: orderId },
+      relations: ['orderItems', 'subOrders', 'subOrders.items', 'subOrders.company', 'addressUser'],
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
+  }
 
   async findAll(): Promise<OrderEntity[]> {
     return this.orderRepo.find({
-      relations: [
-        'orderItems',
-        'orderItems.product',
-        'subOrders',
-        'subOrders.subOrderItems',
-        'subOrders.subOrderItems.product',
-        'deliveryCompany',
-        'livreur',
-        'trackings',
-        'user',
-      ],
-    });
-  }
-
-  async findUserOrdersByStatus(userId: string, status: OrderStatus): Promise<OrderEntity[]> {
-    return this.orderRepo.find({
-      where: {
-        user: { id: userId },
-        status,
-      },
-      relations: [
-        'orderItems',
-        'orderItems.product',
-        'subOrders',
-        'subOrders.subOrderItems',
-        'subOrders.subOrderItems.product',
-        'deliveryCompany',
-        'livreur',
-        'trackings',
-      ],
+      relations: ['orderItems', 'subOrders', 'subOrders.items', 'subOrders.company', 'user', 'addressUser'],
       order: { createdAt: 'DESC' },
     });
   }
 
-  async findAllByUserOrder(userId: string): Promise<OrderEntity[]> {
-    return this.orderRepo.find({
-      where: { userId }, // Filtrer les commandes par utilisateur
-      relations: [
-        'orderItems',
-        'orderItems.product',
-        'subOrders',
-        'subOrders.subOrderItems',
-        'subOrders.subOrderItems.product',
-        'deliveryCompany',
-        'livreur',
-        'trackings',
-        'user',
-      ],
-      order: { createdAt: 'DESC' }, // Optionnel : tri des commandes par date de création
-    });
-  }
-
-  async findOrdersByCompany(companyId: string): Promise<OrderEntity[]> {
-    return this.orderRepo
-      .createQueryBuilder('order')
-      .leftJoinAndSelect('order.orderItems', 'orderItem')
-      .leftJoinAndSelect('orderItem.product', 'product')
-      .leftJoinAndSelect('order.subOrders', 'subOrder')
-      .leftJoinAndSelect('subOrder.subOrderItems', 'subOrderItem')
-      .leftJoinAndSelect('subOrderItem.product', 'subOrderProduct')
-      .where('product.companyId = :companyId OR subOrderProduct.companyId = :companyId', { companyId })
-      .orderBy('order.createdAt', 'DESC')
-      .getMany();
-  }
-  async findOrdersStatusByCompany(companyId: string, status?: OrderStatus): Promise<OrderEntity[]> {
-    const query = this.orderRepo
-      .createQueryBuilder('order')
-      .leftJoinAndSelect('order.orderItems', 'orderItem')
-      .leftJoinAndSelect('orderItem.product', 'product')
-      .leftJoinAndSelect('order.subOrders', 'subOrder')
-      .leftJoinAndSelect('subOrder.subOrderItems', 'subOrderItem')
-      .leftJoinAndSelect('subOrderItem.product', 'subOrderProduct')
-      .leftJoinAndSelect('order.user', 'user')
-      .where(
-        'product.companyId = :companyId OR subOrderProduct.companyId = :companyId',
-        { companyId }
-      );
-
-    if (status) {
-      query.andWhere('order.status = :status', { status });
-    }
-
-    return query.getMany();
-  }
-
-
-
-  async findOne(id: string): Promise<OrderEntity> {
-    const order = await this.orderRepo.findOne({ where: { id }, relations: ['subOrders'] });
-    if (!order) throw new NotFoundException('Commande non trouvée');
-    return order;
-  }
-
-  async remove(id: string): Promise<void> {
-    await this.findOne(id);
-    await this.orderRepo.delete(id);
-  }
 }

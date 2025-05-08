@@ -1,46 +1,56 @@
-import { OrderItemEntity } from "src/order_items/entities/order_item.entity";
-import { Product } from "src/products/entities/product.entity";
-import { SubOrderEntity } from "src/sub_orders/entities/sub_order.entity";
+import { AddressUser } from "src/address-user/entities/address-user.entity";
+import { OrderItemEntity } from "src/order-item/entities/order-item.entity";
+import { SubOrderEntity } from "src/sub-order/entities/sub-order.entity";
 import { UserEntity } from "src/users/entities/user.entity";
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
-import { OrderStatus } from "../enum/orderstatus.enum";
 
 @Entity('orders')
 export class OrderEntity {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @Column('decimal')
+    totalAmount: number;
+
+    @Column('decimal')
+    shippingCost: number;
+
+    @Column('decimal')
+    latitude: number;
+
+    @Column('decimal')
+    longitude: number;
+
+    @Column()
+    currency: string;
+
     @ManyToOne(() => UserEntity, (user) => user.orders)
+    @JoinColumn({ name: 'userId' })
     user: UserEntity;
 
     @Column()
     userId: string;
 
-    @OneToMany(() => SubOrderEntity, (subOrder) => subOrder.order)
+    @ManyToOne(() => AddressUser, { nullable: false }) // changé de true → false
+    @JoinColumn({ name: 'addressUserId' }) // Ajout explicite de la colonne FK
+    addressUser: AddressUser;
+    
+    @Column()
+    addressUserId: string;
+
+    @OneToMany(() => OrderItemEntity, (item) => item.order, { cascade: true })
+    orderItems: OrderItemEntity[];
+
+    @OneToMany(() => SubOrderEntity, (subOrder) => subOrder.order, { cascade: true })
     subOrders: SubOrderEntity[];
 
-    @Column({ type: 'enum', enum: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'] })
-    status: OrderStatus;
+    @Column({ type: 'float', nullable: false })
+    grandTotal: number;
+
 
     @CreateDateColumn()
     createdAt: Date;
 
     @UpdateDateColumn()
     updatedAt: Date;
-
-    @OneToMany(() => OrderItemEntity, (item) => item.order, { cascade: true })
-    orderItems: OrderItemEntity[];
-
-    @ManyToOne(() => Product)
-    @JoinColumn({ name: 'productId' })
-    product: Product;
-
-    @Column({ nullable: true })
-    address: string;
-
-    @Column({ nullable: true })
-    latitude: string;
-
-    @Column({ nullable: true })
-    longitude: string;
 }

@@ -4,9 +4,10 @@ import { VehicleType } from "../utility/common/user-vehiculetype.enum";
 import { OtpEntity } from "src/otp/entities/otp.entity";
 import { Exclude } from "class-transformer";
 import { UserHasCompanyEntity } from "src/user_has_company/entities/user_has_company.entity";
-import { OrderEntity } from "src/order/entities/order.entity";
 import { CompanyEntity } from "src/company/entities/company.entity";
 import { TravelReservationEntity } from "src/travel_reservation/entities/travel_reservation.entity";
+import { AddressUser } from "src/address-user/entities/address-user.entity";
+import { OrderEntity } from "src/order/entities/order.entity";
 
 @Entity('users')
 export class UserEntity {
@@ -84,8 +85,6 @@ export class UserEntity {
     @OneToMany(() => UserHasCompanyEntity, (userHasCompany) => userHasCompany.user)
     userHasCompany: UserHasCompanyEntity[];
 
-    @OneToMany(() => OrderEntity, (order) => order.user)
-    orders: OrderEntity[];
 
     @Column({ nullable: true })
     socketId?: string;
@@ -99,4 +98,17 @@ export class UserEntity {
 
     @OneToMany(() => TravelReservationEntity, (reservation) => reservation.client)
     travelReservations: TravelReservationEntity[];
+
+    @OneToMany(() => AddressUser, (address) => address.user)
+    addresses: AddressUser[];
+
+    @ManyToOne(() => AddressUser, { nullable: true })
+    defaultAddress: AddressUser;
+
+    @Column({ nullable: true })
+    defaultAddressId: string;
+
+    @OneToMany(() => OrderEntity, (order) => order.user)
+    orders: OrderEntity[];
+
 }

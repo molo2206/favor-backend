@@ -228,7 +228,6 @@ export class CompanyService {
         user,
         company: updatedCompany,
       });
-
       await this.userHasCompanyRepository.save(userHasCompany);
     }
 

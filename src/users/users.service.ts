@@ -182,6 +182,8 @@ export class UsersService {
         vehicleType: fullUser.vehicleType,
         plateNumber: fullUser.plateNumber,
         activeCompany: fullUser.activeCompany,
+        defaultAddressId: fullUser.defaultAddressId,
+        defaultAddress: fullUser.defaultAddress,
         userHasCompany,
       },
     };
@@ -217,6 +219,7 @@ export class UsersService {
       .createQueryBuilder('users')
       .addSelect('users.password')
       .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
       .leftJoinAndSelect('userHasCompany.company', 'company')
       .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
       .leftJoinAndSelect('permissions.permission', 'permission')
@@ -306,6 +309,8 @@ export class UsersService {
         dateOfBirth: userWithoutPassword.dateOfBirth,
         vehicleType: userWithoutPassword.vehicleType,
         plateNumber: userWithoutPassword.plateNumber,
+        defaultAddressId: userWithoutPassword.defaultAddressId,
+        defaultAddress: userWithoutPassword.defaultAddress,
         userHasCompany,
         activeCompany,
       },
@@ -344,7 +349,7 @@ export class UsersService {
 
     const { password, ...userWithoutPassword } = updatedUser;
 
-   
+
     const userHasCompany = userWithoutPassword.userHasCompany?.map((uhc) => ({
       id: uhc.id,
       isOwner: uhc.isOwner,

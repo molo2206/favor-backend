@@ -119,7 +119,10 @@ export class DeliveryService {
       ...dto,
       delivery,
     });
-    this.eventsGateway.broadcastEvent('order.created', { deliveryId });
+    this.eventsGateway.notifyUser(delivery.order.user.id, 'delivery.tracking.updated', {
+      deliveryId,
+      trackingStatus: dto.status,
+    });
     return this.trackingRepository.save(tracking);
   }
 

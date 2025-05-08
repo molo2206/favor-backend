@@ -14,9 +14,6 @@ import { TypeCompanyModule } from './type_company/type_company.module';
 import { RoleUserModule } from './role_user/role_user.module';
 import { CategoryModule } from './category/category.module';
 import { ProductModule } from './products/products.module';
-import { OrderModule } from './order/order.module';
-import { SubOrdersModule } from './sub_orders/sub_orders.module';
-import { OrderItemsModule } from './order_items/order_items.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CloudinaryModule } from './users/utility/helpers/cloudinary.module';
 import { DeliveryModule } from './delivery/delivery.module';
@@ -27,6 +24,11 @@ import { join } from 'path';
 import { TravelReservationModule } from './travel_reservation/travel_reservation.module';
 import { MeasureModule } from './measure/measure.module';
 import { EventsModule } from './events/events.module';
+import { AddressUserModule } from './address-user/address-user.module';
+import { OrderModule } from './order/order.module';
+import { OrderItemModule } from './order-item/order-item.module';
+import { SubOrderModule } from './sub-order/sub-order.module';
+import { SubOrderItemModule } from './sub-order-item/sub-order-item.module';
 
 @Module({
   imports: [
@@ -68,9 +70,6 @@ import { EventsModule } from './events/events.module';
     RoleUserModule,
     CategoryModule,
     ProductModule,
-    OrderModule,
-    SubOrdersModule,
-    OrderItemsModule,
     CloudinaryModule,
     DeliveryModule,
     SignatureModule,
@@ -78,6 +77,11 @@ import { EventsModule } from './events/events.module';
     TravelReservationModule,
     MeasureModule,
     EventsModule,
+    AddressUserModule,
+    OrderModule,
+    OrderItemModule,
+    SubOrderModule,
+    SubOrderItemModule,
   ],
   controllers: [AppController],
   providers: [AppService],

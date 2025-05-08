@@ -28,6 +28,7 @@ declare global {
         vehicleType?: string;
         plateNumber?: string;
         activeCompanyId?: string;
+        defaultAddressId?: string;
       } | null;
     }
 
@@ -73,13 +74,13 @@ export class CurrentUserMiddleware implements NestMiddleware {
         isActive: user.data.isActive,
         country: user.data.country,
         city: user.data.city,
-        address: user.data.address,
         preferredLanguage: user.data.preferredLanguage,
         loyaltyPoints: user.data.loyaltyPoints,
         dateOfBirth: user.data.dateOfBirth,
         vehicleType: user.data.vehicleType,
         plateNumber: user.data.plateNumber,
         activeCompanyId: user.data.activeCompanyId,
+        defaultAddressId: user.data.defaultAddressId,
         role
       };
     } catch (err) {

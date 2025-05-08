@@ -1,30 +1,31 @@
-import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
+import { IsArray, IsNotEmpty, IsNumber, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CreateSubOrderDto } from 'src/sub_orders/dto/create-sub_order.dto';
-import { CreateOrderItemDto } from 'src/order_items/dto/create-order_item.dto';
+import { CreateOrderItemDto } from 'src/order-item/dto/create-order-item.dto';
 
 export class CreateOrderDto {
-    @IsEnum(['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'])
-    status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
-
-    @IsOptional()
     @IsNumber()
-    totalAmount?: number;
+    @IsNotEmpty()
+    totalAmount: number;
+  
+    @IsNumber()
+    @IsNotEmpty()
+    shippingCost: number;
+  
+    @IsNotEmpty()
+    addressUserId: string;
+
+    @IsNumber()
+    latitude: number;
+
+    @IsNumber()
+    longitude: number;
+
+    @IsString()
+    @IsNotEmpty()
+    currency: string;
 
     @IsArray()
-    @Type(() => CreateOrderItemDto)  // Assurez-vous d'importer et de définir OrderItemDto pour les items
-    orderItems?: CreateOrderItemDto[];
-
-    @IsArray()
-    @Type(() => CreateSubOrderDto)  // Assurez-vous que SubOrderDto est bien défini
-    subOrders?: CreateSubOrderDto[];
-
-    @IsNotEmpty({ message: 'L’adresse est obligatoire.' })
-    address: string;
-
-    @IsNotEmpty({ message: 'La latitude est obligatoire.' })
-    latitude: string;
-
-    @IsNotEmpty({ message: 'La longitude est obligatoire.' })
-    longitude: string;
+    @ValidateNested({ each: true })
+    @Type(() => CreateOrderItemDto)
+    orderItems: CreateOrderItemDto[];
 }
