@@ -42,6 +42,7 @@ export class OrderService {
       shippingCost,
       currency,
       orderItems,
+      type
     } = createOrderDto;
 
     const addressUser = await this.addressUserRepo.findOne({
@@ -59,6 +60,7 @@ export class OrderService {
       currency,
       grandTotal,
       addressUser,
+      type
     });
     await this.orderRepo.save(order);
 
@@ -180,5 +182,5 @@ export class OrderService {
       order: { createdAt: 'DESC' },
     });
   }
-  
+
 }

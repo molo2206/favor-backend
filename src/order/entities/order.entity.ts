@@ -2,6 +2,7 @@ import { AddressUser } from "src/address-user/entities/address-user.entity";
 import { OrderItemEntity } from "src/order-item/entities/order-item.entity";
 import { SubOrderEntity } from "src/sub-order/entities/sub-order.entity";
 import { UserEntity } from "src/users/entities/user.entity";
+import { CompanyType } from "src/users/utility/common/type.company.enum";
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 
 @Entity('orders')
@@ -14,6 +15,9 @@ export class OrderEntity {
 
     @Column('decimal')
     shippingCost: number;
+
+    @Column({ type: 'enum', enum: CompanyType })
+    type: CompanyType;
 
     @Column()
     currency: string;
@@ -28,7 +32,7 @@ export class OrderEntity {
     @ManyToOne(() => AddressUser, { nullable: false }) // changé de true → false
     @JoinColumn({ name: 'addressUserId' }) // Ajout explicite de la colonne FK
     addressUser: AddressUser;
-    
+
     @Column()
     addressUserId: string;
 
