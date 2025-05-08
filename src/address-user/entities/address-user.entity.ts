@@ -15,7 +15,7 @@ export class AddressUser {
     lastName: string;
 
     @Column()
-    addresss: string;
+    address: string;
 
     @Column()
     phone: string;

@@ -19,7 +19,7 @@ export class CreateAddressUserDto {
     longitude: string;
 
     @IsString()
-    addresss: string;
+    address: string;
 
     @IsEnum(Address)
     type: Address;
