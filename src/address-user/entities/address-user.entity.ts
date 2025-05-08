@@ -15,6 +15,9 @@ export class AddressUser {
     lastName: string;
 
     @Column()
+    addresss: string;
+
+    @Column()
     phone: string;
 
     @Column({
@@ -35,7 +38,6 @@ export class AddressUser {
     
     @Column({ type: 'double precision' })
     longitude: number;
-    
     
 
     @CreateDateColumn()

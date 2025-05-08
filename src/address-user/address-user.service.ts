@@ -28,14 +28,16 @@ export class AddressUserService {
       );
     }
 
-    // Créer et sauvegarder la nouvelle adresse
-    const savedAddress = this.addressUserRepo.create({
+    // Créer l'entité en mémoire
+    const address = this.addressUserRepo.create({
       ...createDto,
-      user, // ou: user: { id: user.id },
+      user,
       latitude: Number(createDto.latitude),
       longitude: Number(createDto.longitude),
     });
-    
+
+    // Sauvegarder en base
+    const savedAddress = await this.addressUserRepo.save(address);
 
     // Si l'adresse est par défaut, mettre à jour le user
     if (createDto.isDefault) {

@@ -20,6 +20,10 @@ export class UpdateAddressUserDto {
     @IsOptional()
     longitude: string;
 
+    @IsString()
+    @IsOptional()
+    addresss: string;
+
     @IsEnum(Address)
     @IsOptional()
     type?: Address;

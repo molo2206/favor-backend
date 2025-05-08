@@ -18,6 +18,9 @@ export class CreateAddressUserDto {
     @IsString()
     longitude: string;
 
+    @IsString()
+    addresss: string;
+
     @IsEnum(Address)
     type: Address;
 
