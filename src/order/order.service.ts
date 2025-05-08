@@ -40,8 +40,6 @@ export class OrderService {
     const {
       totalAmount,
       shippingCost,
-      latitude,
-      longitude,
       currency,
       orderItems,
     } = createOrderDto;
@@ -58,8 +56,6 @@ export class OrderService {
       user,
       totalAmount,
       shippingCost,
-      latitude,
-      longitude,
       currency,
       grandTotal,
       addressUser,

@@ -14,12 +14,6 @@ export class CreateOrderDto {
     @IsNotEmpty()
     addressUserId: string;
 
-    @IsNumber()
-    latitude: number;
-
-    @IsNumber()
-    longitude: number;
-
     @IsString()
     @IsNotEmpty()
     currency: string;

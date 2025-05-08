@@ -15,12 +15,6 @@ export class OrderEntity {
     @Column('decimal')
     shippingCost: number;
 
-    @Column('decimal')
-    latitude: number;
-
-    @Column('decimal')
-    longitude: number;
-
     @Column()
     currency: string;
 
