@@ -224,6 +224,7 @@ export class ProductService {
 
   async findProductPublishedByCategory(
     categoryId?: string,
+    shopType?: string,
     page = 1,
     limit = 10,
   ): Promise<{
@@ -247,6 +248,10 @@ export class ProductService {
       queryBuilder.andWhere('(category.id = :categoryId)', {
         categoryId,
       });
+    }
+
+    if (shopType) {
+      queryBuilder.andWhere('product.companyActivity = :shopType', { shopType });
     }
 
     queryBuilder.skip((page - 1) * limit).take(limit);

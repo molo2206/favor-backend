@@ -134,11 +134,13 @@ export class ProductController {
   @Get('published/public/bycategory')
   async getPublishedProductByCategory(
     @Query('categoryId') categoryId?: string,
+    @Query('shopType') shopType?: string,
     @Query('page') page = 1,
     @Query('limit') limit = 10,
   ) {
     return this.productService.findProductPublishedByCategory(
       categoryId,
+      shopType,
       Number(page),
       Number(limit),
     );
