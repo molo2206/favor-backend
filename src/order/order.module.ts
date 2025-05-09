@@ -9,6 +9,8 @@ import { AddressUserModule } from '../address-user/address-user.module'; // impo
 import { SubOrderItemEntity } from 'src/sub-order-item/entities/sub-order-item.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { OrderController } from './order.controller';
+import { MailModule } from 'src/email/email.module';
+import { InvoiceModule } from 'src/users/utility/common/invoice.module';
 
 @Module({
   imports: [
@@ -18,12 +20,14 @@ import { OrderController } from './order.controller';
       SubOrderEntity,
       SubOrderItemEntity,
       Product,
-      AddressUser, // ajouter ici pour que le repository soit injectable
+      AddressUser,
     ]),
-    AddressUserModule, // 👈 import du module contenant le repo
+    AddressUserModule,
+    MailModule,
+    InvoiceModule,
   ],
-  
+
   providers: [OrderService],
   controllers: [OrderController],
 })
-export class OrderModule {}
+export class OrderModule { }

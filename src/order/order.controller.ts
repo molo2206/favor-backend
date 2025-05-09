@@ -5,6 +5,8 @@ import {
   UseGuards,
   Get,
   Param,
+  Query,
+  Patch,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -12,6 +14,8 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { OrderEntity } from './entities/order.entity';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 @ApiBearerAuth()
 @Controller('orders')
@@ -20,7 +24,7 @@ export class OrderController {
   constructor(private readonly orderService: OrderService) { }
 
   @Post()
-  
+
   async createOrder(
     @Body() createOrderDto: CreateOrderDto,
     @CurrentUser() user: UserEntity,
@@ -49,5 +53,21 @@ export class OrderController {
   @Get()
   async getAll() {
     return this.orderService.findAll();
+  }
+
+  @Get('type/by-type')
+  async getOrderByType(
+    @Query('type') type?: string,
+  ): Promise<{ message: string; data: OrderEntity[] }> {
+    return this.orderService.findByType(type); // Retourner l'objet avec le message et les données
+  }
+
+
+  @Patch(':orderId/status')
+  async changeStatus(
+    @Param('orderId') orderId: string,
+    @Body() dto: UpdateOrderStatusDto,
+  ): Promise<OrderEntity> {
+    return this.orderService.updateOrderStatus(orderId, dto);
   }
 }
