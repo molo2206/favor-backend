@@ -245,12 +245,10 @@ export class ProductService {
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     if (categoryId) {
-      queryBuilder.andWhere('(category.id = :categoryId)', {
-        categoryId,
-      });
+      queryBuilder.andWhere('category.id = :categoryId', { categoryId });
     }
 
-    if (shopType) {
+    if (typeof shopType === 'string' && shopType.trim() !== '') {
       queryBuilder.andWhere('product.companyActivity = :shopType', { shopType });
     }
 
@@ -268,6 +266,7 @@ export class ProductService {
       },
     };
   }
+
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async findByActiveCompanyForUser(user: UserEntity): Promise<any> {
