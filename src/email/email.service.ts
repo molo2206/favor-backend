@@ -10,8 +10,8 @@ export class MailService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async sendHtmlEmail(to: string, subject: string, htmlPageName: string, context: any = {}) {
         const basePath = process.env.NODE_ENV === 'production'
-            ? path.join(process.cwd(), 'dist', 'src', 'templates')
-            : path.join(process.cwd(), 'src', 'templates');
+            ? path.join(process.cwd(), 'dist', 'src', 'templates/auth')
+            : path.join(process.cwd(), 'src', 'templates/auth');
 
         const htmlPath = path.join(basePath, htmlPageName);
         let htmlContent = fs.readFileSync(htmlPath, 'utf-8');

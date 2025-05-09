@@ -63,8 +63,8 @@ export class MailOrderService {
     ) {
         const basePath =
             process.env.NODE_ENV === 'production'
-                ? path.join(process.cwd(), 'dist', 'src', 'templates')
-                : path.join(process.cwd(), 'src', 'templates');
+                ? path.join(process.cwd(), 'dist', 'src', 'templates/order')
+                : path.join(process.cwd(), 'src', 'templates/order');
 
         const htmlPath = path.join(basePath, htmlPageName);
 
@@ -111,8 +111,8 @@ export class MailOrderService {
     ) {
         const basePath =
             process.env.NODE_ENV === 'production'
-                ? path.join(process.cwd(), 'dist', 'src', 'templates')
-                : path.join(process.cwd(), 'src', 'templates');
+                ? path.join(process.cwd(), 'dist', 'src', 'template/order')
+                : path.join(process.cwd(), 'src', 'templates/order');
 
         const htmlPath = path.join(basePath, htmlPageName);  // 'order-validation' template
 

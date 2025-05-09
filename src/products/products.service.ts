@@ -175,6 +175,7 @@ export class ProductService {
   async findProductPublishedByTypeByCompany(
     type?: string,
     companyId?: string,
+    shopType?: string,
     page = 1,
     limit = 10,
   ): Promise<{
@@ -200,6 +201,10 @@ export class ProductService {
 
     if (companyId) {
       queryBuilder.andWhere('product.companyId = :companyId', { companyId });
+    }
+
+    if (shopType) {
+      queryBuilder.andWhere('product.companyActivity = :shopType', { shopType });
     }
 
     queryBuilder.skip((page - 1) * limit).take(limit);

@@ -94,10 +94,11 @@ export class ProductController {
   async getPublishedProducts(
     @Query('type') type?: string,
     @Query('companyId') companyId?: string,
+    @Query('shopType') shopType?: string,
     @Query('page') page = 1,
     @Query('limit') limit = 10,
   ) {
-    return this.productService.findProductPublishedByTypeByCompany(type, companyId, Number(page), Number(limit));
+    return this.productService.findProductPublishedByTypeByCompany(type, companyId, shopType, Number(page), Number(limit));
   }
 
   @Get('group-by-type')
