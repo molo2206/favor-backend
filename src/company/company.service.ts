@@ -150,9 +150,9 @@ export class CompanyService {
       throw new BadRequestException("Les données de l'entreprise ne peuvent pas être vides");
     }
 
-    const company = await this.companyRepository.findOne({ where: { id: current_user.activeCompany?.id } });
+    const company = await this.companyRepository.findOne({ where: { id: current_user.activeCompanyId } });
     if (!company) {
-      throw new NotFoundException(`Entreprise avec l'ID ${current_user.activeCompany?.id} introuvable`);
+      throw new NotFoundException(`Entreprise avec l'ID ${current_user.activeCompanyId} introuvable`);
     }
     const requiredFields: (keyof CreateCompanyDto)[] = ['address', 'latitude', 'longitude'];
 
@@ -213,23 +213,6 @@ export class CompanyService {
     }
 
     const updatedCompany = await this.companyRepository.save(company);
-
-    let userHasCompany = await this.userHasCompanyRepository.findOne({
-      where: {
-        user: { id: current_user.id },
-        company: { id: current_user.activeCompany?.id },
-      },
-    });
-
-    if (!userHasCompany) {
-      const user = await this.userRepository.findOneByOrFail({ id: current_user.id });
-
-      userHasCompany = this.userHasCompanyRepository.create({
-        user,
-        company: updatedCompany,
-      });
-      await this.userHasCompanyRepository.save(userHasCompany);
-    }
 
     return {
       message: 'Companie mise à jour avec succès',

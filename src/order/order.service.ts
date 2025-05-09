@@ -15,6 +15,7 @@ import { MailOrderService } from 'src/email/emailorder.service';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus } from 'src/users/utility/common/order.status.enum';
 import { MailService } from 'src/email/email.service';
+import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
 
 @Injectable()
 export class OrderService {
@@ -47,7 +48,7 @@ export class OrderService {
     createOrderDto: CreateOrderDto,
     user: UserEntity,
   ): Promise<OrderEntity> {
-    const { totalAmount, shippingCost, currency, orderItems, addressUserId, type } = createOrderDto;
+    const { totalAmount, shippingCost, currency, orderItems, addressUserId, type, shopType } = createOrderDto;
 
     // Récupération de l'adresse
     const addressUser = await this.addressUserRepo.findOne({
@@ -56,7 +57,6 @@ export class OrderService {
     if (!addressUser) {
       throw new NotFoundException('Address not found');
     }
-
     const grandTotal = totalAmount + shippingCost;
 
     // Création de la commande principale
@@ -84,6 +84,21 @@ export class OrderService {
         throw new NotFoundException(`Product not found: ${item.productId}`);
       }
 
+      // Déterminer le prix en fonction de l'activité
+      let selectedPrice = product.detail ?? 0;
+
+      switch (shopType) {
+        case CompanyActivity.RETAILER:
+          selectedPrice = product.detail ?? 0;
+          break;
+        case CompanyActivity.WHOLESALER:
+          selectedPrice = product.gros ?? 0;
+          break;
+        case CompanyActivity.WHOLESALER_RETAILER:
+          selectedPrice = product.gros ?? product.detail ?? 0;
+          break;
+      }
+
       const orderItem = this.orderItemRepo.create({
         order,
         product,
@@ -107,7 +122,7 @@ export class OrderService {
       });
 
       group.items.push(subOrderItem);
-      group.total += product.price * item.quantity;
+      group.total += selectedPrice * item.quantity;
     }
 
     // Sauvegarde des orderItems
@@ -118,13 +133,12 @@ export class OrderService {
       const subOrder = this.subOrderRepo.create({
         order,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        company: { id: group.companyId } as any, // Conversion temporaire pour correspondre aux types
+        company: { id: group.companyId } as any,
         totalAmount: group.total,
       });
 
       await this.subOrderRepo.save(subOrder);
 
-      // Génération et assignation du numéro de facture
       subOrder.invoiceNumber = this.invoiceService.generateInvoiceNumber(subOrder.id);
       await this.subOrderRepo.save(subOrder);
 
@@ -144,7 +158,7 @@ export class OrderService {
         'subOrders.company',
         'orderItems.product',
         'addressUser',
-        'user'
+        'user',
       ],
     });
 
@@ -157,7 +171,6 @@ export class OrderService {
       relations: ['company', 'items', 'items.product', 'order'],
     });
 
-    // Envoi du mail de facture avec les données converties
     await this.mailService.sendHtmlEmail(
       user.email,
       'Votre facture - FavorHelp',
@@ -165,7 +178,7 @@ export class OrderService {
       {
         user,
         order: finalOrder,
-        subOrders, // Passage des sous-commandes converties
+        subOrders,
       },
     );
 
