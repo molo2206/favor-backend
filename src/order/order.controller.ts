@@ -5,6 +5,7 @@ import {
   UseGuards,
   Get,
   Param,
+  Query,
   Patch,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
@@ -54,12 +55,12 @@ export class OrderController {
     return this.orderService.findAll();
   }
 
-  // @Get('type/by-type')
-  // async getOrderByType(
-  //   @Query('type') type?: string,
-  // ): Promise<{ message: string; data: OrderEntity[] }> {
-  //   return this.orderService.findByType(type); // Retourner l'objet avec le message et les données
-  // }
+  @Get('type/by-type')
+  async getOrderByType(
+    @Query('type') type?: string,
+  ): Promise<{ message: string; data: OrderEntity[] }> {
+    return this.orderService.findByType(type); // Retourner l'objet avec le message et les données
+  }
 
 
   @Patch(':orderId/status')
