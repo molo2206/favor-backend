@@ -28,7 +28,7 @@ export class SubOrderEntity {
   @Column({ type: 'float', default: 0 })
   totalAmount: number;
 
-  @Column({ unique: true })
+  @Column({ nullable: true })
   invoiceNumber: string;
 
   @CreateDateColumn()
