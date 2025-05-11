@@ -16,43 +16,24 @@ export class MailOrderService {
     constructor(private readonly mailerService: MailerService) { }
 
     generateSubOrdersHtml(subOrders: SubOrderEntity[], currency: string): string {
-        return subOrders.map((subOrder) => {
-            const itemsHtml = subOrder.items
-                .map((item) => {
-                    const productName = item.product?.name || 'Produit non disponible';
-                    const productPrice = item.product?.price || 0;
-                    const totalPrice = productPrice * item.quantity;
+        const itemsHtml = subOrders.flatMap((subOrder) =>
+            subOrder.items.map((item) => {
+                const productName = item.product?.name || 'Produit non disponible';
+                const productPrice = item.product?.price || 0;
+                const totalPrice = productPrice * item.quantity;
 
-                    return `
-            <tr>
-              <td>${productName}</td>
-              <td>${item.quantity}</td>
-              <td>${productPrice} ${currency}</td>
-              <td>${totalPrice} ${currency}</td>
-            </tr>
-          `;
-                })
-                .join('');
+                return `
+                    <tr>
+                        <td>${productName}</td>
+                        <td>${item.quantity}</td>
+                        <td>${productPrice} ${currency}</td>
+                        <td>${totalPrice} ${currency}</td>
+                    </tr>
+                `;
+            })
+        ).join('');
 
-            return `
-        <div class="suborder-title">
-          Entreprise : ${subOrder.company.companyName} - Facture N° ${subOrder.invoiceNumber}
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Produit</th>
-              <th>Quantité</th>
-              <th>Prix unitaire</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHtml}
-          </tbody>
-        </table>
-      `;
-        }).join('');
+        return itemsHtml;
     }
 
     async sendHtmlEmail(

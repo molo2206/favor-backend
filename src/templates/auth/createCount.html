@@ -1,127 +1,157 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
-    <meta charset="UTF-8">
-    <title>Bienvenue sur FavorHelp</title>
-    <style>
-        body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #dce9ff, #ffffff);
-            margin: 0;
-            padding: 40px 20px;
-            color: #1c1e21;
-        }
-
-        .container {
-            background: #fff;
-            padding: 50px 30px;
-            max-width: 650px;
-            margin: 0 auto;
-            border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
-
-        .logo {
-            margin-bottom: 20px;
-        }
-
-        .logo img {
-            width: 120px;
-        }
-
-        .header {
-            font-size: 32px;
-            font-weight: bold;
-            color: #1877f2;
-            margin-bottom: 15px;
-        }
-
-        .subheader {
-            font-size: 20px;
-            color: #4b4f56;
-            margin-bottom: 30px;
-        }
-
-        .details {
-            text-align: left;
-            background: #f0f2f5;
-            padding: 25px;
-            border-radius: 10px;
-            font-size: 16px;
-            color: #4b4f56;
-        }
-
-        .details p {
-            margin: 10px 0;
-        }
-
-        .button {
-            display: inline-block;
-            margin-top: 30px;
-            padding: 14px 28px;
-            background-color: #1877f2;
-            color: white;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            text-decoration: none;
-            transition: background-color 0.3s;
-        }
-
-        .button:hover {
-            background-color: #155db2;
-        }
-
-        .security-tip {
-            margin-top: 30px;
-            font-size: 14px;
-            color: #606770;
-            line-height: 1.6;
-        }
-
-        .footer {
-            margin-top: 40px;
-            font-size: 12px;
-            color: #90949c;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Facture</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: #f1f5f9;
+    }
+    .card {
+      background: #fff;
+      padding: 2rem;
+      max-width: 900px;
+      margin: 2rem auto;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 {
+      background: #0066ee;
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-size: 1.5rem;
+    }
+    .section {
+      margin-top: 2rem;
+    }
+    .section-title {
+      background: #0066ee;
+      color: white;
+      padding: 0.5rem;
+      font-weight: bold;
+      border-radius: 4px 4px 0 0;
+    }
+    .section-content {
+      display: flex;
+      justify-content: space-between;
+      padding: 1rem 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    table th, table td {
+      border: 1px solid #ddd;
+      padding: 0.5rem;
+      text-align: left;
+    }
+    table th {
+      background: #0066ee;
+      color: white;
+    }
+    .totals {
+      text-align: right;
+      margin-top: 1.5rem;
+    }
+    .totals div {
+      margin-top: 0.3rem;
+    }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      border-top: 1px solid #ddd;
+      padding-top: 1rem;
+    }
+  </style>
 </head>
-
 <body>
-    <div class="container">
-        <div class="logo">
-            <img src="https://favorhelp.com/logo.png" alt="FavorHelp Logo">
-        </div>
-
-        <div class="header">Bienvenue, {{ userWithoutPassword.fullName }} ! 🎉</div>
-
-        <div class="subheader">
-            Votre compte a été créé avec succès sur FavorHelp.
-        </div>
-
-        <div class="details">
-            <p><strong>Nom :</strong> {{ userWithoutPassword.fullName }}</p>
-            <p><strong>Email :</strong> {{ userWithoutPassword.email }}</p>
-            <p><strong>Date de création :</strong> {{ userWithoutPassword.createdAt }}</p>
-            <p><strong>Rôle :</strong> Client (CUSTOMER)</p>
-        </div>
-
-        <a href="{{ loginUrl }}" class="button">Accéder à votre compte</a>
-
-        <div class="security-tip">
-            🔒 Conseils de sécurité :<br>
-            - Ne partagez jamais votre mot de passe.<br>
-            - Utilisez un mot de passe complexe et unique.<br>
-            - Vérifiez toujours l'URL avant de vous connecter.<br>
-            - Contactez notre support en cas d’activité suspecte.
-        </div>
-
-        <div class="footer">
-            &copy; {{ year }} FavorHelp. Tous droits réservés.
-        </div>
+  <div class="card">
+    <div class="header">
+      <h1>FACTURE</h1>
     </div>
-</body>
 
+    <div class="section">
+      <div class="section-content">
+        <div>
+          <strong>Facturé à :</strong><br />
+          {{user.fullName}}<br />
+          {{user.email}}<br />
+        </div>
+        <div>
+          <strong>Date :</strong> {{order.createdAt}}<br />
+          <strong>Devise :</strong> {{order.currency}}<br />
+        </div>
+      </div>
+    </div>
+
+    {{#each subOrders}}
+    <div class="section">
+      <div class="section-title">Sous-commande - {{company.name}} (Facture N°: {{invoiceNumber}})</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Produit</th>
+            <th>Quantité</th>
+            <th>Prix unitaire</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each items}}
+          <tr>
+            <td>{{product.name}}</td>
+            <td>{{quantity}}</td>
+            <td>{{product.price}} {{../order.currency}}</td>
+            <td>{{multiply product.price quantity}} {{../order.currency}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="text-align: right;"><strong>Total Sous-commande :</strong></td>
+            <td><strong>{{totalAmount}} {{../order.currency}}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {{/each}}
+
+    <div class="section">
+      <div class="section-title">Résumé de la commande</div>
+      <div class="totals">
+        <div><strong>Sous-total :</strong> {{order.totalAmount}} {{order.currency}}</div>
+        <div>Frais de livraison : {{order.shippingCost}} {{order.currency}}</div>
+        <div><strong>Total général :</strong> {{order.grandTotal}} {{order.currency}}</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>
+        <strong>Conditions générales :</strong><br />
+        Les marchandises peuvent être soumises à des droits d'importation et taxes locales selon le pays de destination.
+        Il est de la responsabilité de l'acheteur de vérifier les lois douanières locales.
+      </div>
+      <div>
+        <strong>Méthode de paiement :</strong><br />
+        Compte : Ar-00 123,647 $40<br />
+        Nom du titulaire : Jhon Doe<br />
+        📞 +00 123 647-640<br />
+        ✉️ info@themevessel.com
+      </div>
+    </div>
+  </div>
+</body>
 </html>

@@ -1,237 +1,177 @@
 <!DOCTYPE html>
-<html lang="fr">
-  <head>
-    <title>Favor Invoice</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta charset="UTF-8" />
-    <link
-      type="text/css"
-      rel="stylesheet"
-      href="https://favorbusiness.com/assets/css/bootstrap.min.css"
-    />
-    <link
-      type="text/css"
-      rel="stylesheet"
-      href="https://favorbusiness.com/assets/fonts/font-awesome/css/font-awesome.min.css"
-    />
-    <link
-      rel="shortcut icon"
-      href="https://favorbusiness.com/assets/img/favicon.ico"
-      type="image/x-icon"
-    />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap"
-      rel="stylesheet"
-    />
+<html lang="en">
 
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      type="text/css"
-      href="https://fonts.googleapis.com/css?family=Poppins:100,200,300,400,500,600,700,800,900"
-    />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: #f1f5f9;
+    }
 
-    <link
-      type="text/css"
-      rel="stylesheet"
-      href="https://favorbusiness.com/assets/css/style.css"
-    />
-  </head>
-  <body>
-    <div class="invoice-1 invoice-content">
-      <div class="container">
-        <div class="row">
-          <div class="col-lg-12">
-            <div class="invoice-inner clearfix">
-              <div class="invoice-info clearfix" id="invoice_wrapper">
-                <div class="invoice-headar">
-                  <div class="row g-0">
-                    <div class="col-sm-6">
-                      <div class="invoice-logo">
-                        <!-- logo started -->
-                        <div class="logo">
-                          <img src="https://favorbusiness.com/assets/img/logos/logo.png" alt="logo" />
-                        </div>
-                        <!-- logo ended -->
-                      </div>
-                    </div>
-                    <div class="col-sm-6 invoice-id">
-                      <div class="info">
-                        <h1 class="color-white inv-header-1">Invoice</h1>
-                        <p class="color-white mb-1">
-                          Invoice Number <span>#45613</span>
-                        </p>
-                        <p class="color-white mb-0">
-                          Invoice Date <span>21 Sep 2021</span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="invoice-top">
-                  <div class="row">
-                    <div class="col-sm-6">
-                      <div class="invoice-number mb-30">
-                        <h4 class="inv-title-1">Invoice To</h4>
-                        <h2 class="name mb-10">Jhon Smith</h2>
-                        <p class="invo-addr-1">
-                          Theme Vessel <br />
-                          info@themevessel.com <br />
-                          21-12 Green Street, Meherpur, Bangladesh <br />
-                        </p>
-                      </div>
-                    </div>
-                    <div class="col-sm-6">
-                      <div class="invoice-number mb-30">
-                        <div class="invoice-number-inner">
-                          <h4 class="inv-title-1">Invoice From</h4>
-                          <h2 class="name mb-10">Animas Roky</h2>
-                          <p class="invo-addr-1">
-                            Apexo Inc <br />
-                            billing@apexo.com <br />
-                            169 Teroghoria, Bangladesh <br />
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="invoice-center">
-                  <div class="table-responsive">
-                    <table class="table mb-0 table-striped invoice-table">
-                      <thead class="bg-primary">
-                        <tr class="tr">
-                          <th>No.</th>
-                          <th class="pl0 text-start">Item Description</th>
-                          <th class="text-center">Price</th>
-                          <th class="text-center">Quantity</th>
-                          <th class="text-end">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr class="tr">
-                          <td>
-                            <div class="item-desc-1">
-                              <span>01</span>
-                            </div>
-                          </td>
-                          <td class="pl0">Businesscard Design</td>
-                          <td class="text-center">$300</td>
-                          <td class="text-center">2</td>
-                          <td class="text-end">$600.00</td>
-                        </tr>
-                        <tr class="bg-grea">
-                          <td>
-                            <div class="item-desc-1">
-                              <span>02</span>
-                            </div>
-                          </td>
-                          <td class="pl0">Fruit Flayer Design</td>
-                          <td class="text-center">$400</td>
-                          <td class="text-center">1</td>
-                          <td class="text-end">$60.00</td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <div class="item-desc-1">
-                              <span>03</span>
-                            </div>
-                          </td>
-                          <td class="pl0">Application Interface Design</td>
-                          <td class="text-center">$240</td>
-                          <td class="text-center">3</td>
-                          <td class="text-end">$640.00</td>
-                        </tr>
+    .card {
+      background: #fff;
+      padding: 2rem;
+      max-width: 900px;
+      margin: 2rem auto;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+    }
 
-                        <tr>
-                          <td>
-                            <div class="item-desc-1">
-                              <span>04</span>
-                            </div>
-                          </td>
-                          <td class="pl0">Theme Development</td>
-                          <td class="text-center">$720</td>
-                          <td class="text-center">4</td>
-                          <td class="text-end">$640.00</td>
-                        </tr>
-                        <tr class="tr2">
-                          <td></td>
-                          <td></td>
-                          <td></td>
-                          <td class="text-center">SubTotal</td>
-                          <td class="text-end">$710.99</td>
-                        </tr>
-                        <tr class="tr2">
-                          <td></td>
-                          <td></td>
-                          <td></td>
-                          <td class="text-center">Tax</td>
-                          <td class="text-end">$85.99</td>
-                        </tr>
-                        <tr class="tr2">
-                          <td></td>
-                          <td></td>
-                          <td></td>
-                          <td class="text-center f-w-600 active-color">
-                            Grand Total
-                          </td>
-                          <td class="f-w-600 text-end active-color">$795.99</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                <div class="invoice-bottom">
-                  <div class="row">
-                    <div class="col-lg-6 col-md-8 col-sm-7">
-                      <div class="mb-30 dear-client">
-                        <h3 class="inv-title-1">Terms & Conditions</h3>
-                        <p>
-                          Lorem Ipsum is simply dummy text of the printing and
-                          typesetting industry. Lorem Ipsum has been typesetting
-                          industry. Lorem Ipsum
-                        </p>
-                      </div>
-                    </div>
-                    <div class="col-lg-6 col-md-4 col-sm-5">
-                      <div class="mb-30 payment-method">
-                        <h3 class="inv-title-1">Payment Method</h3>
-                        <ul class="payment-method-list-1 text-14">
-                          <li><strong>Account No:</strong> 00 123 647 840</li>
-                          <li><strong>Account Name:</strong> Jhon Doe</li>
-                          <li><strong>Branch Name:</strong> xyz</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="invoice-contact">
-                  <div class="row g-0">
-                    <div class="col-lg-9 col-md-11 col-sm-12">
-                      <div class="contact-info">
-                        <a href="tel:+55-4XX-634-7071"
-                          ><i class="fa fa-phone"></i> +00 123 647 840</a
-                        >
-                        <a href="tel:info@themevessel.com"
-                          ><i class="fa fa-envelope"></i>
-                          info@themevessel.com</a
-                        >
-                        <a
-                          href="tel:info@themevessel.com"
-                          class="mr-0 d-none-580"
-                          ><i class="fa fa-map-marker"></i> 169 Teroghoria,
-                          Bangladesh</a
-                        >
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      background: #0066ee;
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-size: 1.5rem;
+    }
+
+    .section {
+      margin-top: 2rem;
+    }
+
+    .section-title {
+      background: #0066ee;
+      color: white;
+      padding: 0.5rem;
+      font-weight: bold;
+      border-radius: 4px 4px 0 0;
+    }
+
+    .section-content {
+      display: flex;
+      justify-content: space-between;
+      padding: 1rem 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+
+    table th,
+    table td {
+      border: 1px solid #ddd;
+      padding: 0.5rem;
+      text-align: left;
+    }
+
+    table th {
+      background: #0066ee;
+      color: white;
+    }
+
+    .totals {
+      text-align: right;
+      margin-top: 1.5rem;
+    }
+
+    .totals div {
+      margin-top: 0.3rem;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      border-top: 1px solid #ddd;
+      padding-top: 1rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>INVOICE / FACTURE</h1>
+    </div>
+
+    <div class="section">
+      <div class="section-content">
+        <div>
+          <strong>Invoice To / Facturé à</strong><br />
+          {{user.fullName}}<br />
+          {{user.email}}<br />
+        </div>
+        <div>
+          <strong>Invoice Number / N° de facture:</strong> #{{subOrder.invoiceNumber}}<br />
+          <strong>Date:</strong> {{order.date}}<br />
         </div>
       </div>
     </div>
-  </body>
+
+    <div class="section">
+      <div class="section-title">Invoice Details / Détails de la facture</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Produit / Product</th>
+            <th>Quantité / Quantity</th>
+            <th>Prix unitaire / Unit Price</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{subOrdersHtml}}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="text-align: right;"><strong>Sous-total / Subtotal:</strong></td>
+            <td>{{order.subTotal}} {{order.currency}}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="text-align: right;">Frais de livraison / Shipping Fee:</td>
+            <td>{{order.shippingFee}} {{order.currency}}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="text-align: right;">Frais de douane / Customs Fee:</td>
+            <td>{{order.customsFee}} {{order.currency}}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="text-align: right;">Remise / Discount:</td>
+            <td>-{{order.discount}} {{order.currency}}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="text-align: right;">TVA / Tax:</td>
+            <td>{{order.tax}} {{order.currency}}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="text-align: right;"><strong>Total général / Grand Total:</strong></td>
+            <td><strong>{{order.totalAmount}} {{order.currency}}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="footer">
+      <div>
+        <strong>Conditions générales / Terms & Conditions</strong><br />
+        Les marchandises peuvent être soumises à des droits d'importation et taxes locales selon le pays de destination.
+        Il est de la responsabilité de l'acheteur de vérifier les lois douanières locales.<br /><br />
+        Goods may be subject to import duties and local taxes depending on the destination country.
+        It is the buyer's responsibility to check local customs regulations.
+      </div>
+      <div>
+        <strong>Méthode de paiement / Payment Method</strong><br />
+        Compte / Account: Ar-00 123,647 $40<br />
+        Nom du titulaire / Account Name: Jhon Doe<br />
+        📞 +00 123 647-640<br />
+        ✉️ info@themevessel.com
+      </div>
+    </div>
+  </div>
+</body>
+
 </html>

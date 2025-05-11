@@ -11,6 +11,7 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { ProductStatus } from 'src/users/utility/common/product.status.enum';
 import { MeasureEntity } from 'src/measure/entities/measure.entity';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
+import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
 
 @Injectable()
 export class ProductService {
@@ -203,8 +204,14 @@ export class ProductService {
       queryBuilder.andWhere('product.companyId = :companyId', { companyId });
     }
 
-    if (shopType) {
-      queryBuilder.andWhere('product.companyActivity = :shopType', { shopType });
+    if (shopType?.trim()) {
+      if (shopType === CompanyActivity.WHOLESALER) {
+        queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
+          activities: [CompanyActivity.WHOLESALER, CompanyActivity.WHOLESALER_RETAILER],
+        });
+      } else {
+        queryBuilder.andWhere('product.companyActivity = :shopType', { shopType });
+      }
     }
 
     queryBuilder.skip((page - 1) * limit).take(limit);
@@ -221,6 +228,7 @@ export class ProductService {
       }
     };
   }
+
 
   async findProductPublishedByCategory(
     categoryId?: string,
@@ -248,8 +256,15 @@ export class ProductService {
       queryBuilder.andWhere('category.id = :categoryId', { categoryId });
     }
 
-    if (typeof shopType === 'string' && shopType.trim() !== '') {
-      queryBuilder.andWhere('product.companyActivity = :shopType', { shopType });
+    if (shopType?.trim()) {
+      // Si WHOLESALER, on veut aussi inclure WHOLESALER_RETAILER
+      if (shopType === CompanyActivity.WHOLESALER) {
+        queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
+          activities: [CompanyActivity.WHOLESALER, CompanyActivity.WHOLESALER_RETAILER],
+        });
+      } else {
+        queryBuilder.andWhere('product.companyActivity = :shopType', { shopType });
+      }
     }
 
     queryBuilder.skip((page - 1) * limit).take(limit);
@@ -266,6 +281,7 @@ export class ProductService {
       },
     };
   }
+
 
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
