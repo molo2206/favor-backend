@@ -175,7 +175,7 @@ export class OrderService {
     if (!addressUser) throw new NotFoundException('Address not found');
 
     const grandTotal = totalAmount + shippingCost;
-
+    const invoiceNumb = this.invoiceService.generateInvoiceNumber();
     const order = this.orderRepo.create({
       user,
       totalAmount,
@@ -184,7 +184,7 @@ export class OrderService {
       grandTotal,
       addressUser,
       type,
-      invoiceNumber: this.invoiceService.generateInvoiceNumber()
+      invoiceNumber: invoiceNumb
     });
     await this.orderRepo.save(order);
 
@@ -242,6 +242,8 @@ export class OrderService {
       await this.subOrderRepo.save(subOrder);
 
       // Génération du numéro de facture unique
+      subOrder.invoiceNumber = invoiceNumb;
+      await this.subOrderRepo.save(subOrder);
 
       for (const item of group.items) {
         item.subOrder = subOrder;
