@@ -43,6 +43,9 @@ export class OrderEntity {
     @OneToMany(() => SubOrderEntity, (subOrder) => subOrder.order, { cascade: true })
     subOrders: SubOrderEntity[];
 
+    @Column({ nullable: true })
+    invoiceNumber: string;
+
     @Column({ type: 'float', nullable: false })
     grandTotal: number;
 

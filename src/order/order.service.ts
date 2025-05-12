@@ -165,14 +165,14 @@ export class OrderService {
   //   return finalOrder;
   // }
 
-async createOrder(
+  async createOrder(
     createOrderDto: CreateOrderDto,
     user: UserEntity,
-  ): Promise < OrderEntity > {
+  ): Promise<OrderEntity> {
     const { totalAmount, shippingCost, currency, orderItems, addressUserId, type, shopType } = createOrderDto;
 
     const addressUser = await this.addressUserRepo.findOne({ where: { id: addressUserId } });
-    if(!addressUser) throw new NotFoundException('Address not found');
+    if (!addressUser) throw new NotFoundException('Address not found');
 
     const grandTotal = totalAmount + shippingCost;
 
@@ -184,13 +184,14 @@ async createOrder(
       grandTotal,
       addressUser,
       type,
+      invoiceNumber: this.invoiceService.generateInvoiceNumber()
     });
     await this.orderRepo.save(order);
 
     const orderItemEntities: OrderItemEntity[] = [];
     const groupedByCompany = new Map<string, { companyId: string; items: SubOrderItemEntity[]; total: number }>();
 
-    for(const item of orderItems) {
+    for (const item of orderItems) {
       const product = await this.productRepo.findOne({
         where: { id: item.productId },
         relations: ['company'],
@@ -228,9 +229,9 @@ async createOrder(
       group.total += selectedPrice * item.quantity;
     }
 
-  await this.orderItemRepo.save(orderItemEntities);
+    await this.orderItemRepo.save(orderItemEntities);
 
-    for(const [, group] of groupedByCompany) {
+    for (const [, group] of groupedByCompany) {
       const subOrder = this.subOrderRepo.create({
         order,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -241,8 +242,6 @@ async createOrder(
       await this.subOrderRepo.save(subOrder);
 
       // Génération du numéro de facture unique
-      subOrder.invoiceNumber = this.invoiceService.generateInvoiceNumber();
-      await this.subOrderRepo.save(subOrder);
 
       for (const item of group.items) {
         item.subOrder = subOrder;
@@ -250,7 +249,7 @@ async createOrder(
       await this.subOrderItemRepo.save(group.items);
     }
 
-  const finalOrder = await this.orderRepo.findOne({
+    const finalOrder = await this.orderRepo.findOne({
       where: { id: order.id },
       relations: [
         'orderItems',
@@ -263,7 +262,7 @@ async createOrder(
       ],
     });
 
-    if(!finalOrder) throw new NotFoundException('Order not found after creation');
+    if (!finalOrder) throw new NotFoundException('Order not found after creation');
 
     const subOrders = await this.subOrderRepo.find({
       where: { order: { id: finalOrder.id } },
@@ -285,104 +284,104 @@ async createOrder(
   }
 
 
-  async updateOrderStatus(orderId: string, dto: UpdateOrderStatusDto): Promise < OrderEntity > {
-  const order = await this.orderRepo.findOne({
-    where: { id: orderId },
-    relations: [
-      'orderItems',
-      'subOrders',
-      'subOrders.items',
-      'subOrders.company',
-      'orderItems.product',
-      'addressUser',
-      'user'
-    ],
-  });
+  async updateOrderStatus(orderId: string, dto: UpdateOrderStatusDto): Promise<OrderEntity> {
+    const order = await this.orderRepo.findOne({
+      where: { id: orderId },
+      relations: [
+        'orderItems',
+        'subOrders',
+        'subOrders.items',
+        'subOrders.company',
+        'orderItems.product',
+        'addressUser',
+        'user'
+      ],
+    });
 
-  if(!order) {
-    throw new NotFoundException('Commande introuvable');
-  }
+    if (!order) {
+      throw new NotFoundException('Commande introuvable');
+    }
 
     // Mise à jour du statut
     order.status = dto.status;
 
-  // Sauvegarde de la commande
-  const updatedOrder = await this.orderRepo.save(order);
+    // Sauvegarde de la commande
+    const updatedOrder = await this.orderRepo.save(order);
 
-  // Envoi de l'email uniquement si la commande est validée
-  if(dto.status === OrderStatus.VALIDATED) {
-  await this.mailService.sendHtmlEmailValidation(
-    order.user.email,
-    'Votre commande a été validée',
-    'order-validation.html',
-    {
-      order,
-      user: order.user,
-      year: new Date().getFullYear(),
-    },
-  );
-}
-return updatedOrder;
+    // Envoi de l'email uniquement si la commande est validée
+    if (dto.status === OrderStatus.VALIDATED) {
+      await this.mailService.sendHtmlEmailValidation(
+        order.user.email,
+        'Votre commande a été validée',
+        'order-validation.html',
+        {
+          order,
+          user: order.user,
+          year: new Date().getFullYear(),
+        },
+      );
+    }
+    return updatedOrder;
   }
-  async getOrdersByUser(userId: string): Promise < OrderEntity[] > {
-  return this.orderRepo.find({
-    where: { user: { id: userId } },
-    relations: [
-      'orderItems',
-      'orderItems.product',
-      'subOrders',
-      'subOrders.items',
-      'subOrders.items.product',
-      'subOrders.company',
-      'addressUser'
-    ],
-    order: {
-      createdAt: 'DESC',
-    },
-  });
-}
-  async findByType(type ?: string): Promise < { message: string; data: OrderEntity[] } > {
-  const query = this.orderRepo.createQueryBuilder('order')
-    .leftJoinAndSelect('order.user', 'user')
-    .leftJoinAndSelect('order.orderItems', 'orderItems')
-    .leftJoinAndSelect('orderItems.product', 'product')
-    .leftJoinAndSelect('order.subOrders', 'subOrders')
-    .leftJoinAndSelect('subOrders.items', 'subOrderItems')
-    .leftJoinAndSelect('subOrderItems.product', 'subOrderProduct')
-    .orderBy('order.createdAt', 'DESC');
+  async getOrdersByUser(userId: string): Promise<OrderEntity[]> {
+    return this.orderRepo.find({
+      where: { user: { id: userId } },
+      relations: [
+        'orderItems',
+        'orderItems.product',
+        'subOrders',
+        'subOrders.items',
+        'subOrders.items.product',
+        'subOrders.company',
+        'addressUser'
+      ],
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+  async findByType(type?: string): Promise<{ message: string; data: OrderEntity[] }> {
+    const query = this.orderRepo.createQueryBuilder('order')
+      .leftJoinAndSelect('order.user', 'user')
+      .leftJoinAndSelect('order.orderItems', 'orderItems')
+      .leftJoinAndSelect('orderItems.product', 'product')
+      .leftJoinAndSelect('order.subOrders', 'subOrders')
+      .leftJoinAndSelect('subOrders.items', 'subOrderItems')
+      .leftJoinAndSelect('subOrderItems.product', 'subOrderProduct')
+      .orderBy('order.createdAt', 'DESC');
 
-  if(type) {
-    query.where('order.status = :type', { type });
-  }
+    if (type) {
+      query.where('order.status = :type', { type });
+    }
 
     const orders = await query.getMany();
 
-  if(orders.length === 0) {
-  throw new NotFoundException(`Aucune commande trouvée pour le type : ${type}`);
-}
+    if (orders.length === 0) {
+      throw new NotFoundException(`Aucune commande trouvée pour le type : ${type}`);
+    }
 
-return {
-  message: `Commandes récupérées avec succès pour le type : ${type}.`,
-  data: orders,
-};
+    return {
+      message: `Commandes récupérées avec succès pour le type : ${type}.`,
+      data: orders,
+    };
   }
 
 
 
-  async findOne(orderId: string): Promise < OrderEntity > {
-  const order = await this.orderRepo.findOne({
-    where: { id: orderId },
-    relations: ['orderItems', 'subOrders', 'subOrders.items', 'subOrders.company', 'addressUser'],
-  });
-  if(!order) throw new NotFoundException('Order not found');
-  return order;
-}
+  async findOne(orderId: string): Promise<OrderEntity> {
+    const order = await this.orderRepo.findOne({
+      where: { id: orderId },
+      relations: ['orderItems', 'subOrders', 'subOrders.items', 'subOrders.company', 'addressUser'],
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
+  }
 
-  async findAll(): Promise < OrderEntity[] > {
-  return this.orderRepo.find({
-    relations: ['orderItems', 'subOrders', 'subOrders.items', 'subOrders.company', 'user', 'addressUser'],
-    order: { createdAt: 'DESC' },
-  });
-}
+  async findAll(): Promise<OrderEntity[]> {
+    return this.orderRepo.find({
+      relations: ['orderItems', 'subOrders', 'subOrders.items', 'subOrders.company', 'user', 'addressUser'],
+      order: { createdAt: 'DESC' },
+    });
+  }
 
 }

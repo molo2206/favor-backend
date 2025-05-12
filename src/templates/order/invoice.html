@@ -11,6 +11,8 @@
       margin: 0;
       padding: 2rem;
       background: #f1f5f9;
+      border: 4px solid #0066ee;
+      box-sizing: border-box;
     }
 
     .card {
@@ -106,7 +108,7 @@
           {{user.email}}<br />
         </div>
         <div>
-          <strong>Invoice Number / N° de facture:</strong> #{{subOrder.invoiceNumber}}<br />
+          <strong>Invoice Number / N° de facture:</strong> #{{order.invoiceNumber}}<br />
           <strong>Date:</strong> {{order.date}}<br />
         </div>
       </div>
