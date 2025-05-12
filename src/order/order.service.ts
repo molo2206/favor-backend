@@ -16,6 +16,7 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus } from 'src/users/utility/common/order.status.enum';
 import { MailService } from 'src/email/email.service';
 import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
+import { PaymentStatus } from 'src/users/utility/common/payment.status.enum';
 
 @Injectable()
 export class OrderService {
@@ -184,7 +185,8 @@ export class OrderService {
       grandTotal,
       addressUser,
       type,
-      invoiceNumber: invoiceNumb
+      invoiceNumber: invoiceNumb,
+      paymentStatus: PaymentStatus.PENDING
     });
     await this.orderRepo.save(order);
 

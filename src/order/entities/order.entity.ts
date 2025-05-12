@@ -3,6 +3,7 @@ import { OrderItemEntity } from "src/order-item/entities/order-item.entity";
 import { SubOrderEntity } from "src/sub-order/entities/sub-order.entity";
 import { UserEntity } from "src/users/entities/user.entity";
 import { OrderStatus } from "src/users/utility/common/order.status.enum";
+import { PaymentStatus } from "src/users/utility/common/payment.status.enum";
 import { CompanyType } from "src/users/utility/common/type.company.enum";
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 
@@ -45,6 +46,13 @@ export class OrderEntity {
 
     @Column({ nullable: true })
     invoiceNumber: string;
+
+    @Column({
+        type: 'enum',
+        enum: PaymentStatus,
+        default: PaymentStatus.PENDING,
+    })
+    paymentStatus: PaymentStatus;
 
     @Column({ type: 'float', nullable: false })
     grandTotal: number;
