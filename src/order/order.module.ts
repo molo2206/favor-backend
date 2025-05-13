@@ -30,4 +30,4 @@ import { InvoiceModule } from 'src/users/utility/common/invoice.module';
   providers: [OrderService],
   controllers: [OrderController],
 })
-export class OrderModule { }
+export class OrderModule {}

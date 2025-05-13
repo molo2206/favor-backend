@@ -42,137 +42,26 @@ export class OrderService {
     private readonly mailService: MailOrderService,
     private readonly mailServices: MailService,
 
-    private readonly invoiceService: InvoiceService
-  ) { }
-
-  // async createOrder(
-  //   createOrderDto: CreateOrderDto,
-  //   user: UserEntity,
-  // ): Promise<OrderEntity> {
-  //   const { totalAmount, shippingCost, currency, orderItems, addressUserId, type, shopType } = createOrderDto;
-
-  //   const addressUser = await this.addressUserRepo.findOne({ where: { id: addressUserId } });
-  //   if (!addressUser) throw new NotFoundException('Address not found');
-
-  //   const grandTotal = totalAmount + shippingCost;
-
-  //   const order = this.orderRepo.create({
-  //     user,
-  //     totalAmount,
-  //     shippingCost,
-  //     currency,
-  //     grandTotal,
-  //     addressUser,
-  //     type,
-  //   });
-  //   await this.orderRepo.save(order);
-
-  //   const orderItemEntities: OrderItemEntity[] = [];
-  //   const groupedByCompany = new Map<string, { companyId: string; items: SubOrderItemEntity[]; total: number }>();
-
-  //   for (const item of orderItems) {
-  //     const product = await this.productRepo.findOne({
-  //       where: { id: item.productId },
-  //       relations: ['company'],
-  //     });
-  //     if (!product) throw new NotFoundException(`Product not found: ${item.productId}`);
-
-  //     // ✅ Tarification centralisée
-  //     let selectedPrice = product.detail_price_original ?? 0;
-  //     if (
-  //       shopType === CompanyActivity.WHOLESALER ||
-  //       shopType === CompanyActivity.WHOLESALER_RETAILER
-  //     ) {
-  //       selectedPrice = product.gros_price_original ?? product.detail_price_original ?? 0;
-  //     }
-
-  //     const orderItem = this.orderItemRepo.create({
-  //       order,
-  //       product,
-  //       quantity: item.quantity,
-  //     });
-  //     orderItemEntities.push(orderItem);
-
-  //     const companyId = product.company.id;
-  //     if (!groupedByCompany.has(companyId)) {
-  //       groupedByCompany.set(companyId, {
-  //         companyId,
-  //         items: [],
-  //         total: 0,
-  //       });
-  //     }
-
-  //     const group = groupedByCompany.get(companyId)!;
-  //     const subOrderItem = this.subOrderItemRepo.create({
-  //       product,
-  //       quantity: item.quantity,
-  //     });
-
-  //     group.items.push(subOrderItem);
-  //     group.total += selectedPrice * item.quantity;
-  //   }
-
-  //   await this.orderItemRepo.save(orderItemEntities);
-
-  //   for (const [, group] of groupedByCompany) {
-  //     const subOrder = this.subOrderRepo.create({
-  //       order,
-  //       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //       company: { id: group.companyId } as any,
-  //       totalAmount: group.total,
-  //     });
-
-  //     await this.subOrderRepo.save(subOrder);
-  //     subOrder.invoiceNumber = this.invoiceService.generateInvoiceNumber();
-  //     await this.subOrderRepo.save(subOrder);
-
-  //     for (const item of group.items) {
-  //       item.subOrder = subOrder;
-  //     }
-  //     await this.subOrderItemRepo.save(group.items);
-  //   }
-
-  //   const finalOrder = await this.orderRepo.findOne({
-  //     where: { id: order.id },
-  //     relations: [
-  //       'orderItems',
-  //       'subOrders',
-  //       'subOrders.items',
-  //       'subOrders.company',
-  //       'orderItems.product',
-  //       'addressUser',
-  //       'user',
-  //     ],
-  //   });
-
-  //   if (!finalOrder) throw new NotFoundException('Order not found after creation');
-
-  //   const subOrders = await this.subOrderRepo.find({
-  //     where: { order: { id: finalOrder.id } },
-  //     relations: ['company', 'items', 'items.product', 'order'],
-  //   });
-
-  //   await this.mailService.sendHtmlEmail(
-  //     user.email,
-  //     'Votre facture - FavorHelp',
-  //     'invoice.html',
-  //     {
-  //       user,
-  //       order: finalOrder,
-  //       subOrders,
-  //     },
-  //   );
-
-  //   return finalOrder;
-  // }
+    private readonly invoiceService: InvoiceService,
+  ) {}
 
   async createOrder(
     createOrderDto: CreateOrderDto,
     user: UserEntity,
   ): Promise<OrderEntity> {
-    const { totalAmount, shippingCost, currency, orderItems, addressUserId, type, shopType } = createOrderDto;
+    const {
+      totalAmount,
+      shippingCost,
+      currency,
+      orderItems,
+      addressUserId,
+      type,
+      shopType,
+    } = createOrderDto;
 
-    const addressUser = await this.addressUserRepo.findOne({ where: { id: addressUserId } });
+    const addressUser = await this.addressUserRepo.findOne({
+      where: { id: addressUserId },
+    });
     if (!addressUser) throw new NotFoundException('Address not found');
 
     const grandTotal = totalAmount + shippingCost;
@@ -186,23 +75,31 @@ export class OrderService {
       addressUser,
       type,
       invoiceNumber: invoiceNumb,
-      paymentStatus: PaymentStatus.PENDING
+      paymentStatus: PaymentStatus.PENDING,
     });
     await this.orderRepo.save(order);
 
     const orderItemEntities: OrderItemEntity[] = [];
-    const groupedByCompany = new Map<string, { companyId: string; items: SubOrderItemEntity[]; total: number }>();
+    const groupedByCompany = new Map<
+      string,
+      { companyId: string; items: SubOrderItemEntity[]; total: number }
+    >();
 
     for (const item of orderItems) {
       const product = await this.productRepo.findOne({
         where: { id: item.productId },
         relations: ['company'],
       });
-      if (!product) throw new NotFoundException(`Product not found: ${item.productId}`);
+      if (!product)
+        throw new NotFoundException(`Product not found: ${item.productId}`);
 
       let selectedPrice = product.detail_price_original ?? 0;
-      if (shopType === CompanyActivity.WHOLESALER || shopType === CompanyActivity.WHOLESALER_RETAILER) {
-        selectedPrice = product.gros_price_original ?? product.detail_price_original ?? 0;
+      if (
+        shopType === CompanyActivity.WHOLESALER ||
+        shopType === CompanyActivity.WHOLESALER_RETAILER
+      ) {
+        selectedPrice =
+          product.gros_price_original ?? product.detail_price_original ?? 0;
       }
 
       const orderItem = this.orderItemRepo.create({
@@ -266,7 +163,8 @@ export class OrderService {
       ],
     });
 
-    if (!finalOrder) throw new NotFoundException('Order not found after creation');
+    if (!finalOrder)
+      throw new NotFoundException('Order not found after creation');
 
     const subOrders = await this.subOrderRepo.find({
       where: { order: { id: finalOrder.id } },
@@ -287,18 +185,21 @@ export class OrderService {
     return finalOrder;
   }
 
-
-  async updateOrderStatus(orderId: string, dto: UpdateOrderStatusDto): Promise<OrderEntity> {
+  async updateOrderStatus(
+    orderId: string,
+    dto: UpdateOrderStatusDto,
+  ): Promise<OrderEntity> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: [
         'orderItems',
+        'orderItems.product',
         'subOrders',
         'subOrders.items',
+        'subOrders.items.product',
         'subOrders.company',
-        'orderItems.product',
         'addressUser',
-        'user'
+        'user',
       ],
     });
 
@@ -337,15 +238,19 @@ export class OrderService {
         'subOrders.items',
         'subOrders.items.product',
         'subOrders.company',
-        'addressUser'
+        'addressUser',
+        'user',
       ],
       order: {
         createdAt: 'DESC',
       },
     });
   }
-  async findByType(type?: string): Promise<{ message: string; data: OrderEntity[] }> {
-    const query = this.orderRepo.createQueryBuilder('order')
+  async findByType(
+    type?: string,
+  ): Promise<{ message: string; data: OrderEntity[] }> {
+    const query = this.orderRepo
+      .createQueryBuilder('order')
       .leftJoinAndSelect('order.user', 'user')
       .leftJoinAndSelect('order.orderItems', 'orderItems')
       .leftJoinAndSelect('orderItems.product', 'product')
@@ -361,7 +266,9 @@ export class OrderService {
     const orders = await query.getMany();
 
     if (orders.length === 0) {
-      throw new NotFoundException(`Aucune commande trouvée pour le type : ${type}`);
+      throw new NotFoundException(
+        `Aucune commande trouvée pour le type : ${type}`,
+      );
     }
 
     return {
@@ -370,22 +277,35 @@ export class OrderService {
     };
   }
 
-
-
-  async findOne(orderId: string): Promise<OrderEntity> {
+  async findOne(orderId: string): Promise<{ data: OrderEntity }> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
-      relations: ['orderItems', 'subOrders', 'subOrders.items', 'subOrders.company', 'addressUser'],
+      relations: [
+        'orderItems.product',
+        'subOrders',
+        'subOrders.items.product',
+        'subOrders.company',
+        'user',
+        'addressUser',
+      ],
     });
     if (!order) throw new NotFoundException('Order not found');
-    return order;
+    return { data: order };
   }
 
-  async findAll(): Promise<OrderEntity[]> {
-    return this.orderRepo.find({
-      relations: ['orderItems', 'subOrders', 'subOrders.items', 'subOrders.company', 'user', 'addressUser'],
+  async findAll(): Promise<{ data: OrderEntity[] }> {
+    const orders = await this.orderRepo.find({
+      relations: [
+        'orderItems.product',
+        'subOrders',
+        'subOrders.items.product',
+        'subOrders.company',
+        'user',
+        'addressUser',
+      ],
       order: { createdAt: 'DESC' },
     });
-  }
 
+    return { data: orders };
+  }
 }
