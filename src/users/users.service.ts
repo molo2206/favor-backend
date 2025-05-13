@@ -1,7 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -36,19 +41,27 @@ export class UsersService {
     private readonly configService: ConfigService,
     private readonly cloudinary: CloudinaryService,
     private readonly mailService: MailService,
-  ) { }
+  ) {}
 
-  async signup(createUserDto: CreateUserDto): Promise<{ message: string; data: any }> {
+  async signup(
+    createUserDto: CreateUserDto,
+  ): Promise<{ message: string; data: any }> {
     const { email, phone, otpCode, password } = createUserDto;
 
-    const emailExists = await this.usersRepository.findOne({ where: { email } });
-    if (emailExists) {
-      throw new BadRequestException('Un compte avec cet email existe déjà.');
+    const phoneExists = await this.usersRepository.findOne({
+      where: { phone },
+    });
+    if (phoneExists) {
+      throw new BadRequestException(
+        'Un compte avec ce numéro de téléphone existe déjà.',
+      );
     }
 
-    const phoneExists = await this.usersRepository.findOne({ where: { phone } });
-    if (phoneExists) {
-      throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
+    const emailExists = await this.usersRepository.findOne({
+      where: { email },
+    });
+    if (emailExists) {
+      throw new BadRequestException('Un compte avec cet email existe déjà.');
     }
 
     if (!otpCode) {
@@ -85,7 +98,7 @@ export class UsersService {
       email,
       'Vous avez déjà un compte dans FavorHelp',
       'createCount.html',
-      { userWithoutPassword, year: new Date().getFullYear() }
+      { userWithoutPassword, year: new Date().getFullYear() },
     );
 
     return {
@@ -98,10 +111,14 @@ export class UsersService {
     updateUserDto: Partial<UpdateUserDto>,
     currentUser: UserEntity,
   ): Promise<{ message: string; data: any }> {
-    const user = await this.usersRepository.findOne({ where: { id: currentUser.id } });
+    const user = await this.usersRepository.findOne({
+      where: { id: currentUser.id },
+    });
 
     if (!user) {
-      throw new NotFoundException(`Utilisateur avec l'ID ${currentUser.id} non trouvé`);
+      throw new NotFoundException(
+        `Utilisateur avec l'ID ${currentUser.id} non trouvé`,
+      );
     }
 
     Object.assign(user, updateUserDto);
@@ -119,49 +136,55 @@ export class UsersService {
       ],
     });
     if (!fullUser) {
-      throw new NotFoundException("Utilisateur enrichi introuvable après la mise à jour.");
+      throw new NotFoundException(
+        'Utilisateur enrichi introuvable après la mise à jour.',
+      );
     }
     // Formatage du résultat comme dans `signin`
-    const userHasCompany = fullUser.userHasCompany?.map((uhc) => ({
-      id: uhc.id,
-      isOwner: uhc.isOwner,
-      company: uhc.company
-        ? {
-          id: uhc.company.id,
-          companyName: uhc.company.companyName || '',
-          logo: uhc.company.logo,
-          banner: uhc.company.banner,
-          companyAddress: uhc.company.companyAddress || '',
-          typeCompany: uhc.company.typeCompany,
-          phone: uhc.company.phone,
-          vatNumber: uhc.company.vatNumber,
-          registrationDocumentUrl: uhc.company.registrationDocumentUrl,
-          warehouseLocation: uhc.company.warehouseLocation,
-          email: uhc.company.email,
-          website: uhc.company.website,
-          status: uhc.company.status,
-          companyActivity: uhc.company.companyActivity,
-          latitude: uhc.company.latitude,
-          longitude: uhc.company.longitude,
-          address: uhc.company.address
-        }
-        : null,
-      permissions: uhc.permissions?.map((p) => ({
-        id: p.permission?.id,
-        name: p.permission?.name,
-        create: p.create,
-        read: p.read,
-        update: p.update,
-        delete: p.delete,
-        status: p.status,
-        createdAt: p.permission?.createdAt instanceof Date
-          ? p.permission.createdAt
-          : new Date(p.permission?.createdAt),
-        updatedAt: p.permission?.updatedAt instanceof Date
-          ? p.permission.updatedAt
-          : new Date(p.permission?.updatedAt),
-      })) ?? [],
-    })) ?? [];
+    const userHasCompany =
+      fullUser.userHasCompany?.map((uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+        company: uhc.company
+          ? {
+              id: uhc.company.id,
+              companyName: uhc.company.companyName || '',
+              logo: uhc.company.logo,
+              banner: uhc.company.banner,
+              companyAddress: uhc.company.companyAddress || '',
+              typeCompany: uhc.company.typeCompany,
+              phone: uhc.company.phone,
+              vatNumber: uhc.company.vatNumber,
+              registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+              warehouseLocation: uhc.company.warehouseLocation,
+              email: uhc.company.email,
+              website: uhc.company.website,
+              status: uhc.company.status,
+              companyActivity: uhc.company.companyActivity,
+              latitude: uhc.company.latitude,
+              longitude: uhc.company.longitude,
+              address: uhc.company.address,
+            }
+          : null,
+        permissions:
+          uhc.permissions?.map((p) => ({
+            id: p.permission?.id,
+            name: p.permission?.name,
+            create: p.create,
+            read: p.read,
+            update: p.update,
+            delete: p.delete,
+            status: p.status,
+            createdAt:
+              p.permission?.createdAt instanceof Date
+                ? p.permission.createdAt
+                : new Date(p.permission?.createdAt),
+            updatedAt:
+              p.permission?.updatedAt instanceof Date
+                ? p.permission.updatedAt
+                : new Date(p.permission?.updatedAt),
+          })) ?? [],
+      })) ?? [];
 
     return {
       message: 'Utilisateur mis à jour avec succès.',
@@ -189,9 +212,15 @@ export class UsersService {
     };
   }
 
-  async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<{ message: string }> {
+  async changePassword(
+    userId: string,
+    changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
     const { currentPassword, newPassword } = changePasswordDto;
-    const user = await this.usersRepository.findOne({ where: { id: userId }, select: ['id', 'password'] });
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'password'],
+    });
 
     if (!user) {
       throw new NotFoundException('Utilisateur non trouvé');
@@ -227,67 +256,75 @@ export class UsersService {
       .getOne();
 
     if (!user) {
-      throw new UnauthorizedException('Adresse e-mail ou mot de passe incorrect.');
+      throw new UnauthorizedException(
+        'Adresse e-mail ou mot de passe incorrect.',
+      );
     }
 
-    const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      userSignInDto.password,
+      user.password,
+    );
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Adresse e-mail ou mot de passe incorrect.');
+      throw new UnauthorizedException(
+        'Adresse e-mail ou mot de passe incorrect.',
+      );
     }
 
     const token = await this.accessToken(user);
     const refresh_t = await this.refreshToken(user);
     const { password, ...userWithoutPassword } = user;
 
-    const userHasCompany = userWithoutPassword.userHasCompany?.map((uhc) => ({
-      id: uhc.id,
-      isOwner: uhc.isOwner,
-      company: uhc.company
-        ? {
-          id: uhc.company.id,
-          companyName: uhc.company.companyName || '',
-          logo: uhc.company.logo,
-          banner: uhc.company.banner,
-          companyAddress: uhc.company.companyAddress || '',
-          typeCompany: uhc.company.typeCompany,
-          phone: uhc.company.phone,
-          vatNumber: uhc.company.vatNumber,
-          registrationDocumentUrl: uhc.company.registrationDocumentUrl,
-          warehouseLocation: uhc.company.warehouseLocation,
-          email: uhc.company.email,
-          website: uhc.company.website,
-          status: uhc.company.status,
-          companyActivity: uhc.company.companyActivity,
-          open_time: uhc.company.open_time,
-          delivery_minutes: uhc.company.delivery_minutes,
-          distance_km: uhc.company.distance_km,
-          latitude: uhc.company.latitude,
-          longitude: uhc.company.longitude,
-          address: uhc.company.address
-        }
-        : null,
-      permissions:
-        uhc.permissions?.map((p) => ({
-          id: p.permission?.id,
-          name: p.permission?.name,
-          create: p.create,
-          read: p.read,
-          update: p.update,
-          delete: p.delete,
-          status: p.status,
-          createdAt:
-            p.permission?.createdAt instanceof Date
-              ? p.permission.createdAt
-              : new Date(p.permission?.createdAt),
-          updatedAt:
-            p.permission?.updatedAt instanceof Date
-              ? p.permission.updatedAt
-              : new Date(p.permission?.updatedAt),
-        })) ?? [],
-    })) ?? [];
+    const userHasCompany =
+      userWithoutPassword.userHasCompany?.map((uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+        company: uhc.company
+          ? {
+              id: uhc.company.id,
+              companyName: uhc.company.companyName || '',
+              logo: uhc.company.logo,
+              banner: uhc.company.banner,
+              companyAddress: uhc.company.companyAddress || '',
+              typeCompany: uhc.company.typeCompany,
+              phone: uhc.company.phone,
+              vatNumber: uhc.company.vatNumber,
+              registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+              warehouseLocation: uhc.company.warehouseLocation,
+              email: uhc.company.email,
+              website: uhc.company.website,
+              status: uhc.company.status,
+              companyActivity: uhc.company.companyActivity,
+              open_time: uhc.company.open_time,
+              delivery_minutes: uhc.company.delivery_minutes,
+              distance_km: uhc.company.distance_km,
+              latitude: uhc.company.latitude,
+              longitude: uhc.company.longitude,
+              address: uhc.company.address,
+            }
+          : null,
+        permissions:
+          uhc.permissions?.map((p) => ({
+            id: p.permission?.id,
+            name: p.permission?.name,
+            create: p.create,
+            read: p.read,
+            update: p.update,
+            delete: p.delete,
+            status: p.status,
+            createdAt:
+              p.permission?.createdAt instanceof Date
+                ? p.permission.createdAt
+                : new Date(p.permission?.createdAt),
+            updatedAt:
+              p.permission?.updatedAt instanceof Date
+                ? p.permission.updatedAt
+                : new Date(p.permission?.updatedAt),
+          })) ?? [],
+      })) ?? [];
 
     const activeCompany = userHasCompany.find(
-      (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId
+      (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
     )?.company;
 
     return {
@@ -349,57 +386,60 @@ export class UsersService {
 
     const { password, ...userWithoutPassword } = updatedUser;
 
-
-    const userHasCompany = userWithoutPassword.userHasCompany?.map((uhc) => ({
-      id: uhc.id,
-      isOwner: uhc.isOwner,
-      company: uhc.company
-        ? {
-          id: uhc.company.id,
-          companyName: uhc.company.companyName || '',
-          logo: uhc.company.logo,
-          banner: uhc.company.banner,
-          companyAddress: uhc.company.companyAddress || '',
-          typeCompany: uhc.company.typeCompany,
-          phone: uhc.company.phone,
-          vatNumber: uhc.company.vatNumber,
-          registrationDocumentUrl: uhc.company.registrationDocumentUrl,
-          warehouseLocation: uhc.company.warehouseLocation,
-          email: uhc.company.email,
-          website: uhc.company.website,
-          status: uhc.company.status,
-          companyActivity: uhc.company.companyActivity,
-          open_time: uhc.company.open_time,
-          delivery_minutes: uhc.company.delivery_minutes,
-          distance_km: uhc.company.distance_km,
-          latitude: uhc.company.latitude,
-          longitude: uhc.company.longitude,
-          address: uhc.company.address
-        }
-        : null,
-      permissions: uhc.permissions?.map((p) => ({
-        id: p.permission?.id,
-        name: p.permission?.name,
-        create: p.create,
-        read: p.read,
-        update: p.update,
-        delete: p.delete,
-        status: p.status,
-        createdAt: p.permission?.createdAt instanceof Date
-          ? p.permission.createdAt
-          : new Date(p.permission?.createdAt),
-        updatedAt: p.permission?.updatedAt instanceof Date
-          ? p.permission.updatedAt
-          : new Date(p.permission?.updatedAt),
-      })) ?? [],
-    })) ?? [];
+    const userHasCompany =
+      userWithoutPassword.userHasCompany?.map((uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+        company: uhc.company
+          ? {
+              id: uhc.company.id,
+              companyName: uhc.company.companyName || '',
+              logo: uhc.company.logo,
+              banner: uhc.company.banner,
+              companyAddress: uhc.company.companyAddress || '',
+              typeCompany: uhc.company.typeCompany,
+              phone: uhc.company.phone,
+              vatNumber: uhc.company.vatNumber,
+              registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+              warehouseLocation: uhc.company.warehouseLocation,
+              email: uhc.company.email,
+              website: uhc.company.website,
+              status: uhc.company.status,
+              companyActivity: uhc.company.companyActivity,
+              open_time: uhc.company.open_time,
+              delivery_minutes: uhc.company.delivery_minutes,
+              distance_km: uhc.company.distance_km,
+              latitude: uhc.company.latitude,
+              longitude: uhc.company.longitude,
+              address: uhc.company.address,
+            }
+          : null,
+        permissions:
+          uhc.permissions?.map((p) => ({
+            id: p.permission?.id,
+            name: p.permission?.name,
+            create: p.create,
+            read: p.read,
+            update: p.update,
+            delete: p.delete,
+            status: p.status,
+            createdAt:
+              p.permission?.createdAt instanceof Date
+                ? p.permission.createdAt
+                : new Date(p.permission?.createdAt),
+            updatedAt:
+              p.permission?.updatedAt instanceof Date
+                ? p.permission.updatedAt
+                : new Date(p.permission?.updatedAt),
+          })) ?? [],
+      })) ?? [];
 
     const responseUser = {
       ...userWithoutPassword,
       userHasCompany,
       activeCompany: userWithoutPassword.activeCompany,
     };
-    const sanitizedUser = instanceToPlain(responseUser)
+    const sanitizedUser = instanceToPlain(responseUser);
 
     return {
       message: 'Image de profil mise à jour avec succès.',
@@ -410,15 +450,25 @@ export class UsersService {
   async sendOtp(email: string): Promise<any> {
     const dto = plainToInstance(VerifyOtpDto, { email, otpCode: '000000' });
 
-    const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+    const errors = await validate(dto, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
     if (errors.length > 0) {
-      const errorMessages = errors.map(err => Object.values(err.constraints ?? {}).join(', ')).join(', ');
+      const errorMessages = errors
+        .map((err) => Object.values(err.constraints ?? {}).join(', '))
+        .join(', ');
       throw new BadRequestException(errorMessages);
     }
 
-    const existingOtp = await this.otpRepository.findOne({ where: { email, isUsed: false } });
+    const existingOtp = await this.otpRepository.findOne({
+      where: { email, isUsed: false },
+    });
     if (existingOtp && new Date() < existingOtp.expiresAt) {
-      return { message: 'Un OTP actif existe déjà.', otpCode: existingOtp.otpCode };
+      return {
+        message: 'Un OTP actif existe déjà.',
+        otpCode: existingOtp.otpCode,
+      };
     }
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -433,7 +483,7 @@ export class UsersService {
       email,
       'Votre OTP de connexion',
       'sendOtp.html',
-      { otpCode, year: new Date().getFullYear() } // envoi otpCode + année
+      { otpCode, year: new Date().getFullYear() }, // envoi otpCode + année
     );
     return { message: 'OTP envoyé avec succès.' };
   }
@@ -441,7 +491,7 @@ export class UsersService {
   async sendResetPasswordOtp(email: string): Promise<any> {
     const user = await this.usersRepository.findOne({ where: { email } });
     if (!user) {
-      throw new BadRequestException("Aucun utilisateur trouvé avec cet email.");
+      throw new BadRequestException('Aucun utilisateur trouvé avec cet email.');
     }
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -457,7 +507,7 @@ export class UsersService {
       email,
       'Réinitialisation de mot de passe',
       'sendOtp.html',
-      { otpCode, year: new Date().getFullYear() } // envoi otpCode + année
+      { otpCode, year: new Date().getFullYear() }, // envoi otpCode + année
     );
     return { message: 'OTP envoyé avec succès.' };
   }
@@ -476,7 +526,7 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await this.usersRepository.findOne({ where: { email } });
     if (!user) {
-      throw new BadRequestException("Utilisateur non trouvé.");
+      throw new BadRequestException('Utilisateur non trouvé.');
     }
 
     user.password = hashedPassword;
@@ -507,7 +557,6 @@ export class UsersService {
     return sanitizedUser;
   }
 
-
   async accessToken(user: UserEntity): Promise<string> {
     const payload = {
       id: user.id,
@@ -532,7 +581,9 @@ export class UsersService {
       role: user.role,
     };
 
-    const secretKey = this.configService.get<string>('REFRESH_TOKEN_SECRET_KEY');
+    const secretKey = this.configService.get<string>(
+      'REFRESH_TOKEN_SECRET_KEY',
+    );
     if (!secretKey) {
       throw new Error('REFRESH_TOKEN_SECRET_KEY is not defined!');
     }
@@ -561,7 +612,9 @@ export class UsersService {
       throw new UnauthorizedException('Refresh token invalide ou expiré.');
     }
 
-    const user = await this.usersRepository.findOne({ where: { id: decoded.id } });
+    const user = await this.usersRepository.findOne({
+      where: { id: decoded.id },
+    });
     if (!user) {
       throw new UnauthorizedException('Utilisateur introuvable.');
     }
@@ -612,7 +665,9 @@ export class UsersService {
     const roles = Object.values(UserRole);
 
     if (role && roles.includes(role as UserRole)) {
-      const usersByRole = await this.usersRepository.find({ where: { role: role as UserRole } });
+      const usersByRole = await this.usersRepository.find({
+        where: { role: role as UserRole },
+      });
 
       return { data: usersByRole }; // NE PAS faire un deuxième find() ici
     }
@@ -627,7 +682,6 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
     return { data: user };
   }
-
 
   async findUserByEmail(email: string) {
     return await this.usersRepository.findOneBy({ email });

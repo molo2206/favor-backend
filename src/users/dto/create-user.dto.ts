@@ -22,9 +22,6 @@ export class CreateUserDto {
     @Length(6, 20, {
         message: 'Le mot de passe doit contenir entre 6 et 20 caractères.',
     })
-    @Matches(/(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])/, {
-        message: 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.',
-    })
     password: string;
 
     @IsOptional()
