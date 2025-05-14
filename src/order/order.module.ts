@@ -11,6 +11,7 @@ import { Product } from 'src/products/entities/product.entity';
 import { OrderController } from './order.controller';
 import { MailModule } from 'src/email/email.module';
 import { InvoiceModule } from 'src/users/utility/common/invoice.module';
+import { PdfModule } from 'src/pdf/pdf.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { InvoiceModule } from 'src/users/utility/common/invoice.module';
     AddressUserModule,
     MailModule,
     InvoiceModule,
+    PdfModule,
   ],
 
   providers: [OrderService],

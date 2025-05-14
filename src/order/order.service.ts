@@ -14,9 +14,9 @@ import { InvoiceService } from 'src/users/utility/common/invoice.util';
 import { MailOrderService } from 'src/email/emailorder.service';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus } from 'src/users/utility/common/order.status.enum';
-import { MailService } from 'src/email/email.service';
 import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
 import { PaymentStatus } from 'src/users/utility/common/payment.status.enum';
+import { PdfService } from 'src/pdf/pdf.service';
 
 @Injectable()
 export class OrderService {
@@ -40,7 +40,7 @@ export class OrderService {
     private readonly addressUserRepo: Repository<AddressUser>,
 
     private readonly mailService: MailOrderService,
-    private readonly mailServices: MailService,
+    private readonly pdfService: PdfService,
 
     private readonly invoiceService: InvoiceService,
   ) {}
@@ -153,13 +153,16 @@ export class OrderService {
     const finalOrder = await this.orderRepo.findOne({
       where: { id: order.id },
       relations: [
-        'orderItems',
-        'subOrders',
-        'subOrders.items',
-        'subOrders.company',
         'orderItems.product',
-        'addressUser',
+        'orderItems.product.category',
+        'orderItems.product.measure',
+        'subOrders',
+        'subOrders.items.product',
+        'subOrders.items.product.category',
+        'subOrders.items.product.measure',
+        'subOrders.company',
         'user',
+        'addressUser',
       ],
     });
 
@@ -170,6 +173,21 @@ export class OrderService {
       where: { order: { id: finalOrder.id } },
       relations: ['company', 'items', 'items.product', 'order'],
     });
+
+    // const pdfBuffer = await this.pdfService.generateInvoicePdf({
+    //   user,
+    //   order: finalOrder,
+    //   subOrders,
+    // });
+
+    // await this.mailService.sendEmailWithAttachment(
+    //   user.email,
+    //   'Votre facture - FavorHelp',
+    //   'Veuillez trouver votre facture ci-jointe.', // <- text fallback
+    //   'facture.pdf', // <- filename
+    //   pdfBuffer, // <- file buffer
+    //   '<p>Veuillez trouver votre facture ci-jointe.</p>', // <- htmlContent (optionnel)
+    // );
 
     await this.mailService.sendHtmlEmail(
       user.email,
@@ -192,14 +210,16 @@ export class OrderService {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: [
-        'orderItems',
         'orderItems.product',
+        'orderItems.product.category',
+        'orderItems.product.measure',
         'subOrders',
-        'subOrders.items',
         'subOrders.items.product',
+        'subOrders.items.product.category',
+        'subOrders.items.product.measure',
         'subOrders.company',
-        'addressUser',
         'user',
+        'addressUser',
       ],
     });
 
@@ -232,14 +252,16 @@ export class OrderService {
     return this.orderRepo.find({
       where: { user: { id: userId } },
       relations: [
-        'orderItems',
-        'orderItems.product',
+       'orderItems.product',
+        'orderItems.product.category',
+        'orderItems.product.measure',
         'subOrders',
-        'subOrders.items',
         'subOrders.items.product',
+        'subOrders.items.product.category',
+        'subOrders.items.product.measure',
         'subOrders.company',
-        'addressUser',
         'user',
+        'addressUser',
       ],
       order: {
         createdAt: 'DESC',
@@ -252,11 +274,15 @@ export class OrderService {
     const query = this.orderRepo
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.user', 'user')
-      .leftJoinAndSelect('order.orderItems', 'orderItems')
-      .leftJoinAndSelect('orderItems.product', 'product')
-      .leftJoinAndSelect('order.subOrders', 'subOrders')
-      .leftJoinAndSelect('subOrders.items', 'subOrderItems')
-      .leftJoinAndSelect('subOrderItems.product', 'subOrderProduct')
+      .leftJoinAndSelect('order.orderItems', 'orderItem')
+      .leftJoinAndSelect('orderItem.product', 'product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('order.subOrders', 'subOrder')
+      .leftJoinAndSelect('subOrder.items', 'subOrderItem')
+      .leftJoinAndSelect('subOrderItem.product', 'subOrderProduct')
+      .leftJoinAndSelect('subOrderProduct.category', 'subOrderCategory')
+      .leftJoinAndSelect('subOrderProduct.measure', 'subOrderMeasure')
       .orderBy('order.createdAt', 'DESC');
 
     if (type) {
@@ -265,14 +291,14 @@ export class OrderService {
 
     const orders = await query.getMany();
 
-    if (orders.length === 0) {
+    if (!orders.length) {
       throw new NotFoundException(
         `Aucune commande trouvée pour le type : ${type}`,
       );
     }
 
     return {
-      message: `Commandes récupérées avec succès pour le type : ${type}.`,
+      message: `Commandes récupérées avec succès pour le type : ${type ?? 'tous'}.`,
       data: orders,
     };
   }
@@ -281,15 +307,23 @@ export class OrderService {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: [
-        'orderItems.product',
+       'orderItems.product',
+        'orderItems.product.category',
+        'orderItems.product.measure',
         'subOrders',
         'subOrders.items.product',
+        'subOrders.items.product.category',
+        'subOrders.items.product.measure',
         'subOrders.company',
         'user',
         'addressUser',
       ],
     });
-    if (!order) throw new NotFoundException('Order not found');
+
+    if (!order) {
+      throw new NotFoundException(`Commande avec l’ID ${orderId} introuvable.`);
+    }
+
     return { data: order };
   }
 
@@ -297,8 +331,12 @@ export class OrderService {
     const orders = await this.orderRepo.find({
       relations: [
         'orderItems.product',
+        'orderItems.product.category',
+        'orderItems.product.measure',
         'subOrders',
         'subOrders.items.product',
+        'subOrders.items.product.category',
+        'subOrders.items.product.measure',
         'subOrders.company',
         'user',
         'addressUser',

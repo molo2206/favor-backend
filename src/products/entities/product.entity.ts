@@ -89,7 +89,7 @@ export class Product {
     status: ProductStatus;
 
     @ManyToOne(() => MeasureEntity, (measure) => measure.products, { nullable: true })
-    measure?: MeasureEntity;
+    measure ?: MeasureEntity;
 
     @Column({
         type: 'enum',

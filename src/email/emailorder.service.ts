@@ -18,16 +18,16 @@ export class MailOrderService {
   constructor(private readonly mailerService: MailerService) {}
 
   generateSubOrdersHtml(subOrders: SubOrderEntity[], currency: string): string {
-  let counter = 1;
+    let counter = 1;
 
-  const itemsHtml = subOrders
-    .flatMap((subOrder) =>
-      subOrder.items.map((item) => {
-        const productName = item.product?.name || 'Produit non disponible';
-        const productPrice = item.product?.price || 0;
-        const totalPrice = productPrice * item.quantity;
+    const itemsHtml = subOrders
+      .flatMap((subOrder) =>
+        subOrder.items.map((item) => {
+          const productName = item.product?.name || 'Produit non disponible';
+          const productPrice = item.product?.price || 0;
+          const totalPrice = productPrice * item.quantity;
 
-        return `
+          return `
           <tr>
               <td>${counter++}</td>
               <td>${productName}</td>
@@ -36,13 +36,12 @@ export class MailOrderService {
               <td>${totalPrice} ${currency}</td>
           </tr>
         `;
-      }),
-    )
-    .join('');
+        }),
+      )
+      .join('');
 
-  return itemsHtml;
-}
-
+    return itemsHtml;
+  }
 
   async sendHtmlEmail(
     to: string,
@@ -97,19 +96,35 @@ export class MailOrderService {
     text: string,
     filename: string,
     fileBuffer: Buffer,
+    htmlContent?: string,
   ): Promise<void> {
-    await this.mailerService.sendMail({
-      to,
-      subject,
-      text,
-      attachments: [
-        {
-          filename,
-          content: fileBuffer,
-        },
-      ],
-    });
+    try {
+      await this.mailerService.sendMail({
+        to,
+        subject,
+        text,
+        html: htmlContent ?? `<p>${text}</p>`,
+        attachments: [
+          {
+            filename,
+            content: fileBuffer,
+            contentType: 'application/pdf',
+          },
+        ],
+      });
+      // Optionnel : logger le succès
+      console.log(`Email envoyé avec PDF à ${to}`);
+    } catch (error) {
+      // Log ou gestion d'erreur personnalisée
+      console.error(
+        'Erreur lors de l’envoi de l’email avec pièce jointe :',
+        error,
+      );
+      throw new Error('Échec de l’envoi de l’email avec pièce jointe.');
+    }
   }
+
+  // mail.service.ts
 
   async sendHtmlEmailValidation(
     to: string,
