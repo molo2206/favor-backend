@@ -17,6 +17,9 @@ import { OrderStatus } from 'src/users/utility/common/order.status.enum';
 import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
 import { PaymentStatus } from 'src/users/utility/common/payment.status.enum';
 import { PdfService } from 'src/pdf/pdf.service';
+import { TransactionEntity } from 'src/transaction/entities/transaction.entity';
+import { v4 as uuidv4 } from 'uuid';
+import { CreateTransactionDto } from 'src/transaction/dto/create-transaction.dto';
 
 @Injectable()
 export class OrderService {
@@ -43,6 +46,9 @@ export class OrderService {
     private readonly pdfService: PdfService,
 
     private readonly invoiceService: InvoiceService,
+
+    @InjectRepository(TransactionEntity)
+    private readonly transactionRepository: Repository<TransactionEntity>,
   ) {}
 
   async createOrder(
@@ -206,7 +212,7 @@ export class OrderService {
   async updateOrderStatus(
     orderId: string,
     dto: UpdateOrderStatusDto,
-  ): Promise<OrderEntity> {
+  ): Promise<{ data: OrderEntity; message: string }> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: [
@@ -229,11 +235,12 @@ export class OrderService {
 
     // Mise à jour du statut
     order.status = dto.status;
+    order.paid = true;
 
     // Sauvegarde de la commande
     const updatedOrder = await this.orderRepo.save(order);
 
-    // Envoi de l'email uniquement si la commande est validée
+    // Si le statut de la commande est validé, envoi de l'email
     if (dto.status === OrderStatus.VALIDATED) {
       await this.mailService.sendHtmlEmailValidation(
         order.user.email,
@@ -245,9 +252,31 @@ export class OrderService {
           year: new Date().getFullYear(),
         },
       );
+
+      const createTransactionDto: CreateTransactionDto = {
+        orderId: updatedOrder.id,
+        amount: updatedOrder.totalAmount,
+        paymentStatus: PaymentStatus.PENDING, // Statut de paiement initial
+        transactionReference: uuidv4(), // Générer une référence unique
+        paymentMethod: 'Carte de crédit', // Exemple : ajuster selon le moyen de paiement réel
+        paymentGateway: 'Stripe', // Exemple : ajuster selon la passerelle de paiement
+        currency: 'USD', // Exemple de devise, à ajuster selon la commande
+      };
+
+      // Créer l'entité de transaction à partir du DTO
+      const transaction =
+        this.transactionRepository.create(createTransactionDto);
+
+      // Sauvegarder la transaction dans la base de données
+     
     }
-    return updatedOrder;
+    // Retourner le message et la commande mise à jour
+    return {
+      message: `La commande ${orderId} a été mise à jour avec succès.`,
+      data: updatedOrder,
+    };
   }
+
   async getOrdersByUser(userId: string): Promise<OrderEntity[]> {
     return this.orderRepo.find({
       where: { user: { id: userId } },

@@ -1,72 +1,86 @@
-import { AddressUser } from "src/address-user/entities/address-user.entity";
-import { OrderItemEntity } from "src/order-item/entities/order-item.entity";
-import { SubOrderEntity } from "src/sub-order/entities/sub-order.entity";
-import { UserEntity } from "src/users/entities/user.entity";
-import { OrderStatus } from "src/users/utility/common/order.status.enum";
-import { PaymentStatus } from "src/users/utility/common/payment.status.enum";
-import { CompanyType } from "src/users/utility/common/type.company.enum";
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { AddressUser } from 'src/address-user/entities/address-user.entity';
+import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
+import { SubOrderEntity } from 'src/sub-order/entities/sub-order.entity';
+import { UserEntity } from 'src/users/entities/user.entity';
+import { OrderStatus } from 'src/users/utility/common/order.status.enum';
+import { PaymentStatus } from 'src/users/utility/common/payment.status.enum';
+import { CompanyType } from 'src/users/utility/common/type.company.enum';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('orders')
 export class OrderEntity {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-    @Column('decimal')
-    totalAmount: number;
+  @Column('decimal')
+  totalAmount: number;
 
-    @Column('decimal')
-    shippingCost: number;
+  @Column('decimal')
+  shippingCost: number;
 
-    @Column({ type: 'enum', enum: CompanyType })
-    type: CompanyType;
+  @Column({ type: 'enum', enum: CompanyType })
+  type: CompanyType;
 
-    @Column()
-    currency: string;
+  @Column()
+  currency: string;
 
-    @ManyToOne(() => UserEntity, (user) => user.orders)
-    @JoinColumn({ name: 'userId' })
-    user: UserEntity;
+  @ManyToOne(() => UserEntity, (user) => user.orders)
+  @JoinColumn({ name: 'userId' })
+  user: UserEntity;
 
-    @Column()
-    userId: string;
+  @Column()
+  userId: string;
 
-    @ManyToOne(() => AddressUser, { nullable: false }) // changé de true → false
-    @JoinColumn({ name: 'addressUserId' }) // Ajout explicite de la colonne FK
-    addressUser: AddressUser;
+  @ManyToOne(() => AddressUser, { nullable: false }) // changé de true → false
+  @JoinColumn({ name: 'addressUserId' }) // Ajout explicite de la colonne FK
+  addressUser: AddressUser;
 
-    @Column()
-    addressUserId: string;
+  @Column()
+  addressUserId: string;
 
-    @OneToMany(() => OrderItemEntity, (item) => item.order, { cascade: true })
-    orderItems: OrderItemEntity[];
+  @OneToMany(() => OrderItemEntity, (item) => item.order, { cascade: true })
+  orderItems: OrderItemEntity[];
 
-    @OneToMany(() => SubOrderEntity, (subOrder) => subOrder.order, { cascade: true })
-    subOrders: SubOrderEntity[];
+  @OneToMany(() => SubOrderEntity, (subOrder) => subOrder.order, {
+    cascade: true,
+  })
+  subOrders: SubOrderEntity[];
 
-    @Column({ nullable: true })
-    invoiceNumber: string;
+  @Column({ nullable: true })
+  invoiceNumber: string;
 
-    @Column({
-        type: 'enum',
-        enum: PaymentStatus,
-        default: PaymentStatus.PENDING,
-    })
-    paymentStatus: PaymentStatus;
+  @Column({
+    type: 'enum',
+    enum: PaymentStatus,
+    default: PaymentStatus.PENDING,
+  })
+  paymentStatus: PaymentStatus;
 
-    @Column({ type: 'float', nullable: false })
-    grandTotal: number;
+  @Column({ type: 'float', nullable: false })
+  grandTotal: number;
 
-    @Column({
-        type: 'enum',
-        enum: OrderStatus,
-        default: OrderStatus.PENDING,
-    })
-    status: OrderStatus;
+  @Column({
+    type: 'enum',
+    enum: OrderStatus,
+    default: OrderStatus.PENDING,
+  })
+  status: OrderStatus;
 
-    @CreateDateColumn()
-    createdAt: Date;
+  @Column({ type: 'boolean', default: false })
+  paid: boolean; // Correct type: boolean
 
-    @UpdateDateColumn()
-    updatedAt: Date;
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

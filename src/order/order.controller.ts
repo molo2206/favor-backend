@@ -21,10 +21,9 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 @Controller('orders')
 @UseGuards(AuthentificationGuard)
 export class OrderController {
-  constructor(private readonly orderService: OrderService) { }
+  constructor(private readonly orderService: OrderService) {}
 
   @Post()
-
   async createOrder(
     @Body() createOrderDto: CreateOrderDto,
     @CurrentUser() user: UserEntity,
@@ -62,12 +61,11 @@ export class OrderController {
     return this.orderService.findByType(type); // Retourner l'objet avec le message et les données
   }
 
-
   @Patch(':orderId/status')
   async changeStatus(
     @Param('orderId') orderId: string,
     @Body() dto: UpdateOrderStatusDto,
-  ): Promise<OrderEntity> {
+  ): Promise<{ data: OrderEntity; message: string }> {
     return this.orderService.updateOrderStatus(orderId, dto);
   }
 }

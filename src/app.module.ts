@@ -29,6 +29,7 @@ import { OrderModule } from './order/order.module';
 import { OrderItemModule } from './order-item/order-item.module';
 import { SubOrderModule } from './sub-order/sub-order.module';
 import { SubOrderItemModule } from './sub-order-item/sub-order-item.module';
+import { TransactionModule } from './transaction/transaction.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { SubOrderItemModule } from './sub-order-item/sub-order-item.module';
     OrderItemModule,
     SubOrderModule,
     SubOrderItemModule,
+    TransactionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
