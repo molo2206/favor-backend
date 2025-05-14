@@ -264,13 +264,42 @@ export class OrderService {
       // Créer l'entité de transaction à partir du DTO
       const transaction =
         this.transactionRepository.create(createTransactionDto);
-
+      await this.transactionRepository.save(transaction);
       // Sauvegarder la transaction dans la base de données
     }
     // Retourner le message et la commande mise à jour
     return {
       message: `La commande ${orderId} a été mise à jour avec succès.`,
       data: updatedOrder,
+    };
+  }
+
+  async getAllTransctions(): Promise<{ data: TransactionEntity[] }> {
+    const transactions = await this.transactionRepository.find({
+      relations: ['order', 'order.user'],
+    });
+
+    return { data: transactions };
+  }
+
+  async getTransactionsByUser(
+    userId: string,
+  ): Promise<{ data: TransactionEntity[]; message: string }> {
+    const transactions = await this.transactionRepository.find({
+      where: {
+        order: {
+          user: { id: userId },
+        },
+      },
+      relations: ['order', 'order.user'],
+      order: { createdAt: 'DESC' }, // Pour trier par date la plus récente
+    });
+
+    return {
+      data: transactions,
+      message: transactions.length
+        ? `Transactions de l'utilisateur ${userId} récupérées avec succès.`
+        : `Aucune transaction trouvée pour l'utilisateur ${userId}.`,
     };
   }
 

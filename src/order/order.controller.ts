@@ -68,4 +68,14 @@ export class OrderController {
   ): Promise<{ data: OrderEntity; message: string }> {
     return this.orderService.updateOrderStatus(orderId, dto);
   }
+
+  @Get('/transactions/all')
+  async getAllTrans() {
+    return this.orderService.getAllTransctions();
+  }
+
+  @Get('/transactions/me')
+  async getMyTransactions(@CurrentUser() user: UserEntity) {
+    return this.orderService.getTransactionsByUser(user.id);
+  }
 }
