@@ -258,8 +258,6 @@ export class OrderService {
         amount: updatedOrder.totalAmount,
         paymentStatus: PaymentStatus.PENDING, // Statut de paiement initial
         transactionReference: uuidv4(), // Générer une référence unique
-        paymentMethod: 'Carte de crédit', // Exemple : ajuster selon le moyen de paiement réel
-        paymentGateway: 'Stripe', // Exemple : ajuster selon la passerelle de paiement
         currency: 'USD', // Exemple de devise, à ajuster selon la commande
       };
 
@@ -268,7 +266,6 @@ export class OrderService {
         this.transactionRepository.create(createTransactionDto);
 
       // Sauvegarder la transaction dans la base de données
-     
     }
     // Retourner le message et la commande mise à jour
     return {
