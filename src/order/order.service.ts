@@ -153,11 +153,11 @@ export class OrderService {
     const finalOrder = await this.orderRepo.findOne({
       where: { id: order.id },
       relations: [
-        'orderItems.product',
+        'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
         'subOrders',
-        'subOrders.items.product',
+        'subOrders.items.product.company',
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',
@@ -181,12 +181,12 @@ export class OrderService {
     // });
 
     // await this.mailService.sendEmailWithAttachment(
-    //   user.email,
-    //   'Votre facture - FavorHelp',
-    //   'Veuillez trouver votre facture ci-jointe.', // <- text fallback
-    //   'facture.pdf', // <- filename
-    //   pdfBuffer, // <- file buffer
-    //   '<p>Veuillez trouver votre facture ci-jointe.</p>', // <- htmlContent (optionnel)
+    //   user.email, // L'adresse email du destinataire
+    //   'Votre facture - FavorHelp', // Sujet de l'email
+    //   'Veuillez trouver votre facture ci-jointe.', // Texte de fallback pour les clients email texte
+    //   'facture.pdf', // Nom du fichier PDF attaché
+    //   pdfBuffer, // Le buffer PDF généré
+    //   '<p>Veuillez trouver votre facture ci-jointe.</p>', // Contenu HTML optionnel (si souhaité)
     // );
 
     await this.mailService.sendHtmlEmail(
@@ -210,11 +210,11 @@ export class OrderService {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: [
-        'orderItems.product',
+        'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
         'subOrders',
-        'subOrders.items.product',
+        'subOrders.items.product.company',
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',
@@ -252,11 +252,11 @@ export class OrderService {
     return this.orderRepo.find({
       where: { user: { id: userId } },
       relations: [
-       'orderItems.product',
+        'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
         'subOrders',
-        'subOrders.items.product',
+        'subOrders.items.product.company',
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',
@@ -268,23 +268,27 @@ export class OrderService {
       },
     });
   }
+
   async findByType(
     type?: string,
   ): Promise<{ message: string; data: OrderEntity[] }> {
     const query = this.orderRepo
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.user', 'user')
+      .leftJoinAndSelect('order.addressUser', 'addressUser')
       .leftJoinAndSelect('order.orderItems', 'orderItem')
       .leftJoinAndSelect('orderItem.product', 'product')
-      .leftJoinAndSelect('product.category', 'category')
-      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.company', 'productCompany')
+      .leftJoinAndSelect('product.category', 'productCategory')
+      .leftJoinAndSelect('product.measure', 'productMeasure')
       .leftJoinAndSelect('order.subOrders', 'subOrder')
       .leftJoinAndSelect('subOrder.items', 'subOrderItem')
       .leftJoinAndSelect('subOrderItem.product', 'subOrderProduct')
-      .leftJoinAndSelect('subOrderProduct.category', 'subOrderCategory')
-      .leftJoinAndSelect('subOrderProduct.measure', 'subOrderMeasure')
+      .leftJoinAndSelect('subOrderProduct.company', 'subOrderProductCompany')
+      .leftJoinAndSelect('subOrderProduct.category', 'subOrderProductCategory')
+      .leftJoinAndSelect('subOrderProduct.measure', 'subOrderProductMeasure')
+      .leftJoinAndSelect('subOrder.company', 'subOrderCompany')
       .orderBy('order.createdAt', 'DESC');
-
     if (type) {
       query.where('order.type = :type', { type });
     }
@@ -307,11 +311,11 @@ export class OrderService {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: [
-       'orderItems.product',
+        'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
         'subOrders',
-        'subOrders.items.product',
+        'subOrders.items.product.company',
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',
@@ -330,11 +334,11 @@ export class OrderService {
   async findAll(): Promise<{ data: OrderEntity[] }> {
     const orders = await this.orderRepo.find({
       relations: [
-        'orderItems.product',
+        'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
         'subOrders',
-        'subOrders.items.product',
+        'subOrders.items.product.company',
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',

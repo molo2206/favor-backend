@@ -23,7 +23,7 @@
     "migration:run": "npm run typeorm -- migration:run",
     "migration-revert": "npm run typeorm -- migration:revert",
     "db:drop": "npm run typeorm schema:drop",
-    "copy-templates": "copyfiles -u 1 'src/templates/**/*' dist/templates"
+    "copy-templates": "mkdir dist\\src\\templates && copy src\\templates\\invoice.ejs dist\\src\\templates\\"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -53,6 +53,7 @@
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.14.1",
+    "puppeteer": "^19.11.1",
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
@@ -82,6 +83,7 @@
     "@types/nodemailer": "^6.4.17",
     "@types/passport-google-oauth20": "^2.0.16",
     "@types/passport-jwt": "^4.0.1",
+    "@types/puppeteer": "^5.4.7",
     "@types/sharp": "^0.31.1",
     "@types/supertest": "^6.0.2",
     "@types/swagger-ui-express": "^4.1.8",

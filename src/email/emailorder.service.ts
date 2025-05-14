@@ -96,35 +96,39 @@ export class MailOrderService {
     text: string,
     filename: string,
     fileBuffer: Buffer,
-    htmlContent?: string,
+    htmlPagePath?: string,
+    context: Record<string, any> = {},
   ): Promise<void> {
     try {
+      // Fallback HTML basique si aucun template n’est fourni
+      let htmlContent = `<p>${text}</p>`;
+
+      if (htmlPagePath) {
+        htmlContent = await renderFile(htmlPagePath, context);
+      }
+
       await this.mailerService.sendMail({
         to,
         subject,
         text,
-        html: htmlContent ?? `<p>${text}</p>`,
+        html: htmlContent,
         attachments: [
           {
             filename,
             content: fileBuffer,
-            contentType: 'application/pdf',
+            contentType: 'application/pdf', // ou autre selon usage
           },
         ],
       });
-      // Optionnel : logger le succès
-      console.log(`Email envoyé avec PDF à ${to}`);
+
+      console.log(`✅ Email avec pièce jointe envoyé à ${to}`);
     } catch (error) {
-      // Log ou gestion d'erreur personnalisée
-      console.error(
-        'Erreur lors de l’envoi de l’email avec pièce jointe :',
-        error,
-      );
-      throw new Error('Échec de l’envoi de l’email avec pièce jointe.');
+      console.error(`❌ Échec de l'envoi d'email à ${to}:`, error);
+      throw new Error('Erreur lors de l’envoi de l’email avec pièce jointe.');
     }
   }
 
-  // mail.service.ts
+
 
   async sendHtmlEmailValidation(
     to: string,

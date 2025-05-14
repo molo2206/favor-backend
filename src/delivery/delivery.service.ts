@@ -30,42 +30,33 @@ export class DeliveryService {
     @InjectRepository(TrackingEntity)
     private readonly trackingRepository: Repository<TrackingEntity>,
 
-    private readonly eventsGateway: EventsGateway
+    private readonly eventsGateway: EventsGateway,
+  ) {}
 
-  ) { }
-
-  async create(createDeliveryDto: CreateDeliveryDto): Promise<{ message: string; data: DeliveryEntity }> {
+  async create(
+    createDeliveryDto: CreateDeliveryDto,
+  ): Promise<{ message: string; data: DeliveryEntity }> {
     // Recherche de l'entreprise de livraison
     const deliveryCompany = await this.companyRepository.findOne({
       where: { id: createDeliveryDto.deliveryCompanyId },
     });
 
-    // Recherche du livreur (utilisateur)
-    const livreur = await this.userRepository.findOne({
-      where: { id: createDeliveryDto.livreurId },
-    });
-
     // Recherche de la commande avec ses sous-commandes et articles
     const order = await this.orderRepository.findOne({
       where: { id: createDeliveryDto.orderId },
-      relations: [
-        'subOrders',
-        'orderItems',
-        'subOrders.subOrderItems',
-      ],
     });
 
     // Vérifie si les entités nécessaires existent
-    if (!deliveryCompany || !livreur || !order) {
-      throw new NotFoundException('Données invalides : entreprise, livreur ou commande non trouvée.');
+    if (!deliveryCompany || !order) {
+      throw new NotFoundException(
+        'Données invalides : entreprise, livreur ou commande non trouvée.',
+      );
     }
 
     // Étape 1 : Création et sauvegarde de la livraison seule
     const delivery = this.deliveryRepository.create({
       deliveryCompany,
-      livreur,
       order,
-      deliveryAddress: createDeliveryDto.deliveryAddress,
       currentStatus: DeliveryStatus.IN_TRANSIT,
       estimatedDeliveryTime: createDeliveryDto.estimatedDeliveryTime,
     });
@@ -75,7 +66,7 @@ export class DeliveryService {
     // Étape 2 : Création et sauvegarde du suivi initial
     const initialTracking = this.trackingRepository.create({
       status: DeliveryStatus.IN_TRANSIT,
-      location: createDeliveryDto.deliveryAddress || 'Inconnue',
+      location: 'Inconnue',
       notes: 'Livraison en cours de traitement',
       delivery, // Maintenant que delivery a un ID, la FK fonctionne
     });
@@ -85,22 +76,16 @@ export class DeliveryService {
     // Étape 3 : Rechargement de la livraison avec toutes ses relations
     const fullDelivery = await this.deliveryRepository.findOne({
       where: { id: delivery.id },
-      relations: [
-        'order',
-        'order.subOrders',
-        'order.orderItems',
-        'order.subOrders.subOrderItems',
-        'deliveryCompany',
-        'livreur',
-        'trackings',
-      ],
+      relations: ['order', 'deliveryCompany', 'livreur', 'trackings'],
     });
 
     if (!fullDelivery) {
-      throw new NotFoundException("La livraison n'a pas pu être retrouvée après sa création.");
+      throw new NotFoundException(
+        "La livraison n'a pas pu être retrouvée après sa création.",
+      );
     }
 
-    return { message: "Traitement réussi avec succès", data: fullDelivery };
+    return { message: 'Traitement réussi avec succès', data: fullDelivery };
   }
 
   async addTrackingToDelivery(
@@ -119,24 +104,20 @@ export class DeliveryService {
       ...dto,
       delivery,
     });
-    this.eventsGateway.notifyUser(delivery.order.user.id, 'delivery.tracking.updated', {
-      deliveryId,
-      trackingStatus: dto.status,
-    });
+    this.eventsGateway.notifyUser(
+      delivery.order.user.id,
+      'delivery.tracking.updated',
+      {
+        deliveryId,
+        trackingStatus: dto.status,
+      },
+    );
     return this.trackingRepository.save(tracking);
   }
 
   async findAll(): Promise<DeliveryEntity[]> {
     return await this.deliveryRepository.find({
-      relations: [
-        'order',
-        'order.subOrders',
-        'order.subOrders.subOrderItems',
-        'order.orderItems',
-        'deliveryCompany',
-        'livreur',
-        'trackings',
-      ],
+      relations: ['order', 'deliveryCompany', 'livreur', 'trackings'],
       order: {
         createdAt: 'DESC',
       },
@@ -164,40 +145,37 @@ export class DeliveryService {
     });
 
     if (!delivery) {
-      throw new NotFoundException("Aucune livraison trouvée pour cette commande.");
+      throw new NotFoundException(
+        'Aucune livraison trouvée pour cette commande.',
+      );
     }
 
     if (!delivery.trackings || delivery.trackings.length === 0) {
-      throw new NotFoundException("Aucun tracking trouvé pour cette commande.");
+      throw new NotFoundException('Aucun tracking trouvé pour cette commande.');
     }
 
     // On trie par date croissante (du plus ancien au plus récent)
-    const sortedTrackings = delivery.trackings.sort((a, b) =>
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    const sortedTrackings = delivery.trackings.sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
 
     return sortedTrackings;
   }
 
-
   async findOne(id: string): Promise<DeliveryEntity> {
     const delivery = await this.deliveryRepository.findOne({
       where: { id },
-      relations: [
-        'order',
-        'order.subOrders',
-        'order.subOrders.subOrderItems',
-        'order.orderItems',
-        'deliveryCompany',
-        'livreur',
-        'trackings',
-      ]
+      relations: ['order', 'deliveryCompany', 'livreur', 'trackings'],
     });
     if (!delivery) throw new NotFoundException('Livraison non trouvée');
     return delivery;
   }
 
-  async update(id: string, updateDeliveryDto: UpdateDeliveryDto): Promise<DeliveryEntity> {
+  async update(
+    id: string,
+    updateDeliveryDto: UpdateDeliveryDto,
+  ): Promise<DeliveryEntity> {
     const delivery = await this.findOne(id);
     Object.assign(delivery, updateDeliveryDto);
     return this.deliveryRepository.save(delivery);
