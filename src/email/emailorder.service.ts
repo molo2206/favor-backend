@@ -18,27 +18,31 @@ export class MailOrderService {
   constructor(private readonly mailerService: MailerService) {}
 
   generateSubOrdersHtml(subOrders: SubOrderEntity[], currency: string): string {
-    const itemsHtml = subOrders
-      .flatMap((subOrder) =>
-        subOrder.items.map((item) => {
-          const productName = item.product?.name || 'Produit non disponible';
-          const productPrice = item.product?.price || 0;
-          const totalPrice = productPrice * item.quantity;
+  let counter = 1;
 
-          return `
-                    <tr>
-                        <td>${productName}</td>
-                        <td>${item.quantity}</td>
-                        <td>${productPrice} ${currency}</td>
-                        <td>${totalPrice} ${currency}</td>
-                    </tr>
-                `;
-        }),
-      )
-      .join('');
+  const itemsHtml = subOrders
+    .flatMap((subOrder) =>
+      subOrder.items.map((item) => {
+        const productName = item.product?.name || 'Produit non disponible';
+        const productPrice = item.product?.price || 0;
+        const totalPrice = productPrice * item.quantity;
 
-    return itemsHtml;
-  }
+        return `
+          <tr>
+              <td>${counter++}</td>
+              <td>${productName}</td>
+              <td>${item.quantity}</td>
+              <td>${productPrice} ${currency}</td>
+              <td>${totalPrice} ${currency}</td>
+          </tr>
+        `;
+      }),
+    )
+    .join('');
+
+  return itemsHtml;
+}
+
 
   async sendHtmlEmail(
     to: string,

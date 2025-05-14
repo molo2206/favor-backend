@@ -260,7 +260,7 @@ export class OrderService {
       .orderBy('order.createdAt', 'DESC');
 
     if (type) {
-      query.where('order.status = :type', { type });
+      query.where('order.type = :type', { type });
     }
 
     const orders = await query.getMany();
