@@ -10,11 +10,10 @@ async function bootstrap() {
 
   // Autoriser les requêtes cross-origin (ex: depuis localhost:5173)
   app.enableCors({
-    origin: '*',
-    credentials: false,
+    origin: ['http://localhost:5173', 'https://favor-help.vercel.app'],
+    credentials: true,
   });
-
-  // Autorise les corps JSON et urlencoded
+  // Autorise les corps JSON et urlencodeds
   app.use(bodyParser.json({ limit: '10mb' }));
   app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
