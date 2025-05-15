@@ -10,8 +10,8 @@ async function bootstrap() {
 
   // Autoriser les requêtes cross-origin (ex: depuis localhost:5173)
   app.enableCors({
-    origin: ['http://localhost:5173'], // liste des URLs autorisées
-    credentials: true, // si tu utilises des cookies ou Authorization headers
+    origin: '*',
+    credentials: false,
   });
 
   // Autorise les corps JSON et urlencoded
