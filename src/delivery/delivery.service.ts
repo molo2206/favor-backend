@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DeliveryEntity } from './entities/delivery.entity';
@@ -45,18 +49,30 @@ export class DeliveryService {
       relations: ['subOrders', 'subOrders.items', 'user'],
     });
 
+    if (!order) {
+      throw new NotFoundException('Commande de livraison non trouvée.');
+    }
+
+    // 🛑 Vérifier si une livraison existe déjà pour cette commande
+    const existingDelivery = await this.deliveryRepository.findOne({
+      where: { order: { id: order.id } },
+    });
+
+    if (existingDelivery) {
+      throw new ConflictException(
+        'Une livraison a déjà été créée pour cette commande.',
+      );
+    }
+
     // 2. Trouver l'entreprise de livraison
     const deliveryCompany = await this.companyRepository.findOne({
       where: { id: deliveryCompanyId },
     });
 
-    if (!order) {
-      throw new NotFoundException('Commande de livraison non trouvée.');
-    }
-
     if (!deliveryCompany) {
       throw new NotFoundException('Entreprise de livraison non trouvée.');
     }
+
     // 3. Créer la livraison
     const delivery = this.deliveryRepository.create({
       deliveryCompany,
@@ -67,7 +83,7 @@ export class DeliveryService {
 
     await this.deliveryRepository.save(delivery);
 
-    // 4. Ajouter un suivi initial
+    // 4. Créer le suivi initial
     const tracking = this.trackingRepository.create({
       status: DeliveryStatus.IN_TRANSIT,
       location: 'Inconnue',
@@ -77,7 +93,7 @@ export class DeliveryService {
 
     await this.trackingRepository.save(tracking);
 
-    // 5. Recharger la livraison complète
+    // 5. Recharger la livraison avec toutes les relations
     const fullDelivery = await this.deliveryRepository.findOne({
       where: { id: delivery.id },
       relations: ['order', 'deliveryCompany', 'livreur', 'trackings'],
