@@ -72,6 +72,7 @@ export class OrderService {
 
     const grandTotal = totalAmount + shippingCost;
     const invoiceNumb = this.invoiceService.generateInvoiceNumber();
+
     const order = this.orderRepo.create({
       user,
       totalAmount,
@@ -83,6 +84,7 @@ export class OrderService {
       invoiceNumber: invoiceNumb,
       paymentStatus: PaymentStatus.PENDING,
     });
+
     await this.orderRepo.save(order);
 
     const orderItemEntities: OrderItemEntity[] = [];
@@ -112,6 +114,7 @@ export class OrderService {
         order,
         product,
         quantity: item.quantity,
+        price: item.price,
       });
       orderItemEntities.push(orderItem);
 
@@ -128,6 +131,7 @@ export class OrderService {
       const subOrderItem = this.subOrderItemRepo.create({
         product,
         quantity: item.quantity,
+        price: item.price,
       });
 
       group.items.push(subOrderItem);
@@ -235,6 +239,7 @@ export class OrderService {
 
     // Mise à jour du statut
     order.status = dto.status;
+    order.paymentStatus = PaymentStatus.PAID;
     order.paid = true;
 
     // Sauvegarde de la commande
