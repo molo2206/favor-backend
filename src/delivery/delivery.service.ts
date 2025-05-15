@@ -50,12 +50,13 @@ export class DeliveryService {
       where: { id: deliveryCompanyId },
     });
 
-    if (!order || !deliveryCompany) {
-      throw new NotFoundException(
-        'Commande ou entreprise de livraison non trouvée.',
-      );
+    if (!order) {
+      throw new NotFoundException('Commande de livraison non trouvée.');
     }
 
+    if (!deliveryCompany) {
+      throw new NotFoundException('Entreprise de livraison non trouvée.');
+    }
     // 3. Créer la livraison
     const delivery = this.deliveryRepository.create({
       deliveryCompany,
