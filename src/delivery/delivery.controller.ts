@@ -22,7 +22,7 @@ import { TrackingEntity } from 'src/tracking/entities/tracking.entity';
 
 @Controller('delivery')
 export class DeliveryController {
-  constructor(private readonly deliveryService: DeliveryService) { }
+  constructor(private readonly deliveryService: DeliveryService) {}
 
   @Post()
   @UseGuards(AuthentificationGuard)
@@ -37,9 +37,12 @@ export class DeliveryController {
   async addTracking(
     @Param('deliveryId') deliveryId: string,
     @Body() dto: CreateTrackingDto,
-  ): Promise<{ message: string, data: TrackingEntity }> {
-    const tracking = await this.deliveryService.addTrackingToDelivery(deliveryId, dto);
-    return { message: "Traitement réussi avec succès", data: tracking };
+  ): Promise<{ message: string; data: TrackingEntity }> {
+    const tracking = await this.deliveryService.addTrackingToDelivery(
+      deliveryId,
+      dto,
+    );
+    return { message: 'Traitement réussi avec succès', data: tracking };
   }
 
   @Get('/tracking/:deliveryId')
@@ -61,8 +64,7 @@ export class DeliveryController {
   @Get()
   @UseGuards(AuthentificationGuard)
   async findAll(): Promise<{ data: DeliveryEntity[] }> {
-    const deliveries = await this.deliveryService.findAll();
-    return { data: deliveries };
+    return this.deliveryService.findAll();
   }
 
   @Get(':id')
@@ -74,7 +76,10 @@ export class DeliveryController {
   @Put(':id')
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  update(@Param('id') id: string, @Body() dto: UpdateDeliveryDto): Promise<DeliveryEntity> {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateDeliveryDto,
+  ): Promise<DeliveryEntity> {
     return this.deliveryService.update(id, dto);
   }
 

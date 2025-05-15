@@ -133,13 +133,34 @@ export class DeliveryService {
     return this.trackingRepository.save(tracking);
   }
 
-  async findAll(): Promise<DeliveryEntity[]> {
-    return await this.deliveryRepository.find({
-      relations: ['order', 'deliveryCompany', 'livreur', 'trackings'],
+  async findAll(): Promise<{ data: DeliveryEntity[] }> {
+    const deliveries = await this.deliveryRepository.find({
+      relations: [
+        'order',
+        'order.orderItems',
+        'order.orderItems.product',
+        'order.orderItems.product.company',
+        'order.orderItems.product.category',
+        'order.orderItems.product.measure',
+        'order.subOrders',
+        'order.subOrders.company',
+        'order.subOrders.items',
+        'order.subOrders.items.product',
+        'order.subOrders.items.product.company',
+        'order.subOrders.items.product.category',
+        'order.subOrders.items.product.measure',
+        'order.user',
+        'order.addressUser',
+        'deliveryCompany',
+        'livreur',
+        'trackings',
+      ],
       order: {
         createdAt: 'DESC',
       },
     });
+
+    return { data: deliveries };
   }
 
   async getTrackingsByDelivery(deliveryId: string): Promise<TrackingEntity[]> {
