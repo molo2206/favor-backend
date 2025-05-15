@@ -38,9 +38,6 @@ export class DeliveryEntity {
   })
   currentStatus: DeliveryStatus;
 
-  @Column()
-  deliveryAddress: string;
-
   @Column({ nullable: true })
   deliveryNotes?: string;
 
