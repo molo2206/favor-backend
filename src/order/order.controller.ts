@@ -7,6 +7,8 @@ import {
   Param,
   Query,
   Patch,
+  ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -77,5 +79,15 @@ export class OrderController {
   @Get('/transactions/me')
   async getMyTransactions(@CurrentUser() user: UserEntity) {
     return this.orderService.getTransactionsByUser(user.id);
+  }
+
+  @Get('sub-orders/bycompany/active')
+  @UseGuards(AuthentificationGuard)
+  async getSubOrdersByCompany(@CurrentUser() user: UserEntity) {
+    if (!user.activeCompanyId) {
+      throw new BadRequestException("L'entreprise active est requise.");
+    }
+
+    return this.orderService.findSubOrdersByCompanys(user.activeCompanyId);
   }
 }

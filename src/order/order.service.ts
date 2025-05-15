@@ -20,6 +20,7 @@ import { PdfService } from 'src/pdf/pdf.service';
 import { TransactionEntity } from 'src/transaction/entities/transaction.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateTransactionDto } from 'src/transaction/dto/create-transaction.dto';
+import { TransactionType } from 'src/transaction/transaction.enum';
 
 @Injectable()
 export class OrderService {
@@ -261,9 +262,10 @@ export class OrderService {
       const createTransactionDto: CreateTransactionDto = {
         orderId: updatedOrder.id,
         amount: updatedOrder.totalAmount,
-        paymentStatus: PaymentStatus.PENDING, // Statut de paiement initial
+        paymentStatus: PaymentStatus.PAID, // Statut de paiement initial
         transactionReference: uuidv4(), // Générer une référence unique
         currency: 'USD', // Exemple de devise, à ajuster selon la commande
+        type: TransactionType.CREDIT,
       };
 
       // Créer l'entité de transaction à partir du DTO
@@ -403,5 +405,26 @@ export class OrderService {
     });
 
     return { data: orders };
+  }
+
+  async findSubOrdersByCompanys(
+    companyId: string,
+  ): Promise<{ data: SubOrderEntity[] }> {
+    const orders = await this.orderRepo.find({
+      relations: [
+        'subOrders',
+        'subOrders.items.product.company',
+        'subOrders.items.product.category',
+        'subOrders.items.product.measure',
+        'subOrders.company',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+
+    const subOrders: SubOrderEntity[] = orders
+      .flatMap((order) => order.subOrders)
+      .filter((sub) => sub.company.id === companyId);
+
+    return { data: subOrders };
   }
 }

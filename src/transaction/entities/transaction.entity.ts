@@ -7,6 +7,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { TransactionType } from '../transaction.enum';
 
 @Entity('transactions')
 export class TransactionEntity {
@@ -24,6 +25,9 @@ export class TransactionEntity {
 
   @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING })
   paymentStatus: PaymentStatus;
+
+  @Column({ type: 'enum', enum: TransactionType })
+  type: TransactionType;
 
   @Column()
   transactionReference: string; // Référence unique de la transaction (par exemple, un ID généré par un fournisseur de paiement)

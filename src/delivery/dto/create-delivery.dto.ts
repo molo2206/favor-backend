@@ -12,9 +12,9 @@ export class CreateDeliveryDto {
   @IsNotEmpty()
   deliveryCompanyId: string;
 
-  @IsUUID()
   @IsNotEmpty()
-  orderId: string;
+  @IsString()
+  invoiceNumber: string;
 
   @IsEnum(DeliveryStatus)
   @IsOptional()

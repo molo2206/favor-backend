@@ -36,53 +36,54 @@ export class DeliveryService {
   async create(
     createDeliveryDto: CreateDeliveryDto,
   ): Promise<{ message: string; data: DeliveryEntity }> {
-    // Recherche de l'entreprise de livraison
-    const deliveryCompany = await this.companyRepository.findOne({
-      where: { id: createDeliveryDto.deliveryCompanyId },
-    });
+    const { invoiceNumber, deliveryCompanyId, estimatedDeliveryTime } =
+      createDeliveryDto;
 
-    // Recherche de la commande avec ses sous-commandes et articles
+    // 1. Trouver la commande via invoiceNumber
     const order = await this.orderRepository.findOne({
-      where: { id: createDeliveryDto.orderId },
+      where: { invoiceNumber },
+      relations: ['subOrders', 'subOrders.items', 'user'],
     });
 
-    // Vérifie si les entités nécessaires existent
-    if (!deliveryCompany || !order) {
+    // 2. Trouver l'entreprise de livraison
+    const deliveryCompany = await this.companyRepository.findOne({
+      where: { id: deliveryCompanyId },
+    });
+
+    if (!order || !deliveryCompany) {
       throw new NotFoundException(
-        'Données invalides : entreprise, livreur ou commande non trouvée.',
+        'Commande ou entreprise de livraison non trouvée.',
       );
     }
 
-    // Étape 1 : Création et sauvegarde de la livraison seule
+    // 3. Créer la livraison
     const delivery = this.deliveryRepository.create({
       deliveryCompany,
       order,
       currentStatus: DeliveryStatus.IN_TRANSIT,
-      estimatedDeliveryTime: createDeliveryDto.estimatedDeliveryTime,
+      estimatedDeliveryTime,
     });
 
-    await this.deliveryRepository.save(delivery); // Sauvegarde pour avoir un ID
+    await this.deliveryRepository.save(delivery);
 
-    // Étape 2 : Création et sauvegarde du suivi initial
-    const initialTracking = this.trackingRepository.create({
+    // 4. Ajouter un suivi initial
+    const tracking = this.trackingRepository.create({
       status: DeliveryStatus.IN_TRANSIT,
       location: 'Inconnue',
       notes: 'Livraison en cours de traitement',
-      delivery, // Maintenant que delivery a un ID, la FK fonctionne
+      delivery,
     });
 
-    await this.trackingRepository.save(initialTracking);
+    await this.trackingRepository.save(tracking);
 
-    // Étape 3 : Rechargement de la livraison avec toutes ses relations
+    // 5. Recharger la livraison complète
     const fullDelivery = await this.deliveryRepository.findOne({
       where: { id: delivery.id },
       relations: ['order', 'deliveryCompany', 'livreur', 'trackings'],
     });
 
     if (!fullDelivery) {
-      throw new NotFoundException(
-        "La livraison n'a pas pu être retrouvée après sa création.",
-      );
+      throw new NotFoundException("La livraison n'a pas pu être retrouvée.");
     }
 
     return { message: 'Traitement réussi avec succès', data: fullDelivery };
