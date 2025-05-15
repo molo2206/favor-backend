@@ -355,12 +355,6 @@ export class OrderService {
 
     const orders = await query.getMany();
 
-    if (!orders.length) {
-      throw new NotFoundException(
-        `Aucune commande trouvée pour le type : ${type}`,
-      );
-    }
-
     return {
       message: `Commandes récupérées avec succès pour le type : ${type ?? 'tous'}.`,
       data: orders,
