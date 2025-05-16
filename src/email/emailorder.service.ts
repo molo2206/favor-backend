@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { SubOrderEntity } from 'src/sub-order/entities/sub-order.entity';
 import ejs from 'ejs';
-import * as pdf from 'html-pdf';
+import puppeteer from 'puppeteer';
 
 interface Context {
   user: { fullName: string; email: string };
@@ -90,32 +90,39 @@ export class MailOrderService {
     });
   }
 
-  async generatePdfFromTemplate(
-    templateName: string,
-    context: any,
-  ): Promise<Buffer> {
-    const filePath =
-      process.env.NODE_ENV === 'production'
-        ? path.join(
-            process.cwd(),
-            'dist',
-            'src',
-            'templates/order',
-            templateName,
-          )
-        : path.join(process.cwd(), 'src', 'templates/order', templateName);
+ async generatePdfFromTemplate(templateName: string, context: any): Promise<Buffer> {
+  const templatePath = path.join(
+    process.cwd(),
+    process.env.NODE_ENV === 'production' ? 'dist/src/templates' : 'src/templates',
+    templateName,
+  );
 
-    const template = fs.readFileSync(filePath, 'utf8');
-    const html = ejs.render(template, context);
+  const htmlContent = await ejs.renderFile(templatePath, context, { async: true });
 
-    return new Promise((resolve, reject) => {
-      pdf.create(html).toBuffer((err, buffer) => {
-        if (err) return reject(err);
-        resolve(buffer);
-      });
-    });
-  }
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  const page = await browser.newPage();
 
+  await page.setContent(htmlContent, {
+    waitUntil: 'networkidle0',
+  });
+
+  const pdfBuffer = await page.pdf({
+    format: 'A4',
+    printBackground: true,
+    margin: {
+      top: '20px',
+      bottom: '30px',
+      left: '20px',
+      right: '20px',
+    },
+  });
+
+  await browser.close();
+  return pdfBuffer;
+}
   async sendInvoiceWithPdf(to: string, subject: string, context: Context) {
     const pdfBuffer = await this.generatePdfFromTemplate('invoice.ejs', {
       ...context,
