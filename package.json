@@ -23,7 +23,7 @@
     "migration:run": "npm run typeorm -- migration:run",
     "migration-revert": "npm run typeorm -- migration:revert",
     "db:drop": "npm run typeorm schema:drop",
-    "copy-templates": "shx mkdir -p dist/src/templates && shx cp src/templates/invoice.ejs dist/src/templates/"
+    "copy-templates": "shx mkdir -p dist/src/templates/order && shx cp src/templates/order/invoice.ejs dist/src/templates/order/"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
