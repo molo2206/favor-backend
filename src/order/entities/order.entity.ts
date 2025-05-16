@@ -15,6 +15,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 
 @Entity('orders')
 export class OrderEntity {
@@ -77,7 +78,9 @@ export class OrderEntity {
 
   @Column({ type: 'boolean', default: false })
   paid: boolean; // Correct type: boolean
-  
+
+  @Column({ type: 'enum', enum: CompanyActivity }) // Ajout du champ
+  shopType: CompanyActivity;
 
   @CreateDateColumn()
   createdAt: Date;

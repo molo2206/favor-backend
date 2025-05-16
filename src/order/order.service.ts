@@ -321,7 +321,7 @@ export class OrderService {
         order,
         subOrders,
         paymentQrCode,
-        subOrdersHtml: this.mailService.generateSubOrdersHtml(
+        subOrdersHtml: this.mailService.generateSubOrdersByInvoiceNumberHtml(
           subOrders,
           order.currency,
         ),
