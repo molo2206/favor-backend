@@ -13,7 +13,10 @@ interface Context {
     id: string;
     totalAmount: number;
     currency: string;
-    shopType: string;
+    shopType: CompanyActivity;
+    invoiceNumber?: string;
+    address?: string;
+    paymentStatus: string;
   };
   subOrders: SubOrderEntity[];
   subOrdersHtml?: string; // HTML des sous-commandes
@@ -27,41 +30,47 @@ export class MailOrderService {
   generateSubOrdersHtml(
     subOrders: SubOrderEntity[],
     currency: string,
-    shopType: string,
+    shopType: CompanyActivity,
   ): string {
     let counter = 1;
 
-    const itemsHtml = subOrders
+    return subOrders
       .flatMap((subOrder) =>
         subOrder.items.map((item) => {
           const product = item.product;
           const productName = product?.name || 'Produit non disponible';
 
-          let selectedPrice = product.detail_price_original ?? 0;
+          let selectedPrice = Number(product?.detail_price_original ?? 0);
+          let priceLabel = 'Détail';
+
           if (
             shopType === CompanyActivity.WHOLESALER ||
             shopType === CompanyActivity.WHOLESALER_RETAILER
           ) {
-            selectedPrice =
-              product.gros_price_original ?? product.detail_price_original ?? 0;
+            selectedPrice = Number(
+              product?.gros_price_original ??
+                product?.detail_price_original ??
+                0,
+            );
+            priceLabel = product?.gros_price_original ? 'Gros' : 'Détail';
           }
+
+          if (isNaN(selectedPrice)) selectedPrice = 0;
 
           const totalPrice = selectedPrice * item.quantity;
 
           return `
-            <tr>
-              <td>${counter++}</td>
-              <td>${productName}</td>
-              <td>${item.quantity}</td>
-              <td>${selectedPrice.toFixed(2)} ${currency}</td>
-              <td>${totalPrice.toFixed(2)} ${currency}</td>
-            </tr>
-          `;
+        <tr>
+          <td>${counter++}</td>
+          <td>${productName}</td>
+          <td>${item.quantity}</td>
+          <td>${selectedPrice.toFixed(2)} ${currency} <small style="color: #6b7280;">(${priceLabel})</small></td>
+          <td>${totalPrice.toFixed(2)} ${currency}</td>
+        </tr>
+      `;
         }),
       )
       .join('');
-
-    return itemsHtml;
   }
 
   async sendHtmlEmail(
@@ -83,6 +92,9 @@ export class MailOrderService {
       context.subOrders &&
       context.order?.currency &&
       context.order.shopType &&
+      context.order.address &&
+      context.order.invoiceNumber &&
+      context.order.address &&
       !context.subOrdersHtml
     ) {
       context.subOrdersHtml = this.generateSubOrdersHtml(

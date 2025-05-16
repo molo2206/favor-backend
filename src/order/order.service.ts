@@ -211,7 +211,10 @@ export class OrderService {
           id: finalOrder.id,
           totalAmount: finalOrder.totalAmount,
           currency: finalOrder.currency,
-          shopType: shop,
+          shopType: shop, 
+          invoiceNumber: finalOrder.invoiceNumber,
+          address:finalOrder.addressUser.address,
+          paymentStatus: order.paymentStatus
         },
         subOrders,
         paymentQrCode,

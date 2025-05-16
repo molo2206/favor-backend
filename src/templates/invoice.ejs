@@ -182,8 +182,9 @@
             <strong>Date:</strong> <%= order.createdAt %><br />
           </div>
           <div>
-           <strong>Adresse Livraison:</strong><br />
-           <%= order.address || 'Non spécifiée' %>
+            <strong>Adresse Livraison:</strong><br />
+            <%= order.addressUser?.address %><br />
+            <%= order.addressUser?.city %>, <%= order.addressUser?.country %>
           </div>
         </div>
       </div>
