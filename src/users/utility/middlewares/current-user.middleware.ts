@@ -6,7 +6,7 @@ import { verify } from 'jsonwebtoken';
 import { UsersService } from 'src/users/users.service';
 import { JwtPayload } from 'src/users/interfaces/jwt-payload.interface';
 import { ConfigService } from '@nestjs/config';
-import { VehicleType } from '../common/user-vehiculetype.enum';
+import { VehicleType } from '../../enum/user-vehiculetype.enum';
 
 declare global {
   namespace Express {

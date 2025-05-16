@@ -6,7 +6,7 @@ import {
   IsDecimal,
   IsOptional,
 } from 'class-validator';
-import { PaymentStatus } from 'src/users/utility/common/payment.status.enum';
+import { PaymentStatus } from 'src/transaction/enum/payment.status.enum';
 import { TransactionType } from '../transaction.enum';
 
 export class CreateTransactionDto {

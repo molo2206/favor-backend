@@ -1,5 +1,9 @@
 // order.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OrderEntity } from './entities/order.entity';
@@ -10,17 +14,18 @@ import { SubOrderEntity } from 'src/sub-order/entities/sub-order.entity';
 import { SubOrderItemEntity } from 'src/sub-order-item/entities/sub-order-item.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { AddressUser } from 'src/address-user/entities/address-user.entity';
-import { InvoiceService } from 'src/users/utility/common/invoice.util';
 import { MailOrderService } from 'src/email/emailorder.service';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
-import { OrderStatus } from 'src/users/utility/common/order.status.enum';
-import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
-import { PaymentStatus } from 'src/users/utility/common/payment.status.enum';
+import { OrderStatus } from 'src/order/enum/order.status.enum';
+import { CompanyActivity } from 'src/company/enum/activity.company.enum';
+import { PaymentStatus } from 'src/transaction/enum/payment.status.enum';
 import { PdfService } from 'src/pdf/pdf.service';
 import { TransactionEntity } from 'src/transaction/entities/transaction.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateTransactionDto } from 'src/transaction/dto/create-transaction.dto';
 import { TransactionType } from 'src/transaction/transaction.enum';
+import { InvoiceService } from './invoice/invoice.util';
+import * as QRCode from 'qrcode';
 
 @Injectable()
 export class OrderService {
@@ -184,30 +189,16 @@ export class OrderService {
       where: { order: { id: finalOrder.id } },
       relations: ['company', 'items', 'items.product', 'order'],
     });
+    const paymentQrCode = await QRCode.toDataURL(finalOrder.invoiceNumber);
 
-    // const pdfBuffer = await this.pdfService.generateInvoicePdf({
-    //   user,
-    //   order: finalOrder,
-    //   subOrders,
-    // });
-
-    // await this.mailService.sendEmailWithAttachment(
-    //   user.email, // L'adresse email du destinataire
-    //   'Votre facture - FavorHelp', // Sujet de l'email
-    //   'Veuillez trouver votre facture ci-jointe.', // Texte de fallback pour les clients email texte
-    //   'facture.pdf', // Nom du fichier PDF attaché
-    //   pdfBuffer, // Le buffer PDF généré
-    //   '<p>Veuillez trouver votre facture ci-jointe.</p>', // Contenu HTML optionnel (si souhaité)
-    // );
-
-    await this.mailService.sendHtmlEmail(
+    await this.mailService.sendInvoiceWithPdf(
       user.email,
-      'Votre facture - FavorHelp',
-      'invoice.html',
+      'Votre facture PDF - FavorHelp',
       {
         user,
         order: finalOrder,
         subOrders,
+        paymentQrCode,
       },
     );
 
@@ -239,6 +230,11 @@ export class OrderService {
     }
 
     // Mise à jour du statut
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException(
+        'Cette commande est déjà validée ou fermée et ne peut plus être modifiée.',
+      );
+    }
     order.status = dto.status;
     order.paymentStatus = PaymentStatus.PAID;
     order.paid = true;
@@ -246,16 +242,21 @@ export class OrderService {
     // Sauvegarde de la commande
     const updatedOrder = await this.orderRepo.save(order);
 
+    const subOrders = await this.subOrderRepo.find({
+      where: { order: { id: updatedOrder.id } },
+      relations: ['company', 'items', 'items.product', 'order'],
+    });
     // Si le statut de la commande est validé, envoi de l'email
     if (dto.status === OrderStatus.VALIDATED) {
-      await this.mailService.sendHtmlEmailValidation(
+      const paymentQrCode = await QRCode.toDataURL(order.invoiceNumber);
+      await this.mailService.sendInvoicePaidWithPdf(
         order.user.email,
-        'Votre commande a été validée',
-        'order-validation.html',
+        'Veuillez trouver ci-joint votre facture PDF, déjà payée et validée - FavorHelp',
         {
-          order,
           user: order.user,
-          year: new Date().getFullYear(),
+          order,
+          subOrders,
+          paymentQrCode,
         },
       );
 
@@ -281,6 +282,57 @@ export class OrderService {
     };
   }
 
+  async generateInvoiceByInvoiceNumber(
+    invoiceNumber: string,
+  ): Promise<{ pdfBuffer: Buffer; message: string }> {
+    const order = await this.orderRepo.findOne({
+      where: { invoiceNumber },
+      relations: [
+        'orderItems.product.company',
+        'orderItems.product.category',
+        'orderItems.product.measure',
+        'subOrders',
+        'subOrders.items.product.company',
+        'subOrders.items.product.category',
+        'subOrders.items.product.measure',
+        'subOrders.company',
+        'user',
+        'addressUser',
+      ],
+    });
+
+    if (!order) {
+      throw new NotFoundException(
+        'Commande introuvable avec ce numéro de facture.',
+      );
+    }
+
+    const subOrders = await this.subOrderRepo.find({
+      where: { order: { id: order.id } },
+      relations: ['company', 'items', 'items.product', 'order'],
+    });
+
+    const paymentQrCode = await QRCode.toDataURL(order.invoiceNumber);
+
+    const pdfBuffer = await this.mailService.generatePdfFromTemplate(
+      'invoice.ejs',
+      {
+        user: order.user,
+        order,
+        subOrders,
+        paymentQrCode,
+        subOrdersHtml: this.mailService.generateSubOrdersHtml(
+          subOrders,
+          order.currency,
+        ),
+      },
+    );
+
+    return {
+      pdfBuffer,
+      message: 'Facture générée avec succès',
+    };
+  }
   async getAllTransctions(): Promise<{ data: TransactionEntity[] }> {
     const transactions = await this.transactionRepository.find({
       relations: ['order', 'order.user'],

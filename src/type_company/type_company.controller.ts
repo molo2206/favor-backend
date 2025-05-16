@@ -6,7 +6,7 @@ import { UpdateTypeCompanyDto } from './dto/update-type_company.dto';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { AuthorizeRoles } from 'src/users/utility/decorators/authorize.roles.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UserRole } from 'src/users/utility/common/user-role-enum';
+import { UserRole } from 'src/users/enum/user-role-enum';
 
 @Controller('type-companies')
 export class TypeCompanyController {

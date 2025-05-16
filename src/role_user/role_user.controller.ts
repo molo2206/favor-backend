@@ -5,7 +5,7 @@ import { CreateRoleUserDto } from './dto/create-role_user.dto';
 import { UpdateRoleUserDto } from './dto/update-role_user.dto';
 import { AuthorizeRoles } from 'src/users/utility/decorators/authorize-roles.decorator';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
-import { UserRole } from 'src/users/utility/common/user-role-enum';
+import { UserRole } from 'src/users/enum/user-role-enum';
 
 
 @Controller('roles')

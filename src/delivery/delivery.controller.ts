@@ -16,7 +16,7 @@ import { UpdateDeliveryDto } from './dto/update-delivery.dto';
 import { DeliveryEntity } from './entities/delivery.entity';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { AuthorizeRoles } from 'src/users/utility/decorators/authorize-roles.decorator';
-import { UserRole } from 'src/users/utility/common/user-role-enum';
+import { UserRole } from 'src/users/enum/user-role-enum';
 import { CreateTrackingDto } from 'src/tracking/dto/create-tracking.dto';
 import { TrackingEntity } from 'src/tracking/entities/tracking.entity';
 

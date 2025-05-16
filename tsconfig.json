@@ -17,6 +17,7 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
-    "typeRoots": ["./node_modules/@types", "./src/common/types"]
+    "typeRoots": ["./node_modules/@types", "./src/common/types"],
+    "esModuleInterop": true
   }
 }

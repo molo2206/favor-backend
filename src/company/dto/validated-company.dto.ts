@@ -1,5 +1,5 @@
 import { IsOptional, IsUUID, IsEnum } from 'class-validator';
-import { CompanyStatus } from 'src/users/utility/common/company-status.enum';
+import { CompanyStatus } from 'src/company/enum/company-status.enum';
 
 export class UpdateCompanyDto {
     @IsUUID()

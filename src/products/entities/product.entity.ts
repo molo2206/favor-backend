@@ -12,9 +12,9 @@ import { CompanyEntity } from 'src/company/entities/company.entity';
 import { CategoryEntity } from 'src/category/entities/category.entity';
 import { ImageProductEntity } from './imageProduct.entity';
 import { Expose, Type } from 'class-transformer';
-import { ProductStatus } from 'src/users/utility/common/product.status.enum';
+import { ProductStatus } from 'src/products/enum/product.status.enum';
 import { MeasureEntity } from 'src/measure/entities/measure.entity';
-import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
+import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 
 @Entity('products')
 export class Product {

@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TravelReservationEntity } from './entities/travel_reservation.entity';
 import { CreateTravelReservationDto } from './dto/create-travel_reservation.dto';
-import { ReservationStatus } from 'src/users/utility/common/reservation.status.enum';
+import { ReservationStatus } from 'src/travel_reservation/enum/reservation.status.enum';
 import { UserEntity } from 'src/users/entities/user.entity';
 
 @Injectable()

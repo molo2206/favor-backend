@@ -18,6 +18,8 @@ import { AuthentificationGuard } from 'src/users/utility/guards/authentification
 import { UserEntity } from 'src/users/entities/user.entity';
 import { OrderEntity } from './entities/order.entity';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { Response } from 'express';
+import { Res } from '@nestjs/common';
 
 @ApiBearerAuth()
 @Controller('orders')
@@ -44,6 +46,21 @@ export class OrderController {
       message: 'Orders retrieved successfully',
       data: orders,
     };
+  }
+
+  @Get('invoice/sss/pdf/:invoiceNumber')
+  async getInvoicePdf(
+    @Param('invoiceNumber') invoiceNumber: string,
+    @Res() res: Response,
+  ) {
+    const { pdfBuffer } =
+      await this.orderService.generateInvoiceByInvoiceNumber(invoiceNumber);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename=invoice-${invoiceNumber}.pdf`,
+    );
+    return res.send(pdfBuffer);
   }
 
   @Get(':id')

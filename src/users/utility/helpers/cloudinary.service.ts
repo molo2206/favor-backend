@@ -3,7 +3,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 import { fileTypeFromBuffer } from 'file-type';
 import { v2 as cloudinary } from 'cloudinary';
 import * as streamifier from 'streamifier';

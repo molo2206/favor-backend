@@ -11,9 +11,9 @@ import { SubOrderItemEntity } from 'src/sub-order-item/entities/sub-order-item.e
 import { Product } from 'src/products/entities/product.entity';
 import { OrderController } from './order.controller';
 import { MailModule } from 'src/email/email.module';
-import { InvoiceModule } from 'src/users/utility/common/invoice.module';
 import { PdfModule } from 'src/pdf/pdf.module';
 import { TransactionModule } from 'src/transaction/transaction.module';  // Assurez-vous que TransactionModule est bien importé
+import { InvoiceModule } from './invoice/invoice.module';
 
 @Module({
   imports: [

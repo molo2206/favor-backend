@@ -1,6 +1,6 @@
 import { IsOptional, IsString, IsUrl, IsNotEmpty, IsEnum } from 'class-validator';
-import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
-import { CompanyType } from 'src/users/utility/common/type.company.enum';
+import { CompanyActivity } from 'src/company/enum/activity.company.enum';
+import { CompanyType } from 'src/company/enum/type.company.enum';
 
 export class CreateCompanyDto {
   @IsNotEmpty()

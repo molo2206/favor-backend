@@ -1,5 +1,5 @@
 import { IsString, IsEnum, IsBoolean, IsOptional } from 'class-validator';
-import { Address } from 'src/users/utility/common/address.status.enum';
+import { Address } from 'src/address-user/enum/address.status.enum';
 
 
 export class CreateAddressUserDto {

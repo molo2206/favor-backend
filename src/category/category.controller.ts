@@ -17,7 +17,7 @@ import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
-import { UserRole } from 'src/users/utility/common/user-role-enum';
+import { UserRole } from 'src/users/enum/user-role-enum';
 import { AuthorizeRoles } from 'src/users/utility/decorators/authorize.roles.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CategoryEntity } from './entities/category.entity';

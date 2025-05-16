@@ -1,5 +1,5 @@
 import { OrderEntity } from 'src/order/entities/order.entity';
-import { PaymentStatus } from 'src/users/utility/common/payment.status.enum';
+import { PaymentStatus } from 'src/transaction/enum/payment.status.enum';
 import {
   Column,
   CreateDateColumn,

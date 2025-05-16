@@ -1,5 +1,5 @@
 import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
-import { TravelType } from 'src/users/utility/common/travel.type.enum';
+import { TravelType } from 'src/travel_reservation/enum/travel.type.enum';
 
 export class CreateTravelReservationDto {
     @IsEnum(TravelType)

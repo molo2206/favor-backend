@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { UserEntity } from '../../users/entities/user.entity'; // adapte le chemin selon ta structure
-import { Address } from 'src/users/utility/common/address.status.enum';
+import { Address } from 'src/address-user/enum/address.status.enum';
 
 
 @Entity('address_user')

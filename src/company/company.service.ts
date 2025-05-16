@@ -10,10 +10,10 @@ import { CreateUserHasCompanyDto } from 'src/user_has_company/dto/create-user_ha
 import { instanceToPlain } from 'class-transformer';
 import { TypeCompany } from 'src/type_company/entities/type_company.entity';
 import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
-import { CompanyType } from 'src/users/utility/common/type.company.enum';
+import { CompanyType } from 'src/company/enum/type.company.enum';
 import { UpdateCompanyStatusDto } from './dto/update-company-status.dto';
 import { MailService } from 'src/email/email.service';
-import { CompanyStatus } from 'src/users/utility/common/company-status.enum';
+import { CompanyStatus } from 'src/company/enum/company-status.enum';
 
 @Injectable()
 export class CompanyService {

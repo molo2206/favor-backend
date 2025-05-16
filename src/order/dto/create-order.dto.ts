@@ -1,8 +1,8 @@
 import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateOrderItemDto } from 'src/order-item/dto/create-order-item.dto';
-import { CompanyType } from 'src/users/utility/common/type.company.enum';
-import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
+import { CompanyType } from 'src/company/enum/type.company.enum';
+import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 
 export class CreateOrderDto {
     @IsNumber()

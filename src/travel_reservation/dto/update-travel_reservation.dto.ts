@@ -1,5 +1,5 @@
 import { IsEnum } from 'class-validator';
-import { ReservationStatus } from 'src/users/utility/common/reservation.status.enum';
+import { ReservationStatus } from 'src/travel_reservation/enum/reservation.status.enum';
 
 export class UpdateReservationStatusDto {
   @IsEnum(ReservationStatus, {

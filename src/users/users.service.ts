@@ -26,7 +26,7 @@ import * as qrcode from 'qrcode';
 import { UpdateUserDto } from './dto/update-profile';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtService } from '@nestjs/jwt';
-import { UserRole } from './utility/common/user-role-enum';
+import { UserRole } from './enum/user-role-enum';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
 import { MailService } from 'src/email/email.service';
 @Injectable()

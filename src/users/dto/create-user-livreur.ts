@@ -1,5 +1,5 @@
 import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
-import { VehicleType } from '../utility/common/user-vehiculetype.enum';
+import { VehicleType } from '../enum/user-vehiculetype.enum';
 
 
 export class CreateLivreurDto {

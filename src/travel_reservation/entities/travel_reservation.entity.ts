@@ -7,8 +7,8 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { TravelType } from 'src/users/utility/common/travel.type.enum';
-import { ReservationStatus } from 'src/users/utility/common/reservation.status.enum';
+import { TravelType } from 'src/travel_reservation/enum/travel.type.enum';
+import { ReservationStatus } from 'src/travel_reservation/enum/reservation.status.enum';
 import { IsEnum } from 'class-validator';
 
 @Entity('travel_reservations')

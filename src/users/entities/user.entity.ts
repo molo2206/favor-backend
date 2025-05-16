@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, Timestamp, UpdateDateColumn } from "typeorm";
-import { UserRole } from "../utility/common/user-role-enum";
-import { VehicleType } from "../utility/common/user-vehiculetype.enum";
+import { UserRole } from "../enum/user-role-enum";
+import { VehicleType } from "../enum/user-vehiculetype.enum";
 import { OtpEntity } from "src/otp/entities/otp.entity";
 import { Exclude } from "class-transformer";
 import { UserHasCompanyEntity } from "src/user_has_company/entities/user_has_company.entity";

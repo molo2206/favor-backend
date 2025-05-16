@@ -1,6 +1,6 @@
 import { IsString, IsNumber, IsOptional, IsUUID, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ProductStatus } from 'src/users/utility/common/product.status.enum';
+import { ProductStatus } from 'src/products/enum/product.status.enum';
 
 export class CreateProductDto {
   // Obligatoire

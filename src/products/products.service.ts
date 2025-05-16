@@ -8,10 +8,10 @@ import { CategoryEntity } from 'src/category/entities/category.entity';
 import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
 import { ImageProductEntity } from './entities/imageProduct.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { ProductStatus } from 'src/users/utility/common/product.status.enum';
+import { ProductStatus } from 'src/products/enum/product.status.enum';
 import { MeasureEntity } from 'src/measure/entities/measure.entity';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
-import { CompanyActivity } from 'src/users/utility/common/activity.company.enum';
+import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 
 @Injectable()
 export class ProductService {

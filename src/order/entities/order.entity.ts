@@ -2,9 +2,9 @@ import { AddressUser } from 'src/address-user/entities/address-user.entity';
 import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
 import { SubOrderEntity } from 'src/sub-order/entities/sub-order.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { OrderStatus } from 'src/users/utility/common/order.status.enum';
-import { PaymentStatus } from 'src/users/utility/common/payment.status.enum';
-import { CompanyType } from 'src/users/utility/common/type.company.enum';
+import { OrderStatus } from 'src/order/enum/order.status.enum';
+import { PaymentStatus } from 'src/transaction/enum/payment.status.enum';
+import { CompanyType } from 'src/company/enum/type.company.enum';
 import {
   Column,
   CreateDateColumn,
@@ -77,6 +77,7 @@ export class OrderEntity {
 
   @Column({ type: 'boolean', default: false })
   paid: boolean; // Correct type: boolean
+  
 
   @CreateDateColumn()
   createdAt: Date;

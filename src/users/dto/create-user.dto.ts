@@ -1,6 +1,6 @@
 
 import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, Length, Matches } from 'class-validator';
-import { UserRole } from '../utility/common/user-role-enum';
+import { UserRole } from '../enum/user-role-enum';
 
 
 

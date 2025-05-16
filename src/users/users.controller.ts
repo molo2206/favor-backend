@@ -26,7 +26,7 @@ import { ResetPasswordDto } from 'src/otp/dto/reset-password.dto';
 import { CurrentUser } from './utility/decorators/current-user-decorator';
 import { AuthentificationGuard } from './utility/guards/authentification.guard';
 import { AuthorizeGuard } from './utility/guards/authorization.guard';
-import { UserRole } from './utility/common/user-role-enum';
+import { UserRole } from './enum/user-role-enum';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { Verify2FADto } from './dto/verify2fact.dto';
 import * as speakeasy from 'speakeasy';
