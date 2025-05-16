@@ -107,6 +107,7 @@ export class OrderService {
       if (!product)
         throw new NotFoundException(`Product not found: ${item.productId}`);
 
+      // Logique prix selon shopType
       let selectedPrice = product.detail_price_original ?? 0;
       if (
         shopType === CompanyActivity.WHOLESALER ||
@@ -120,7 +121,7 @@ export class OrderService {
         order,
         product,
         quantity: item.quantity,
-        price: item.price,
+        price: selectedPrice, // on utilise selectedPrice ici pour cohérence
       });
       orderItemEntities.push(orderItem);
 
@@ -137,7 +138,7 @@ export class OrderService {
       const subOrderItem = this.subOrderItemRepo.create({
         product,
         quantity: item.quantity,
-        price: item.price,
+        price: selectedPrice, // idem ici
       });
 
       group.items.push(subOrderItem);
@@ -189,14 +190,29 @@ export class OrderService {
       where: { order: { id: finalOrder.id } },
       relations: ['company', 'items', 'items.product', 'order'],
     });
+
     const paymentQrCode = await QRCode.toDataURL(finalOrder.invoiceNumber);
+
+    // Déterminer shopType pour le contexte email
+    let shop = CompanyActivity.RETAILER;
+    if (
+      shopType === CompanyActivity.WHOLESALER ||
+      shopType === CompanyActivity.WHOLESALER_RETAILER
+    ) {
+      shop = CompanyActivity.WHOLESALER;
+    }
 
     await this.mailService.sendInvoiceWithPdf(
       user.email,
       'Votre facture PDF - FavorHelp',
       {
         user,
-        order: finalOrder,
+        order: {
+          id: finalOrder.id,
+          totalAmount: finalOrder.totalAmount,
+          currency: finalOrder.currency,
+          shopType: shop,
+        },
         subOrders,
         paymentQrCode,
       },
