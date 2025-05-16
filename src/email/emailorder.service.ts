@@ -13,7 +13,7 @@ interface Context {
     id: string;
     totalAmount: number;
     currency: string;
-    shopType: CompanyActivity;
+    shopType: string;
   };
   subOrders: SubOrderEntity[];
   subOrdersHtml?: string; // HTML des sous-commandes
@@ -27,7 +27,7 @@ export class MailOrderService {
   generateSubOrdersHtml(
     subOrders: SubOrderEntity[],
     currency: string,
-    shopType: CompanyActivity,
+    shopType: string,
   ): string {
     let counter = 1;
 
@@ -37,19 +37,13 @@ export class MailOrderService {
           const product = item.product;
           const productName = product?.name || 'Produit non disponible';
 
-          let selectedPrice = Number(product?.detail_price_original ?? 0);
-          let priceLabel = 'Détail';
-
+          let selectedPrice = product.detail_price_original ?? 0;
           if (
             shopType === CompanyActivity.WHOLESALER ||
             shopType === CompanyActivity.WHOLESALER_RETAILER
           ) {
-            selectedPrice = Number(
-              product?.gros_price_original ??
-                product?.detail_price_original ??
-                0,
-            );
-            priceLabel = product?.gros_price_original ? 'Gros' : 'Détail';
+            selectedPrice =
+              product.gros_price_original ?? product.detail_price_original ?? 0;
           }
 
           const totalPrice = selectedPrice * item.quantity;
@@ -59,7 +53,7 @@ export class MailOrderService {
               <td>${counter++}</td>
               <td>${productName}</td>
               <td>${item.quantity}</td>
-              <td>${selectedPrice.toFixed(2)} ${currency} <small style="color: #6b7280;">(${priceLabel})</small></td>
+              <td>${selectedPrice.toFixed(2)} ${currency}</td>
               <td>${totalPrice.toFixed(2)} ${currency}</td>
             </tr>
           `;
