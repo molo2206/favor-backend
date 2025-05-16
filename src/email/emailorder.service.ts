@@ -82,8 +82,7 @@ export class MailOrderService {
       }
       return typeof value === 'string' ? value : String(value);
     });
-
-    // Envoi de l'email
+// KJK;K;LK;SKKS;KLS
     await this.mailerService.sendMail({
       to,
       subject,
