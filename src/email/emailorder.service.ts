@@ -93,7 +93,7 @@ export class MailOrderService {
  async generatePdfFromTemplate(templateName: string, context: any): Promise<Buffer> {
   const templatePath = path.join(
     process.cwd(),
-    process.env.NODE_ENV === 'production' ? 'dist/src/templates' : 'src/templates',
+    process.env.NODE_ENV === 'production' ? 'dist/src/templates/order' : 'src/templates/order',
     templateName,
   );
 
