@@ -256,8 +256,12 @@ export class UsersService {
       .getOne();
 
     if (!user) {
+      throw new UnauthorizedException("Cette adresse e-mail n'existe pas.");
+    }
+
+    if (!user.password) {
       throw new UnauthorizedException(
-        'Adresse e-mail ou mot de passe incorrect.',
+        'Mot de passe non défini pour ce compte.',
       );
     }
 
@@ -265,10 +269,9 @@ export class UsersService {
       userSignInDto.password,
       user.password,
     );
+
     if (!isPasswordValid) {
-      throw new UnauthorizedException(
-        'Adresse e-mail ou mot de passe incorrect.',
-      );
+      throw new UnauthorizedException('Mot de passe incorrect.');
     }
 
     const token = await this.accessToken(user);
