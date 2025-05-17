@@ -5,7 +5,6 @@ import * as path from 'path';
 import { SubOrderEntity } from 'src/sub-order/entities/sub-order.entity';
 import ejs from 'ejs';
 import puppeteer from 'puppeteer';
-import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 
 interface Context {
   user: { fullName: string; email: string };
@@ -13,10 +12,9 @@ interface Context {
     id: string;
     totalAmount: number;
     currency: string;
-    shopType: CompanyActivity;
     invoiceNumber?: string;
     address?: string;
-    paymentStatus: string;
+    paymentStatus?: string;
   };
   subOrders: SubOrderEntity[];
   subOrdersHtml?: string; // HTML des sous-commandes
@@ -27,11 +25,7 @@ interface Context {
 export class MailOrderService {
   constructor(private readonly mailerService: MailerService) {}
 
-  generateSubOrdersHtml(
-    subOrders: SubOrderEntity[],
-    currency: string,
-    shopType: CompanyActivity,
-  ): string {
+  generateSubOrdersHtml(subOrders: SubOrderEntity[], currency: string): string {
     let counter = 1;
 
     return subOrders
@@ -40,31 +34,14 @@ export class MailOrderService {
           const product = item.product;
           const productName = product?.name || 'Produit non disponible';
 
-          let selectedPrice = Number(product?.detail_price_original ?? 0);
-          let priceLabel = 'Détail';
-
-          if (
-            shopType === CompanyActivity.WHOLESALER ||
-            shopType === CompanyActivity.WHOLESALER_RETAILER
-          ) {
-            selectedPrice = Number(
-              product?.gros_price_original ??
-                product?.detail_price_original ??
-                0,
-            );
-            priceLabel = product?.gros_price_original ? 'Gros' : 'Détail';
-          }
-
-          if (isNaN(selectedPrice)) selectedPrice = 0;
-
-          const totalPrice = selectedPrice * item.quantity;
+          const totalPrice = item.price * item.quantity;
 
           return `
         <tr>
           <td>${counter++}</td>
           <td>${productName}</td>
           <td>${item.quantity}</td>
-          <td>${selectedPrice.toFixed(2)} ${currency} <small style="color: #6b7280;">(${priceLabel})</small></td>
+          <td>${item.price.toFixed(2)} ${currency} <small style="color: #6b7280;"></small></td>
           <td>${totalPrice.toFixed(2)} ${currency}</td>
         </tr>
       `;
@@ -91,16 +68,15 @@ export class MailOrderService {
     if (
       context.subOrders &&
       context.order?.currency &&
-      context.order.shopType &&
       context.order.address &&
       context.order.invoiceNumber &&
       context.order.address &&
+      context.order.paymentStatus &&
       !context.subOrdersHtml
     ) {
       context.subOrdersHtml = this.generateSubOrdersHtml(
         context.subOrders,
         context.order.currency,
-        context.order.shopType,
       );
     }
 
@@ -166,11 +142,7 @@ export class MailOrderService {
       ...context,
       subOrdersHtml:
         context.subOrdersHtml ??
-        this.generateSubOrdersHtml(
-          context.subOrders,
-          context.order.currency,
-          context.order.shopType,
-        ),
+        this.generateSubOrdersHtml(context.subOrders, context.order.currency),
     });
 
     await this.mailerService.sendMail({
@@ -206,11 +178,7 @@ export class MailOrderService {
       ...context,
       subOrdersHtml:
         context.subOrdersHtml ??
-        this.generateSubOrdersHtml(
-          context.subOrders,
-          context.order.currency,
-          context.order.shopType,
-        ),
+        this.generateSubOrdersHtml(context.subOrders, context.order.currency),
     });
 
     await this.mailerService.sendMail({

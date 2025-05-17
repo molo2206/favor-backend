@@ -68,7 +68,6 @@ export class OrderService {
       orderItems,
       addressUserId,
       type,
-      shopType,
     } = createOrderDto;
 
     const addressUser = await this.addressUserRepo.findOne({
@@ -107,21 +106,11 @@ export class OrderService {
       if (!product)
         throw new NotFoundException(`Product not found: ${item.productId}`);
 
-      // Logique prix selon shopType
-      let selectedPrice = product.detail_price_original ?? 0;
-      if (
-        shopType === CompanyActivity.WHOLESALER ||
-        shopType === CompanyActivity.WHOLESALER_RETAILER
-      ) {
-        selectedPrice =
-          product.gros_price_original ?? product.detail_price_original ?? 0;
-      }
-
       const orderItem = this.orderItemRepo.create({
         order,
         product,
         quantity: item.quantity,
-        price: selectedPrice, // on utilise selectedPrice ici pour cohérence
+        price: item.price, // on utilise selectedPrice ici pour cohérence
       });
       orderItemEntities.push(orderItem);
 
@@ -138,11 +127,11 @@ export class OrderService {
       const subOrderItem = this.subOrderItemRepo.create({
         product,
         quantity: item.quantity,
-        price: selectedPrice, // idem ici
+        price: item.price, // idem ici
       });
 
       group.items.push(subOrderItem);
-      group.total += selectedPrice * item.quantity;
+      group.total += item.price * item.quantity;
     }
 
     await this.orderItemRepo.save(orderItemEntities);
@@ -193,15 +182,6 @@ export class OrderService {
 
     const paymentQrCode = await QRCode.toDataURL(finalOrder.invoiceNumber);
 
-    // Déterminer shopType pour le contexte email
-    let shop = CompanyActivity.RETAILER;
-    if (
-      shopType === CompanyActivity.WHOLESALER ||
-      shopType === CompanyActivity.WHOLESALER_RETAILER
-    ) {
-      shop = CompanyActivity.WHOLESALER;
-    }
-
     await this.mailService.sendInvoiceWithPdf(
       user.email,
       'Votre facture PDF - FavorHelp',
@@ -211,10 +191,9 @@ export class OrderService {
           id: finalOrder.id,
           totalAmount: finalOrder.totalAmount,
           currency: finalOrder.currency,
-          shopType: shop, 
           invoiceNumber: finalOrder.invoiceNumber,
-          address:finalOrder.addressUser.address,
-          paymentStatus: order.paymentStatus
+          address: finalOrder.addressUser.address,
+          paymentStatus: order.paymentStatus,
         },
         subOrders,
         paymentQrCode,

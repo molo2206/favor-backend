@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-namespace */
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import { ForbiddenException, Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
-import { verify } from 'jsonwebtoken';
+import { TokenExpiredError, verify } from 'jsonwebtoken';
 import { UsersService } from 'src/users/users.service';
 import { JwtPayload } from 'src/users/interfaces/jwt-payload.interface';
 import { ConfigService } from '@nestjs/config';
 import { VehicleType } from '../../enum/user-vehiculetype.enum';
+import { JsonWebTokenError } from '@nestjs/jwt';
 
 declare global {
   namespace Express {
@@ -37,7 +38,10 @@ declare global {
 
 @Injectable()
 export class CurrentUserMiddleware implements NestMiddleware {
-  constructor(private readonly usersService: UsersService, private readonly configService: ConfigService,) { }
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
     const rawAuthHeader = req.headers.authorization || req.headers.Authorization;
@@ -53,16 +57,17 @@ export class CurrentUserMiddleware implements NestMiddleware {
     try {
       const secretKey = this.configService.get<string>('ACCESS_TOKEN_SECRET_KEY');
       if (!secretKey) {
-        throw new Error('ACCESS_TOKEN_SECRET_KEY is not defined in your environment variables');
+        throw new Error('ACCESS_TOKEN_SECRET_KEY is not defined in env');
       }
-      const payload = verify(token, secretKey) as unknown as JwtPayload;
+
+      const payload = verify(token, secretKey) as JwtPayload;
 
       const user = await this.usersService.findOne(payload.id);
-
       if (!user) {
         req.currentUser = null;
         return next();
       }
+
       const role = Array.isArray(payload.role) ? payload.role[0] : payload.role;
 
       req.currentUser = {
@@ -81,10 +86,17 @@ export class CurrentUserMiddleware implements NestMiddleware {
         plateNumber: user.data.plateNumber,
         activeCompanyId: user.data.activeCompanyId,
         defaultAddressId: user.data.defaultAddressId,
-        role
+        role,
       };
     } catch (err) {
-      req.currentUser = null;
+      if (err instanceof TokenExpiredError) {
+        throw new ForbiddenException('Token expiré. Veuillez vous reconnecter.');
+      } else if (err instanceof JsonWebTokenError) {
+        throw new UnauthorizedException('Token invalide.');
+      }
+
+      // cas générique (ex: erreur de vérification inconnue)
+      throw new UnauthorizedException('Erreur d’authentification.');
     }
 
     return next();

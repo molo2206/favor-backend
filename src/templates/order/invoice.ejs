@@ -163,9 +163,9 @@
           <div class="status <%= order.paymentStatus?.toLowerCase() %>">
             <%= order.paymentStatus === 'PAID' ? '✅ Payée' : order.paymentStatus === 'PENDING' ? '⏳ En attente de validation.' : '❌ Annulée' %>
           </div>
-          <div style="font-size: 0.85rem; color: #4b5563;">
+          <!-- <div style="font-size: 0.85rem; color: #4b5563;">
             <%= order.type %> / <%= order.shopType %>
-          </div>
+          </div> -->
         </div>
       </div>
 
