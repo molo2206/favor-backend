@@ -12,7 +12,6 @@ import {
   UploadedFile,
   ValidationPipe,
   BadRequestException,
-  UnauthorizedException,
   Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -38,12 +37,13 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly mailService: MailService,
-  ) { }
+  ) {}
 
   // ────── 🟢 Authentification / Inscription ──────
   @Post('signup')
-  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  async signup(@Body() createUserDto: CreateUserDto): Promise<{ message: string; data: Omit<UserEntity, 'password'> }> {
+  async signup(
+    @Body() createUserDto: CreateUserDto,
+  ): Promise<{ message: string; data: Omit<UserEntity, 'password'> }> {
     const { message, data } = await this.usersService.signup(createUserDto);
     return { message, data };
   }
@@ -56,14 +56,13 @@ export class UsersController {
 
   @Post('refresh-token')
   async refresh(@Body('refresh_token') refreshToken: string) {
-    const accessToken = await this.usersService.refreshTokenWithValidation(refreshToken);
+    const accessToken =
+      await this.usersService.refreshTokenWithValidation(refreshToken);
     return {
       message: 'Nouveau token généré',
       access_token: accessToken,
     };
   }
-
-
 
   // ────── 🔐 Authentification à deux facteurs ──────
   @UseGuards(AuthentificationGuard)
@@ -100,7 +99,7 @@ export class UsersController {
 
     const isValid = await this.usersService.verifyToken(
       currentUser.twoFASecret, // Secret stocké dans la base
-      dto.token,                // Token envoyé par l'utilisateur
+      dto.token, // Token envoyé par l'utilisateur
     );
 
     if (!isValid) {
@@ -142,16 +141,15 @@ export class UsersController {
   @Get('me')
   async getProfile(
     @CurrentUser() currentUser: UserEntity,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ data: Record<string, any> }> {
     if (!currentUser) {
-      throw new UnauthorizedException('Utilisateur non connecté.');
+      throw new BadRequestException('Utilisateur non connecté.');
     }
 
     const fullUser = await this.usersService.getFullProfile(currentUser.id);
     return { data: fullUser };
   }
-
 
   // ────── 🔄 Mot de passe oublié / réinitialisation ──────
 
@@ -194,7 +192,6 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
-
   @Delete(':id')
   async remove(@Param('id') id: string) {
     await this.usersService.remove(id);
@@ -203,7 +200,11 @@ export class UsersController {
 
   @Post('send')
   async sendEmail() {
-    await this.mailService.sendHtmlEmail('devmolomolo@gmail.com', 'Bienvenue sur notre plateforme', 'welcome.html');
+    await this.mailService.sendHtmlEmail(
+      'devmolomolo@gmail.com',
+      'Bienvenue sur notre plateforme',
+      'welcome.html',
+    );
     return { message: 'Email envoyé' };
   }
 }

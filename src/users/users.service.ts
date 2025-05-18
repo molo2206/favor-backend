@@ -256,11 +256,11 @@ export class UsersService {
       .getOne();
 
     if (!user) {
-      throw new UnauthorizedException("Cette adresse e-mail n'existe pas.");
+      throw new BadRequestException("Cette adresse e-mail n'existe pas.");
     }
 
     if (!user.password) {
-      throw new UnauthorizedException(
+      throw new BadRequestException(
         'Mot de passe non défini pour ce compte.',
       );
     }
@@ -271,7 +271,7 @@ export class UsersService {
     );
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Mot de passe incorrect.');
+      throw new BadRequestException('Mot de passe incorrect.');
     }
 
     const token = await this.accessToken(user);
@@ -612,14 +612,14 @@ export class UsersService {
     try {
       decoded = await this.jwtService.verifyAsync(refresh_token, { secret });
     } catch (err) {
-      throw new UnauthorizedException('Refresh token invalide ou expiré.');
+      throw new BadRequestException('Refresh token invalide ou expiré.');
     }
 
     const user = await this.usersRepository.findOne({
       where: { id: decoded.id },
     });
     if (!user) {
-      throw new UnauthorizedException('Utilisateur introuvable.');
+      throw new BadRequestException('Utilisateur introuvable.');
     }
 
     return this.accessToken(user); // Génère un nouveau access_token

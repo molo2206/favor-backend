@@ -6,7 +6,6 @@ import { TokenExpiredError, verify } from 'jsonwebtoken';
 import { UsersService } from 'src/users/users.service';
 import { JwtPayload } from 'src/users/interfaces/jwt-payload.interface';
 import { ConfigService } from '@nestjs/config';
-import { VehicleType } from '../../enum/user-vehiculetype.enum';
 import { JsonWebTokenError } from '@nestjs/jwt';
 
 declare global {
