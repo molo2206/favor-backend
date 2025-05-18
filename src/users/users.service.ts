@@ -573,7 +573,7 @@ export class UsersService {
     }
 
     return await this.jwtService.signAsync(payload, {
-      expiresIn: '1h',
+      expiresIn: '5m',
       secret: secretKey,
     });
   }
