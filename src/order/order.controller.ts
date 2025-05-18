@@ -23,11 +23,13 @@ import { Res } from '@nestjs/common';
 
 @ApiBearerAuth()
 @Controller('orders')
-@UseGuards(AuthentificationGuard)
+
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
+
   @Post()
+  @UseGuards(AuthentificationGuard)
   async createOrder(
     @Body() createOrderDto: CreateOrderDto,
     @CurrentUser() user: UserEntity,
@@ -40,6 +42,7 @@ export class OrderController {
   }
 
   @Get('my-order')
+  @UseGuards(AuthentificationGuard)
   async getMyOrders(@CurrentUser() user: UserEntity) {
     const orders = await this.orderService.getOrdersByUser(user.id);
     return {
@@ -48,32 +51,36 @@ export class OrderController {
     };
   }
 
-  @Get('invoice/sss/pdf/:invoiceNumber')
+  @Get('invoice/pdf/:invoiceNumber')
   async getInvoicePdf(
     @Param('invoiceNumber') invoiceNumber: string,
     @Res() res: Response,
   ) {
     const { pdfBuffer } =
       await this.orderService.generateInvoiceByInvoiceNumber(invoiceNumber);
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `inline; filename=invoice-${invoiceNumber}.pdf`,
+      `attachment; filename=invoice-${invoiceNumber}.pdf`,
     );
     return res.send(pdfBuffer);
   }
 
   @Get(':id')
+  @UseGuards(AuthentificationGuard)
   async getOneOrder(@Param('id') id: string) {
     return this.orderService.findOne(id);
   }
 
   @Get()
+  @UseGuards(AuthentificationGuard)
   async getAll() {
     return this.orderService.findAll();
   }
 
   @Get('type/by-type')
+  @UseGuards(AuthentificationGuard)
   async getOrderByType(
     @Query('type') type?: string,
   ): Promise<{ message: string; data: OrderEntity[] }> {
@@ -81,6 +88,7 @@ export class OrderController {
   }
 
   @Patch(':orderId/status')
+  @UseGuards(AuthentificationGuard)
   async changeStatus(
     @Param('orderId') orderId: string,
     @Body() dto: UpdateOrderStatusDto,
@@ -89,11 +97,13 @@ export class OrderController {
   }
 
   @Get('/transactions/all')
+  @UseGuards(AuthentificationGuard)
   async getAllTrans() {
     return this.orderService.getAllTransctions();
   }
 
   @Get('/transactions/me')
+  @UseGuards(AuthentificationGuard)
   async getMyTransactions(@CurrentUser() user: UserEntity) {
     return this.orderService.getTransactionsByUser(user.id);
   }
