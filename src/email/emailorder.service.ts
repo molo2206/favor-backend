@@ -37,14 +37,14 @@ export class MailOrderService {
           const totalPrice = item.price * item.quantity;
 
           return `
-        <tr>
-          <td>${counter++}</td>
-          <td>${productName}</td>
-          <td>${item.quantity}</td>
-          <td>${item.price.toFixed(2)} ${currency} <small style="color: #6b7280;"></small></td>
-          <td>${totalPrice.toFixed(2)} ${currency}</td>
-        </tr>
-      `;
+      <tr>
+        <td>${counter++}</td>
+        <td>${productName}</td>
+        <td>${item.quantity}</td>
+        <td>${item.price} ${currency}</td>
+        <td>${totalPrice} ${currency}</td>
+      </tr>
+    `;
         }),
       )
       .join('');
@@ -255,14 +255,14 @@ export class MailOrderService {
           const productName = item.product?.name || 'Produit non disponible';
           const totalPrice = item.price * item.quantity;
           return `
-        <tr>
-          <td>${counter++}</td>
-          <td>${productName}</td>
-          <td>${item.quantity}</td>
-          <td>${item.price.toFixed(2)} ${currency} <small style="color: #6b7280;"></small></td>
-          <td>${totalPrice.toFixed(2)} ${currency}</td>
-        </tr>
-      `;
+      <tr>
+        <td>${counter++}</td>
+        <td>${productName}</td>
+        <td>${item.quantity}</td>
+        <td>${item.price} ${currency}</td>
+        <td>${totalPrice} ${currency}</td>
+      </tr>
+    `;
         }),
       )
       .join('');
