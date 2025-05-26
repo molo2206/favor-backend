@@ -5,22 +5,18 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { sign } from 'jsonwebtoken';
 import { UserEntity } from './entities/user.entity';
 import { OtpEntity } from 'src/otp/entities/otp.entity';
 import { CreateUserDto } from './dto/create-user.dto';
-import { MailerService } from '@nestjs-modules/mailer';
 import { LoginUserDto } from './dto/login-user.dto';
 import { validate } from 'class-validator';
 import { instanceToPlain, plainToInstance } from 'class-transformer';
 import { VerifyOtpDto } from 'src/otp/dto/verify-otp.dto';
 import { ResetPasswordDto } from 'src/otp/dto/reset-password.dto';
-import { UpdateUserImageDto } from './dto/update-user.dto';
 import * as speakeasy from 'speakeasy';
 import * as qrcode from 'qrcode';
 import { UpdateUserDto } from './dto/update-profile';
@@ -111,105 +107,110 @@ export class UsersService {
     updateUserDto: Partial<UpdateUserDto>,
     currentUser: UserEntity,
   ): Promise<{ message: string; data: any }> {
-    const user = await this.usersRepository.findOne({
-      where: { id: currentUser.id },
-    });
+    try {
+      const user = await this.usersRepository.findOne({
+        where: { id: currentUser.id },
+      });
 
-    if (!user) {
-      throw new NotFoundException(
-        `Utilisateur avec l'ID ${currentUser.id} non trouvé`,
-      );
+      if (!user) {
+        throw new NotFoundException(
+          `Utilisateur avec l'ID ${currentUser.id} non trouvé`,
+        );
+      }
+
+      Object.assign(user, updateUserDto);
+      await this.usersRepository.save(user);
+
+      const fullUser = await this.usersRepository.findOne({
+        where: { id: user.id },
+        relations: [
+          'activeCompany',
+          'userHasCompany',
+          'userHasCompany.company',
+          'userHasCompany.permissions',
+          'userHasCompany.permissions.permission',
+        ],
+      });
+
+      if (!fullUser) {
+        throw new NotFoundException(
+          'Utilisateur enrichi introuvable après la mise à jour.',
+        );
+      }
+
+      const userHasCompany =
+        fullUser.userHasCompany?.map((uhc) => ({
+          id: uhc.id,
+          isOwner: uhc.isOwner,
+          company: uhc.company
+            ? {
+                id: uhc.company.id,
+                companyName: uhc.company.companyName || '',
+                logo: uhc.company.logo,
+                banner: uhc.company.banner,
+                companyAddress: uhc.company.companyAddress || '',
+                typeCompany: uhc.company.typeCompany,
+                phone: uhc.company.phone,
+                vatNumber: uhc.company.vatNumber,
+                registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+                warehouseLocation: uhc.company.warehouseLocation,
+                email: uhc.company.email,
+                website: uhc.company.website,
+                status: uhc.company.status,
+                companyActivity: uhc.company.companyActivity,
+                latitude: uhc.company.latitude,
+                longitude: uhc.company.longitude,
+                address: uhc.company.address,
+              }
+            : null,
+          permissions:
+            uhc.permissions?.map((p) => ({
+              id: p.permission?.id,
+              name: p.permission?.name,
+              create: p.create,
+              read: p.read,
+              update: p.update,
+              delete: p.delete,
+              status: p.status,
+              createdAt:
+                p.permission?.createdAt instanceof Date
+                  ? p.permission.createdAt
+                  : new Date(p.permission?.createdAt),
+              updatedAt:
+                p.permission?.updatedAt instanceof Date
+                  ? p.permission.updatedAt
+                  : new Date(p.permission?.updatedAt),
+            })) ?? [],
+        })) ?? [];
+
+      return {
+        message: 'Utilisateur mis à jour avec succès.',
+        data: {
+          id: fullUser.id,
+          fullName: fullUser.fullName,
+          email: fullUser.email,
+          phone: fullUser.phone,
+          image: fullUser.image,
+          role: fullUser.role,
+          isActive: fullUser.isActive,
+          country: fullUser.country,
+          city: fullUser.city,
+          address: fullUser.address,
+          preferredLanguage: fullUser.preferredLanguage,
+          loyaltyPoints: fullUser.loyaltyPoints,
+          dateOfBirth: fullUser.dateOfBirth,
+          vehicleType: fullUser.vehicleType,
+          plateNumber: fullUser.plateNumber,
+          activeCompany: fullUser.activeCompany,
+          defaultAddressId: fullUser.defaultAddressId,
+          defaultAddress: fullUser.defaultAddress,
+          userHasCompany,
+        },
+      };
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l’utilisateur:', error);
+      throw new Error('Une erreur interne est survenue.');
     }
-
-    Object.assign(user, updateUserDto);
-    await this.usersRepository.save(user);
-
-    // Rechargement de l'utilisateur enrichi avec toutes les relations
-    const fullUser = await this.usersRepository.findOne({
-      where: { id: user.id },
-      relations: [
-        'activeCompany',
-        'userHasCompany',
-        'userHasCompany.company',
-        'userHasCompany.permissions',
-        'userHasCompany.permissions.permission',
-      ],
-    });
-    if (!fullUser) {
-      throw new NotFoundException(
-        'Utilisateur enrichi introuvable après la mise à jour.',
-      );
-    }
-    // Formatage du résultat comme dans `signin`
-    const userHasCompany =
-      fullUser.userHasCompany?.map((uhc) => ({
-        id: uhc.id,
-        isOwner: uhc.isOwner,
-        company: uhc.company
-          ? {
-              id: uhc.company.id,
-              companyName: uhc.company.companyName || '',
-              logo: uhc.company.logo,
-              banner: uhc.company.banner,
-              companyAddress: uhc.company.companyAddress || '',
-              typeCompany: uhc.company.typeCompany,
-              phone: uhc.company.phone,
-              vatNumber: uhc.company.vatNumber,
-              registrationDocumentUrl: uhc.company.registrationDocumentUrl,
-              warehouseLocation: uhc.company.warehouseLocation,
-              email: uhc.company.email,
-              website: uhc.company.website,
-              status: uhc.company.status,
-              companyActivity: uhc.company.companyActivity,
-              latitude: uhc.company.latitude,
-              longitude: uhc.company.longitude,
-              address: uhc.company.address,
-            }
-          : null,
-        permissions:
-          uhc.permissions?.map((p) => ({
-            id: p.permission?.id,
-            name: p.permission?.name,
-            create: p.create,
-            read: p.read,
-            update: p.update,
-            delete: p.delete,
-            status: p.status,
-            createdAt:
-              p.permission?.createdAt instanceof Date
-                ? p.permission.createdAt
-                : new Date(p.permission?.createdAt),
-            updatedAt:
-              p.permission?.updatedAt instanceof Date
-                ? p.permission.updatedAt
-                : new Date(p.permission?.updatedAt),
-          })) ?? [],
-      })) ?? [];
-
-    return {
-      message: 'Utilisateur mis à jour avec succès.',
-      data: {
-        id: fullUser.id,
-        fullName: fullUser.fullName,
-        email: fullUser.email,
-        phone: fullUser.phone,
-        image: fullUser.image,
-        role: fullUser.role,
-        isActive: fullUser.isActive,
-        country: fullUser.country,
-        city: fullUser.city,
-        address: fullUser.address,
-        preferredLanguage: fullUser.preferredLanguage,
-        loyaltyPoints: fullUser.loyaltyPoints,
-        dateOfBirth: fullUser.dateOfBirth,
-        vehicleType: fullUser.vehicleType,
-        plateNumber: fullUser.plateNumber,
-        activeCompany: fullUser.activeCompany,
-        defaultAddressId: fullUser.defaultAddressId,
-        defaultAddress: fullUser.defaultAddress,
-        userHasCompany,
-      },
-    };
   }
 
   async changePassword(
@@ -260,9 +261,7 @@ export class UsersService {
     }
 
     if (!user.password) {
-      throw new BadRequestException(
-        'Mot de passe non défini pour ce compte.',
-      );
+      throw new BadRequestException('Mot de passe non défini pour ce compte.');
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -573,7 +572,7 @@ export class UsersService {
     }
 
     return await this.jwtService.signAsync(payload, {
-      expiresIn: '5m',
+      expiresIn: '48h',
       secret: secretKey,
     });
   }
