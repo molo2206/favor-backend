@@ -45,19 +45,31 @@ export class SaleTransactionController {
   @Get()
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
   async findAll() {
-    return this.saleTransactionService.findAll();
+    const data = await this.saleTransactionService.findAll();
+    return {
+      message: 'Liste des transactions récupérée avec succès',
+      data,
+    };
   }
 
   @Get('me')
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   async findByUser(@CurrentUser() user: UserEntity) {
-    return this.saleTransactionService.findByUser(user);
+    const data = await this.saleTransactionService.findByUser(user);
+    return {
+      message: 'Vos transactions ont été récupérées avec succès',
+      data,
+    };
   }
 
   @Get(':id')
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   async findOne(@Param('id') id: string) {
-    return this.saleTransactionService.findOne(id);
+    const data = await this.saleTransactionService.findOne(id);
+    return {
+      message: `Transaction #${id} récupérée avec succès`,
+      data,
+    };
   }
 
   @Patch(':id')
@@ -78,6 +90,6 @@ export class SaleTransactionController {
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
   async remove(@Param('id') id: string) {
     await this.saleTransactionService.remove(id);
-    return { message: 'Transaction supprimée avec succès' };
+    return { message: `Transaction #${id} supprimée avec succès` };
   }
 }

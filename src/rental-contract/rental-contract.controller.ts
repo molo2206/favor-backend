@@ -41,20 +41,32 @@ export class RentalContractController {
 
   @Get()
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
-  findAll() {
-    return this.rentalContractService.findAll();
+  async findAll() {
+    const data = await this.rentalContractService.findAll();
+    return {
+      message: 'Liste des contrats de location récupérée avec succès',
+      data,
+    };
   }
 
   @Get('me')
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  findByUser(@CurrentUser() user: UserEntity) {
-    return this.rentalContractService.findByUser(user);
+  async findByUser(@CurrentUser() user: UserEntity) {
+    const data = await this.rentalContractService.findByUser(user);
+    return {
+      message: 'Contrats de location de l’utilisateur récupérés avec succès',
+      data,
+    };
   }
 
   @Get(':id')
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  findOne(@Param('id') id: string, @CurrentUser() user: UserEntity) {
-    return this.rentalContractService.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: UserEntity) {
+    const data = await this.rentalContractService.findOne(id);
+    return {
+      message: `Contrat de location #${id} récupéré avec succès`,
+      data,
+    };
   }
 
   @Patch(':id')
@@ -66,7 +78,10 @@ export class RentalContractController {
     @CurrentUser() user: UserEntity,
   ) {
     const updated = await this.rentalContractService.update(id, updateRentalContractDto);
-    return updated;
+    return {
+      message: `Contrat de location mis à jour avec succès`,
+      data: updated,
+    };
   }
 
   @Patch(':id/cancel')

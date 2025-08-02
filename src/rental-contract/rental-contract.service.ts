@@ -47,12 +47,15 @@ export class RentalContractService {
     });
   }
 
-  async findByUser(user: UserEntity): Promise<RentalContract[]> {
-    return this.rentalRepo.find({
+  async findByUser(user: UserEntity): Promise<Partial<RentalContract>[]> {
+    const contracts = await this.rentalRepo.find({
       where: { customer: { id: user.id } },
       order: { createdAt: 'DESC' },
-      relations: ['vehicle'],
+      relations: ['vehicle', 'customer'],
     });
+
+    // Supprimer customer des objets renvoyés
+    return contracts.map(({ customer, ...rest }) => rest);
   }
 
   async findOne(id: string): Promise<RentalContract> {

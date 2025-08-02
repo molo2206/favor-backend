@@ -1,4 +1,4 @@
-import { IsUUID, IsNumber, IsEnum, IsDateString, IsOptional } from 'class-validator';
+import { IsUUID, IsNumber, IsEnum, IsDateString } from 'class-validator';
 import { PaymentStatus } from '../enum/paymentStatus.enum';
 
 export class CreateSaleTransactionDto {
@@ -9,8 +9,7 @@ export class CreateSaleTransactionDto {
   salePrice: number;
 
   @IsEnum(PaymentStatus)
-  @IsOptional()
-  paymentStatus?: PaymentStatus;
+  paymentStatus: PaymentStatus;
 
   @IsDateString()
   date: string;
