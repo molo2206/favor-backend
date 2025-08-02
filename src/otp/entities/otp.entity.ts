@@ -24,6 +24,4 @@ export class OtpEntity {
 
     @Column({ type: 'timestamp', nullable: true })
     expiresAt: Date;
-
-
 }

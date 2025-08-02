@@ -3,20 +3,20 @@ import { config } from 'dotenv';
 
 config();
 export const dataSourceOptions: DataSourceOptions = {
-    type: 'mysql',
-    host: 'localhost',
-    port: 3306,
-    username: 'admin',
-    password: 'Favor@2025',
-    database: 'favor_db',
-    //jhjhjhjhjh
-    // username: 'root',
-    // password: '',
-    // database: 'favor_db',
-    entities: ['dist/**/*.entity{.ts,.js}'],
-    migrations: ['dist/db/migrations/*{.ts,.js}'],
-    logging: false,
-    synchronize: true,
+  type: 'mysql',
+  host: 'localhost',
+  port: 3306,
+  username: 'admin',
+  password: 'Favor@2025',
+  database: 'favor_db',
+  //jhjhjhjhjh
+  // username: 'root',
+  // password: '',
+  // database: 'favor_db',
+  entities: ['dist/**/*.entity{.ts,.js}'],
+  migrations: ['dist/db/migrations/*{.ts,.js}'],
+  logging: false,
+  synchronize: true,
 };
 
 const dataSource = new DataSource(dataSourceOptions);

@@ -159,7 +159,7 @@ export class ProductService {
       .leftJoinAndSelect('category.children', 'categoryChildren')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
-      .where('product.status = :status', { status: ProductStatus.PUBLISHED }); // ✅ filtrage par statut
+      .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     if (type) {
       queryBuilder.andWhere('product.type = :type', { type });
