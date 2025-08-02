@@ -64,7 +64,7 @@ export class ProductController {
   @Patch(':id')
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  @UseInterceptors(AnyFilesInterceptor()) // ou FileInterceptor selon le cas
+  @UseInterceptors(AnyFilesInterceptor()) 
   async update(
     @Param('id') id: string,
     @Body() dto: CreateProductDto,
@@ -91,6 +91,7 @@ export class ProductController {
   }
 
   @Get()
+  @Public()
   async getProductsByType(
     @Query('type') type?: string,
   ): Promise<{ message: string; data: Product[] }> {
@@ -98,6 +99,7 @@ export class ProductController {
   }
 
   @Get('published')
+  @Public()
   async getProductsPublishedByType(
     @Query('type') type?: string,
   ): Promise<{ message: string; data: Product[] }> {
@@ -105,6 +107,7 @@ export class ProductController {
   }
 
   @Get('published/public')
+  @Public()
   async getPublishedProducts(
     @Query('type') type?: string,
     @Query('companyId') companyId?: string,
@@ -129,6 +132,7 @@ export class ProductController {
   }
 
   @Get('group-by-type_first')
+  @Public()
   async groupByType_first(): Promise<Record<string, Product>> {
     return this.productService.groupByType_First_Product();
   }
@@ -137,7 +141,7 @@ export class ProductController {
   @Public()
   async getGroupedProductsByCategory(
     @Query('categoryId') categoryId?: string,
-    @CurrentUser() user?: UserEntity, // peut être null
+    @CurrentUser() user?: UserEntity,
   ): Promise<{
     data: (CategoryEntity & { products: Product[] })[];
   }> {
@@ -154,6 +158,7 @@ export class ProductController {
   }
 
   @Get('published/public/bycategory')
+  @Public()
   async getPublishedProductByCategory(
     @Query('categoryId') categoryId?: string,
     @Query('shopType') shopType?: string,
@@ -169,6 +174,7 @@ export class ProductController {
   }
 
   @Get('search')
+  @Public()
   async search(@Query('search') query: string): Promise<{ message: string; data: Product[] }> {
     return this.productService.searchProducts(query);
   }
