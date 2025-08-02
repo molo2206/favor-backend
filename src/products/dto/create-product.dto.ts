@@ -1,6 +1,9 @@
 import { IsString, IsNumber, IsOptional, IsUUID, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
+import { Type_rental_both_sale_car } from '../enum/type_rental_both_sale_car';
+import { FuelType } from '../enum/fuelType_enum';
+import { Transmission } from '../enum/transmission.enum';
 
 export class CreateProductDto {
   // Obligatoire
@@ -14,14 +17,6 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
-  carModel?: string;
-
-  @IsOptional()
-  @IsString()
-  licensePlate?: string;
-
-  @IsOptional()
-  @IsString()
   ingredients?: string;
 
   // Optionnels - Nombres
@@ -29,11 +24,6 @@ export class CreateProductDto {
   @Type(() => Number)
   @IsNumber()
   price?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  durationInMinutes?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -74,4 +64,45 @@ export class CreateProductDto {
   @IsEnum(ProductStatus)
   status?: ProductStatus;
 
+  @IsOptional()
+  @IsString()
+  registrationNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  brand: string;
+
+  @IsOptional()
+  @IsString()
+  model: string;
+
+  @IsOptional()
+  @IsString()
+  typecar?: Type_rental_both_sale_car;
+
+  @IsOptional()
+  @IsString()
+  year: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  dailyRate?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  salePrice?: number;
+
+  @IsOptional()
+  @IsString()
+  fuelType?: FuelType;
+
+  @IsOptional()
+  @IsString()
+  transmission?: Transmission;
+
+  @IsOptional()
+  @IsString()
+  color?: string;
 }
