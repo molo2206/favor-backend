@@ -1,4 +1,19 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, ValidationPipe, UsePipes, UseInterceptors, UploadedFiles, ClassSerializerInterceptor, Query, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  UseGuards,
+  ValidationPipe,
+  UsePipes,
+  UseInterceptors,
+  UploadedFiles,
+  ClassSerializerInterceptor,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { Product } from './entities/product.entity';
 import { ProductService } from './products.service';
@@ -10,10 +25,11 @@ import { CategoryEntity } from 'src/category/entities/category.entity';
 import { CurrentUser } from '../users/utility/decorators/current-user-decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
+import { Public } from 'src/users/utility/decorators/public.decorator';
 
 @Controller('products')
 export class ProductController {
-  constructor(private readonly productService: ProductService) { }
+  constructor(private readonly productService: ProductService) {}
 
   @UseInterceptors(ClassSerializerInterceptor)
   @Post()
@@ -26,13 +42,12 @@ export class ProductController {
     @Body() dto: CreateProductDto,
     @CurrentUser() user: UserEntity,
   ) {
-
     if (!files || files.length === 0) {
       throw new BadRequestException('Vous devez fournir au moins deux images');
     }
 
     if (files.length < 2 || files.length > 4) {
-      throw new BadRequestException('Le nombre d\'images doit être compris entre 2 et 4');
+      throw new BadRequestException("Le nombre d'images doit être compris entre 2 et 4");
     }
 
     if (!user.activeCompanyId) {
@@ -75,7 +90,6 @@ export class ProductController {
     return this.productService.findOne(id);
   }
 
-
   @Get()
   async getProductsByType(
     @Query('type') type?: string,
@@ -98,7 +112,13 @@ export class ProductController {
     @Query('page') page = 1,
     @Query('limit') limit = 10,
   ) {
-    return this.productService.findProductPublishedByTypeByCompany(type, companyId, shopType, Number(page), Number(limit));
+    return this.productService.findProductPublishedByTypeByCompany(
+      type,
+      companyId,
+      shopType,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @Get('group-by-type')
@@ -114,11 +134,14 @@ export class ProductController {
   }
 
   @Get('/category')
+  @Public()
   async getGroupedProductsByCategory(
     @Query('categoryId') categoryId?: string,
+    @CurrentUser() user?: UserEntity, // peut être null
   ): Promise<{
     data: (CategoryEntity & { products: Product[] })[];
   }> {
+    console.log('User connecté (si existe)', user);
     return this.productService.findAllGroupedByCategory(categoryId);
   }
 
@@ -144,7 +167,6 @@ export class ProductController {
       Number(limit),
     );
   }
-
 
   @Get('search')
   async search(@Query('search') query: string): Promise<{ message: string; data: Product[] }> {
