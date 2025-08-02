@@ -1,9 +1,5 @@
 // order.service.ts
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OrderEntity } from './entities/order.entity';
@@ -26,6 +22,18 @@ import { CreateTransactionDto } from 'src/transaction/dto/create-transaction.dto
 import { TransactionType } from 'src/transaction/transaction.enum';
 import { InvoiceService } from './invoice/invoice.util';
 import * as QRCode from 'qrcode';
+
+function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
+  const transitions: Record<OrderStatus, OrderStatus[]> = {
+    [OrderStatus.PENDING]: [OrderStatus.VALIDATED, OrderStatus.REJECTED],
+    [OrderStatus.VALIDATED]: [OrderStatus.PROCESSING, OrderStatus.REJECTED],
+    [OrderStatus.PROCESSING]: [OrderStatus.COMPLETED],
+    [OrderStatus.COMPLETED]: [OrderStatus.DELIVERED],
+    [OrderStatus.DELIVERED]: [],
+    [OrderStatus.REJECTED]: [],
+  };
+  return transitions[current]?.includes(next);
+}
 
 @Injectable()
 export class OrderService {
@@ -57,18 +65,9 @@ export class OrderService {
     private readonly transactionRepository: Repository<TransactionEntity>,
   ) {}
 
-  async createOrder(
-    createOrderDto: CreateOrderDto,
-    user: UserEntity,
-  ): Promise<OrderEntity> {
-    const {
-      totalAmount,
-      shippingCost,
-      currency,
-      orderItems,
-      addressUserId,
-      type,
-    } = createOrderDto;
+  async createOrder(createOrderDto: CreateOrderDto, user: UserEntity): Promise<OrderEntity> {
+    const { totalAmount, shippingCost, currency, orderItems, addressUserId, type } =
+      createOrderDto;
 
     const addressUser = await this.addressUserRepo.findOne({
       where: { id: addressUserId },
@@ -103,8 +102,7 @@ export class OrderService {
         where: { id: item.productId },
         relations: ['company'],
       });
-      if (!product)
-        throw new NotFoundException(`Product not found: ${item.productId}`);
+      if (!product) throw new NotFoundException(`Product not found: ${item.productId}`);
 
       const orderItem = this.orderItemRepo.create({
         order,
@@ -172,8 +170,7 @@ export class OrderService {
       ],
     });
 
-    if (!finalOrder)
-      throw new NotFoundException('Order not found after creation');
+    if (!finalOrder) throw new NotFoundException('Order not found after creation');
 
     const subOrders = await this.subOrderRepo.find({
       where: { order: { id: finalOrder.id } },
@@ -182,23 +179,19 @@ export class OrderService {
 
     const paymentQrCode = await QRCode.toDataURL(finalOrder.invoiceNumber);
 
-    await this.mailService.sendInvoiceWithPdf(
-      user.email,
-      'Votre facture PDF - FavorHelp',
-      {
-        user,
-        order: {
-          id: finalOrder.id,
-          totalAmount: finalOrder.totalAmount,
-          currency: finalOrder.currency,
-          invoiceNumber: finalOrder.invoiceNumber,
-          address: finalOrder.addressUser.address,
-          paymentStatus: order.paymentStatus,
-        },
-        subOrders,
-        paymentQrCode,
+    await this.mailService.sendInvoiceWithPdf(user.email, 'Votre facture PDF - FavorHelp', {
+      user,
+      order: {
+        id: finalOrder.id,
+        totalAmount: finalOrder.totalAmount,
+        currency: finalOrder.currency,
+        invoiceNumber: finalOrder.invoiceNumber,
+        address: finalOrder.addressUser.address,
+        paymentStatus: order.paymentStatus,
       },
-    );
+      subOrders,
+      paymentQrCode,
+    });
 
     return finalOrder;
   }
@@ -227,26 +220,32 @@ export class OrderService {
       throw new NotFoundException('Commande introuvable');
     }
 
-    // Mise à jour du statut
-    if (order.status !== OrderStatus.PENDING) {
+    // Vérification de la transition
+    if (!isValidStatusTransition(order.status, dto.status)) {
       throw new BadRequestException(
-        'Cette commande est déjà validée ou fermée et ne peut plus être modifiée.',
+        `Transition invalide de "${order.status}" vers "${dto.status}".`,
       );
     }
-    order.status = dto.status;
-    order.paymentStatus = PaymentStatus.PAID;
-    order.paid = true;
 
-    // Sauvegarde de la commande
+    // Application des changements
+    order.status = dto.status;
+
+    // ⚠️ Le paiement est effectué seulement lors de la validation initiale
+    if (dto.status === OrderStatus.VALIDATED) {
+      order.paymentStatus = PaymentStatus.PAID;
+      order.paid = true;
+    }
+
     const updatedOrder = await this.orderRepo.save(order);
 
     const subOrders = await this.subOrderRepo.find({
       where: { order: { id: updatedOrder.id } },
       relations: ['company', 'items', 'items.product', 'order'],
     });
-    // Si le statut de la commande est validé, envoi de l'email
+
     if (dto.status === OrderStatus.VALIDATED) {
       const paymentQrCode = await QRCode.toDataURL(order.invoiceNumber);
+
       await this.mailService.sendInvoicePaidWithPdf(
         order.user.email,
         'Veuillez trouver ci-joint votre facture PDF, déjà payée et validée - FavorHelp',
@@ -261,19 +260,16 @@ export class OrderService {
       const createTransactionDto: CreateTransactionDto = {
         orderId: updatedOrder.id,
         amount: updatedOrder.totalAmount,
-        paymentStatus: PaymentStatus.PAID, // Statut de paiement initial
-        transactionReference: uuidv4(), // Générer une référence unique
-        currency: 'USD', // Exemple de devise, à ajuster selon la commande
+        paymentStatus: PaymentStatus.PAID,
+        transactionReference: uuidv4(),
+        currency: 'USD',
         type: TransactionType.CREDIT,
       };
 
-      // Créer l'entité de transaction à partir du DTO
-      const transaction =
-        this.transactionRepository.create(createTransactionDto);
+      const transaction = this.transactionRepository.create(createTransactionDto);
       await this.transactionRepository.save(transaction);
-      // Sauvegarder la transaction dans la base de données
     }
-    // Retourner le message et la commande mise à jour
+
     return {
       message: `La commande ${orderId} a été mise à jour avec succès.`,
       data: updatedOrder,
@@ -300,9 +296,7 @@ export class OrderService {
     });
 
     if (!order) {
-      throw new NotFoundException(
-        'Commande introuvable avec ce numéro de facture.',
-      );
+      throw new NotFoundException('Commande introuvable avec ce numéro de facture.');
     }
 
     const subOrders = await this.subOrderRepo.find({
@@ -312,19 +306,16 @@ export class OrderService {
 
     const paymentQrCode = await QRCode.toDataURL(order.invoiceNumber);
 
-    const pdfBuffer = await this.mailService.generatePdfFromTemplate(
-      'invoice.ejs',
-      {
-        user: order.user,
-        order,
+    const pdfBuffer = await this.mailService.generatePdfFromTemplate('invoice.ejs', {
+      user: order.user,
+      order,
+      subOrders,
+      paymentQrCode,
+      subOrdersHtml: this.mailService.generateSubOrdersByInvoiceNumberHtml(
         subOrders,
-        paymentQrCode,
-        subOrdersHtml: this.mailService.generateSubOrdersByInvoiceNumberHtml(
-          subOrders,
-          order.currency,
-        ),
-      },
-    );
+        order.currency,
+      ),
+    });
 
     return {
       pdfBuffer,
@@ -381,9 +372,7 @@ export class OrderService {
     });
   }
 
-  async findByType(
-    type?: string,
-  ): Promise<{ message: string; data: OrderEntity[] }> {
+  async findByType(type?: string): Promise<{ message: string; data: OrderEntity[] }> {
     const query = this.orderRepo
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.user', 'user')
@@ -457,9 +446,7 @@ export class OrderService {
     return { data: orders };
   }
 
-  async findSubOrdersByCompanys(
-    companyId: string,
-  ): Promise<{ data: SubOrderEntity[] }> {
+  async findSubOrdersByCompanys(companyId: string): Promise<{ data: SubOrderEntity[] }> {
     const orders = await this.orderRepo.find({
       relations: [
         'subOrders',
