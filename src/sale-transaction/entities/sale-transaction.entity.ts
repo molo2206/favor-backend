@@ -37,4 +37,7 @@ export class SaleTransaction {
 
   @Column()
   date: Date;
+
+  @Column({ type: 'int', default: 1 })
+  quantity: number;
 }

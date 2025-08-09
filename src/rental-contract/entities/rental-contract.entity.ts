@@ -20,7 +20,6 @@ export class RentalContract {
   @Column({ type: 'timestamp' })
   startDate: Date;
 
-
   @Column({ type: 'datetime', nullable: true, default: null })
   endDate: Date;
 
@@ -35,6 +34,9 @@ export class RentalContract {
 
   @Column({ type: 'enum', enum: RentalStatus, default: RentalStatus.PENDING })
   status: RentalStatus;
+
+  @Column({ type: 'int', default: 1 })
+  quantity: number;  // <-- Ajout du champ quantité
 
   @CreateDateColumn()
   createdAt: Date;

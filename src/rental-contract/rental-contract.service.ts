@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { CreateRentalContractDto } from './dto/create-rental-contract.dto';
 import { UpdateRentalContractDto } from './dto/update-rental-contract.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -23,8 +28,53 @@ export class RentalContractService {
 
     const start = new Date(dto.startDate);
     const end = new Date(dto.endDate);
+
+    if (start >= end)
+      throw new BadRequestException('La date de début doit être avant la date de fin');
+
+    // Vérification chevauchement contrats actifs
+    const overlappingCount = await this.rentalRepo
+      .createQueryBuilder('rental_contracts')
+      .where('rental_contracts.vehicleId = :vehicleId', { vehicleId: vehicle.id })
+      .andWhere('rental_contracts.status IN (:...statuses)', {
+        statuses: [RentalStatus.PENDING, RentalStatus.ACTIVE],
+      })
+      .andWhere('(rental_contracts.startDate <= :end AND rental_contracts.endDate >= :start)', {
+        start,
+        end,
+      })
+      .getCount();
+
+    if (overlappingCount > 0) {
+      throw new BadRequestException('Le véhicule est déjà loué pendant cette période');
+    }
+
+    // Vérification quantité disponible
+    if (vehicle.quantity && vehicle.quantity > 0) {
+      const result = await this.rentalRepo
+        .createQueryBuilder('rental_contracts')
+        .select('SUM(rental_contracts.quantity)', 'totalBooked')
+        .where('rental_contracts.vehicleId = :vehicleId', { vehicleId: vehicle.id })
+        .andWhere('rental_contracts.status IN (:...statuses)', {
+          statuses: [RentalStatus.PENDING, RentalStatus.ACTIVE],
+        })
+        .andWhere(
+          '(rental_contracts.startDate <= :end AND rental_contracts.endDate >= :start)',
+          { start, end },
+        )
+        .getRawOne();
+
+      const bookedQuantity = parseInt(result.totalBooked, 10) || 0;
+      const requestedQuantity = dto.quantity ?? 1;
+
+      if (bookedQuantity + requestedQuantity > vehicle.quantity) {
+        throw new BadRequestException('Quantité insuffisante disponible pour cette période');
+      }
+    }
+
     const totalDays = Math.ceil((+end - +start) / (1000 * 60 * 60 * 24));
-    const totalAmount = totalDays * (dto.dailyRate || vehicle.dailyRate || 0);
+    const dailyRate = dto.dailyRate ?? vehicle.dailyRate ?? 0;
+    const totalAmount = totalDays * dailyRate * (dto.quantity ?? 1);
 
     const contract = this.rentalRepo.create({
       customer: user,
@@ -32,12 +82,32 @@ export class RentalContractService {
       startDate: dto.startDate,
       endDate: dto.endDate,
       totalDays,
-      dailyRate: dto.dailyRate || vehicle.dailyRate,
+      dailyRate,
       totalAmount,
       status: dto.status ?? RentalStatus.PENDING,
+      quantity: dto.quantity ?? 1,
     });
 
-    return this.rentalRepo.save(contract);
+    // Sauvegarde du contrat
+    const savedContract = await this.rentalRepo.save(contract);
+
+    // Mise à jour de la quantité dans la table product
+    if (vehicle.quantity !== undefined && vehicle.quantity !== null && vehicle.quantity > 0) {
+      const requestedQuantity = dto.quantity ?? 1;
+
+      const newQuantity = vehicle.quantity - requestedQuantity;
+
+      if (newQuantity < 0) {
+        throw new BadRequestException(
+          'La quantité disponible est insuffisante pour cette réservation.',
+        );
+      }
+
+      vehicle.quantity = newQuantity;
+      await this.productRepo.save(vehicle);
+    }
+
+    return savedContract;
   }
 
   async findAll(): Promise<RentalContract[]> {

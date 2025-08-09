@@ -30,4 +30,8 @@ export class CreateRentalContractDto {
   @IsOptional()
   @IsEnum(RentalStatus)
   status?: RentalStatus; // Défaut = PENDING
+
+  @IsOptional()
+  @IsNumber()
+  quantity?: number;
 }

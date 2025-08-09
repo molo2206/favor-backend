@@ -32,6 +32,23 @@ export class SaleTransactionService {
       throw new NotFoundException('Véhicule non trouvé');
     }
 
+    // Vérification quantité disponible
+    if (vehicle.quantity === undefined || vehicle.quantity === null || vehicle.quantity <= 0) {
+      throw new BadRequestException('Produit en rupture de stock');
+    }
+
+    const requestedQuantity = dto.quantity ?? 1; // par défaut 1 si non précisé
+
+    if (requestedQuantity > vehicle.quantity) {
+      throw new BadRequestException(
+        `Quantité demandée (${requestedQuantity}) supérieure à la quantité disponible (${vehicle.quantity})`,
+      );
+    }
+
+    // Met à jour la quantité restante
+    vehicle.quantity -= requestedQuantity;
+    await this.productRepo.save(vehicle);
+
     const salePrice = vehicle.salePrice ?? 0;
     const paymentStatus = PaymentStatus.PENDING;
     const date = new Date();
@@ -44,6 +61,7 @@ export class SaleTransactionService {
       salePrice,
       paymentStatus,
       date,
+      quantity: requestedQuantity, // Ajoute cette propriété si elle existe dans ton entity SaleTransaction
     });
 
     return this.saleRepo.save(transaction);
