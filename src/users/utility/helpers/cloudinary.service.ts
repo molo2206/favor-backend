@@ -51,14 +51,30 @@ export class CloudinaryService {
       throw new UnprocessableEntityException('Only JPEG, PNG, or WEBP images are allowed.');
     }
 
+    const metadata = await sharp(file.buffer).metadata();
+
+    
+    let maxWidth = 800;
+    let maxHeight = 800;
+
+    let quality = 90; 
+    if (metadata.size && metadata.size > 3 * 1024 * 1024) {
+  
+      quality = 75;
+      maxWidth = 600; 
+      maxHeight = 600;
+    } else if (metadata.size && metadata.size > 1 * 1024 * 1024) {
+      quality = 85;
+    }
+
     const processedBuffer = await sharp(file.buffer)
       .resize({
-        width: 400,
-        height: 400,
-        fit: 'inside',
-        withoutEnlargement: true,
+        width: maxWidth,
+        height: maxHeight,
+        fit: 'inside', 
+        withoutEnlargement: true, 
       })
-      .webp({ quality: 80 })
+      .webp({ quality })
       .toBuffer();
 
     return this.retry(() => this.uploadToCloudinary(processedBuffer, folder));
