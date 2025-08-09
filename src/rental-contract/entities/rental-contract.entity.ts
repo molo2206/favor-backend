@@ -36,7 +36,10 @@ export class RentalContract {
   status: RentalStatus;
 
   @Column({ type: 'int', default: 1 })
-  quantity: number;  // <-- Ajout du champ quantité
+  quantity: number; // <-- Ajout du champ quantité
+
+  @Column({ nullable: true })
+  rentalNumber: string;
 
   @CreateDateColumn()
   createdAt: Date;

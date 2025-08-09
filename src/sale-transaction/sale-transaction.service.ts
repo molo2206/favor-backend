@@ -7,6 +7,7 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { SaleTransaction } from './entities/sale-transaction.entity';
 import { PaymentStatus } from './enum/paymentStatus.enum';
+import { InvoiceService } from 'src/order/invoice/invoice.util';
 
 @Injectable()
 export class SaleTransactionService {
@@ -19,6 +20,8 @@ export class SaleTransactionService {
 
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+
+    private readonly invoiceService: InvoiceService,
   ) {}
 
   async create(dto: CreateSaleTransactionDto, userId: string): Promise<SaleTransaction> {
@@ -37,7 +40,8 @@ export class SaleTransactionService {
       throw new BadRequestException('Produit en rupture de stock');
     }
 
-    const requestedQuantity = dto.quantity ?? 1; // par défaut 1 si non précisé
+    // Conversion sécurisée en number
+    const requestedQuantity: number = dto.quantity ? parseInt(dto.quantity as any, 10) : 1;
 
     if (requestedQuantity > vehicle.quantity) {
       throw new BadRequestException(
@@ -46,7 +50,7 @@ export class SaleTransactionService {
     }
 
     // Met à jour la quantité restante
-    vehicle.quantity -= requestedQuantity;
+    vehicle.quantity = vehicle.quantity - requestedQuantity;
     await this.productRepo.save(vehicle);
 
     const salePrice = vehicle.salePrice ?? 0;
@@ -61,7 +65,8 @@ export class SaleTransactionService {
       salePrice,
       paymentStatus,
       date,
-      quantity: requestedQuantity, // Ajoute cette propriété si elle existe dans ton entity SaleTransaction
+      quantity: requestedQuantity,
+      saleNumber: this.invoiceService.generateInvoiceNumber(),
     });
 
     return this.saleRepo.save(transaction);

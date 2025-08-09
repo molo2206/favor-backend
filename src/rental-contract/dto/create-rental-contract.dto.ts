@@ -1,4 +1,4 @@
-import { IsUUID, IsDateString, IsNumber, IsEnum, IsOptional } from 'class-validator';
+import { IsUUID, IsDateString, IsNumber, IsEnum, IsOptional, IsString, IsNumberString } from 'class-validator';
 import { RentalStatus } from '../enum/rentalStatus.enum';
 
 export class CreateRentalContractDto {
@@ -32,6 +32,6 @@ export class CreateRentalContractDto {
   status?: RentalStatus; // Défaut = PENDING
 
   @IsOptional()
-  @IsNumber()
-  quantity?: number;
+  @IsNumberString() // accepte "23", "5", etc. mais pas "abc"
+  quantity?: string;
 }

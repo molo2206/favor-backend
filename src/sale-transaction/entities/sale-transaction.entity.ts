@@ -40,4 +40,7 @@ export class SaleTransaction {
 
   @Column({ type: 'int', default: 1 })
   quantity: number;
+
+  @Column({ nullable: true })
+  saleNumber: string;
 }

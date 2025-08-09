@@ -12,6 +12,7 @@ import { Repository } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { RentalStatus } from './enum/rentalStatus.enum';
+import { InvoiceService } from 'src/order/invoice/invoice.util';
 
 @Injectable()
 export class RentalContractService {
@@ -20,6 +21,7 @@ export class RentalContractService {
     private rentalRepo: Repository<RentalContract>,
     @InjectRepository(Product)
     private productRepo: Repository<Product>,
+    private readonly invoiceService: InvoiceService,
   ) {}
 
   async create(dto: CreateRentalContractDto, user: UserEntity): Promise<RentalContract> {
@@ -65,7 +67,7 @@ export class RentalContractService {
         .getRawOne();
 
       const bookedQuantity = parseInt(result.totalBooked, 10) || 0;
-      const requestedQuantity = dto.quantity ?? 1;
+      const requestedQuantity = dto.quantity ? parseInt(dto.quantity, 10) : 1;
 
       if (bookedQuantity + requestedQuantity > vehicle.quantity) {
         throw new BadRequestException('Quantité insuffisante disponible pour cette période');
@@ -74,7 +76,7 @@ export class RentalContractService {
 
     const totalDays = Math.ceil((+end - +start) / (1000 * 60 * 60 * 24));
     const dailyRate = dto.dailyRate ?? vehicle.dailyRate ?? 0;
-    const totalAmount = totalDays * dailyRate * (dto.quantity ?? 1);
+    const totalAmount = totalDays * dailyRate * (parseInt(dto.quantity as any) ?? 1);
 
     const contract = this.rentalRepo.create({
       customer: user,
@@ -85,15 +87,15 @@ export class RentalContractService {
       dailyRate,
       totalAmount,
       status: dto.status ?? RentalStatus.PENDING,
-      quantity: dto.quantity ?? 1,
+      quantity: parseInt(dto.quantity as any) ?? 1,
+      rentalNumber: this.invoiceService.generateInvoiceNumber(),
     });
 
     // Sauvegarde du contrat
     const savedContract = await this.rentalRepo.save(contract);
 
-    // Mise à jour de la quantité dans la table product
     if (vehicle.quantity !== undefined && vehicle.quantity !== null && vehicle.quantity > 0) {
-      const requestedQuantity = dto.quantity ?? 1;
+      const requestedQuantity: number = dto.quantity ? parseInt(dto.quantity, 10) : 1;
 
       const newQuantity = vehicle.quantity - requestedQuantity;
 
