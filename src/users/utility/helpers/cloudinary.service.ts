@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
 import { fileTypeFromBuffer } from 'file-type';
@@ -55,7 +52,7 @@ export class CloudinaryService {
     }
 
     const processedBuffer = await sharp(file.buffer)
-      .resize(300, 300, { fit: 'cover' })
+      .resize(300, 300, { fit: 'contain' })
       .webp({ quality: 80 })
       .toBuffer();
 
@@ -75,7 +72,9 @@ export class CloudinaryService {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
     if (!allowedTypes.includes(mime)) {
-      throw new UnprocessableEntityException('Only JPEG, PNG, WEBP images or PDFs are allowed.');
+      throw new UnprocessableEntityException(
+        'Only JPEG, PNG, WEBP images or PDFs are allowed.',
+      );
     }
 
     let processedBuffer: Buffer;
