@@ -52,7 +52,12 @@ export class CloudinaryService {
     }
 
     const processedBuffer = await sharp(file.buffer)
-      .resize(300, 300, { fit: 'contain' })
+      .resize({
+        width: 400,
+        height: 400,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
       .webp({ quality: 80 })
       .toBuffer();
 
