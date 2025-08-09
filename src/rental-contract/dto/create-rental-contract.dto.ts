@@ -3,27 +3,31 @@ import { RentalStatus } from '../enum/rentalStatus.enum';
 
 export class CreateRentalContractDto {
   @IsUUID()
-  @IsOptional()
+  @IsOptional() // optionnel, on peut le déduire avec @CurrentUser
   customerId?: string;
 
   @IsUUID()
   vehicleId: string;
 
   @IsDateString()
-  startDate: Date;
+  startDate: string; // ← en string ISO, pas Date direct
 
   @IsDateString()
-  endDate: Date;
+  endDate: string;
 
+  @IsOptional()
   @IsNumber()
-  totalDays: number;
+  totalDays?: number; // Calculé automatiquement
 
+  @IsOptional()
   @IsNumber()
-  dailyRate: number;
+  dailyRate?: number; // Calculé automatiquement
 
+  @IsOptional()
   @IsNumber()
-  totalAmount: number;
+  totalAmount?: number; // Calculé automatiquement
 
+  @IsOptional()
   @IsEnum(RentalStatus)
-  status: RentalStatus;
+  status?: RentalStatus; // Défaut = PENDING
 }

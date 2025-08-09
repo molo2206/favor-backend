@@ -32,18 +32,22 @@ export class SaleTransactionService {
       throw new NotFoundException('Véhicule non trouvé');
     }
 
+    // Calcul automatique du prix si non fourni
+    const salePrice = dto.salePrice ?? vehicle.salePrice ?? 0;
+
     const transaction = this.saleRepo.create({
       customer,
       customerId: customer.id,
       vehicle,
       vehicleId: vehicle.id,
-      salePrice: dto.salePrice,
+      salePrice,
       paymentStatus: dto.paymentStatus ?? PaymentStatus.PENDING,
       date: new Date(dto.date),
     });
 
     return this.saleRepo.save(transaction);
   }
+
   findAll(): Promise<SaleTransaction[]> {
     return this.saleRepo.find({
       relations: ['customer', 'vehicle'],
