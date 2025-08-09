@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateSaleTransactionDto } from './dto/create-sale-transaction.dto';
@@ -32,8 +32,9 @@ export class SaleTransactionService {
       throw new NotFoundException('Véhicule non trouvé');
     }
 
-    // Calcul automatique du prix si non fourni
-    const salePrice = dto.salePrice ?? vehicle.salePrice ?? 0;
+    const salePrice = vehicle.salePrice ?? 0;
+    const paymentStatus = PaymentStatus.PENDING;
+    const date = new Date();
 
     const transaction = this.saleRepo.create({
       customer,
@@ -41,8 +42,8 @@ export class SaleTransactionService {
       vehicle,
       vehicleId: vehicle.id,
       salePrice,
-      paymentStatus: dto.paymentStatus ?? PaymentStatus.PENDING,
-      date: new Date(dto.date),
+      paymentStatus,
+      date,
     });
 
     return this.saleRepo.save(transaction);
