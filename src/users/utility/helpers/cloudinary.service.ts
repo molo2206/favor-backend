@@ -57,14 +57,14 @@ export class CloudinaryService {
     let maxWidth = 800;
     let maxHeight = 800;
 
-    let quality = 90; 
+    let quality = 95; 
     if (metadata.size && metadata.size > 3 * 1024 * 1024) {
   
-      quality = 75;
+      quality = 85;
       maxWidth = 600; 
       maxHeight = 600;
     } else if (metadata.size && metadata.size > 1 * 1024 * 1024) {
-      quality = 85;
+      quality = 90;
     }
 
     const processedBuffer = await sharp(file.buffer)
