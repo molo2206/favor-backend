@@ -1,13 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  Injectable,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { UserEntity } from './entities/user.entity';
 import { OtpEntity } from 'src/otp/entities/otp.entity';
@@ -39,18 +35,14 @@ export class UsersService {
     private readonly mailService: MailService,
   ) {}
 
-  async signup(
-    createUserDto: CreateUserDto,
-  ): Promise<{ message: string; data: any }> {
+  async signup(createUserDto: CreateUserDto): Promise<{ message: string; data: any }> {
     const { email, phone, otpCode, password } = createUserDto;
 
     const phoneExists = await this.usersRepository.findOne({
       where: { phone },
     });
     if (phoneExists) {
-      throw new BadRequestException(
-        'Un compte avec ce numéro de téléphone existe déjà.',
-      );
+      throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
     }
 
     const emailExists = await this.usersRepository.findOne({
@@ -113,9 +105,7 @@ export class UsersService {
       });
 
       if (!user) {
-        throw new NotFoundException(
-          `Utilisateur avec l'ID ${currentUser.id} non trouvé`,
-        );
+        throw new NotFoundException(`Utilisateur avec l'ID ${currentUser.id} non trouvé`);
       }
 
       Object.assign(user, updateUserDto);
@@ -133,9 +123,7 @@ export class UsersService {
       });
 
       if (!fullUser) {
-        throw new NotFoundException(
-          'Utilisateur enrichi introuvable après la mise à jour.',
-        );
+        throw new NotFoundException('Utilisateur enrichi introuvable après la mise à jour.');
       }
 
       const userHasCompany =
@@ -264,10 +252,7 @@ export class UsersService {
       throw new BadRequestException('Mot de passe non défini pour ce compte.');
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      userSignInDto.password,
-      user.password,
-    );
+    const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
 
     if (!isPasswordValid) {
       throw new BadRequestException('Mot de passe incorrect.');
@@ -450,8 +435,8 @@ export class UsersService {
   }
 
   async sendOtp(email: string): Promise<any> {
-    const dto = plainToInstance(VerifyOtpDto, { email, otpCode: '000000' });
-
+    const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const dto = plainToInstance(VerifyOtpDto, { email, code: '0000' });
     const errors = await validate(dto, {
       whitelist: true,
       forbidNonWhitelisted: true,
@@ -473,7 +458,6 @@ export class UsersService {
       };
     }
 
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const otp = this.otpRepository.create({
       email,
       otpCode,
@@ -481,12 +465,10 @@ export class UsersService {
     });
     await this.otpRepository.save(otp);
 
-    await this.mailService.sendHtmlEmail(
-      email,
-      'Votre OTP de connexion',
-      'sendOtp.html',
-      { otpCode, year: new Date().getFullYear() }, // envoi otpCode + année
-    );
+    await this.mailService.sendHtmlEmail(email, 'Votre OTP de connexion', 'sendOtp.html', {
+      otpCode,
+      year: new Date().getFullYear(),
+    });
     return { message: 'OTP envoyé avec succès.' };
   }
 
@@ -496,7 +478,7 @@ export class UsersService {
       throw new BadRequestException('Aucun utilisateur trouvé avec cet email.');
     }
 
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
     const otp = this.otpRepository.create({
       email,
       otpCode,
@@ -538,6 +520,23 @@ export class UsersService {
     await this.otpRepository.save(otpEntry);
 
     return { message: 'Mot de passe réinitialisé avec succès.' };
+  }
+
+  async verifyOtp(email: string, code: string): Promise<{ message: string }> {
+    // 1. Recherche d’un OTP valide (non utilisé et non expiré)
+    const otpEntry = await this.otpRepository.findOne({
+      where: {
+        email: email.toLowerCase(),
+        otpCode: code,
+        isUsed: false,
+        expiresAt: MoreThan(new Date()),
+      },
+    });
+
+    if (!otpEntry) {
+      throw new BadRequestException('Code OTP invalide ou expiré.');
+    }
+    return { message: 'OTP validé avec succès.' };
   }
 
   async getFullProfile(userId: string): Promise<Record<string, any>> {
@@ -583,9 +582,7 @@ export class UsersService {
       role: user.role,
     };
 
-    const secretKey = this.configService.get<string>(
-      'REFRESH_TOKEN_SECRET_KEY',
-    );
+    const secretKey = this.configService.get<string>('REFRESH_TOKEN_SECRET_KEY');
     if (!secretKey) {
       throw new Error('REFRESH_TOKEN_SECRET_KEY is not defined!');
     }
@@ -640,6 +637,7 @@ export class UsersService {
       window: 60, // Permet de vérifier également les tokens dans une fenêtre de 1 période (±30 secondes)
     });
   }
+
   async findById(userId: string): Promise<UserEntity> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) {

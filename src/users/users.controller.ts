@@ -31,6 +31,7 @@ import { Verify2FADto } from './dto/verify2fact.dto';
 import * as speakeasy from 'speakeasy';
 import { AuthorizeRoles } from './utility/decorators/authorize.roles.decorator';
 import { MailService } from 'src/email/email.service';
+import { VerifyOtpDto } from './dto/VerifyOtpDto';
 
 @Controller('users')
 export class UsersController {
@@ -56,8 +57,7 @@ export class UsersController {
 
   @Post('refresh-token')
   async refresh(@Body('refresh_token') refreshToken: string) {
-    const accessToken =
-      await this.usersService.refreshTokenWithValidation(refreshToken);
+    const accessToken = await this.usersService.refreshTokenWithValidation(refreshToken);
     return {
       message: 'Nouveau token généré',
       access_token: accessToken,
@@ -89,10 +89,7 @@ export class UsersController {
   }
   @Post('verify')
   @UseGuards(AuthentificationGuard)
-  async verify2FA(
-    @Body() dto: Verify2FADto,
-    @CurrentUser() currentUser: UserEntity,
-  ) {
+  async verify2FA(@Body() dto: Verify2FADto, @CurrentUser() currentUser: UserEntity) {
     // Log pour vérifier les valeurs
     // console.log('Vérification 2FA - Secret:', currentUser.twoFASecret);
     // console.log('Vérification 2FA - Token:', dto.token);
@@ -171,11 +168,23 @@ export class UsersController {
   @UseGuards(AuthentificationGuard)
   @Patch('me/change-password')
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  async changePassword(
-    @Body() dto: ChangePasswordDto,
-    @CurrentUser() currentUser: UserEntity,
-  ) {
+  async changePassword(@Body() dto: ChangePasswordDto, @CurrentUser() currentUser: UserEntity) {
     return await this.usersService.changePassword(currentUser.id, dto);
+  }
+
+  @Post('verify-otp')
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async verifyOtpCode(@Body() dto: VerifyOtpDto) {
+    if (!dto.email || !dto.code) {VerifyOtpDto
+      throw new BadRequestException('Email et code sont requis');
+    }
+    return this.usersService.verifyOtp(dto.email, dto.code);
   }
   // ────── 👥 Gestion des utilisateurs (admin) ──────
 

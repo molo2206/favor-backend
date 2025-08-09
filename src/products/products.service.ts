@@ -34,7 +34,6 @@ export class ProductService {
     private readonly measureRepo: Repository<MeasureEntity>
   ) { }
 
-  // Création d'un produit
   async create(
     createProductDto: CreateProductDto,
     files: Express.Multer.File[],
@@ -58,7 +57,6 @@ export class ProductService {
       throw new NotFoundException('Entreprise active introuvable');
     }
 
-    // Gestion de la catégorie
     let category: CategoryEntity | null | undefined = undefined;
     if (categoryId) {
       category = await this.categoryRepo.findOne({ where: { id: categoryId } });

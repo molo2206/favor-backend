@@ -32,6 +32,8 @@ import { SubOrderItemModule } from './sub-order-item/sub-order-item.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { SaleTransactionModule } from './sale-transaction/sale-transaction.module';
 import { RentalContractModule } from './rental-contract/rental-contract.module';
+import { ServiceModule } from './service/service.module';
+import { ReservServiceModule } from './reserv-service/reserv-service.module';
 
 @Module({
   imports: [
@@ -88,6 +90,8 @@ import { RentalContractModule } from './rental-contract/rental-contract.module';
     TransactionModule,
     SaleTransactionModule,
     RentalContractModule,
+    ServiceModule,
+    ReservServiceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
