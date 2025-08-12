@@ -240,32 +240,119 @@ export class ProductService {
       queryBuilder.andWhere('product.transmission = :transmission', { transmission });
     }
 
-    if (typecar) {
-      queryBuilder.andWhere('product.typecar = :typecar', { typecar });
+    // Filtrage selon typecar
+
+    if (typecar === Type_rental_both_sale_car.SALE) {
+      if (minSalePrice !== undefined && maxSalePrice !== undefined) {
+        if (minSalePrice === maxSalePrice) {
+          queryBuilder.andWhere('product.salePrice = :exactPrice', {
+            exactPrice: minSalePrice,
+          });
+        } else {
+          queryBuilder.andWhere(
+            '(product.salePrice BETWEEN :minSalePrice AND :maxSalePrice OR product.salePrice = :minSalePrice OR product.salePrice = :maxSalePrice)',
+            { minSalePrice, maxSalePrice },
+          );
+        }
+      } else {
+        if (minSalePrice !== undefined) {
+          queryBuilder.andWhere('product.salePrice >= :minSalePrice', { minSalePrice });
+        }
+        if (maxSalePrice !== undefined) {
+          queryBuilder.andWhere('product.salePrice <= :maxSalePrice', { maxSalePrice });
+        }
+      }
+      queryBuilder.andWhere('product.typecar = :typecar', {
+        typecar: Type_rental_both_sale_car.SALE,
+      });
+    } else if (typecar === Type_rental_both_sale_car.RENTAL) {
+      if (minDailyRate !== undefined) {
+        queryBuilder.andWhere('product.dailyRate >= :minDailyRate', { minDailyRate });
+      }
+      if (maxDailyRate !== undefined) {
+        queryBuilder.andWhere('product.dailyRate <= :maxDailyRate', { maxDailyRate });
+      }
+      queryBuilder.andWhere('product.typecar = :typecar', {
+        typecar: Type_rental_both_sale_car.RENTAL,
+      });
+    } else if (typecar === Type_rental_both_sale_car.BOTH) {
+      if (minSalePrice !== undefined && maxSalePrice !== undefined) {
+        if (minSalePrice === maxSalePrice) {
+          queryBuilder.andWhere('product.salePrice = :exactPrice', {
+            exactPrice: minSalePrice,
+          });
+        } else {
+          queryBuilder.andWhere(
+            '(product.salePrice BETWEEN :minSalePrice AND :maxSalePrice OR product.salePrice = :minSalePrice OR product.salePrice = :maxSalePrice)',
+            { minSalePrice, maxSalePrice },
+          );
+        }
+      } else {
+        if (minSalePrice !== undefined) {
+          queryBuilder.andWhere('product.salePrice >= :minSalePrice', { minSalePrice });
+        }
+        if (maxSalePrice !== undefined) {
+          queryBuilder.andWhere('product.salePrice <= :maxSalePrice', { maxSalePrice });
+        }
+      }
+      if (minDailyRate !== undefined) {
+        queryBuilder.andWhere('product.dailyRate >= :minDailyRate', { minDailyRate });
+      }
+      if (maxDailyRate !== undefined) {
+        queryBuilder.andWhere('product.dailyRate <= :maxDailyRate', { maxDailyRate });
+      }
+      queryBuilder.andWhere('product.typecar = :typecar', {
+        typecar: Type_rental_both_sale_car.BOTH,
+      });
+    } else {
+      // Pas de filtre typecar — on prend tout
+      if (minDailyRate !== undefined) {
+        queryBuilder.andWhere(
+          '(product.typecar IN (:...rentalTypes) AND product.dailyRate >= :minDailyRate)',
+          {
+            rentalTypes: [Type_rental_both_sale_car.RENTAL, Type_rental_both_sale_car.BOTH],
+            minDailyRate,
+          },
+        );
+      }
+      if (maxDailyRate !== undefined) {
+        queryBuilder.andWhere(
+          '(product.typecar IN (:...rentalTypes) AND product.dailyRate <= :maxDailyRate)',
+          {
+            rentalTypes: [Type_rental_both_sale_car.RENTAL, Type_rental_both_sale_car.BOTH],
+            maxDailyRate,
+          },
+        );
+      }
+      if (minSalePrice !== undefined) {
+        queryBuilder.andWhere(
+          '(product.typecar IN (:...saleTypes) AND product.salePrice >= :minSalePrice)',
+          {
+            saleTypes: [Type_rental_both_sale_car.SALE, Type_rental_both_sale_car.BOTH],
+            minSalePrice,
+          },
+        );
+      }
+      if (maxSalePrice !== undefined) {
+        queryBuilder.andWhere(
+          '(product.typecar IN (:...saleTypes) AND product.salePrice <= :maxSalePrice)',
+          {
+            saleTypes: [Type_rental_both_sale_car.SALE, Type_rental_both_sale_car.BOTH],
+            maxSalePrice,
+          },
+        );
+      }
     }
 
-    if (minDailyRate !== undefined) {
-      queryBuilder.andWhere('product.dailyRate >= :minDailyRate', { minDailyRate });
-    }
-
-    if (maxDailyRate !== undefined) {
-      queryBuilder.andWhere('product.dailyRate <= :maxDailyRate', { maxDailyRate });
-    }
-
-    if (minSalePrice !== undefined) {
-      queryBuilder.andWhere('product.salePrice >= :minSalePrice', { minSalePrice });
-    }
-
-    if (maxSalePrice !== undefined) {
-      queryBuilder.andWhere('product.salePrice <= :maxSalePrice', { maxSalePrice });
-    }
-
+    queryBuilder.orderBy('product.createdAt', 'DESC');
     queryBuilder.skip((page - 1) * limit).take(limit);
 
     const [products, total] = await queryBuilder.getManyAndCount();
 
     return {
-      message: `Produits PUBLIÉS récupérés avec succès${type ? ` pour le type : ${type}` : ''}${companyId ? ` pour l'entreprise ${companyId}` : ''}.`,
+      message: `Produits PUBLIÉS récupérés avec succès${type ? ` pour le type : ${type}` : ''}${
+        companyId ? ` pour l'entreprise ${companyId}` : ''
+      }.`,
       data: {
         data: products,
         total,
@@ -281,14 +368,14 @@ export class ProductService {
     fuelType?: FuelType,
     transmission?: Transmission,
     typecar?: Type_rental_both_sale_car,
-    year?: String,
-    minDailyRate?: number,
-    maxDailyRate?: number,
-    minSalePrice?: number,
-    maxSalePrice?: number,
-    
+    year?: string,
+    type?: string,
+    minDailyRate?: number | string,
+    maxDailyRate?: number | string,
+    minSalePrice?: number | string,
+    maxSalePrice?: number | string,
     page = 1,
-    limit = 10, // si tu passes limit=0 => pas de pagination
+    limit = 10,
   ): Promise<{
     message: string;
     data: {
@@ -298,6 +385,14 @@ export class ProductService {
       limit: number;
     };
   }> {
+    const toNumber = (val: any) =>
+      val !== undefined && val !== null && val !== '' ? Number(val) : undefined;
+
+    minDailyRate = toNumber(minDailyRate);
+    maxDailyRate = toNumber(maxDailyRate);
+    minSalePrice = toNumber(minSalePrice);
+    maxSalePrice = toNumber(maxSalePrice);
+
     const queryBuilder = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
@@ -307,10 +402,20 @@ export class ProductService {
       .leftJoinAndSelect('product.measure', 'measure')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
+    // Filtre catégorie (inclut parent/enfants)
     if (categoryId) {
-      queryBuilder.andWhere('category.id = :categoryId', { categoryId });
+      queryBuilder.andWhere(
+        '(category.id = :categoryId OR categoryParent.id = :categoryId OR categoryChildren.id = :categoryId)',
+        { categoryId },
+      );
     }
 
+    // Filtre type produit
+    if (type) {
+      queryBuilder.andWhere('product.type = :type', { type });
+    }
+
+    // Filtre shopType
     if (shopType?.trim()) {
       if (shopType === CompanyActivity.WHOLESALER) {
         queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
@@ -329,30 +434,122 @@ export class ProductService {
       queryBuilder.andWhere('product.transmission = :transmission', { transmission });
     }
 
-    if (typecar) {
-      queryBuilder.andWhere('product.typecar = :typecar', { typecar });
-    }
-
     if (year) {
       queryBuilder.andWhere('product.year = :year', { year });
     }
 
-    if (minDailyRate !== undefined) {
-      queryBuilder.andWhere('product.dailyRate >= :minDailyRate', { minDailyRate });
+    // Filtrage selon typecar
+
+    if (typecar === Type_rental_both_sale_car.SALE) {
+      // salePrice avec intervalle exact ou borne
+      if (minSalePrice !== undefined && maxSalePrice !== undefined) {
+        if (minSalePrice === maxSalePrice) {
+          queryBuilder.andWhere('product.salePrice = :exactPrice', {
+            exactPrice: minSalePrice,
+          });
+        } else {
+          queryBuilder.andWhere(
+            '(product.salePrice BETWEEN :minSalePrice AND :maxSalePrice OR product.salePrice = :minSalePrice OR product.salePrice = :maxSalePrice)',
+            { minSalePrice, maxSalePrice },
+          );
+        }
+      } else {
+        if (minSalePrice !== undefined) {
+          queryBuilder.andWhere('product.salePrice >= :minSalePrice', { minSalePrice });
+        }
+        if (maxSalePrice !== undefined) {
+          queryBuilder.andWhere('product.salePrice <= :maxSalePrice', { maxSalePrice });
+        }
+      }
+      queryBuilder.andWhere('product.typecar = :typecar', {
+        typecar: Type_rental_both_sale_car.SALE,
+      });
+    } else if (typecar === Type_rental_both_sale_car.RENTAL) {
+      if (minDailyRate !== undefined) {
+        queryBuilder.andWhere('product.dailyRate >= :minDailyRate', { minDailyRate });
+      }
+      if (maxDailyRate !== undefined) {
+        queryBuilder.andWhere('product.dailyRate <= :maxDailyRate', { maxDailyRate });
+      }
+      queryBuilder.andWhere('product.typecar = :typecar', {
+        typecar: Type_rental_both_sale_car.RENTAL,
+      });
+    } else if (typecar === Type_rental_both_sale_car.BOTH) {
+      // SalePrice
+      if (minSalePrice !== undefined && maxSalePrice !== undefined) {
+        if (minSalePrice === maxSalePrice) {
+          queryBuilder.andWhere('product.salePrice = :exactPrice', {
+            exactPrice: minSalePrice,
+          });
+        } else {
+          queryBuilder.andWhere(
+            '(product.salePrice BETWEEN :minSalePrice AND :maxSalePrice OR product.salePrice = :minSalePrice OR product.salePrice = :maxSalePrice)',
+            { minSalePrice, maxSalePrice },
+          );
+        }
+      } else {
+        if (minSalePrice !== undefined) {
+          queryBuilder.andWhere('product.salePrice >= :minSalePrice', { minSalePrice });
+        }
+        if (maxSalePrice !== undefined) {
+          queryBuilder.andWhere('product.salePrice <= :maxSalePrice', { maxSalePrice });
+        }
+      }
+      // DailyRate
+      if (minDailyRate !== undefined) {
+        queryBuilder.andWhere('product.dailyRate >= :minDailyRate', { minDailyRate });
+      }
+      if (maxDailyRate !== undefined) {
+        queryBuilder.andWhere('product.dailyRate <= :maxDailyRate', { maxDailyRate });
+      }
+      queryBuilder.andWhere('product.typecar = :typecar', {
+        typecar: Type_rental_both_sale_car.BOTH,
+      });
+    } else {
+      // Pas de filtre typecar : on retourne tout, mais on filtre dailyRate uniquement pour RENTAL et BOTH
+      if (minDailyRate !== undefined) {
+        queryBuilder.andWhere(
+          '(product.typecar IN (:...rentalTypes) AND product.dailyRate >= :minDailyRate)',
+          {
+            rentalTypes: [Type_rental_both_sale_car.RENTAL, Type_rental_both_sale_car.BOTH],
+            minDailyRate,
+          },
+        );
+      }
+      if (maxDailyRate !== undefined) {
+        queryBuilder.andWhere(
+          '(product.typecar IN (:...rentalTypes) AND product.dailyRate <= :maxDailyRate)',
+          {
+            rentalTypes: [Type_rental_both_sale_car.RENTAL, Type_rental_both_sale_car.BOTH],
+            maxDailyRate,
+          },
+        );
+      }
+      // salePrice uniquement pour SALE et BOTH
+      if (minSalePrice !== undefined) {
+        queryBuilder.andWhere(
+          '(product.typecar IN (:...saleTypes) AND product.salePrice >= :minSalePrice)',
+          {
+            saleTypes: [Type_rental_both_sale_car.SALE, Type_rental_both_sale_car.BOTH],
+            minSalePrice,
+          },
+        );
+      }
+      if (maxSalePrice !== undefined) {
+        queryBuilder.andWhere(
+          '(product.typecar IN (:...saleTypes) AND product.salePrice <= :maxSalePrice)',
+          {
+            saleTypes: [Type_rental_both_sale_car.SALE, Type_rental_both_sale_car.BOTH],
+            maxSalePrice,
+          },
+        );
+      }
     }
 
-    if (maxDailyRate !== undefined) {
-      queryBuilder.andWhere('product.dailyRate <= :maxDailyRate', { maxDailyRate });
-    }
+    // Tri par date de création par défaut
+    queryBuilder.orderBy('product.createdAt', 'DESC');
 
-    if (minSalePrice !== undefined) {
-      queryBuilder.andWhere('product.salePrice >= :minSalePrice', { minSalePrice });
-    }
-
-    if (maxSalePrice !== undefined) {
-      queryBuilder.andWhere('product.salePrice <= :maxSalePrice', { maxSalePrice });
-    }
-
+    // Pagination
     if (limit > 0) {
       queryBuilder.skip((page - 1) * limit).take(limit);
     }
