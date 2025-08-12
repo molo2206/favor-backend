@@ -15,6 +15,7 @@ interface Context {
     invoiceNumber?: string;
     address?: string;
     paymentStatus?: string;
+    date?: string;
   };
   subOrders: SubOrderEntity[];
   subOrdersHtml?: string; // HTML des sous-commandes
@@ -50,12 +51,7 @@ export class MailOrderService {
       .join('');
   }
 
-  async sendHtmlEmail(
-    to: string,
-    subject: string,
-    htmlPageName: string,
-    context: Context,
-  ) {
+  async sendHtmlEmail(to: string, subject: string, htmlPageName: string, context: Context) {
     const basePath =
       process.env.NODE_ENV === 'production'
         ? path.join(process.cwd(), 'dist', 'src', 'templates/order')
@@ -103,10 +99,7 @@ export class MailOrderService {
     });
   }
 
-  async generatePdfFromTemplate(
-    templateName: string,
-    context: any,
-  ): Promise<Buffer> {
+  async generatePdfFromTemplate(templateName: string, context: any): Promise<Buffer> {
     const templatePath = path.join(
       process.cwd(),
       process.env.NODE_ENV === 'production'
@@ -137,6 +130,39 @@ export class MailOrderService {
     return pdfBuffer;
   }
 
+  async sendInvoiceCarWithPdf(to: string, subject: string, context: Context) {
+    const pdfBuffer = await this.generatePdfFromTemplate('invoice.car.ejs', {
+      ...context,
+      subOrdersHtml: null,
+    });
+
+    await this.mailerService.sendMail({
+      to,
+      subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 30px;">
+          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <img src="https://cosamed.org/1%20Favor.png" alt="Logo" style="max-width: 200px; height: auto; display: inline-block;" />
+            </div>
+            <h2 style="color: #1d4ed8; text-align: center;">Votre Facture est Prête</h2>
+            <p style="font-size: 16px; line-height: 1.6; color: #333;">Bonjour,</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #333;">Veuillez trouver ci-joint votre facture qui est en attente de validation au format PDF.</p>
+            <p style="font-size: 14px; color: #999; margin-top: 30px; text-align: center;">
+              Merci pour votre confiance,<br/>L’équipe FavorHelp
+            </p>
+          </div>
+        </div>
+      `,
+      attachments: [
+        {
+          filename: 'factureCarSale.pdf',
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
+    });
+  }
   async sendInvoiceWithPdf(to: string, subject: string, context: Context) {
     const pdfBuffer = await this.generatePdfFromTemplate('invoice.ejs', {
       ...context,
@@ -243,10 +269,7 @@ export class MailOrderService {
       html: htmlContent,
     });
   }
-  generateSubOrdersByInvoiceNumberHtml(
-    subOrders: SubOrderEntity[],
-    currency: string,
-  ): string {
+  generateSubOrdersByInvoiceNumberHtml(subOrders: SubOrderEntity[], currency: string): string {
     let counter = 1;
 
     const itemsHtml = subOrders

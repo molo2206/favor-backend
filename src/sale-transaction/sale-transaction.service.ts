@@ -8,6 +8,8 @@ import { Product } from 'src/products/entities/product.entity';
 import { SaleTransaction } from './entities/sale-transaction.entity';
 import { PaymentStatus } from './enum/paymentStatus.enum';
 import { InvoiceService } from 'src/order/invoice/invoice.util';
+import { MailOrderService } from 'src/email/emailorder.service';
+import * as QRCode from 'qrcode';
 
 @Injectable()
 export class SaleTransactionService {
@@ -22,6 +24,8 @@ export class SaleTransactionService {
     private readonly productRepo: Repository<Product>,
 
     private readonly invoiceService: InvoiceService,
+
+    private readonly mailService: MailOrderService,
   ) {}
 
   async create(dto: CreateSaleTransactionDto, userId: string): Promise<SaleTransaction> {
@@ -49,7 +53,6 @@ export class SaleTransactionService {
       );
     }
 
-    // Met à jour la quantité restante
     vehicle.quantity = vehicle.quantity - requestedQuantity;
     await this.productRepo.save(vehicle);
 
@@ -68,6 +71,30 @@ export class SaleTransactionService {
       quantity: requestedQuantity,
       saleNumber: this.invoiceService.generateInvoiceNumber(),
     });
+    const user = customer;
+    const subOrders = [];
+    const paymentQrCode = await QRCode.toDataURL(transaction.saleNumber);
+    await this.mailService.sendInvoiceCarWithPdf(
+      customer.email,
+      'Votre facture PDF - FavorHelp',
+      {
+        user,
+        order: {
+          id: transaction.id,
+          totalAmount: transaction.salePrice,
+          currency: 'USD',
+          invoiceNumber: transaction.saleNumber,
+          address: user.address,
+          paymentStatus: transaction.paymentStatus,
+          date:
+            transaction.date instanceof Date
+              ? transaction.date.toISOString()
+              : String(transaction.date),
+        },
+        subOrders,
+        paymentQrCode,
+      },
+    );
 
     return this.saleRepo.save(transaction);
   }

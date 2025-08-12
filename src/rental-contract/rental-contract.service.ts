@@ -69,7 +69,7 @@ export class RentalContractService {
       const bookedQuantity = parseInt(result.totalBooked, 10) || 0;
       const requestedQuantity = dto.quantity ? parseInt(dto.quantity, 10) : 1;
 
-      if (bookedQuantity + requestedQuantity > vehicle.quantity) {
+      if (bookedQuantity + requestedQuantity >= vehicle.quantity) {
         throw new BadRequestException('Quantité insuffisante disponible pour cette période');
       }
     }
@@ -104,9 +104,6 @@ export class RentalContractService {
           'La quantité disponible est insuffisante pour cette réservation.',
         );
       }
-
-      vehicle.quantity = newQuantity;
-      await this.productRepo.save(vehicle);
     }
 
     return savedContract;

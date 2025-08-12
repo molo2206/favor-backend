@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
@@ -12,6 +17,9 @@ import { ProductStatus } from 'src/products/enum/product.status.enum';
 import { MeasureEntity } from 'src/measure/entities/measure.entity';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 import { CompanyActivity } from 'src/company/enum/activity.company.enum';
+import { FuelType } from './enum/fuelType_enum';
+import { Transmission } from './enum/transmission.enum';
+import { Type_rental_both_sale_car } from './enum/type_rental_both_sale_car';
 
 @Injectable()
 export class ProductService {
@@ -31,8 +39,8 @@ export class ProductService {
     private readonly cloudinary: CloudinaryService,
 
     @InjectRepository(MeasureEntity)
-    private readonly measureRepo: Repository<MeasureEntity>
-  ) { }
+    private readonly measureRepo: Repository<MeasureEntity>,
+  ) {}
 
   async create(
     createProductDto: CreateProductDto,
@@ -81,7 +89,7 @@ export class ProductService {
       image: mainImage,
       type: company.typeCompany,
       status: productStatus,
-      companyActivity: company?.companyActivity
+      companyActivity: company?.companyActivity,
     });
 
     await this.productRepo.save(product);
@@ -129,7 +137,8 @@ export class ProductService {
   }
 
   async findByType(type?: string): Promise<{ message: string; data: Product[] }> {
-    const queryBuilder = this.productRepo.createQueryBuilder('product')
+    const queryBuilder = this.productRepo
+      .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('category.parent', 'categoryParent')
@@ -149,8 +158,11 @@ export class ProductService {
     };
   }
 
-  async findProductPublishedByType(type?: string): Promise<{ message: string; data: Product[] }> {
-    const queryBuilder = this.productRepo.createQueryBuilder('product')
+  async findProductPublishedByType(
+    type?: string,
+  ): Promise<{ message: string; data: Product[] }> {
+    const queryBuilder = this.productRepo
+      .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('category.parent', 'categoryParent')
@@ -175,6 +187,13 @@ export class ProductService {
     type?: string,
     companyId?: string,
     shopType?: string,
+    fuelType?: FuelType,
+    transmission?: Transmission,
+    typecar?: Type_rental_both_sale_car,
+    minDailyRate?: number,
+    maxDailyRate?: number,
+    minSalePrice?: number,
+    maxSalePrice?: number,
     page = 1,
     limit = 10,
   ): Promise<{
@@ -186,7 +205,8 @@ export class ProductService {
       limit: number;
     };
   }> {
-    const queryBuilder = this.productRepo.createQueryBuilder('product')
+    const queryBuilder = this.productRepo
+      .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('category.parent', 'categoryParent')
       .leftJoinAndSelect('category.children', 'categoryChildren')
@@ -212,6 +232,34 @@ export class ProductService {
       }
     }
 
+    if (fuelType) {
+      queryBuilder.andWhere('product.fuelType = :fuelType', { fuelType });
+    }
+
+    if (transmission) {
+      queryBuilder.andWhere('product.transmission = :transmission', { transmission });
+    }
+
+    if (typecar) {
+      queryBuilder.andWhere('product.typecar = :typecar', { typecar });
+    }
+
+    if (minDailyRate !== undefined) {
+      queryBuilder.andWhere('product.dailyRate >= :minDailyRate', { minDailyRate });
+    }
+
+    if (maxDailyRate !== undefined) {
+      queryBuilder.andWhere('product.dailyRate <= :maxDailyRate', { maxDailyRate });
+    }
+
+    if (minSalePrice !== undefined) {
+      queryBuilder.andWhere('product.salePrice >= :minSalePrice', { minSalePrice });
+    }
+
+    if (maxSalePrice !== undefined) {
+      queryBuilder.andWhere('product.salePrice <= :maxSalePrice', { maxSalePrice });
+    }
+
     queryBuilder.skip((page - 1) * limit).take(limit);
 
     const [products, total] = await queryBuilder.getManyAndCount();
@@ -223,16 +271,24 @@ export class ProductService {
         total,
         page,
         limit,
-      }
+      },
     };
   }
-
 
   async findProductPublishedByCategory(
     categoryId?: string,
     shopType?: string,
+    fuelType?: FuelType,
+    transmission?: Transmission,
+    typecar?: Type_rental_both_sale_car,
+    year?: String,
+    minDailyRate?: number,
+    maxDailyRate?: number,
+    minSalePrice?: number,
+    maxSalePrice?: number,
+    
     page = 1,
-    limit = 10,
+    limit = 10, // si tu passes limit=0 => pas de pagination
   ): Promise<{
     message: string;
     data: {
@@ -242,7 +298,8 @@ export class ProductService {
       limit: number;
     };
   }> {
-    const queryBuilder = this.productRepo.createQueryBuilder('product')
+    const queryBuilder = this.productRepo
+      .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('category.parent', 'categoryParent')
       .leftJoinAndSelect('category.children', 'categoryChildren')
@@ -255,7 +312,6 @@ export class ProductService {
     }
 
     if (shopType?.trim()) {
-      // Si WHOLESALER, on veut aussi inclure WHOLESALER_RETAILER
       if (shopType === CompanyActivity.WHOLESALER) {
         queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
           activities: [CompanyActivity.WHOLESALER, CompanyActivity.WHOLESALER_RETAILER],
@@ -265,7 +321,41 @@ export class ProductService {
       }
     }
 
-    queryBuilder.skip((page - 1) * limit).take(limit);
+    if (fuelType) {
+      queryBuilder.andWhere('product.fuelType = :fuelType', { fuelType });
+    }
+
+    if (transmission) {
+      queryBuilder.andWhere('product.transmission = :transmission', { transmission });
+    }
+
+    if (typecar) {
+      queryBuilder.andWhere('product.typecar = :typecar', { typecar });
+    }
+
+    if (year) {
+      queryBuilder.andWhere('product.year = :year', { year });
+    }
+
+    if (minDailyRate !== undefined) {
+      queryBuilder.andWhere('product.dailyRate >= :minDailyRate', { minDailyRate });
+    }
+
+    if (maxDailyRate !== undefined) {
+      queryBuilder.andWhere('product.dailyRate <= :maxDailyRate', { maxDailyRate });
+    }
+
+    if (minSalePrice !== undefined) {
+      queryBuilder.andWhere('product.salePrice >= :minSalePrice', { minSalePrice });
+    }
+
+    if (maxSalePrice !== undefined) {
+      queryBuilder.andWhere('product.salePrice <= :maxSalePrice', { maxSalePrice });
+    }
+
+    if (limit > 0) {
+      queryBuilder.skip((page - 1) * limit).take(limit);
+    }
 
     const [products, total] = await queryBuilder.getManyAndCount();
 
@@ -280,8 +370,6 @@ export class ProductService {
     };
   }
 
-
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async findByActiveCompanyForUser(user: UserEntity): Promise<any> {
     if (!user.activeCompanyId) {
@@ -294,13 +382,7 @@ export class ProductService {
 
     const products = await this.productRepo.find({
       where: { company: { id: user.activeCompanyId } },
-      relations: [
-        'category',
-        'category.parent',
-        'category.children',
-        'images',
-        'measure',
-      ],
+      relations: ['category', 'category.parent', 'category.children', 'images', 'measure'],
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
     const { products: _, ...companyData } = company as any;
@@ -312,25 +394,22 @@ export class ProductService {
   }
   async groupByType(): Promise<Record<string, Product[]>> {
     const products = await this.productRepo.find({
-      relations: [
-        'category',
-        'category.parent',
-        'category.children',
-        'images',
-        'measure',
-      ],
+      relations: ['category', 'category.parent', 'category.children', 'images', 'measure'],
     });
 
-    const grouped = products.reduce((acc, product) => {
-      const type = product.type;
+    const grouped = products.reduce(
+      (acc, product) => {
+        const type = product.type;
 
-      if (!acc[type]) {
-        acc[type] = [];
-      }
+        if (!acc[type]) {
+          acc[type] = [];
+        }
 
-      acc[type].push(product);
-      return acc;
-    }, {} as Record<string, Product[]>);
+        acc[type].push(product);
+        return acc;
+      },
+      {} as Record<string, Product[]>,
+    );
 
     return grouped;
   }
@@ -351,7 +430,8 @@ export class ProductService {
     >();
 
     for (const product of products) {
-      const category = product.category || { name: 'Aucune catégorie', id: 'no-category' } as CategoryEntity;
+      const category =
+        product.category || ({ name: 'Aucune catégorie', id: 'no-category' } as CategoryEntity);
       const categoryKey = product.category?.id || 'no-category';
 
       if (!grouped.has(categoryKey)) {
@@ -368,13 +448,10 @@ export class ProductService {
       grouped.get(categoryKey)!.products.push(cleanProduct);
     }
 
-    const result = Array.from(grouped.values()).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
+    const result = Array.from(grouped.values()).sort((a, b) => a.name.localeCompare(b.name));
 
     return { data: result };
   }
-
 
   async groupByType_First_Product(): Promise<Record<string, Product>> {
     const products = await this.productRepo.find({
@@ -393,22 +470,12 @@ export class ProductService {
     return grouped;
   }
 
-  async update(
-    id: string,
-    dto: CreateProductDto,
-    user: UserEntity,
-  ) {
+  async update(id: string, dto: CreateProductDto, user: UserEntity) {
     const { categoryId, status, measureId, ...data } = dto;
 
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: [
-        'category',
-        'category.parent',
-        'category.children',
-        'images',
-        'measure',
-      ],
+      relations: ['category', 'category.parent', 'category.children', 'images', 'measure'],
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
@@ -450,7 +517,8 @@ export class ProductService {
   }
 
   async searchProducts(search: string): Promise<{ message: string; data: Product[] }> {
-    const qb = this.productRepo.createQueryBuilder('product')
+    const qb = this.productRepo
+      .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.images', 'images');

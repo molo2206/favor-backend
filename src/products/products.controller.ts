@@ -26,6 +26,9 @@ import { CurrentUser } from '../users/utility/decorators/current-user-decorator'
 import { UserEntity } from 'src/users/entities/user.entity';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 import { Public } from 'src/users/utility/decorators/public.decorator';
+import { FuelType } from './enum/fuelType_enum';
+import { Transmission } from './enum/transmission.enum';
+import { Type_rental_both_sale_car } from './enum/type_rental_both_sale_car';
 
 @Controller('products')
 export class ProductController {
@@ -64,7 +67,7 @@ export class ProductController {
   @Patch(':id')
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  @UseInterceptors(AnyFilesInterceptor()) 
+  @UseInterceptors(AnyFilesInterceptor())
   async update(
     @Param('id') id: string,
     @Body() dto: CreateProductDto,
@@ -112,15 +115,84 @@ export class ProductController {
     @Query('type') type?: string,
     @Query('companyId') companyId?: string,
     @Query('shopType') shopType?: string,
-    @Query('page') page = 1,
-    @Query('limit') limit = 10,
+    @Query('fuelType') fuelType?: FuelType,
+    @Query('transmission') transmission?: Transmission,
+    @Query('typecar') typecar?: Type_rental_both_sale_car,
+    @Query('minDailyRate') minDailyRate?: string,
+    @Query('maxDailyRate') maxDailyRate?: string,
+    @Query('minSalePrice') minSalePrice?: string,
+    @Query('maxSalePrice') maxSalePrice?: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
   ) {
+    const pageNum = Math.max(Number(page) || 1, 1);
+    const limitNum = Math.max(Number(limit) || 10, 1);
+
     return this.productService.findProductPublishedByTypeByCompany(
-      type,
-      companyId,
-      shopType,
-      Number(page),
-      Number(limit),
+      type || undefined,
+      companyId || undefined,
+      shopType || undefined,
+      fuelType || undefined,
+      transmission || undefined,
+      typecar || undefined,
+      minDailyRate !== undefined ? Number(minDailyRate) : undefined,
+      maxDailyRate !== undefined ? Number(maxDailyRate) : undefined,
+      minSalePrice !== undefined ? Number(minSalePrice) : undefined,
+      maxSalePrice !== undefined ? Number(maxSalePrice) : undefined,
+      pageNum,
+      limitNum,
+    );
+  }
+
+  @Get('published/public/bycategory')
+  @Public()
+  async getPublishedProductByCategory(
+    @Query('categoryId') categoryId?: string,
+    @Query('shopType') shopType?: string,
+    @Query('fuelType') fuelType?: string,
+    @Query('transmission') transmission?: string,
+    @Query('typecar') typecar?: string,
+    @Query('year') year?: string,
+    @Query('minDailyRate') minDailyRate?: string,
+    @Query('maxDailyRate') maxDailyRate?: string,
+    @Query('minSalePrice') minSalePrice?: string,
+    @Query('maxSalePrice') maxSalePrice?: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+  ) {
+    const pageNum = Math.max(Number(page) || 1, 1);
+    const limitNum = Math.max(Number(limit) || 10, 1);
+
+    // Validation + casting des enums
+    const fuelTypeEnum =
+      fuelType && Object.values(FuelType).includes(fuelType as FuelType)
+        ? (fuelType as FuelType)
+        : undefined;
+
+    const transmissionEnum =
+      transmission && Object.values(Transmission).includes(transmission as Transmission)
+        ? (transmission as Transmission)
+        : undefined;
+
+    const typecarEnum =
+      typecar &&
+      Object.values(Type_rental_both_sale_car).includes(typecar as Type_rental_both_sale_car)
+        ? (typecar as Type_rental_both_sale_car)
+        : undefined;
+
+    return this.productService.findProductPublishedByCategory(
+      categoryId || undefined,
+      shopType || undefined,
+      fuelTypeEnum,
+      transmissionEnum,
+      typecarEnum,
+      year || undefined,
+      minDailyRate ? Number(minDailyRate) : undefined,
+      maxDailyRate ? Number(maxDailyRate) : undefined,
+      minSalePrice ? Number(minSalePrice) : undefined,
+      maxSalePrice ? Number(maxSalePrice) : undefined,
+      pageNum,
+      limitNum,
     );
   }
 
@@ -155,22 +227,6 @@ export class ProductController {
   async getProductsByActiveCompany(@CurrentUser() user: UserEntity): Promise<{ data: any }> {
     const result = await this.productService.findByActiveCompanyForUser(user);
     return { data: result };
-  }
-
-  @Get('published/public/bycategory')
-  @Public()
-  async getPublishedProductByCategory(
-    @Query('categoryId') categoryId?: string,
-    @Query('shopType') shopType?: string,
-    @Query('page') page = 1,
-    @Query('limit') limit = 10,
-  ) {
-    return this.productService.findProductPublishedByCategory(
-      categoryId,
-      shopType,
-      Number(page),
-      Number(limit),
-    );
   }
 
   @Get('search')

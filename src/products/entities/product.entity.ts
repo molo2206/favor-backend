@@ -91,8 +91,8 @@ export class Product {
   @Column({ nullable: true })
   ingredients?: string;
 
-  @Column({ nullable: true })
-  quantity?: number;
+  @Column({ type: 'int', default: 0 })
+  quantity: number;
 
   @Column({ nullable: true })
   image?: string;

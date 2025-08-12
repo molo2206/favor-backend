@@ -34,6 +34,9 @@ import { SaleTransactionModule } from './sale-transaction/sale-transaction.modul
 import { RentalContractModule } from './rental-contract/rental-contract.module';
 import { ServiceModule } from './service/service.module';
 import { ReservServiceModule } from './reserv-service/reserv-service.module';
+import { RoomImageModule } from './room-image/room-image.module';
+import { RoomModule } from './room/room.module';
+import { BookingModule } from './booking/booking.module';
 
 @Module({
   imports: [
@@ -92,6 +95,12 @@ import { ReservServiceModule } from './reserv-service/reserv-service.module';
     RentalContractModule,
     ServiceModule,
     ReservServiceModule,
+    RoomImageModule,
+    RoomModule,
+    BookingModule,
+    RoomModule,
+    RoomImageModule,
+    BookingModule
   ],
   controllers: [AppController],
   providers: [AppService],

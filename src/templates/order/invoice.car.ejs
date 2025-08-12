@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!DOCTYPE html>
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
@@ -8,9 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link href="https://unpkg.com/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <script src="https://unpkg.com/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-
+     <script src="https://unpkg.com/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <style>
       body {
         font-family: 'Inter', sans-serif;
@@ -139,11 +137,11 @@
       .qr-code-container {
         max-width: 50%;
         text-align: right;
-        margin-top: 0; 
+        margin-top: 0; /* supprimé le margin top pour être aligné */
       }
       .qr-code-container img {
-        width: 100px;      
-        height: 100px;     
+        width: 100px;      /* réduit la largeur */
+        height: 100px;     /* réduit la hauteur */
         border: 1px solid #e5e7eb;
         border-radius: 12px;
       }
@@ -170,16 +168,17 @@
         }
       }
     </style>
+
   </head>
   <body>
-    <div class="card">
-      <div class="header">
-        <div class="logo-title">
-          <img src="https://cosamed.org/1%20Favor.png" alt="Logo" />
-          <h1>FACTURE</h1>
-        </div>
-       <div class="status-box">
-         <div class="status">
+  <div class="card">
+    <div class="header">
+      <div class="logo-title">
+        <img src="https://cosamed.org/1%20Favor.png" alt="Logo" />
+        <h1>FACTURE</h1>
+      </div>
+     <div class="status-box">
+       <div class="status">
           <% if(order.paymentStatus === 'PAID') { %>
             <i class="fas fa-check-circle" style="color: #16a34a;"></i> Payée
           <% } else if(order.paymentStatus === 'PENDING') { %>
@@ -188,77 +187,69 @@
             <i class="fas fa-times-circle" style="color: #dc2626;"></i> Annulée
           <% } %>
         </div>
+    </div>
+    </div>
 
-      </div>
-
-      </div>
-
-      <div class="section">
-        <div class="section-title">Client</div>
-        <div class="section-content">
-          <div>
-            <strong>Facturé à</strong><br />
-            <%= user.fullName %><br />
-            <%= user.email %><br />
-          </div>
-          <div>
-            <strong>N° Facture:</strong> #<%= order.invoiceNumber %><br />
-            <strong>Date:</strong> <%= order.createdAt %><br />
-          </div>
-          <div>
-           <strong>Adresse Livraison:</strong><br />
-           <%= order.address || 'Non spécifiée' %>
-          </div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">Détails de la facture / Invoice Details</div>
-        <table>
-          <thead>
-            <tr>
-              <th>N°</th>
-              <th>Produit</th>
-              <th>Quantité</th>
-              <th>Prix unitaire</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <%- subOrdersHtml %>
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="4" style="text-align: right"><strong>Sous-total:</strong></td>
-              <td><%= order.totalAmount %> <%= order.currency %></td>
-            </tr>
-            <tr>
-              <td colspan="4" style="text-align: right">Frais de livraison:</td>
-              <td><%= order.shippingFee || 0 %> <%= order.currency %></td>
-            </tr>
-            <tr>
-              <td colspan="4" style="text-align: right"><strong>Total:</strong></td>
-              <td><strong><%= order.totalAmount %> <%= order.currency %></strong></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      <!-- QR Code section -->
-      <% if (paymentQrCode) { %>
-      <div class="qr-code-container">
-        <p><strong>Scannez ce QR code pour accéder au paiement :</strong></p>
-        <img src="<%= paymentQrCode %>" alt="QR Code de paiement" />
-      </div>
-      <% } %>
-      <div class="footer">
+    <div class="section">
+      <div class="section-title">Client</div>
+      <div class="section-content">
         <div>
-          <strong>Contact</strong>
+          <strong>Facturé à</strong><br />
+          <%= user.fullName %><br />
+          <%= user.email %><br />
         </div>
-       <div>
+        <div>
+          <strong>N° Facture:</strong> #<%= order.invoiceNumber %><br />
+          <strong>Date:</strong> <%= order.date %><br />
+        </div>
+        <div>
+         <strong>Adresse Livraison:</strong><br />
+         <%= order.address || 'Non spécifiée' %>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Détails de la facture / Invoice Details</div>
+      <table>
+        <thead>
+          <tr>
+            <th>N°</th>
+            <th>Produit</th>
+            <th>Quantité</th>
+            <th>Prix unitaire</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <%- subOrdersHtml %>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align: right"><strong>Sous-total:</strong></td>
+            <td><%= order.totalAmount %> <%= order.currency %></td>
+          </tr>
+          <tr>
+            <td colspan="4" style="text-align: right">Frais de livraison:</td>
+            <td><%= order.shippingFee || 0 %> <%= order.currency %></td>
+          </tr>
+          <tr>
+            <td colspan="4" style="text-align: right"><strong>Total:</strong></td>
+            <td><strong><%= order.totalAmount %> <%= order.currency %></strong></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="footer">
+      <div>
+        <strong>Contact</strong>
+      </div>
+      <div>
         <i class="fas fa-phone"></i> +243 979 649 404<br />
         <i class="fas fa-envelope"></i> baenisam@gmail.com
       </div>
-      </div>
     </div>
-  </body>
+  </div>
+</body>
+
 </html>
