@@ -14,6 +14,16 @@ import { Product } from 'src/products/entities/product.entity';
 import { RentalStatus } from './enum/rentalStatus.enum';
 import { InvoiceService } from 'src/order/invoice/invoice.util';
 import { UpdateRentalContractStatusDto } from './dto/UpdateRentalContractStatusDto';
+function isValidStatusTransition(current: RentalStatus, next: RentalStatus): boolean {
+  const transition: Record<RentalStatus, RentalStatus[]> = {
+    [RentalStatus.PENDING]: [RentalStatus.VALIDATED, RentalStatus.CANCELLED],
+    [RentalStatus.VALIDATED]: [RentalStatus.COMPLETED, RentalStatus.CANCELLED],
+    [RentalStatus.COMPLETED]: [], 
+    [RentalStatus.CANCELLED]: [], 
+  };
+
+  return transition[current]?.includes(next) ?? false;
+}
 
 @Injectable()
 export class RentalContractService {
@@ -85,12 +95,19 @@ export class RentalContractService {
       throw new NotFoundException('Contrat de location introuvable');
     }
 
-    contract.status = dto.status;
+    if (!isValidStatusTransition(contract.status, dto.status)) {
+      throw new BadRequestException(
+        `Transition de statut invalide : ${contract.status} -> ${dto.status}`,
+      );
+    }
 
     if (dto.status === RentalStatus.VALIDATED) {
-      contract.status = RentalStatus.PAID;
+      contract.status = RentalStatus.VALIDATED;
       contract.paid = true;
+    } else {
+      contract.status = dto.status;
     }
+
     const updatedContract = await this.rentalRepo.save(contract);
 
     return {

@@ -12,6 +12,20 @@ import { MailOrderService } from 'src/email/emailorder.service';
 import * as QRCode from 'qrcode';
 import { UpdateSaleStatusDto } from './dto/UpdateSaleStatusDto';
 
+function isValidPaymentStatusTransition(current: PaymentStatus, next: PaymentStatus): boolean {
+  const transitions: Record<PaymentStatus, PaymentStatus[]> = {
+    [PaymentStatus.PENDING]: [PaymentStatus.VALIDATED, PaymentStatus.REJECTED],
+    [PaymentStatus.VALIDATED]: [PaymentStatus.PAID, PaymentStatus.REJECTED],
+    [PaymentStatus.PAID]: [PaymentStatus.PROCESSING],
+    [PaymentStatus.PROCESSING]: [PaymentStatus.COMPLETED],
+    [PaymentStatus.COMPLETED]: [PaymentStatus.DELIVERED],
+    [PaymentStatus.DELIVERED]: [],
+    [PaymentStatus.REJECTED]: [],
+  };
+
+  return transitions[current]?.includes(next) ?? false;
+}
+
 @Injectable()
 export class SaleTransactionService {
   constructor(
@@ -138,6 +152,12 @@ export class SaleTransactionService {
       throw new NotFoundException('Transaction introuvable');
     }
 
+    if (!isValidPaymentStatusTransition(transaction.paymentStatus, dto.status)) {
+      throw new BadRequestException(
+        `Transition invalide : ${transaction.paymentStatus} → ${dto.status}`,
+      );
+    }
+
     transaction.paymentStatus = dto.status;
 
     if (dto.status === PaymentStatus.VALIDATED) {
@@ -150,6 +170,28 @@ export class SaleTransactionService {
     const fullTransaction = await this.saleRepo.findOne({
       where: { id: transactionId },
       relations: ['customer', 'vehicle'],
+    });
+
+    const user = transaction.customer;
+    const subOrders = [];
+    const paymentQrCode = await QRCode.toDataURL(transaction.saleNumber);
+
+    await this.mailService.sendInvoiceCarWithPdf(user.email, 'Votre facture PDF - FavorHelp', {
+      user,
+      order: {
+        id: transaction.id,
+        totalAmount: transaction.salePrice,
+        currency: 'USD',
+        invoiceNumber: transaction.saleNumber,
+        address: user.address,
+        paymentStatus: transaction.paymentStatus,
+        date:
+          transaction.date instanceof Date
+            ? transaction.date.toISOString()
+            : String(transaction.date),
+      },
+      subOrders,
+      paymentQrCode,
     });
 
     return {

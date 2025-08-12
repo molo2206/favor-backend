@@ -3,5 +3,4 @@ export enum RentalStatus {
   VALIDATED = 'VALIDATED',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
-  PAID = 'PAID',
 }
