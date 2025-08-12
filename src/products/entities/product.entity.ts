@@ -87,6 +87,9 @@ export class Product {
   @Column({ nullable: true })
   color?: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  dailyRate_price_original?: number;
+
   //fin car
   @Column({ nullable: true })
   ingredients?: string;

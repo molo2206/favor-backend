@@ -92,6 +92,11 @@ export class CreateProductDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  dailyRate_price_original?: number;
+
+  @IsOptional()x
+  @Type(() => Number)
+  @IsNumber()
   salePrice?: number;
 
   @IsOptional()
