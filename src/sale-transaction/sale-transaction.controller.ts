@@ -19,6 +19,7 @@ import { RolesGuard } from 'src/users/utility/decorators/roles.guard';
 import { AuthorizeRoles } from 'src/users/utility/decorators/authorize-roles.decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
+import { UpdateSaleStatusDto } from './dto/UpdateSaleStatusDto';
 
 @UseGuards(AuthentificationGuard, RolesGuard)
 @Controller('sale-transactions')
@@ -39,6 +40,20 @@ export class SaleTransactionController {
     return {
       message: 'Transaction de vente créée avec succès',
       data: transaction,
+    };
+  }
+
+  @Patch(':id/status')
+  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async updateStatus(@Param('id') id: string, @Body() updateStatusDto: UpdateSaleStatusDto) {
+    const updated = await this.saleTransactionService.updateSaleTransactionStatus(
+      id,
+      updateStatusDto,
+    );
+    return {
+      message: `Statut de la transaction mis à jour avec succès`,
+      data: updated.data,
     };
   }
 

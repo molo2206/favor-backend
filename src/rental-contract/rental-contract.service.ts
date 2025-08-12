@@ -13,6 +13,7 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { RentalStatus } from './enum/rentalStatus.enum';
 import { InvoiceService } from 'src/order/invoice/invoice.util';
+import { UpdateRentalContractStatusDto } from './dto/UpdateRentalContractStatusDto';
 
 @Injectable()
 export class RentalContractService {
@@ -31,15 +32,14 @@ export class RentalContractService {
     const start = new Date(dto.startDate);
     const end = new Date(dto.endDate);
 
-    if (start >= end)
+    if (start > end)
       throw new BadRequestException('La date de début doit être avant la date de fin');
 
-    // Vérification chevauchement contrats actifs
     const overlappingCount = await this.rentalRepo
       .createQueryBuilder('rental_contracts')
       .where('rental_contracts.vehicleId = :vehicleId', { vehicleId: vehicle.id })
       .andWhere('rental_contracts.status IN (:...statuses)', {
-        statuses: [RentalStatus.PENDING, RentalStatus.ACTIVE],
+        statuses: [RentalStatus.PENDING, RentalStatus.VALIDATED],
       })
       .andWhere('(rental_contracts.startDate <= :end AND rental_contracts.endDate >= :start)', {
         start,
@@ -51,32 +51,12 @@ export class RentalContractService {
       throw new BadRequestException('Le véhicule est déjà loué pendant cette période');
     }
 
-    // Vérification quantité disponible
-    if (vehicle.quantity && vehicle.quantity > 0) {
-      const result = await this.rentalRepo
-        .createQueryBuilder('rental_contracts')
-        .select('SUM(rental_contracts.quantity)', 'totalBooked')
-        .where('rental_contracts.vehicleId = :vehicleId', { vehicleId: vehicle.id })
-        .andWhere('rental_contracts.status IN (:...statuses)', {
-          statuses: [RentalStatus.PENDING, RentalStatus.ACTIVE],
-        })
-        .andWhere(
-          '(rental_contracts.startDate <= :end AND rental_contracts.endDate >= :start)',
-          { start, end },
-        )
-        .getRawOne();
+    const diffTime = end.getTime() - start.getTime();
+    const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-      const bookedQuantity = parseInt(result.totalBooked, 10) || 0;
-      const requestedQuantity = dto.quantity ? parseInt(dto.quantity, 10) : 1;
-
-      if (bookedQuantity + requestedQuantity >= vehicle.quantity) {
-        throw new BadRequestException('Quantité insuffisante disponible pour cette période');
-      }
-    }
-
-    const totalDays = Math.ceil((+end - +start) / (1000 * 60 * 60 * 24));
     const dailyRate = dto.dailyRate ?? vehicle.dailyRate ?? 0;
-    const totalAmount = totalDays * dailyRate * (parseInt(dto.quantity as any) ?? 1);
+    const quantity = dto.quantity ? parseInt(dto.quantity as any) : 1;
+    const totalAmount = totalDays * dailyRate * quantity;
 
     const contract = this.rentalRepo.create({
       customer: user,
@@ -87,32 +67,42 @@ export class RentalContractService {
       dailyRate,
       totalAmount,
       status: dto.status ?? RentalStatus.PENDING,
-      quantity: parseInt(dto.quantity as any) ?? 1,
+      quantity,
       rentalNumber: this.invoiceService.generateInvoiceNumber(),
     });
 
-    // Sauvegarde du contrat
     const savedContract = await this.rentalRepo.save(contract);
+    return savedContract;
+  }
 
-    if (vehicle.quantity !== undefined && vehicle.quantity !== null && vehicle.quantity > 0) {
-      const requestedQuantity: number = dto.quantity ? parseInt(dto.quantity, 10) : 1;
+  async updateRentalContractStatus(
+    contractId: string,
+    dto: UpdateRentalContractStatusDto,
+  ): Promise<{ data: RentalContract; message: string }> {
+    const contract = await this.rentalRepo.findOneBy({ id: contractId });
 
-      const newQuantity = vehicle.quantity - requestedQuantity;
-
-      if (newQuantity < 0) {
-        throw new BadRequestException(
-          'La quantité disponible est insuffisante pour cette réservation.',
-        );
-      }
+    if (!contract) {
+      throw new NotFoundException('Contrat de location introuvable');
     }
 
-    return savedContract;
+    contract.status = dto.status;
+
+    if (dto.status === RentalStatus.VALIDATED) {
+      contract.status = RentalStatus.PAID;
+      contract.paid = true;
+    }
+    const updatedContract = await this.rentalRepo.save(contract);
+
+    return {
+      message: `Le statut du contrat ${contractId} a été mis à jour avec succès.`,
+      data: updatedContract,
+    };
   }
 
   async findAll(): Promise<RentalContract[]> {
     return this.rentalRepo.find({
       order: { createdAt: 'DESC' },
-      relations: ['customer', 'vehicle'],
+      relations: ['customer', 'vehicle.category', 'vehicle.company'],
     });
   }
 
@@ -120,7 +110,7 @@ export class RentalContractService {
     const contracts = await this.rentalRepo.find({
       where: { customer: { id: user.id } },
       order: { createdAt: 'DESC' },
-      relations: ['vehicle', 'customer'],
+      relations: ['customer', 'vehicle.category', 'vehicle.company'],
     });
 
     // Supprimer customer des objets renvoyés
@@ -130,7 +120,7 @@ export class RentalContractService {
   async findOne(id: string): Promise<RentalContract> {
     const contract = await this.rentalRepo.findOne({
       where: { id },
-      relations: ['customer', 'vehicle'],
+      relations: ['customer', 'vehicle.category', 'vehicle.company'],
     });
     if (!contract) throw new NotFoundException('Contrat introuvable');
     return contract;
@@ -149,7 +139,10 @@ export class RentalContractService {
       throw new ForbiddenException('Vous ne pouvez pas annuler ce contrat');
     }
 
-    if (contract.status !== RentalStatus.PENDING && contract.status !== RentalStatus.ACTIVE) {
+    if (
+      contract.status !== RentalStatus.PENDING &&
+      contract.status !== RentalStatus.VALIDATED
+    ) {
       throw new ForbiddenException('Ce contrat ne peut pas être annulé');
     }
 

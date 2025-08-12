@@ -10,6 +10,7 @@ import { PaymentStatus } from './enum/paymentStatus.enum';
 import { InvoiceService } from 'src/order/invoice/invoice.util';
 import { MailOrderService } from 'src/email/emailorder.service';
 import * as QRCode from 'qrcode';
+import { UpdateSaleStatusDto } from './dto/UpdateSaleStatusDto';
 
 @Injectable()
 export class SaleTransactionService {
@@ -124,11 +125,42 @@ export class SaleTransactionService {
       order: { date: 'DESC' },
     });
   }
+  async updateSaleTransactionStatus(
+    transactionId: string,
+    dto: UpdateSaleStatusDto,
+  ): Promise<{ data: SaleTransaction; message: string }> {
+    const transaction = await this.saleRepo.findOne({
+      where: { id: transactionId },
+      relations: ['customer', 'vehicle'],
+    });
+
+    if (!transaction) {
+      throw new NotFoundException('Transaction introuvable');
+    }
+
+    transaction.paymentStatus = dto.status;
+
+    if (dto.status === PaymentStatus.VALIDATED) {
+      transaction.paymentStatus = PaymentStatus.PAID;
+      transaction.paid = true;
+    }
+
+    const updatedTransaction = await this.saleRepo.save(transaction);
+
+    const fullTransaction = await this.saleRepo.findOne({
+      where: { id: transactionId },
+      relations: ['customer', 'vehicle'],
+    });
+
+    return {
+      message: 'Transaction mise à jour avec succès',
+      data: fullTransaction!,
+    };
+  }
 
   async update(id: string, dto: UpdateSaleTransactionDto): Promise<SaleTransaction> {
     const transaction = await this.findOne(id);
 
-    // Gérer la mise à jour du véhicule uniquement si changé
     if (dto.vehicleId && dto.vehicleId !== transaction.vehicle.id) {
       const vehicle = await this.productRepo.findOne({ where: { id: dto.vehicleId } });
       if (!vehicle) throw new NotFoundException('Véhicule non trouvé');

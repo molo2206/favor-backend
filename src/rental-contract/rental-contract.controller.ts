@@ -19,6 +19,7 @@ import { AuthorizeRoles } from 'src/users/utility/decorators/authorize-roles.dec
 import { UserEntity } from 'src/users/entities/user.entity';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
 import { RentalStatus } from './enum/rentalStatus.enum';
+import { UpdateRentalContractStatusDto } from './dto/UpdateRentalContractStatusDto';
 
 @UseGuards(AuthentificationGuard, RolesGuard)
 @Controller('rental-contracts')
@@ -66,6 +67,24 @@ export class RentalContractController {
     return {
       message: `Contrat de location #${id} récupéré avec succès`,
       data,
+    };
+  }
+
+  @Patch(':id/status')
+  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() updateStatusDto: UpdateRentalContractStatusDto,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const updated = await this.rentalContractService.updateRentalContractStatus(
+      id,
+      updateStatusDto,
+    );
+    return {
+      message: `Statut du contrat de location mis à jour avec succès`,
+      data: updated.data,
     };
   }
 

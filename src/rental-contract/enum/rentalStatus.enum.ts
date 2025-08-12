@@ -1,6 +1,7 @@
 export enum RentalStatus {
   PENDING = 'PENDING',
-  ACTIVE = 'ACTIVE',
+  VALIDATED = 'VALIDATED',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
+  PAID = 'PAID',
 }

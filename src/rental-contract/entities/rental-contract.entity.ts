@@ -41,6 +41,9 @@ export class RentalContract {
   @Column({ nullable: true })
   rentalNumber: string;
 
+  @Column({ type: 'boolean', default: false })
+  paid: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 }
