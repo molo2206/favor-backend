@@ -153,8 +153,8 @@ export class ProductController {
     @Query('transmission') transmission?: string,
     @Query('typecar') typecar?: string,
     @Query('year') year?: string,
-    @Query('yearFrom') yearFrom?: string,
-    @Query('yearTo') yearTo?: string,
+    @Query('yearStart') yearStart?: string,
+    @Query('yearEnd') yearEnd?: string,
     @Query('type') type?: string,
     @Query('minDailyRate') minDailyRate?: string,
     @Query('maxDailyRate') maxDailyRate?: string,
@@ -183,6 +183,9 @@ export class ProductController {
         ? (typecar as Type_rental_both_sale_car)
         : undefined;
 
+    const yearStartNum = yearStart ? Number(yearStart) : undefined;
+    const yearEndNum = yearEnd ? Number(yearEnd) : undefined;
+
     return this.productService.findProductPublishedByCategory(
       categoryId || undefined,
       shopType || undefined,
@@ -190,8 +193,8 @@ export class ProductController {
       transmissionEnum,
       typecarEnum,
       year || undefined,
-      yearFrom || undefined,
-      yearTo || undefined,
+      yearStartNum,
+      yearEndNum,
       type || undefined,
       minDailyRate ? Number(minDailyRate) : undefined,
       maxDailyRate ? Number(maxDailyRate) : undefined,

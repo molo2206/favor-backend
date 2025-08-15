@@ -369,13 +369,13 @@ export class ProductService {
     transmission?: Transmission,
     typecar?: Type_rental_both_sale_car,
     year?: string,
-    yearFrom?: string,
-    yearTo?: string,
+    yearStart?: number,
+    yearEnd?: number,
     type?: string,
-    minDailyRate?: number | string,
-    maxDailyRate?: number | string,
-    minSalePrice?: number | string,
-    maxSalePrice?: number | string,
+    minDailyRate?: number,
+    maxDailyRate?: number,
+    minSalePrice?: number,
+    maxSalePrice?: number,
     page = 1,
     limit = 10,
   ): Promise<{
@@ -387,14 +387,6 @@ export class ProductService {
       limit: number;
     };
   }> {
-    const toNumber = (val: any) =>
-      val !== undefined && val !== null && val !== '' ? Number(val) : undefined;
-
-    minDailyRate = toNumber(minDailyRate);
-    maxDailyRate = toNumber(maxDailyRate);
-    minSalePrice = toNumber(minSalePrice);
-    maxSalePrice = toNumber(maxSalePrice);
-
     const queryBuilder = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
@@ -444,12 +436,15 @@ export class ProductService {
     }
 
     // Filtre intervalle de year
-    if (yearFrom && yearTo) {
-      queryBuilder.andWhere('product.year BETWEEN :yearFrom AND :yearTo', { yearFrom, yearTo });
-    } else if (yearFrom) {
-      queryBuilder.andWhere('product.year >= :yearFrom', { yearFrom });
-    } else if (yearTo) {
-      queryBuilder.andWhere('product.year <= :yearTo', { yearTo });
+    if (yearStart && yearEnd) {
+      queryBuilder.andWhere('product.year BETWEEN :yearStart AND :yearEnd', {
+        yearStart,
+        yearEnd,
+      });
+    } else if (yearStart) {
+      queryBuilder.andWhere('product.year >= :yearStart', { yearStart });
+    } else if (yearEnd) {
+      queryBuilder.andWhere('product.year <= :yearEnd', { yearEnd });
     }
 
     // Logique typecar et filtres prix/dailyRate (inchangée)
@@ -507,7 +502,7 @@ export class ProductService {
     const [products, total] = await queryBuilder.getManyAndCount();
 
     return {
-      message: `Produits PUBLIÉS récupérés avec succès.`,
+      message: 'Produits PUBLIÉS récupérés avec succès.',
       data: { data: products, total, page, limit },
     };
   }
