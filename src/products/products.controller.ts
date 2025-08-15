@@ -153,6 +153,8 @@ export class ProductController {
     @Query('transmission') transmission?: string,
     @Query('typecar') typecar?: string,
     @Query('year') year?: string,
+    @Query('yearFrom') yearFrom?: string,
+    @Query('yearTo') yearTo?: string,
     @Query('type') type?: string,
     @Query('minDailyRate') minDailyRate?: string,
     @Query('maxDailyRate') maxDailyRate?: string,
@@ -183,11 +185,13 @@ export class ProductController {
 
     return this.productService.findProductPublishedByCategory(
       categoryId || undefined,
-      shopType || undefined, 
+      shopType || undefined,
       fuelTypeEnum,
       transmissionEnum,
       typecarEnum,
       year || undefined,
+      yearFrom || undefined,
+      yearTo || undefined,
       type || undefined,
       minDailyRate ? Number(minDailyRate) : undefined,
       maxDailyRate ? Number(maxDailyRate) : undefined,
