@@ -5,11 +5,16 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { BedType } from '../enum/bedtype.enum';
 import { RoomStatus } from '../enum/roomStatus.enum';
 import { RoomImage } from 'src/room-image/entities/room-image.entity';
 import { Booking } from 'src/booking/entities/booking.entity';
+import { CompanyEntity } from 'src/company/entities/company.entity';
+import { MeasureEntity } from 'src/measure/entities/measure.entity';
+import { Expose, Type } from 'class-transformer';
 
 @Entity('room')
 export class Room {
@@ -34,9 +39,6 @@ export class Room {
   @Column({ length: 3, default: 'USD' })
   currency: string;
 
-  @Column('simple-array')
-  amenities: string[];
-
   @Column({
     type: 'enum',
     enum: BedType,
@@ -44,27 +46,6 @@ export class Room {
     nullable: false,
   })
   bedType: BedType;
-
-  @Column({ type: 'float', nullable: true })
-  sizeSqm?: number;
-
-  @Column({ nullable: true })
-  floorNumber?: number;
-
-  @Column({ nullable: true })
-  viewType?: string;
-
-  @Column({ default: false })
-  smokingAllowed: boolean;
-
-  @Column({ default: false })
-  accessible: boolean;
-
-  @Column({ default: '14:00' })
-  checkInTime: string;
-
-  @Column({ default: '12:00' })
-  checkOutTime: string;
 
   @Column({ type: 'enum', enum: RoomStatus, default: RoomStatus.AVAILABLE })
   status: RoomStatus;
@@ -76,8 +57,24 @@ export class Room {
   updatedAt: Date;
 
   @OneToMany(() => RoomImage, (image) => image.room, { cascade: true })
+  @Type(() => RoomImage)
+  @Expose()
   images: RoomImage[];
 
   @OneToMany(() => Booking, (booking) => booking.room)
   bookings: Booking[];
+
+  @ManyToOne(() => CompanyEntity, (company) => company.rooms, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'companyId' })
+  company: CompanyEntity;
+
+  @Column()
+  companyId: string;
+
+  @ManyToOne(() => MeasureEntity, (measure) => measure.rooms, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'measureId' })
+  measure: MeasureEntity;
+
+  @Column({ nullable: true })
+  measureId?: string;
 }

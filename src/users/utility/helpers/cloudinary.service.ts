@@ -161,4 +161,18 @@ export class CloudinaryService {
       });
     });
   }
+
+    async handleDeleteFile(fileUrl: string): Promise<string> {
+    if (!fileUrl) throw new UnprocessableEntityException('File URL is required');
+    const publicId = this.extractPublicId(fileUrl);
+    if (!publicId)
+      throw new UnprocessableEntityException('Unable to extract public_id from the URL');
+
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader.destroy(publicId, (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      });
+    });
+  }
 }

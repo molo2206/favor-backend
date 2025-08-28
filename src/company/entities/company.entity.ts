@@ -6,6 +6,7 @@ import { CompanyStatus } from 'src/company/enum/company-status.enum';
 import { CompanyType } from 'src/company/enum/type.company.enum';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Service } from 'src/service/entities/service.entity';
+import { Room } from 'src/room/entities/room.entity';
 
 @Entity('company')
 export class CompanyEntity {
@@ -87,4 +88,7 @@ export class CompanyEntity {
 
   @OneToMany(() => Service, (service) => service.company)
   services: Service[];
+
+  @OneToMany(() => Room, (room) => room.company)
+  rooms: Room[];
 }

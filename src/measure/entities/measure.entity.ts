@@ -8,6 +8,7 @@ import {
   OneToMany,
   JoinColumn,
 } from 'typeorm';
+import { Room } from 'src/room/entities/room.entity';
 
 @Entity('measures')
 export class MeasureEntity {
@@ -29,4 +30,7 @@ export class MeasureEntity {
 
   @OneToMany(() => Product, (product) => product.measure)
   products: Product[];
+
+  @OneToMany(() => Room, (room) => room.measure)
+  rooms: Room[];
 }

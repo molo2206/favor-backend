@@ -23,7 +23,7 @@ export class Booking {
   @JoinColumn({ name: 'roomId' })
   room: Room;
 
-  @Column('varchar', { length: 36, nullable: true })  // nullable for SET NULL on delete
+  @Column('varchar', { length: 36, nullable: true }) 
   userId: string;
 
   @ManyToOne(() => UserEntity, { nullable: true, onDelete: 'SET NULL' })
@@ -50,7 +50,4 @@ export class Booking {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @Column({ type: 'text', nullable: true })
-  specialRequests?: string;
 }

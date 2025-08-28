@@ -5,6 +5,7 @@ import {
   Column,
   ManyToOne,
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 @Entity('room_image')
 export class RoomImage {
@@ -18,5 +19,6 @@ export class RoomImage {
   altText?: string;
 
   @ManyToOne(() => Room, (room) => room.images, { onDelete: 'CASCADE' })
+  @Exclude() 
   room: Room;
 }
