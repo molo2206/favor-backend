@@ -1,25 +1,39 @@
-import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsBoolean,
+} from 'class-validator';
 import { TravelType } from 'src/travel_reservation/enum/travel.type.enum';
 
 export class CreateTravelReservationDto {
-    @IsEnum(TravelType)
-    type: TravelType;
+  @IsEnum(TravelType)
+  type: TravelType;
 
-    @IsString()
-    @IsNotEmpty()
-    destination: string;
+  @IsOptional()
+  @IsString()
+  departureLocation?: string;
 
-    @IsString()
-    @IsNotEmpty()
-    departureLocation: string;
+  @IsOptional()
+  @IsString()
+  arrivalLocation?: string;
 
-    @IsDateString()
-    departureDate: Date;
+  @IsOptional()
+  @IsDateString()
+  departureDate?: Date;
 
-    @IsOptional()
-    @IsDateString()
-    returnDate?: Date;
+  @IsOptional()
+  @IsDateString()
+  arrivalDate?: Date;
 
-    @IsUUID()
-    providerId: string;
+//   @IsOptional()
+//   @IsNumber()
+//   price?: number;
+
+  @IsOptional()
+  @IsString()
+  seatNumber?: string;
 }

@@ -34,17 +34,8 @@ export class TravelReservationEntity {
     @Column({ type: 'timestamp', nullable: true })
     reservationDate: Date;
 
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-    price: number;
-
-    @Column({ nullable: true })
-    vehicleModel?: string; // pour location voiture/moto
-
-    @Column({ nullable: true })
-    plateNumber?: string;
-
-    @Column({ nullable: true })
-    driverIncluded?: boolean;
+    // @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    // price: number;
 
     @Column({ nullable: true })
     seatNumber?: string; // pour avion/bateau
