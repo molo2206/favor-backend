@@ -4,11 +4,11 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  Length,
   Matches,
+  MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { UserRole } from '../enum/user-role-enum';
-import { Exclude } from 'class-transformer';
 
 export class CreateUserDto {
   @IsNotEmpty({ message: 'Le nom complet est requis.' })
@@ -33,19 +33,24 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
-  country: string;
+  country?: string;
 
   @IsOptional()
   @IsString()
-  city: string;
+  city?: string;
 
   @IsOptional()
   @IsString()
   address?: string;
 
+  // ✅ otpCode est optionnel, mais si fourni il doit être string et ≥ 6
   @IsOptional()
-  @IsString()
+  @ValidateIf((o) => o.otpCode !== undefined && o.otpCode !== null && o.otpCode !== '')
+  @IsString({ message: 'OTP doit être une chaîne de caractères.' })
+  @MinLength(6, { message: 'OTP doit contenir au moins 6 caractères.' })
   otpCode?: string;
 
-  @IsOptional() @IsEnum(UserRole, { each: true }) roles?: UserRole;
+  @IsOptional()
+  @IsEnum(UserRole)
+  roles?: UserRole;
 }
