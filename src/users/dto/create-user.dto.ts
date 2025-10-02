@@ -23,10 +23,11 @@ export class CreateUserDto {
   @IsString({ message: 'Le numéro de téléphone doit être une chaîne de caractères.' })
   phone: string;
 
-  @Exclude()
-  @IsNotEmpty({ message: 'Le mot de passe est requis.' })
-  @Length(6, 20, {
-    message: 'Le mot de passe doit contenir entre 6 et 20 caractères.',
+  @IsNotEmpty()
+  @IsString()
+  @Matches(/(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])/, {
+    message:
+      'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.',
   })
   password: string;
 
