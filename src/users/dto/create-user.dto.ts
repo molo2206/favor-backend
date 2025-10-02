@@ -5,9 +5,9 @@ import {
   IsOptional,
   IsString,
   Matches,
-  MinLength,
-  ValidateIf,
+  IsPhoneNumber,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { UserRole } from '../enum/user-role-enum';
 
 export class CreateUserDto {
@@ -15,16 +15,17 @@ export class CreateUserDto {
   @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
   fullName: string;
 
+  @Transform(({ value }) => value.toLowerCase())
   @IsNotEmpty({ message: "L'email est requis." })
   @IsEmail({}, { message: 'Email invalide.' })
   email: string;
 
-  @IsNotEmpty({ message: 'Le numéro de téléphone est requis.' })
-  @IsString({ message: 'Le numéro de téléphone doit être une chaîne de caractères.' })
-  phone: string;
+  @IsOptional()
+  @IsPhoneNumber(undefined, { message: 'Le numéro de téléphone est invalide.' })
+  phone?: string;
 
-  @IsNotEmpty()
-  @IsString()
+  @IsNotEmpty({ message: 'Le mot de passe est requis.' })
+  @IsString({ message: 'Le mot de passe doit être une chaîne de caractères.' })
   @Matches(/(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])/, {
     message:
       'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.',
@@ -43,14 +44,12 @@ export class CreateUserDto {
   @IsString()
   address?: string;
 
-  // ✅ otpCode est optionnel, mais si fourni il doit être string et ≥ 6
   @IsOptional()
-  @ValidateIf((o) => o.otpCode !== undefined && o.otpCode !== null && o.otpCode !== '')
-  @IsString({ message: 'OTP doit être une chaîne de caractères.' })
-  @MinLength(6, { message: 'OTP doit contenir au moins 6 caractères.' })
+  @IsString()
   otpCode?: string;
 
   @IsOptional()
   @IsEnum(UserRole)
-  roles?: UserRole;
+  @Transform(({ value }) => (value ? value : UserRole.CUSTOMER))
+  roles?: UserRole = UserRole.CUSTOMER;
 }

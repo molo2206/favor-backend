@@ -12,7 +12,7 @@ export const dataSourceOptions: DataSourceOptions = {
   //jhjhjhjhjh
   // username: 'root',
   // password: '',
-  // database: 'favor_db',
+  // database: 'favor_db1',
   entities: ['dist/**/*.entity{.ts,.js}'],
   migrations: ['dist/db/migrations/*{.ts,.js}'],
   logging: false,

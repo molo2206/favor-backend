@@ -38,24 +38,24 @@ export class UsersService {
   async signup(createUserDto: CreateUserDto): Promise<{ message: string; data: any }> {
     const { email, phone, otpCode, password } = createUserDto;
 
-    const phoneExists = await this.usersRepository.findOne({
-      where: { phone },
-    });
-    if (phoneExists) {
+    // Vérification doublons
+    if (phone && (await this.usersRepository.findOne({ where: { phone } }))) {
       throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
     }
-
-    const emailExists = await this.usersRepository.findOne({
-      where: { email },
-    });
-    if (emailExists) {
+    if (await this.usersRepository.findOne({ where: { email } })) {
       throw new BadRequestException('Un compte avec cet email existe déjà.');
     }
 
+    // Étape 1 → envoi OTP si otpCode vide
     if (!otpCode) {
-      return this.sendOtp(email);
+      await this.sendOtp(email); // envoi OTP
+      return {
+        message: 'Un code OTP a été envoyé à votre adresse e-mail.',
+        data: { email }, // on renvoie juste l'email pour l'info
+      };
     }
 
+    // Étape 2 → vérification OTP
     const otpEntry = await this.otpRepository.findOne({
       where: { email, otpCode, isUsed: false },
     });
@@ -64,27 +64,27 @@ export class UsersService {
       throw new BadRequestException('OTP invalide ou expiré.');
     }
 
+    // Création utilisateur
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    const data = this.usersRepository.create({
+    const user = this.usersRepository.create({
       ...createUserDto,
-      email,
-      phone,
       password: hashedPassword,
       role: UserRole.CUSTOMER,
     });
 
-    const savedUser = await this.usersRepository.save(data);
+    const savedUser = await this.usersRepository.save(user);
 
+    // Marquer OTP comme utilisé
     otpEntry.isUsed = true;
     otpEntry.user = savedUser;
     await this.otpRepository.save(otpEntry);
 
     const { password: _pw, ...userWithoutPassword } = savedUser;
 
+    // Envoi email de bienvenue
     await this.mailService.sendHtmlEmail(
       email,
-      'Vous avez déjà un compte dans FavorHelp',
+      'Bienvenue dans FavorHelp 🎉',
       'createCount.html',
       { userWithoutPassword, year: new Date().getFullYear() },
     );
@@ -436,7 +436,9 @@ export class UsersService {
 
   async sendOtp(email: string): Promise<any> {
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
-    const dto = plainToInstance(VerifyOtpDto, { email, code: '0000' });
+
+    // Validation DTO (pour s'assurer que l'email est correct)
+    const dto = plainToInstance(VerifyOtpDto, { email, otpCode: '0000' });
     const errors = await validate(dto, {
       whitelist: true,
       forbidNonWhitelisted: true,
@@ -448,28 +450,29 @@ export class UsersService {
       throw new BadRequestException(errorMessages);
     }
 
+    // Supprimer l'ancien OTP actif pour ce mail
     const existingOtp = await this.otpRepository.findOne({
       where: { email, isUsed: false },
     });
-    if (existingOtp && new Date() < existingOtp.expiresAt) {
-      return {
-        message: 'Un OTP actif existe déjà.',
-        otpCode: existingOtp.otpCode,
-      };
+    if (existingOtp) {
+      await this.otpRepository.remove(existingOtp);
     }
 
+    // Créer le nouveau OTP
     const otp = this.otpRepository.create({
       email,
       otpCode,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
     });
     await this.otpRepository.save(otp);
 
+    // Envoyer l'email
     await this.mailService.sendHtmlEmail(email, 'Votre OTP de connexion', 'sendOtp.html', {
       otpCode,
       year: new Date().getFullYear(),
     });
-    return { message: 'OTP envoyé avec succès.' };
+
+    return { message: 'OTP envoyé avec succès.', otpCode };
   }
 
   async sendResetPasswordOtp(email: string): Promise<any> {
