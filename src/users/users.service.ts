@@ -21,9 +21,6 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole } from './enum/user-role-enum';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
 import { MailService } from 'src/email/email.service';
-import { GoogleLoginDto } from './dto/googleLoginDto.dto';
-import { DeviceTokenEntity } from './entities/deviceToken.entity';
-import { UserNotificationEntity } from './entities/userNotification.entity';
 @Injectable()
 export class UsersService {
   constructor(
@@ -31,10 +28,6 @@ export class UsersService {
     private readonly usersRepository: Repository<UserEntity>,
     @InjectRepository(OtpEntity)
     private readonly otpRepository: Repository<OtpEntity>,
-    @InjectRepository(DeviceTokenEntity)
-    private readonly deviceTokenEntity: Repository<DeviceTokenEntity>,
-    @InjectRepository(UserNotificationEntity)
-    private readonly userNotificationEntity: Repository<UserNotificationEntity>,
 
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
@@ -99,232 +92,6 @@ export class UsersService {
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: userWithoutPassword,
-    };
-  }
-  async signin(userSignInDto: LoginUserDto): Promise<{
-    message: string;
-    data: any;
-    access_token: string;
-    refresh_token: string;
-  }> {
-    const user = await this.usersRepository
-      .createQueryBuilder('users')
-      .addSelect('users.password')
-      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
-      .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
-      .leftJoinAndSelect('userHasCompany.company', 'company')
-      .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
-      .leftJoinAndSelect('permissions.permission', 'permission')
-      .where('users.email = :email', { email: userSignInDto.email })
-      .getOne();
-
-    if (!user) {
-      throw new BadRequestException("Cette adresse e-mail n'existe pas.");
-    }
-
-    if (!user.password) {
-      throw new BadRequestException('Mot de passe non défini pour ce compte.');
-    }
-
-    const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
-
-    if (!isPasswordValid) {
-      throw new BadRequestException('Mot de passe incorrect.');
-    }
-
-    const token = await this.accessToken(user);
-    const refresh_t = await this.refreshToken(user);
-    const { password, ...userWithoutPassword } = user;
-
-    const userHasCompany =
-      userWithoutPassword.userHasCompany?.map((uhc) => ({
-        id: uhc.id,
-        isOwner: uhc.isOwner,
-        company: uhc.company
-          ? {
-              id: uhc.company.id,
-              companyName: uhc.company.companyName || '',
-              logo: uhc.company.logo,
-              banner: uhc.company.banner,
-              companyAddress: uhc.company.companyAddress || '',
-              typeCompany: uhc.company.typeCompany,
-              phone: uhc.company.phone,
-              vatNumber: uhc.company.vatNumber,
-              registrationDocumentUrl: uhc.company.registrationDocumentUrl,
-              warehouseLocation: uhc.company.warehouseLocation,
-              email: uhc.company.email,
-              website: uhc.company.website,
-              status: uhc.company.status,
-              companyActivity: uhc.company.companyActivity,
-              open_time: uhc.company.open_time,
-              delivery_minutes: uhc.company.delivery_minutes,
-              distance_km: uhc.company.distance_km,
-              latitude: uhc.company.latitude,
-              longitude: uhc.company.longitude,
-              address: uhc.company.address,
-            }
-          : null,
-        permissions:
-          uhc.permissions?.map((p) => ({
-            id: p.permission?.id,
-            name: p.permission?.name,
-            create: p.create,
-            read: p.read,
-            update: p.update,
-            delete: p.delete,
-            status: p.status,
-            createdAt:
-              p.permission?.createdAt instanceof Date
-                ? p.permission.createdAt
-                : new Date(p.permission?.createdAt),
-            updatedAt:
-              p.permission?.updatedAt instanceof Date
-                ? p.permission.updatedAt
-                : new Date(p.permission?.updatedAt),
-          })) ?? [],
-      })) ?? [];
-
-    const activeCompany = userHasCompany.find(
-      (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
-    )?.company;
-
-    return {
-      message: 'Connexion réussie !',
-      data: {
-        id: userWithoutPassword.id,
-        fullName: userWithoutPassword.fullName,
-        email: userWithoutPassword.email,
-        phone: userWithoutPassword.phone,
-        image: userWithoutPassword.image,
-        role: userWithoutPassword.role,
-        isActive: userWithoutPassword.isActive,
-        country: userWithoutPassword.country,
-        city: userWithoutPassword.city,
-        activeCompanyId: userWithoutPassword.activeCompanyId,
-        address: userWithoutPassword.address,
-        preferredLanguage: userWithoutPassword.preferredLanguage,
-        loyaltyPoints: userWithoutPassword.loyaltyPoints,
-        dateOfBirth: userWithoutPassword.dateOfBirth,
-        vehicleType: userWithoutPassword.vehicleType,
-        plateNumber: userWithoutPassword.plateNumber,
-        defaultAddressId: userWithoutPassword.defaultAddressId,
-        defaultAddress: userWithoutPassword.defaultAddress,
-        userHasCompany,
-        activeCompany,
-      },
-      access_token: token,
-      refresh_token: refresh_t,
-    };
-  }
-
-  async googleLoginByClientData(
-    dto: GoogleLoginDto & { fcmToken?: string; platform?: 'ios' | 'android' | 'web' },
-  ): Promise<{
-    message: string;
-    data: any;
-    token: string;
-    refresh_token: string;
-    fcmToken?: string;
-  }> {
-    const { email, fullName, image, fcmToken: clientFcmToken, platform } = dto;
-
-    if (!email) throw new BadRequestException("L'email est requis.");
-
-    // 🔎 Vérifier si l'utilisateur existe déjà
-    let user = await this.usersRepository.findOne({
-      where: { email: email.toLowerCase() },
-      relations: ['notifications', 'deviceTokens'],
-    });
-
-    let isNewUser = false;
-
-    if (user) {
-      if (user.password && user.provider !== 'google') {
-        throw new BadRequestException(
-          'Ce compte a été créé avec un mot de passe. Veuillez utiliser la connexion standard.',
-        );
-      }
-
-      if (!user.provider || user.provider !== 'google') {
-        await this.usersRepository.update(user.id, { provider: 'google' });
-      }
-    } else {
-      user = this.usersRepository.create({
-        email,
-        fullName,
-        role: UserRole.CUSTOMER,
-        provider: 'google',
-        password: '',
-        isActive: true,
-        image: image ?? undefined,
-      });
-
-      user = await this.usersRepository.save(user);
-      isNewUser = true;
-
-      await this.mailService.sendHtmlEmail(
-        email,
-        'Inscription confirmée sur AfiaGap',
-        'createCount.html',
-        {
-          userWithoutPassword: user,
-          year: new Date().getFullYear(),
-        },
-      );
-    }
-
-    // Tokens JWT
-    const token = await this.accessToken(user);
-    const refresh_token = await this.refreshToken(user);
-
-    // Gestion du DeviceToken
-    if (clientFcmToken && platform) {
-      let existingToken = await this.deviceTokenEntity.findOne({
-        where: { token: clientFcmToken },
-      });
-
-      if (existingToken) {
-        existingToken.userId = user.id;
-        existingToken.platform = platform;
-        existingToken.updatedAt = new Date();
-        await this.deviceTokenEntity.save(existingToken);
-      } else {
-        const newDevice = this.deviceTokenEntity.create({
-          token: clientFcmToken,
-          userId: user.id,
-          platform,
-        });
-        await this.deviceTokenEntity.save(newDevice);
-      }
-    }
-
-    // Récupérer le dernier token de l'utilisateur
-    let finalFcmToken: string | undefined;
-    if (platform) {
-      const device = await this.deviceTokenEntity.findOne({
-        where: { userId: user.id, platform },
-        order: { updatedAt: 'DESC' },
-      });
-      finalFcmToken = device?.token;
-    } else {
-      const lastDevice = await this.deviceTokenEntity.findOne({
-        where: { userId: user.id },
-        order: { updatedAt: 'DESC' },
-      });
-      finalFcmToken = lastDevice?.token;
-    }
-
-    // Nettoyage de l'objet user
-    const { password, ...userWithoutPassword } = user;
-
-    return {
-      message: isNewUser
-        ? 'Compte créé et connexion réussie via Google.'
-        : 'Connexion réussie via Google.',
-      data: userWithoutPassword,
-      token,
-      refresh_token,
-      fcmToken: finalFcmToken,
     };
   }
 
@@ -460,6 +227,121 @@ export class UsersService {
     return { message: 'Mot de passe mis à jour avec succès' };
   }
 
+  async signin(userSignInDto: LoginUserDto): Promise<{
+    message: string;
+    data: any;
+    access_token: string;
+    refresh_token: string;
+  }> {
+    const user = await this.usersRepository
+      .createQueryBuilder('users')
+      .addSelect('users.password')
+      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+      .leftJoinAndSelect('userHasCompany.company', 'company')
+      .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
+      .leftJoinAndSelect('permissions.permission', 'permission')
+      .where('users.email = :email', { email: userSignInDto.email })
+      .getOne();
+
+    if (!user) {
+      throw new BadRequestException("Cette adresse e-mail n'existe pas.");
+    }
+
+    if (!user.password) {
+      throw new BadRequestException('Mot de passe non défini pour ce compte.');
+    }
+
+    const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Mot de passe incorrect.');
+    }
+
+    const token = await this.accessToken(user);
+    const refresh_t = await this.refreshToken(user);
+    const { password, ...userWithoutPassword } = user;
+
+    const userHasCompany =
+      userWithoutPassword.userHasCompany?.map((uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+        company: uhc.company
+          ? {
+              id: uhc.company.id,
+              companyName: uhc.company.companyName || '',
+              logo: uhc.company.logo,
+              banner: uhc.company.banner,
+              companyAddress: uhc.company.companyAddress || '',
+              typeCompany: uhc.company.typeCompany,
+              phone: uhc.company.phone,
+              vatNumber: uhc.company.vatNumber,
+              registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+              warehouseLocation: uhc.company.warehouseLocation,
+              email: uhc.company.email,
+              website: uhc.company.website,
+              status: uhc.company.status,
+              companyActivity: uhc.company.companyActivity,
+              open_time: uhc.company.open_time,
+              delivery_minutes: uhc.company.delivery_minutes,
+              distance_km: uhc.company.distance_km,
+              latitude: uhc.company.latitude,
+              longitude: uhc.company.longitude,
+              address: uhc.company.address,
+            }
+          : null,
+        permissions:
+          uhc.permissions?.map((p) => ({
+            id: p.permission?.id,
+            name: p.permission?.name,
+            create: p.create,
+            read: p.read,
+            update: p.update,
+            delete: p.delete,
+            status: p.status,
+            createdAt:
+              p.permission?.createdAt instanceof Date
+                ? p.permission.createdAt
+                : new Date(p.permission?.createdAt),
+            updatedAt:
+              p.permission?.updatedAt instanceof Date
+                ? p.permission.updatedAt
+                : new Date(p.permission?.updatedAt),
+          })) ?? [],
+      })) ?? [];
+
+    const activeCompany = userHasCompany.find(
+      (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
+    )?.company;
+
+    return {
+      message: 'Connexion réussie !',
+      data: {
+        id: userWithoutPassword.id,
+        fullName: userWithoutPassword.fullName,
+        email: userWithoutPassword.email,
+        phone: userWithoutPassword.phone,
+        image: userWithoutPassword.image,
+        role: userWithoutPassword.role,
+        isActive: userWithoutPassword.isActive,
+        country: userWithoutPassword.country,
+        city: userWithoutPassword.city,
+        activeCompanyId: userWithoutPassword.activeCompanyId,
+        address: userWithoutPassword.address,
+        preferredLanguage: userWithoutPassword.preferredLanguage,
+        loyaltyPoints: userWithoutPassword.loyaltyPoints,
+        dateOfBirth: userWithoutPassword.dateOfBirth,
+        vehicleType: userWithoutPassword.vehicleType,
+        plateNumber: userWithoutPassword.plateNumber,
+        defaultAddressId: userWithoutPassword.defaultAddressId,
+        defaultAddress: userWithoutPassword.defaultAddress,
+        userHasCompany,
+        activeCompany,
+      },
+      access_token: token,
+      refresh_token: refresh_t,
+    };
+  }
   async updateProfileImage(userId: string, file?: Express.Multer.File) {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
