@@ -372,6 +372,7 @@ export class ProductService {
     yearStart?: number,
     yearEnd?: number,
     type?: string,
+    companyId?: string,
     minDailyRate?: number,
     maxDailyRate?: number,
     minSalePrice?: number,
@@ -396,6 +397,10 @@ export class ProductService {
       .leftJoinAndSelect('product.measure', 'measure')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
+    // Filtre par companyId
+    if (companyId) {
+      queryBuilder.andWhere('product.companyId = :companyId', { companyId });
+    }
     // Filtre catégorie
     if (categoryId) {
       queryBuilder.andWhere(
