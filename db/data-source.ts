@@ -15,8 +15,9 @@ export const dataSourceOptions: DataSourceOptions = {
   // database: 'favor_db1',
   entities: ['dist/**/*.entity{.ts,.js}'],
   migrations: ['dist/db/migrations/*{.ts,.js}'],
+  migrationsRun: true,
   logging: false,
-  synchronize: true,
+  synchronize: false,
 };
 
 const dataSource = new DataSource(dataSourceOptions);

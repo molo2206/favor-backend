@@ -52,4 +52,12 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   @Transform(({ value }) => (value ? value : UserRole.CUSTOMER))
   roles?: UserRole = UserRole.CUSTOMER;
+
+  @IsOptional()
+  @IsString()
+  fcmToken?: string;
+
+  @IsOptional()
+  @IsString()
+  platform?: 'ios' | 'android' | 'web';
 }

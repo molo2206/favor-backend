@@ -169,6 +169,7 @@ export class ProductService {
       .leftJoinAndSelect('category.children', 'categoryChildren')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.company', 'company')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     if (type) {
@@ -212,6 +213,7 @@ export class ProductService {
       .leftJoinAndSelect('category.children', 'categoryChildren')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.company', 'company')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     if (type) {
@@ -395,6 +397,7 @@ export class ProductService {
       .leftJoinAndSelect('category.children', 'categoryChildren')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.company', 'company')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     // Filtre par companyId
@@ -518,7 +521,14 @@ export class ProductService {
 
     const products = await this.productRepo.find({
       where: { company: { id: user.activeCompanyId } },
-      relations: ['category', 'category.parent', 'category.children', 'images', 'measure'],
+      relations: [
+        'category',
+        'category.parent',
+        'category.children',
+        'images',
+        'measure',
+        'company',
+      ],
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
     const { products: _, ...companyData } = company as any;
@@ -530,7 +540,14 @@ export class ProductService {
   }
   async groupByType(): Promise<Record<string, Product[]>> {
     const products = await this.productRepo.find({
-      relations: ['category', 'category.parent', 'category.children', 'images', 'measure'],
+      relations: [
+        'category',
+        'category.parent',
+        'category.children',
+        'images',
+        'measure',
+        'company',
+      ],
     });
 
     const grouped = products.reduce(
@@ -557,7 +574,7 @@ export class ProductService {
 
     const products = await this.productRepo.find({
       where: whereCondition,
-      relations: ['category.parent', 'category.children', 'images'],
+      relations: ['category.parent', 'category.children', 'images', 'company'],
     });
 
     const grouped = new Map<
@@ -611,7 +628,7 @@ export class ProductService {
 
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['category', 'category.parent', 'category.children', 'images', 'measure'],
+      relations: ['category', 'category.parent', 'category.children', 'images', 'measure','company'],
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
