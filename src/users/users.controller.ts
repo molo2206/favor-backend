@@ -32,6 +32,7 @@ import * as speakeasy from 'speakeasy';
 import { AuthorizeRoles } from './utility/decorators/authorize.roles.decorator';
 import { MailService } from 'src/email/email.service';
 import { VerifyOtpDto } from './dto/VerifyOtpDto';
+import { GoogleLoginDto } from './dto/googleLoginDto.dto';
 
 @Controller('users')
 export class UsersController {
@@ -53,6 +54,12 @@ export class UsersController {
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   async signin(@Body() loginUserDto: LoginUserDto): Promise<{ data: string }> {
     return await this.usersService.signin(loginUserDto);
+  }
+
+  @Post('/auth/google-login')
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async googleLogin(@Body() dto: GoogleLoginDto) {
+    return this.usersService.googleLoginByClientData(dto);
   }
 
   @Post('refresh-token')
@@ -181,7 +188,8 @@ export class UsersController {
     }),
   )
   async verifyOtpCode(@Body() dto: VerifyOtpDto) {
-    if (!dto.email || !dto.code) {VerifyOtpDto
+    if (!dto.email || !dto.code) {
+      VerifyOtpDto;
       throw new BadRequestException('Email et code sont requis');
     }
     return this.usersService.verifyOtp(dto.email, dto.code);

@@ -53,6 +53,9 @@ export class UserEntity {
   @Column({ nullable: true })
   city: string;
 
+  @Column({ nullable: true })
+  provider: string;
+  
   @Column({ default: true })
   isActive: boolean;
 

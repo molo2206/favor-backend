@@ -21,6 +21,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole } from './enum/user-role-enum';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
 import { MailService } from 'src/email/email.service';
+import { GoogleLoginDto } from './dto/googleLoginDto.dto';
 @Injectable()
 export class UsersService {
   constructor(
@@ -342,6 +343,76 @@ export class UsersService {
       refresh_token: refresh_t,
     };
   }
+
+  async googleLoginByClientData(dto: GoogleLoginDto): Promise<{
+    message: string;
+    data: any;
+    token: string;
+    refresh_token: string;
+  }> {
+    const { email, fullName, image } = dto;
+
+    if (!email) throw new BadRequestException("L'email est requis.");
+
+    // Vérifier si l'utilisateur existe déjà
+    let user = await this.usersRepository.findOne({
+      where: { email: email.toLowerCase() },
+    });
+
+    let isNewUser = false;
+
+    if (user) {
+      if (user.password && user.provider !== 'google') {
+        throw new BadRequestException(
+          'Ce compte a été créé avec un mot de passe. Veuillez utiliser la connexion standard.',
+        );
+      }
+
+      if (!user.provider || user.provider !== 'google') {
+        await this.usersRepository.update(user.id, { provider: 'google' });
+      }
+    } else {
+      user = this.usersRepository.create({
+        email,
+        fullName,
+        role: UserRole.CUSTOMER, // ou UserRole.CUSTOMER si enum
+        provider: 'google',
+        password: '',
+        isActive: true,
+        image: image || undefined,
+      });
+
+      user = await this.usersRepository.save(user);
+      isNewUser = true;
+
+      await this.mailService.sendHtmlEmail(
+        email,
+        'Inscription confirmée sur AfiaGap',
+        'createCount.html',
+        {
+          userWithoutPassword: user,
+          year: new Date().getFullYear(),
+        },
+      );
+    }
+
+    // Générer les tokens JWT
+    const token = await this.accessToken(user);
+    const refresh_token = await this.refreshToken(user);
+
+    // Nettoyage de l'objet user
+    const { password, ...userWithoutPassword } = user;
+
+    return {
+      message: isNewUser
+        ? 'Compte créé et connexion réussie via Google.'
+        : 'Connexion réussie via Google.',
+      data: userWithoutPassword,
+      token,
+      refresh_token,
+    };
+  }
+
   async updateProfileImage(userId: string, file?: Express.Multer.File) {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
