@@ -22,8 +22,6 @@ import { RentalContract } from 'src/rental-contract/entities/rental-contract.ent
 import { SaleTransaction } from 'src/sale-transaction/entities/sale-transaction.entity';
 import { ReservService } from 'src/reserv-service/entities/reserv-service.entity';
 import { Booking } from 'src/booking/entities/booking.entity';
-import { DeviceTokenEntity } from './deviceToken.entity';
-import { UserNotificationEntity } from './userNotification.entity';
 
 @Entity('users')
 export class UserEntity {
@@ -55,12 +53,6 @@ export class UserEntity {
   @Column({ nullable: true })
   city: string;
 
-  @Column({ nullable: true })
-  fcmToken: string;
-
-  @Column({ nullable: true })
-  platform: string;
-
   @Column({ default: true })
   isActive: boolean;
 
@@ -73,9 +65,6 @@ export class UserEntity {
   //Champs spécifiques aux clients
   @Column({ nullable: true })
   address?: string;
-
-  @Column({ nullable: true })
-  provider?: string;
 
   @Column({ nullable: true })
   preferredLanguage?: string;
@@ -145,9 +134,4 @@ export class UserEntity {
   @OneToMany(() => Booking, (booking) => booking.user)
   bookings: Booking[];
 
-  @OneToMany(() => DeviceTokenEntity, (deviceToken) => deviceToken.user)
-  deviceTokens: DeviceTokenEntity[];
-
-  @OneToMany(() => UserNotificationEntity, (notification) => notification.user)
-  notifications: UserNotificationEntity[];
 }

@@ -4,8 +4,6 @@ import { UsersController } from './users.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from './entities/user.entity';
 import { OtpEntity } from 'src/otp/entities/otp.entity';
-import { DeviceTokenEntity } from './entities/deviceToken.entity';
-import { UserNotificationEntity } from './entities/userNotification.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
@@ -16,8 +14,6 @@ import { MailModule } from 'src/email/email.module';
     TypeOrmModule.forFeature([
       UserEntity,
       OtpEntity,
-      DeviceTokenEntity,
-      UserNotificationEntity,
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -42,8 +38,6 @@ import { MailModule } from 'src/email/email.module';
     TypeOrmModule.forFeature([
       UserEntity,
       OtpEntity,
-      DeviceTokenEntity,
-      UserNotificationEntity,
     ]),
   ],
 })
