@@ -37,6 +37,7 @@ import { ReservServiceModule } from './reserv-service/reserv-service.module';
 import { RoomImageModule } from './room-image/room-image.module';
 import { RoomModule } from './room/room.module';
 import { BookingModule } from './booking/booking.module';
+import { AppSettingModule } from './app-setting/app-setting.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { BookingModule } from './booking/booking.module';
       }),
     }),
     UsersModule,
+    AppSettingModule,
     OtpModule,
     CompanyModule,
     UserHasCompanyModule,
@@ -100,7 +102,8 @@ import { BookingModule } from './booking/booking.module';
     BookingModule,
     RoomModule,
     RoomImageModule,
-    BookingModule
+    BookingModule,
+    AppSettingModule
   ],
   controllers: [AppController],
   providers: [AppService],
