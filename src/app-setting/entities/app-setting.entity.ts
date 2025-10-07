@@ -36,8 +36,8 @@ export class AppSetting {
   defaultLanguage: string;
 
   /** Modules activés */
-  @Column('json', { default: '{}' })
-  modules: {
+  @Column('json', { nullable: true })
+  modules?: {
     ecommerce?: boolean;
     restaurant?: boolean;
     services?: boolean;
@@ -49,8 +49,8 @@ export class AppSetting {
   };
 
   /** Intégrations principales */
-  @Column('json', { default: '{}' })
-  integrations: {
+  @Column('json', { nullable: true })
+  integrations?: {
     stripe?: boolean;
     paypal?: boolean;
     mobileMoney?: boolean;
@@ -60,8 +60,8 @@ export class AppSetting {
   };
 
   /** Apparence de la plateforme */
-  @Column('json', { default: '{}' })
-  theme: {
+  @Column('json', { nullable: true })
+  theme?: {
     mode?: 'light' | 'dark';
     primaryColor?: string;
     secondaryColor?: string;
@@ -70,8 +70,8 @@ export class AppSetting {
   };
 
   /** Réseaux sociaux */
-  @Column('json', { default: '{}' })
-  socialLinks: {
+  @Column('json', { nullable: true })
+  socialLinks?: {
     facebook?: string;
     instagram?: string;
     twitter?: string;
@@ -96,16 +96,16 @@ export class AppSetting {
   restaurantExtraFeePerItem: number;
 
   /** Paramètres système */
-  @Column('json', { default: '{}' })
-  system: {
+  @Column('json', { nullable: true })
+  system?: {
     maintenanceMode?: boolean;
     maintenanceMessage?: string;
     allowUserRegistration?: boolean;
   };
 
   /** Configuration avancée */
-  @Column('json', { default: '{}' })
-  advancedConfig: Record<string, any>;
+  @Column('json', { nullable: true })
+  advancedConfig?: Record<string, any>;
 
   /** Politique et conditions d'utilisation */
   @Column('text', { nullable: true })
@@ -119,4 +119,13 @@ export class AppSetting {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  constructor() {
+    this.modules = {};
+    this.integrations = {};
+    this.theme = {};
+    this.socialLinks = {};
+    this.system = {};
+    this.advancedConfig = {};
+  }
 }
