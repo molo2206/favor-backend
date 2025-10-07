@@ -1,4 +1,18 @@
-import { Controller, Post, Body, UseGuards, UseInterceptors, Param, UsePipes, ValidationPipe, Put, Patch, Get, Query, UploadedFiles } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  UseInterceptors,
+  Param,
+  UsePipes,
+  ValidationPipe,
+  Put,
+  Patch,
+  Get,
+  Query,
+  UploadedFiles,
+} from '@nestjs/common';
 import { CompanyService } from './company.service';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
@@ -14,9 +28,11 @@ import { MailService } from 'src/email/email.service';
 
 @Controller('company')
 export class CompanyController {
-  constructor(private readonly companyService: CompanyService, private readonly userHasCompanyService: UserHasCompanyService,
+  constructor(
+    private readonly companyService: CompanyService,
+    private readonly userHasCompanyService: UserHasCompanyService,
     private readonly mailService: MailService,
-  ) { }
+  ) {}
 
   @Post()
   @UseGuards(AuthentificationGuard)
@@ -27,16 +43,21 @@ export class CompanyController {
     @Body() dto: CreateCompanyDto,
     @CurrentUser() currentUser: UserEntity,
   ) {
-    const logo = files.find(file => file.fieldname === 'logo');
-    const banner = files.find(file => file.fieldname === 'banner');
+    const logo = files.find((file) => file.fieldname === 'logo');
+    const banner = files.find((file) => file.fieldname === 'banner');
 
-    const result = await this.companyService.createCompanyWithUser(dto, currentUser, logo, banner);
+    const result = await this.companyService.createCompanyWithUser(
+      dto,
+      currentUser,
+      logo,
+      banner,
+    );
 
     await this.mailService.sendHtmlEmail(
       currentUser.email,
       'Votre entreprise a été créée avec succès',
       'company-status-update.html',
-      { companyName: dto.companyName, status: 'PENDING', year: new Date().getFullYear() }
+      { companyName: dto.companyName, status: 'PENDING', year: new Date().getFullYear() },
     );
 
     return result;
@@ -51,8 +72,8 @@ export class CompanyController {
     @UploadedFiles() files: Express.Multer.File[],
     @CurrentUser() current_user: UserEntity,
   ) {
-    const logo = files.find(file => file.fieldname === 'logo');
-    const banner = files.find(file => file.fieldname === 'banner');
+    const logo = files.find((file) => file.fieldname === 'logo');
+    const banner = files.find((file) => file.fieldname === 'banner');
 
     return this.companyService.updateCompanyWithUser(dto, current_user, logo, banner);
   }
@@ -68,10 +89,7 @@ export class CompanyController {
   }
 
   @Patch(':id/status')
-  async updateStatus(
-    @Param('id') id: string,
-    @Body() dto: UpdateCompanyStatusDto,
-  ) {
+  async updateStatus(@Param('id') id: string, @Body() dto: UpdateCompanyStatusDto) {
     return this.companyService.updateCompanyStatus(id, dto);
   }
 
@@ -80,7 +98,8 @@ export class CompanyController {
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   async linkUserToCompany(
     @Body() dto: CreateUserHasCompanyDto,
-  ): Promise<{ data: UserHasCompanyEntity }> {  // Type attendu { data: UserHasCompanyEntity }
+  ): Promise<{ data: UserHasCompanyEntity }> {
+    // Type attendu { data: UserHasCompanyEntity }
     return await this.companyService.CreateUserToCompany(dto);
   }
 
@@ -93,7 +112,6 @@ export class CompanyController {
     return this.companyService.findCompanyValidatedByType(type, Number(page), Number(limit));
   }
 
-
   @Get()
   @UseGuards(AuthentificationGuard)
   async getCompaniesByType(
@@ -101,7 +119,6 @@ export class CompanyController {
   ): Promise<{ message: string; data: CompanyEntity[] }> {
     return this.companyService.findByType(type);
   }
-
 
   @Get(':id')
   @UseGuards(AuthentificationGuard)

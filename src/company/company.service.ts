@@ -52,7 +52,6 @@ export class CompanyService {
     user: UserEntity,
     logoFile?: Express.Multer.File,
     bannerFile?: Express.Multer.File,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ message: string; data: any }> {
     if (!dto || Object.keys(dto).length === 0) {
       throw new BadRequestException('Les données de l’entreprise sont requises');
@@ -90,6 +89,7 @@ export class CompanyService {
       latitude: dto.latitude,
       longitude: dto.longitude,
       address: dto.address,
+      taux: dto.taux || 0,
     });
 
     const savedCompany = await this.companyRepository.save(company);
@@ -112,7 +112,7 @@ export class CompanyService {
 
     const defaultTaux = this.tauxCompanyRepository.create({
       name: 'Taux initial de la société',
-      value: dto.valueTaux, 
+      value: dto.taux || 0,
       currency: 'CDF',
       isActive: true,
       company: savedCompany,
@@ -181,8 +181,8 @@ export class CompanyService {
         `Entreprise avec l'ID ${current_user.activeCompanyId} introuvable`,
       );
     }
-    const requiredFields: (keyof CreateCompanyDto)[] = ['address', 'latitude', 'longitude'];
 
+    const requiredFields: (keyof CreateCompanyDto)[] = ['address', 'latitude', 'longitude'];
     for (const field of requiredFields) {
       const value = dto[field];
       if (
@@ -219,9 +219,16 @@ export class CompanyService {
 
     for (const field of fieldsToUpdate) {
       if (dto[field] !== undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (company as any)[field] = dto[field];
       }
+    }
+
+    if (dto.taux !== undefined) {
+      const taux = Number(dto.taux);
+      if (isNaN(taux)) {
+        throw new BadRequestException("Le champ 'valueTaux' doit être un nombre valide");
+      }
+      company.taux = taux;
     }
 
     if (logoFile) {

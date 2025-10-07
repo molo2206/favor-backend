@@ -96,4 +96,9 @@ export class CompanyEntity {
 
   @OneToMany(() => TauxCompany, (taux) => taux.company)
   tauxCompanies: TauxCompany[];
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @IsNumber()
+  @IsString()
+  taux: number;
 }
