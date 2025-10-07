@@ -8,12 +8,14 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
 import { MailModule } from 'src/email/email.module';
+import { TauxCompany } from 'src/taux-company/entities/taux-company.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       UserEntity,
       OtpEntity,
+      TauxCompany,
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

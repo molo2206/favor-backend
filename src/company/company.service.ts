@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CompanyEntity } from './entities/company.entity';
@@ -14,6 +19,7 @@ import { CompanyType } from 'src/company/enum/type.company.enum';
 import { UpdateCompanyStatusDto } from './dto/update-company-status.dto';
 import { MailService } from 'src/email/email.service';
 import { CompanyStatus } from 'src/company/enum/company-status.enum';
+import { TauxCompany } from 'src/taux-company/entities/taux-company.entity';
 
 @Injectable()
 export class CompanyService {
@@ -33,10 +39,12 @@ export class CompanyService {
     @InjectRepository(TypeCompany) // Ajout de l'injection du repository TypeCompany
     private readonly typeCompanyRepository: Repository<TypeCompany>, // Définition de la propriété
 
+    @InjectRepository(TauxCompany)
+    private readonly tauxCompanyRepository: Repository<TauxCompany>,
+
     private readonly cloudinary: CloudinaryService,
     private readonly mailService: MailService,
-
-  ) { }
+  ) {}
 
   // services/company.service.ts
   async createCompanyWithUser(
@@ -81,7 +89,7 @@ export class CompanyService {
       distance_km: dto.distance_km,
       latitude: dto.latitude,
       longitude: dto.longitude,
-      address: dto.address
+      address: dto.address,
     });
 
     const savedCompany = await this.companyRepository.save(company);
@@ -102,6 +110,16 @@ export class CompanyService {
       relations: ['activeCompany', 'userHasCompany.company'],
     });
 
+    const defaultTaux = this.tauxCompanyRepository.create({
+      name: 'Taux initial de la société',
+      value: dto.valueTaux, 
+      currency: 'CDF',
+      isActive: true,
+      company: savedCompany,
+    });
+
+    await this.tauxCompanyRepository.save(defaultTaux);
+
     return {
       message: 'Entreprise créée avec succès.',
       data: fullUser!,
@@ -109,9 +127,14 @@ export class CompanyService {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async CreateUserToCompany(dto: CreateUserHasCompanyDto): Promise<{ message: string, data: any }> {  // Retourne 'data' dans l'objet
+  async CreateUserToCompany(
+    dto: CreateUserHasCompanyDto,
+  ): Promise<{ message: string; data: any }> {
+    // Retourne 'data' dans l'objet
     const user = await this.userRepository.findOneOrFail({ where: { id: dto.userId } });
-    const company = await this.companyRepository.findOneOrFail({ where: { id: dto.companyId } });
+    const company = await this.companyRepository.findOneOrFail({
+      where: { id: dto.companyId },
+    });
     const role = await this.roleRepository.findOneOrFail({ where: { id: dto.roleId } });
 
     let userHasCompany = await this.userHasCompanyRepository.findOne({
@@ -137,7 +160,7 @@ export class CompanyService {
     const result = instanceToPlain(saved);
     delete result.user?.password;
 
-    return { message: "Enregistrée avec succès", data: result };  // Encapsule la réponse dans un objet 'data'
+    return { message: 'Enregistrée avec succès', data: result }; // Encapsule la réponse dans un objet 'data'
   }
 
   async updateCompanyWithUser(
@@ -145,20 +168,28 @@ export class CompanyService {
     current_user: UserEntity,
     logoFile?: Express.Multer.File,
     bannerFile?: Express.Multer.File,
-  ): Promise<{ message: string, data: CompanyEntity }> {
+  ): Promise<{ message: string; data: CompanyEntity }> {
     if (!dto || Object.keys(dto).length === 0) {
       throw new BadRequestException("Les données de l'entreprise ne peuvent pas être vides");
     }
 
-    const company = await this.companyRepository.findOne({ where: { id: current_user.activeCompanyId } });
+    const company = await this.companyRepository.findOne({
+      where: { id: current_user.activeCompanyId },
+    });
     if (!company) {
-      throw new NotFoundException(`Entreprise avec l'ID ${current_user.activeCompanyId} introuvable`);
+      throw new NotFoundException(
+        `Entreprise avec l'ID ${current_user.activeCompanyId} introuvable`,
+      );
     }
     const requiredFields: (keyof CreateCompanyDto)[] = ['address', 'latitude', 'longitude'];
 
     for (const field of requiredFields) {
       const value = dto[field];
-      if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+      if (
+        value === undefined ||
+        value === null ||
+        (typeof value === 'string' && value.trim() === '')
+      ) {
         throw new BadRequestException(`Le champ '${field}' est obligatoire`);
       }
     }
@@ -183,7 +214,7 @@ export class CompanyService {
       'companyActivity',
       'latitude',
       'longitude',
-      'address'
+      'address',
     ];
 
     for (const field of fieldsToUpdate) {
@@ -219,7 +250,6 @@ export class CompanyService {
       data: updatedCompany,
     };
   }
-
 
   async updateCompanyStatus(
     id: string,
@@ -257,7 +287,7 @@ export class CompanyService {
           companyName: company.companyName,
           status: company.status,
           year: new Date().getFullYear(),
-        }
+        },
       );
     }
 
@@ -281,7 +311,9 @@ export class CompanyService {
     const companies = await query.getMany();
 
     if (companies.length === 0) {
-      throw new NotFoundException(`Aucune entreprise trouvée${type ? ` pour le type : ${type}` : ''}`);
+      throw new NotFoundException(
+        `Aucune entreprise trouvée${type ? ` pour le type : ${type}` : ''}`,
+      );
     }
 
     return {
@@ -313,7 +345,7 @@ export class CompanyService {
   async findByCompany(companyId: string): Promise<{ data: any }> {
     // Récupère la compagnie avec ses relations nécessaires
     const company = await this.companyRepository.findOne({
-      where: { id: companyId }
+      where: { id: companyId },
     });
 
     if (!company) {
@@ -334,7 +366,7 @@ export class CompanyService {
     return {
       data: {
         ...company, // toutes les propriétés de l'objet company à plat
-        products,   // les produits dans un tableau
+        products, // les produits dans un tableau
       },
     };
   }
@@ -386,46 +418,43 @@ export class CompanyService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = enrichedUser;
 
-    const userHasCompanyList = userWithoutPassword.userHasCompany?.map((uhc) => ({
-      id: uhc.id,
-      isOwner: uhc.isOwner,
-      company: uhc.company
-        ? {
-          id: uhc.company.id,
-          companyName: uhc.company.companyName || '',
-          logo: uhc.company.logo,
-          companyAddress: uhc.company.companyAddress || '',
-          typeCompany: uhc.company.typeCompany,
-          phone: uhc.company.phone,
-          vatNumber: uhc.company.vatNumber,
-          registrationDocumentUrl: uhc.company.registrationDocumentUrl,
-          warehouseLocation: uhc.company.warehouseLocation,
-          email: uhc.company.email,
-          website: uhc.company.website,
-          status: uhc.company.status,
-          companyActivity: uhc.company.companyActivity,
-          latitude: uhc.company.latitude,
-          longitude: uhc.company.longitude,
-          address: uhc.company.address
-        }
-        : null,
-      permissions:
-        uhc.permissions?.map((p) => ({
-          id: p.permission?.id,
-          name: p.permission?.name,
-          create: p.create,
-          read: p.read,
-          update: p.update,
-          delete: p.delete,
-          status: p.status,
-          createdAt: p.permission?.createdAt
-            ? new Date(p.permission.createdAt)
-            : null,
-          updatedAt: p.permission?.updatedAt
-            ? new Date(p.permission.updatedAt)
-            : null,
-        })) ?? [],
-    })) ?? [];
+    const userHasCompanyList =
+      userWithoutPassword.userHasCompany?.map((uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+        company: uhc.company
+          ? {
+              id: uhc.company.id,
+              companyName: uhc.company.companyName || '',
+              logo: uhc.company.logo,
+              companyAddress: uhc.company.companyAddress || '',
+              typeCompany: uhc.company.typeCompany,
+              phone: uhc.company.phone,
+              vatNumber: uhc.company.vatNumber,
+              registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+              warehouseLocation: uhc.company.warehouseLocation,
+              email: uhc.company.email,
+              website: uhc.company.website,
+              status: uhc.company.status,
+              companyActivity: uhc.company.companyActivity,
+              latitude: uhc.company.latitude,
+              longitude: uhc.company.longitude,
+              address: uhc.company.address,
+            }
+          : null,
+        permissions:
+          uhc.permissions?.map((p) => ({
+            id: p.permission?.id,
+            name: p.permission?.name,
+            create: p.create,
+            read: p.read,
+            update: p.update,
+            delete: p.delete,
+            status: p.status,
+            createdAt: p.permission?.createdAt ? new Date(p.permission.createdAt) : null,
+            updatedAt: p.permission?.updatedAt ? new Date(p.permission.updatedAt) : null,
+          })) ?? [],
+      })) ?? [];
 
     const activeCompany = userHasCompanyList.find(
       (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
@@ -460,10 +489,7 @@ export class CompanyService {
   async findAllByUser(userId: string): Promise<Record<string, any>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: [
-        'activeCompany',
-        'userHasCompany.company',
-      ],
+      relations: ['activeCompany', 'userHasCompany.company'],
     });
 
     if (!user) {
@@ -471,14 +497,15 @@ export class CompanyService {
     }
 
     // Extraire les entreprises depuis les relations
-    const companies = user.userHasCompany?.map((uhc) => ({
-      ...uhc.company,
-      role: uhc.role,
-      permissions: uhc.permissions?.map((perm) => ({
-        ...perm.permission,
-      })),
-      isOwner: uhc.isOwner,
-    })) || [];
+    const companies =
+      user.userHasCompany?.map((uhc) => ({
+        ...uhc.company,
+        role: uhc.role,
+        permissions: uhc.permissions?.map((perm) => ({
+          ...perm.permission,
+        })),
+        isOwner: uhc.isOwner,
+      })) || [];
 
     const sanitizedUser = instanceToPlain(user);
     delete sanitizedUser.userHasCompany; // enlever si pas besoin brut
@@ -533,7 +560,7 @@ export class CompanyService {
         total,
         page,
         limit,
-      }
+      },
     };
   }
 }

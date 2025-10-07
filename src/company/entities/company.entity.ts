@@ -7,6 +7,8 @@ import { CompanyType } from 'src/company/enum/type.company.enum';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Service } from 'src/service/entities/service.entity';
 import { Room } from 'src/room/entities/room.entity';
+import { TauxCompany } from 'src/taux-company/entities/taux-company.entity';
+import { IsNumber, IsString } from 'class-validator';
 
 @Entity('company')
 export class CompanyEntity {
@@ -91,4 +93,7 @@ export class CompanyEntity {
 
   @OneToMany(() => Room, (room) => room.company)
   rooms: Room[];
+
+  @OneToMany(() => TauxCompany, (taux) => taux.company)
+  tauxCompanies: TauxCompany[];
 }

@@ -120,6 +120,7 @@ export class UsersService {
           'userHasCompany.company',
           'userHasCompany.permissions',
           'userHasCompany.permissions.permission',
+          'userHasCompany.company.tauxCompanies',
         ],
       });
 
@@ -242,6 +243,7 @@ export class UsersService {
       .leftJoinAndSelect('userHasCompany.company', 'company')
       .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
       .leftJoinAndSelect('permissions.permission', 'permission')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .where('users.email = :email', { email: userSignInDto.email })
       .getOne();
 
@@ -289,6 +291,7 @@ export class UsersService {
               latitude: uhc.company.latitude,
               longitude: uhc.company.longitude,
               address: uhc.company.address,
+              tauxCompanies: uhc.company.tauxCompanies || [],
             }
           : null,
         permissions:
@@ -422,6 +425,7 @@ export class UsersService {
         'userHasCompany.company',
         'userHasCompany.permissions',
         'userHasCompany.permissions.permission',
+        'userHasCompany.company.tauxCompanies',
       ],
     });
 
@@ -470,6 +474,7 @@ export class UsersService {
               latitude: uhc.company.latitude,
               longitude: uhc.company.longitude,
               address: uhc.company.address,
+              tauxCompanies: uhc.company.tauxCompanies || [],
             }
           : null,
         permissions:
@@ -620,6 +625,7 @@ export class UsersService {
         'activeCompany',
         'userHasCompany',
         'userHasCompany.company',
+        'userHasCompany.company.tauxCompanies', // chemin correct
         'userHasCompany.permissions',
         'userHasCompany.permissions.permission',
       ],
@@ -628,8 +634,63 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('Utilisateur introuvable.');
     }
-    const sanitizedUser = instanceToPlain(user);
-    return sanitizedUser;
+
+    const { password, ...userWithoutPassword } = user;
+
+    const userHasCompany =
+      userWithoutPassword.userHasCompany?.map((uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+        company: uhc.company
+          ? {
+              id: uhc.company.id,
+              companyName: uhc.company.companyName || '',
+              logo: uhc.company.logo,
+              banner: uhc.company.banner,
+              companyAddress: uhc.company.companyAddress || '',
+              typeCompany: uhc.company.typeCompany,
+              phone: uhc.company.phone,
+              vatNumber: uhc.company.vatNumber,
+              registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+              warehouseLocation: uhc.company.warehouseLocation,
+              email: uhc.company.email,
+              website: uhc.company.website,
+              status: uhc.company.status,
+              companyActivity: uhc.company.companyActivity,
+              open_time: uhc.company.open_time,
+              delivery_minutes: uhc.company.delivery_minutes,
+              distance_km: uhc.company.distance_km,
+              latitude: uhc.company.latitude,
+              longitude: uhc.company.longitude,
+              address: uhc.company.address,
+              tauxCompanies: uhc.company.tauxCompanies || [], // inclusion ici
+            }
+          : null,
+        permissions:
+          uhc.permissions?.map((p) => ({
+            id: p.permission?.id,
+            name: p.permission?.name,
+            create: p.create,
+            read: p.read,
+            update: p.update,
+            delete: p.delete,
+            status: p.status,
+            createdAt:
+              p.permission?.createdAt instanceof Date
+                ? p.permission.createdAt
+                : new Date(p.permission?.createdAt),
+            updatedAt:
+              p.permission?.updatedAt instanceof Date
+                ? p.permission.updatedAt
+                : new Date(p.permission?.updatedAt),
+          })) ?? [],
+      })) ?? [];
+
+    return {
+      ...userWithoutPassword,
+      userHasCompany,
+      activeCompany: userWithoutPassword.activeCompany,
+    };
   }
 
   async accessToken(user: UserEntity): Promise<string> {

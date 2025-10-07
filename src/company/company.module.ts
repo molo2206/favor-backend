@@ -12,6 +12,7 @@ import { TypeCompanyModule } from 'src/type_company/type_company.module';
 import { TypeCompany } from 'src/type_company/entities/type_company.entity';
 import { CloudinaryModule } from 'src/users/utility/helpers/cloudinary.module';
 import { MailModule } from 'src/email/email.module';
+import { TauxCompanyModule } from 'src/taux-company/taux-company.module';
 
 @Module({
   imports: [
@@ -22,12 +23,13 @@ import { MailModule } from 'src/email/email.module';
       RoleUser,
       TypeCompany,
     ]),
+    TauxCompanyModule,
     CloudinaryModule,
     UserHasCompanyModule,
     TypeCompanyModule,
-    MailModule,  // 👈 ajoute MailModule ici
+    MailModule, // 👈 ajoute MailModule ici
   ],
   controllers: [CompanyController],
   providers: [CompanyService],
 })
-export class CompanyModule { }
+export class CompanyModule {}

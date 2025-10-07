@@ -38,6 +38,7 @@ import { RoomImageModule } from './room-image/room-image.module';
 import { RoomModule } from './room/room.module';
 import { BookingModule } from './booking/booking.module';
 import { AppSettingModule } from './app-setting/app-setting.module';
+import { TauxCompanyModule } from './taux-company/taux-company.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { AppSettingModule } from './app-setting/app-setting.module';
     }),
     UsersModule,
     AppSettingModule,
+    TauxCompanyModule,
     OtpModule,
     CompanyModule,
     UserHasCompanyModule,
@@ -103,15 +105,14 @@ import { AppSettingModule } from './app-setting/app-setting.module';
     RoomModule,
     RoomImageModule,
     BookingModule,
-    AppSettingModule
+    AppSettingModule,
+    TauxCompanyModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(CurrentUserMiddleware)
-      .forRoutes({ path: '*', method: RequestMethod.ALL });
+    consumer.apply(CurrentUserMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
   }
 }

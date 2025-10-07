@@ -123,6 +123,7 @@ export class ProductService {
         'category.children',
         'images',
         'measure',
+        'company.tauxCompanies',
       ],
     });
 
@@ -140,6 +141,7 @@ export class ProductService {
     const queryBuilder = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('category.parent', 'categoryParent')
       .leftJoinAndSelect('category.children', 'categoryChildren')
@@ -170,6 +172,7 @@ export class ProductService {
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('product.company.tauxCompanies', 'tauxCompanies')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     if (type) {
@@ -214,6 +217,7 @@ export class ProductService {
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     if (type) {
@@ -398,6 +402,7 @@ export class ProductService {
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     // Filtre par companyId
@@ -528,6 +533,7 @@ export class ProductService {
         'images',
         'measure',
         'company',
+        'company.tauxCompanies',
       ],
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
@@ -547,6 +553,7 @@ export class ProductService {
         'images',
         'measure',
         'company',
+        'company.tauxCompanies',
       ],
     });
 
@@ -574,7 +581,13 @@ export class ProductService {
 
     const products = await this.productRepo.find({
       where: whereCondition,
-      relations: ['category.parent', 'category.children', 'images', 'company'],
+      relations: [
+        'category.parent',
+        'category.children',
+        'images',
+        'company',
+        'company.tauxCompanies',
+      ],
     });
 
     const grouped = new Map<
@@ -608,7 +621,7 @@ export class ProductService {
 
   async groupByType_First_Product(): Promise<Record<string, Product>> {
     const products = await this.productRepo.find({
-      relations: ['company', 'category', 'images'],
+      relations: ['company', 'category', 'images', 'company.tauxCompanies'],
       order: { createdAt: 'ASC' }, // pour s'assurer que le "premier" est bien le plus ancien
     });
 
@@ -628,7 +641,15 @@ export class ProductService {
 
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['category', 'category.parent', 'category.children', 'images', 'measure','company'],
+      relations: [
+        'category',
+        'category.parent',
+        'category.children',
+        'images',
+        'measure',
+        'company',
+        'company.tauxCompanies',
+      ],
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
@@ -673,6 +694,7 @@ export class ProductService {
     const qb = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.images', 'images');
 
@@ -721,6 +743,7 @@ export class ProductService {
       where: { id },
       relations: [
         'company',
+        'company.tauxCompanies',
         'category',
         'category.parent',
         'category.children',

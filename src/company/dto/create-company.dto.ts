@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsUrl, IsNotEmpty, IsEnum } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsUrl, IsNotEmpty, IsEnum, IsNumber } from 'class-validator';
 import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 import { CompanyType } from 'src/company/enum/type.company.enum';
 
@@ -26,7 +27,7 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsString()
   @IsUrl({}, { message: 'The logo should be a valid URL or file path.' })
-  logo?: string | null;  // Permet de stocker null si le logo n'est pas présent
+  logo?: string | null; // Permet de stocker null si le logo n'est pas présent
 
   @IsOptional()
   @IsEnum(CompanyType, {
@@ -71,11 +72,14 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsString()
   @IsUrl({}, { message: 'The banner should be a valid URL or file path.' })
-  banner?: string | null
+  banner?: string | null;
 
   @IsEnum(CompanyActivity, {
     message: `L'activité doit être : ${Object.values(CompanyActivity).join(', ')}`,
   })
   companyActivity?: CompanyActivity;
-}
 
+  @Type(() => Number)
+  @IsNumber()
+  valueTaux: number;
+}
