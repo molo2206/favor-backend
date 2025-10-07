@@ -65,7 +65,7 @@ export class TauxCompanyService {
     });
 
     return {
-      message: 'Liste des taux récupérée avec succès ✅',
+      message: 'Liste des taux récupérée avec succès',
       data: tauxList,
     };
   }
