@@ -101,4 +101,7 @@ export class CompanyEntity {
   @IsNumber()
   @IsString()
   taux: number;
+
+  @Column({ type: 'varchar', nullable: true, length: 22 })
+  localCurrency: string;
 }

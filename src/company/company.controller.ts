@@ -132,4 +132,10 @@ export class CompanyController {
     const companies = await this.companyService.findAllByUser(user.id);
     return { data: companies };
   }
+
+  @Get('my/dashboard')
+  @UseGuards(AuthentificationGuard)
+  async getDashboard(@CurrentUser() user: UserEntity) {
+    return await this.companyService.getCompanyDashboard(user);
+  }
 }

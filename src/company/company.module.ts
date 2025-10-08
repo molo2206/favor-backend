@@ -13,6 +13,9 @@ import { TypeCompany } from 'src/type_company/entities/type_company.entity';
 import { CloudinaryModule } from 'src/users/utility/helpers/cloudinary.module';
 import { MailModule } from 'src/email/email.module';
 import { TauxCompanyModule } from 'src/taux-company/taux-company.module';
+import { Product } from 'src/products/entities/product.entity';
+import { Service } from 'src/service/entities/service.entity';
+import { OrderEntity } from 'src/order/entities/order.entity';
 
 @Module({
   imports: [
@@ -22,6 +25,9 @@ import { TauxCompanyModule } from 'src/taux-company/taux-company.module';
       UserHasCompanyEntity,
       RoleUser,
       TypeCompany,
+      Product,
+      Service,
+      OrderEntity,
     ]),
     TauxCompanyModule,
     CloudinaryModule,

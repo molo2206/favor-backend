@@ -20,6 +20,12 @@ import { UpdateCompanyStatusDto } from './dto/update-company-status.dto';
 import { MailService } from 'src/email/email.service';
 import { CompanyStatus } from 'src/company/enum/company-status.enum';
 import { TauxCompany } from 'src/taux-company/entities/taux-company.entity';
+import { Product } from 'src/products/entities/product.entity';
+import { Service } from 'src/service/entities/service.entity';
+import { OrderEntity } from 'src/order/entities/order.entity';
+import { OrderStatus } from 'src/order/enum/order.status.enum';
+import { Between } from 'typeorm';
+import { startOfDay, endOfDay, parseISO } from 'date-fns';
 
 @Injectable()
 export class CompanyService {
@@ -41,6 +47,15 @@ export class CompanyService {
 
     @InjectRepository(TauxCompany)
     private readonly tauxCompanyRepository: Repository<TauxCompany>,
+
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
+
+    @InjectRepository(Service)
+    private readonly serviceRepo: Repository<Service>,
+
+    @InjectRepository(OrderEntity)
+    private readonly orderRepo: Repository<OrderEntity>,
 
     private readonly cloudinary: CloudinaryService,
     private readonly mailService: MailService,
@@ -90,6 +105,7 @@ export class CompanyService {
       longitude: dto.longitude,
       address: dto.address,
       taux: dto.taux || 0,
+      localCurrency: dto.localCurrency,
     });
 
     const savedCompany = await this.companyRepository.save(company);
@@ -229,6 +245,9 @@ export class CompanyService {
         throw new BadRequestException("Le champ 'valueTaux' doit être un nombre valide");
       }
       company.taux = taux;
+    }
+    if (dto.localCurrency !== undefined) {
+      company.localCurrency = dto.localCurrency;
     }
 
     if (logoFile) {
@@ -567,6 +586,76 @@ export class CompanyService {
         total,
         page,
         limit,
+      },
+    };
+  }
+
+  async getCompanyDashboard(user: UserEntity, startDate?: string, endDate?: string) {
+    const companyId = user.activeCompanyId;
+    const company = await this.companyRepository.findOne({ where: { id: companyId } });
+
+    if (!company) {
+      throw new NotFoundException('Société introuvable');
+    }
+
+    // 📌 Filtre par période si startDate et endDate fournis
+    let dateFilter: any = {};
+    if (startDate && endDate) {
+      const start = startOfDay(parseISO(startDate));
+      const end = endOfDay(parseISO(endDate));
+      dateFilter = { createdAt: Between(start, end) };
+    }
+
+    // 🛍️ Total produits
+    const totalProducts = await this.productRepo.count({
+      where: { company: { id: companyId }, ...dateFilter },
+    });
+
+    // 🧰 Total services
+    let totalServices = 0;
+    if (company.typeCompany === CompanyType.SERVICE) {
+      totalServices = await this.serviceRepo.count({
+        where: { company: { id: companyId }, ...dateFilter },
+      });
+    }
+
+    // 🕒 Total commandes en attente
+    const totalPendingOrders = await this.orderRepo.count({
+      where: {
+        status: OrderStatus.PENDING,
+        subOrders: { company: { id: companyId } },
+        ...dateFilter,
+      },
+    });
+
+    // ✅ Total commandes livrées
+    const totalDeliveredOrders = await this.orderRepo.count({
+      where: {
+        status: OrderStatus.DELIVERED,
+        subOrders: { company: { id: companyId } },
+        ...dateFilter,
+      },
+    });
+
+    // 📅 Total commandes du jour
+    const today = new Date();
+    const totalTodayOrders = await this.orderRepo.count({
+      where: {
+        subOrders: { company: { id: companyId } },
+        createdAt: Between(startOfDay(today), endOfDay(today)),
+      },
+    });
+
+    return {
+      message: 'Dashboard chargé avec succès',
+      data: {
+        companyId: company.id,
+        companyName: company.companyName,
+        totalProducts,
+        totalServices,
+        totalPendingOrders,
+        totalDeliveredOrders,
+        totalTodayOrders,
       },
     };
   }

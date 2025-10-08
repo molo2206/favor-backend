@@ -67,4 +67,7 @@ export class UpdateCompanyDto {
   @Type(() => Number)
   @IsNumber()
   taux: number;
+
+  @IsString()
+  localCurrency: string;
 }

@@ -79,8 +79,10 @@ export class CreateCompanyDto {
   })
   companyActivity?: CompanyActivity;
 
-  @IsOptional()
   @Type(() => Number)
   @IsNumber({}, { message: "Le champ 'taux' doit être un nombre valide" })
-  taux?: number;
+  taux: number;
+
+  @IsString()
+  localCurrency: string;
 }
