@@ -9,6 +9,7 @@ import {
   UsePipes,
   ValidationPipe,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { DeliveryService } from './delivery.service';
 import { CreateDeliveryDto } from './dto/create-delivery.dto';
@@ -38,10 +39,7 @@ export class DeliveryController {
     @Param('deliveryId') deliveryId: string,
     @Body() dto: CreateTrackingDto,
   ): Promise<{ message: string; data: TrackingEntity }> {
-    const tracking = await this.deliveryService.addTrackingToDelivery(
-      deliveryId,
-      dto,
-    );
+    const tracking = await this.deliveryService.addTrackingToDelivery(deliveryId, dto);
     return { message: 'Traitement réussi avec succès', data: tracking };
   }
 
@@ -76,10 +74,7 @@ export class DeliveryController {
   @Put(':id')
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateDeliveryDto,
-  ): Promise<DeliveryEntity> {
+  update(@Param('id') id: string, @Body() dto: UpdateDeliveryDto): Promise<DeliveryEntity> {
     return this.deliveryService.update(id, dto);
   }
 
@@ -88,5 +83,16 @@ export class DeliveryController {
   @AuthorizeRoles(UserRole.ADMIN)
   remove(@Param('id') id: string): Promise<void> {
     return this.deliveryService.remove(id);
+  }
+
+  @Post('confirm/:pin')
+  async confirmDelivery(
+    @Param('pin') pin: string,
+  ): Promise<{ message: string; data: DeliveryEntity }> {
+    if (!pin || pin.length !== 6) {
+      throw new BadRequestException('PIN invalide.');
+    }
+
+    return this.deliveryService.confirmDeliveryByPin(pin);
   }
 }

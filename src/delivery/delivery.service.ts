@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -15,6 +16,7 @@ import { DeliveryStatus } from './enums/delivery.enum.status';
 import { TrackingEntity } from 'src/tracking/entities/tracking.entity';
 import { CreateTrackingDto } from 'src/tracking/dto/create-tracking.dto';
 import { EventsGateway } from 'src/events/events.gateway';
+import { OrderStatus } from 'src/order/enum/order.status.enum';
 
 @Injectable()
 export class DeliveryService {
@@ -40,70 +42,75 @@ export class DeliveryService {
   async create(
     createDeliveryDto: CreateDeliveryDto,
   ): Promise<{ message: string; data: DeliveryEntity }> {
-    const { invoiceNumber, deliveryCompanyId, estimatedDeliveryTime } =
+    const { invoiceNumber, deliveryCompanyId, livreurId, estimatedDeliveryTime } =
       createDeliveryDto;
 
-    // 1. Trouver la commande via invoiceNumber
+    // 1. Vérifier que la commande existe
     const order = await this.orderRepository.findOne({
       where: { invoiceNumber },
       relations: ['subOrders', 'subOrders.items', 'user'],
     });
-
     if (!order) {
       throw new NotFoundException('Commande de livraison non trouvée.');
     }
 
-    // 🛑 Vérifier si une livraison existe déjà pour cette commande
+    // 2. Vérifier si une livraison existe déjà pour cette commande
     const existingDelivery = await this.deliveryRepository.findOne({
       where: { order: { id: order.id } },
     });
-
     if (existingDelivery) {
-      throw new ConflictException(
-        'Une livraison a déjà été créée pour cette commande.',
-      );
+      throw new ConflictException('Une livraison existe déjà pour cette commande.');
     }
 
-    // 2. Trouver l'entreprise de livraison
+    // 3. Trouver l’entreprise de livraison
     const deliveryCompany = await this.companyRepository.findOne({
       where: { id: deliveryCompanyId },
     });
-
     if (!deliveryCompany) {
       throw new NotFoundException('Entreprise de livraison non trouvée.');
     }
 
-    // 3. Créer la livraison
+    // 4. Trouver le livreur
+    const livreur = await this.userRepository.findOne({
+      where: { id: livreurId },
+    });
+    if (!livreur) {
+      throw new NotFoundException('Livreur non trouvé.');
+    }
+
+    // 5. Créer la livraison
     const delivery = this.deliveryRepository.create({
       deliveryCompany,
       order,
+      livreur,
       currentStatus: DeliveryStatus.IN_TRANSIT,
       estimatedDeliveryTime,
     });
-
     await this.deliveryRepository.save(delivery);
 
-    // 4. Créer le suivi initial
+    // 6. Créer le suivi initial
     const tracking = this.trackingRepository.create({
       status: DeliveryStatus.IN_TRANSIT,
       location: 'Inconnue',
       notes: 'Livraison en cours de traitement',
       delivery,
     });
-
     await this.trackingRepository.save(tracking);
 
-    // 5. Recharger la livraison avec toutes les relations
+    // 7. Recharger la livraison avec toutes ses relations
     const fullDelivery = await this.deliveryRepository.findOne({
       where: { id: delivery.id },
       relations: ['order', 'deliveryCompany', 'livreur', 'trackings'],
     });
 
     if (!fullDelivery) {
-      throw new NotFoundException("La livraison n'a pas pu être retrouvée.");
+      throw new NotFoundException("La livraison n'a pas pu être retrouvée après sa création.");
     }
 
-    return { message: 'Traitement réussi avec succès', data: fullDelivery };
+    return {
+      message: 'Livraison créée avec succès',
+      data: fullDelivery,
+    };
   }
 
   async addTrackingToDelivery(
@@ -122,14 +129,10 @@ export class DeliveryService {
       ...dto,
       delivery,
     });
-    this.eventsGateway.notifyUser(
-      delivery.order.user.id,
-      'delivery.tracking.updated',
-      {
-        deliveryId,
-        trackingStatus: dto.status,
-      },
-    );
+    this.eventsGateway.notifyUser(delivery.order.user.id, 'delivery.tracking.updated', {
+      deliveryId,
+      trackingStatus: dto.status,
+    });
     return this.trackingRepository.save(tracking);
   }
 
@@ -184,9 +187,7 @@ export class DeliveryService {
     });
 
     if (!delivery) {
-      throw new NotFoundException(
-        'Aucune livraison trouvée pour cette commande.',
-      );
+      throw new NotFoundException('Aucune livraison trouvée pour cette commande.');
     }
 
     if (!delivery.trackings || delivery.trackings.length === 0) {
@@ -195,8 +196,7 @@ export class DeliveryService {
 
     // On trie par date croissante (du plus ancien au plus récent)
     const sortedTrackings = delivery.trackings.sort(
-      (a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
 
     return sortedTrackings;
@@ -211,10 +211,7 @@ export class DeliveryService {
     return delivery;
   }
 
-  async update(
-    id: string,
-    updateDeliveryDto: UpdateDeliveryDto,
-  ): Promise<DeliveryEntity> {
+  async update(id: string, updateDeliveryDto: UpdateDeliveryDto): Promise<DeliveryEntity> {
     const delivery = await this.findOne(id);
     Object.assign(delivery, updateDeliveryDto);
     return this.deliveryRepository.save(delivery);
@@ -223,5 +220,49 @@ export class DeliveryService {
   async remove(id: string): Promise<void> {
     const delivery = await this.findOne(id);
     await this.deliveryRepository.remove(delivery);
+  }
+
+  async confirmDeliveryByPin(pin: string): Promise<{ message: string; data: DeliveryEntity }> {
+    // 1. Chercher la commande correspondant au PIN
+    const order = await this.orderRepository.findOne({
+      where: { pin },
+      relations: ['delivery', 'delivery.livreur', 'delivery.trackings'],
+    });
+
+    if (!order || !order.delivery) {
+      throw new NotFoundException('Aucune livraison trouvée pour ce PIN.');
+    }
+
+    const delivery = order.delivery;
+
+    // 2. Vérifier que la livraison n'a pas déjà été effectuée
+    if (delivery.currentStatus === DeliveryStatus.DELIVERED) {
+      throw new BadRequestException('La livraison a déjà été confirmée.');
+    }
+
+    // 3. Mettre à jour la livraison
+    delivery.currentStatus = DeliveryStatus.DELIVERED;
+    delivery.deliveredAt = new Date();
+
+    const updatedDelivery = await this.deliveryRepository.save(delivery);
+
+    // 4. Ajouter un suivi final
+    const tracking = this.trackingRepository.create({
+      status: DeliveryStatus.DELIVERED,
+      location: 'Livraison terminée',
+      notes: 'Livraison confirmée par le client via PIN',
+      delivery: updatedDelivery,
+    });
+    await this.trackingRepository.save(tracking);
+
+    // 5. Réinitialiser le PIN pour sécurité
+    order.pin = '';
+    order.status = OrderStatus.DELIVERED;
+    await this.orderRepository.save(order);
+
+    return {
+      message: 'Livraison confirmée avec succès.',
+      data: updatedDelivery,
+    };
   }
 }

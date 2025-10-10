@@ -12,10 +12,12 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { CompanyActivity } from 'src/company/enum/activity.company.enum';
+import { DeliveryEntity } from 'src/delivery/entities/delivery.entity';
 
 @Entity('orders')
 export class OrderEntity {
@@ -78,6 +80,12 @@ export class OrderEntity {
 
   @Column({ type: 'boolean', default: false })
   paid: boolean; // Correct type: boolean
+
+  @Column({ nullable: true, length: 6 })
+  pin: string;
+
+  @OneToOne(() => DeliveryEntity, (delivery) => delivery.order)
+  delivery: DeliveryEntity;
 
   @Column({ type: 'enum', enum: CompanyActivity }) // Ajout du champ
   shopType: CompanyActivity;

@@ -1,10 +1,4 @@
-import {
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  IsUUID,
-} from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 import { DeliveryStatus } from '../enums/delivery.enum.status';
 
 export class CreateDeliveryDto {
@@ -23,6 +17,10 @@ export class CreateDeliveryDto {
   @IsString()
   @IsOptional()
   deliveryNotes?: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  livreurId: string;
 
   @IsString()
   @IsOptional()

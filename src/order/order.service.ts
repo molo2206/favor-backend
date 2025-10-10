@@ -64,7 +64,9 @@ export class OrderService {
     @InjectRepository(TransactionEntity)
     private readonly transactionRepository: Repository<TransactionEntity>,
   ) {}
-
+  private generatePin(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
   async createOrder(createOrderDto: CreateOrderDto, user: UserEntity): Promise<OrderEntity> {
     const { totalAmount, shippingCost, currency, orderItems, addressUserId, type } =
       createOrderDto;
@@ -230,10 +232,14 @@ export class OrderService {
     // Application des changements
     order.status = dto.status;
 
-    // ⚠️ Le paiement est effectué seulement lors de la validation initiale
+    // Si la commande est validée
     if (dto.status === OrderStatus.VALIDATED) {
+      // Marquer comme payée
       order.paymentStatus = PaymentStatus.PAID;
       order.paid = true;
+
+      // Générer un PIN
+      order.pin = this.generatePin();
     }
 
     const updatedOrder = await this.orderRepo.save(order);
@@ -246,12 +252,27 @@ export class OrderService {
     if (dto.status === OrderStatus.VALIDATED) {
       const paymentQrCode = await QRCode.toDataURL(order.invoiceNumber);
 
+      await this.mailService.sendHtmlEmail(
+        order.user.email,
+        'Votre code PIN pour la commande FavorHelp',
+        'sendPin.html',
+        {
+          pinCode: updatedOrder.pin,
+          invoiceNumber: updatedOrder.invoiceNumber,
+          user: order.user,
+          subOrders,
+          order: updatedOrder,
+          year: new Date().getFullYear(),
+        } as any,
+      );
+
+      // Envoi également de la facture PDF si nécessaire
       await this.mailService.sendInvoicePaidWithPdf(
         order.user.email,
         'Veuillez trouver ci-joint votre facture PDF, déjà payée et validée - FavorHelp',
         {
           user: order.user,
-          order,
+          order: updatedOrder,
           subOrders,
           paymentQrCode,
         },
@@ -276,6 +297,7 @@ export class OrderService {
     };
   }
 
+  
   async generateInvoiceByInvoiceNumber(
     invoiceNumber: string,
   ): Promise<{ pdfBuffer: Buffer; message: string }> {

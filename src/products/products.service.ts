@@ -515,16 +515,24 @@ export class ProductService {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async findByActiveCompanyForUser(user: UserEntity): Promise<any> {
+  async findByActiveCompanyForUser(user: UserEntity, page = 1, limit = 10): Promise<any> {
     if (!user.activeCompanyId) {
       throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
     }
 
+    // Vérification de l'entreprise active
     const company = await this.companyRepo.findOne({
       where: { id: user.activeCompanyId },
     });
 
-    const products = await this.productRepo.find({
+    if (!company) {
+      throw new NotFoundException("L'entreprise active n'existe pas");
+    }
+
+    // Pagination
+    const skip = (page - 1) * limit;
+
+    const [products, total] = await this.productRepo.findAndCount({
       where: { company: { id: user.activeCompanyId } },
       relations: [
         'category',
@@ -532,18 +540,24 @@ export class ProductService {
         'category.children',
         'images',
         'measure',
-        'company',
         'company.tauxCompanies',
       ],
+      skip,
+      take: limit,
+      order: { createdAt: 'DESC' },
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-    const { products: _, ...companyData } = company as any;
 
     return {
-      ...companyData,
-      products,
+      message: 'Liste des produits récupérée avec succès.',
+      data: {
+        data: products,
+        total,
+        page,
+        limit,
+      },
     };
   }
+
   async groupByType(): Promise<Record<string, Product[]>> {
     const products = await this.productRepo.find({
       relations: [
