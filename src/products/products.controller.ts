@@ -241,7 +241,6 @@ export class ProductController {
   ): Promise<{
     message: string;
     data: {
-      company: any;
       data: any[];
       total: number;
       page: number;
