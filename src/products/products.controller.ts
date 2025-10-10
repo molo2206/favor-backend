@@ -234,10 +234,27 @@ export class ProductController {
 
   @Get('by-active-company')
   @UseGuards(AuthentificationGuard)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async getProductsByActiveCompany(@CurrentUser() user: UserEntity): Promise<{ data: any }> {
-    const result = await this.productService.findByActiveCompanyForUser(user);
-    return { data: result };
+  async getProductsByActiveCompany(
+    @CurrentUser() user: UserEntity,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+  ): Promise<{
+    message: string;
+    data: {
+      company: any;
+      data: any[];
+      total: number;
+      page: number;
+      limit: number;
+    };
+  }> {
+    const result = await this.productService.findByActiveCompanyForUser(
+      user,
+      Number(page),
+      Number(limit),
+    );
+
+    return result;
   }
 
   @Get('search')
