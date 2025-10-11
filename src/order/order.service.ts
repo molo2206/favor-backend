@@ -297,7 +297,6 @@ export class OrderService {
     };
   }
 
-  
   async generateInvoiceByInvoiceNumber(
     invoiceNumber: string,
   ): Promise<{ pdfBuffer: Buffer; message: string }> {
@@ -468,22 +467,40 @@ export class OrderService {
     return { data: orders };
   }
 
-  async findSubOrdersByCompanys(companyId: string): Promise<{ data: SubOrderEntity[] }> {
-    const orders = await this.orderRepo.find({
+  async findSubOrdersByCompanys(
+    companyId: string,
+  ): Promise<{ data: SubOrderEntity[]; message: string }> {
+    // ✅ On interroge directement la table des sous-commandes pour éviter de charger toutes les commandes
+    const subOrders = await this.subOrderRepo.find({
+      where: {
+        company: { id: companyId },
+      },
       relations: [
-        'subOrders',
-        'subOrders.items.product.company',
-        'subOrders.items.product.category',
-        'subOrders.items.product.measure',
-        'subOrders.company',
+        'order',
+        'order.user', // ✅ On récupère les infos du client
+        'items',
+        'items.product',
+        'items.product.company',
+        'items.product.category',
+        'items.product.measure',
+        'company',
       ],
-      order: { createdAt: 'DESC' },
+      order: {
+        createdAt: 'DESC',
+      },
     });
 
-    const subOrders: SubOrderEntity[] = orders
-      .flatMap((order) => order.subOrders)
-      .filter((sub) => sub.company.id === companyId);
+    // ✅ Vérification si aucune sous-commande n’est trouvée
+    if (!subOrders || subOrders.length === 0) {
+      return {
+        data: [],
+        message: `Aucune sous-commande trouvée pour cette société (${companyId}).`,
+      };
+    }
 
-    return { data: subOrders };
+    return {
+      data: subOrders,
+      message: `Sous-commandes trouvées pour la société ${companyId} (${subOrders.length}).`,
+    };
   }
 }
