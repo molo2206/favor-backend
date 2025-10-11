@@ -36,7 +36,6 @@ import { ServiceModule } from './service/service.module';
 import { RoomImageModule } from './room-image/room-image.module';
 import { RoomModule } from './room/room.module';
 import { BookingModule } from './booking/booking.module';
-import { AppSettingModule } from './app-setting/app-setting.module';
 import { TauxCompanyModule } from './taux-company/taux-company.module';
 
 @Module({
@@ -70,7 +69,6 @@ import { TauxCompanyModule } from './taux-company/taux-company.module';
       }),
     }),
     UsersModule,
-    AppSettingModule,
     TauxCompanyModule,
     OtpModule,
     CompanyModule,
@@ -103,7 +101,6 @@ import { TauxCompanyModule } from './taux-company/taux-company.module';
     RoomModule,
     RoomImageModule,
     BookingModule,
-    AppSettingModule,
     TauxCompanyModule,
   ],
   controllers: [AppController],
