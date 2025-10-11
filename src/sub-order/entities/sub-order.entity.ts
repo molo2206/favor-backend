@@ -10,6 +10,7 @@ import {
 import { CompanyEntity } from 'src/company/entities/company.entity';
 import { OrderEntity } from 'src/order/entities/order.entity';
 import { SubOrderItemEntity } from 'src/sub-order-item/entities/sub-order-item.entity';
+import { OrderStatus } from 'src/order/enum/order.status.enum';
 
 @Entity('sub_orders')
 export class SubOrderEntity {
@@ -30,6 +31,13 @@ export class SubOrderEntity {
 
   @Column({ nullable: true })
   invoiceNumber: string;
+
+  @Column({
+    type: 'enum',
+    enum: OrderStatus,
+    default: OrderStatus.PENDING,
+  })
+  status: OrderStatus;
 
   @CreateDateColumn()
   createdAt: Date;
