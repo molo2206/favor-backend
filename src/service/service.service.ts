@@ -160,7 +160,7 @@ export class ServiceService {
     const total = await this.serviceRepo.count();
 
     const services = await this.serviceRepo.find({
-      relations: ['company', 'category', 'prestataires', 'prestataires.prestataire'],
+      relations: ['company', 'category', 'prestataires', 'measure', 'prestataires.prestataire'],
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
@@ -192,6 +192,7 @@ export class ServiceService {
       .leftJoinAndSelect('service.company', 'company')
       .leftJoinAndSelect('service.category', 'category')
       .leftJoinAndSelect('service.prestataires', 'shp')
+      .leftJoinAndSelect('service.measure', 'measure')
       .leftJoinAndSelect('shp.prestataire', 'prestataire')
       .orderBy('service.createdAt', 'DESC');
 
@@ -216,7 +217,7 @@ export class ServiceService {
   async findOne(id: string): Promise<{ message: string; data: Service }> {
     const service = await this.serviceRepo.findOne({
       where: { id },
-      relations: ['company', 'category', 'prestataires', 'prestataires.prestataire'],
+      relations: ['company', 'category', 'measure', 'prestataires', 'prestataires.prestataire'],
     });
 
     if (!service) throw new NotFoundException('Service introuvable');
@@ -479,6 +480,7 @@ export class ServiceService {
       .leftJoinAndSelect('service.company', 'company')
       .leftJoinAndSelect('service.category', 'category')
       .leftJoinAndSelect('service.prestataires', 'shp')
+      .leftJoinAndSelect('service.measure', 'measure')
       .leftJoinAndSelect('shp.prestataire', 'prestataire')
       .where('service.status = :status', { status: ProductStatus.PUBLISHED })
       .orderBy('service.createdAt', 'DESC');
