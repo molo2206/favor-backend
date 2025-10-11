@@ -12,6 +12,7 @@ import { CategoryEntity } from 'src/category/entities/category.entity';
 import { CompanyEntity } from 'src/company/entities/company.entity';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
 import { ServiceHasPrestataire } from './service_has_prestataire.entity';
+import { MeasureEntity } from 'src/measure/entities/measure.entity';
 
 @Entity('services')
 export class Service {
@@ -25,7 +26,7 @@ export class Service {
   description?: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-  basePrice?: number;
+  price?: number;
 
   // Stockage JSON comme string longue pour MySQL
   @Column({
@@ -36,7 +37,7 @@ export class Service {
       from: (value: string) => (value ? JSON.parse(value) : []),
     },
   })
-  image?: string[];
+  images?: string[];
 
   @Column({ type: 'enum', enum: ProductStatus, default: ProductStatus.PENDING })
   status: ProductStatus;
@@ -55,6 +56,12 @@ export class Service {
   @OneToMany(() => ServiceHasPrestataire, (shp) => shp.service)
   prestataires: ServiceHasPrestataire[];
 
+  @ManyToOne(() => MeasureEntity, { nullable: true, eager: true })
+  @JoinColumn({ name: 'measureId' })
+  measure?: MeasureEntity;
+
+  @Column({ nullable: true })
+  measureId?: string;
 
   @CreateDateColumn()
   createdAt: Date;

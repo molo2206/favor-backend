@@ -42,7 +42,7 @@ export class ServiceController {
   @Post()
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  @UseInterceptors(FilesInterceptor('files', 4)) // 'files' correspond au nom du champ multipart/form-data
+  @UseInterceptors(FilesInterceptor('images', 4)) // 'files' correspond au nom du champ multipart/form-data
   async create(
     @UploadedFiles() files: Express.Multer.File[],
     @Body() dto: CreateServiceDto,
@@ -81,7 +81,7 @@ export class ServiceController {
   @Patch(':id')
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  @UseInterceptors(FilesInterceptor('files', 4))
+  @UseInterceptors(FilesInterceptor('images', 4))
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateServiceDto,

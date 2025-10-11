@@ -78,9 +78,10 @@ export class ServiceService {
       ...dto,
       category,
       companyId: company.id,
-      image: uploadedUrls,
+      images: uploadedUrls,
       status: ProductStatus.PENDING,
-      basePrice: dto.basePrice,
+      price: dto.price,
+      measureId: dto.measureId,
     });
 
     await this.serviceRepo.save(service);
@@ -120,9 +121,9 @@ export class ServiceService {
       const uploadedUrls = await Promise.all(
         files.map((file) => this.cloudinary.handleUploadImage(file, 'service')),
       );
-      service.image = uploadedUrls; // transformer s'occupe de JSON.stringify
-    } else if (dto.image && dto.image.length > 0) {
-      service.image = dto.image;
+      service.images = uploadedUrls; // transformer s'occupe de JSON.stringify
+    } else if (dto.images && dto.images.length > 0) {
+      service.images = dto.images;
     }
 
     // Mise à jour des autres champs

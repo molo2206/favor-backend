@@ -13,7 +13,7 @@ export class CreateServiceDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  image?: string[];
+  images?: string[];
 
   @IsOptional()
   @IsEnum(ProductStatus)
@@ -26,5 +26,9 @@ export class CreateServiceDto {
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Le prix doit être un nombre avec maximum 2 décimales' })
   @Min(0)
-  basePrice?: number; // Prix de base du service
+  price?: number; // Prix de base du service
+
+  @IsOptional()
+  @IsUUID()
+  measureId?: string;
 }
