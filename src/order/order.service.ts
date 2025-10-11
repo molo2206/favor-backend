@@ -477,7 +477,7 @@ export class OrderService {
       },
       relations: [
         'order',
-        'order.user', // ✅ On récupère les infos du client
+        'order.user', 
         'items',
         'items.product',
         'items.product.company',
