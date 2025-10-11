@@ -467,40 +467,31 @@ export class OrderService {
     return { data: orders };
   }
 
-  async findSubOrdersByCompanys(
-    companyId: string,
-  ): Promise<{ data: SubOrderEntity[]; message: string }> {
-    // ✅ On interroge directement la table des sous-commandes pour éviter de charger toutes les commandes
-    const subOrders = await this.subOrderRepo.find({
-      where: {
-        company: { id: companyId },
-      },
+  async findSubOrdersByCompanys(companyId: string): Promise<{ data: SubOrderEntity[] }> {
+    const orders = await this.orderRepo.find({
       relations: [
-        'order',
-        'order.user', 
-        'items',
-        'items.product',
-        'items.product.company',
-        'items.product.category',
-        'items.product.measure',
-        'company',
+        'user', // ✅ Relation directe avec OrderEntity
+        'addressUser', // ✅ Relation directe avec OrderEntity
+        'subOrders',
+        'subOrders.items.product.company',
+        'subOrders.items.product.category',
+        'subOrders.items.product.measure',
+        'subOrders.company',
       ],
-      order: {
-        createdAt: 'DESC',
-      },
+      order: { createdAt: 'DESC' },
     });
 
-    // ✅ Vérification si aucune sous-commande n’est trouvée
-    if (!subOrders || subOrders.length === 0) {
-      return {
-        data: [],
-        message: `Aucune sous-commande trouvée pour cette société (${companyId}).`,
-      };
-    }
+    // Récupération et filtrage des subOrders
+    const subOrders: SubOrderEntity[] = orders
+      .flatMap((order) =>
+        order.subOrders.map((sub) => ({
+          ...sub,
+          user: order.user, // ✅ on rattache le client à la sous-commande
+          addressUser: order.addressUser, // ✅ on rattache l'adresse client à la sous-commande
+        })),
+      )
+      .filter((sub) => sub.company.id === companyId);
 
-    return {
-      data: subOrders,
-      message: `Sous-commandes trouvées pour la société ${companyId} (${subOrders.length}).`,
-    };
+    return { data: subOrders };
   }
 }
