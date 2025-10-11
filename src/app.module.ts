@@ -33,7 +33,6 @@ import { TransactionModule } from './transaction/transaction.module';
 import { SaleTransactionModule } from './sale-transaction/sale-transaction.module';
 import { RentalContractModule } from './rental-contract/rental-contract.module';
 import { ServiceModule } from './service/service.module';
-import { ReservServiceModule } from './reserv-service/reserv-service.module';
 import { RoomImageModule } from './room-image/room-image.module';
 import { RoomModule } from './room/room.module';
 import { BookingModule } from './booking/booking.module';
@@ -98,7 +97,6 @@ import { TauxCompanyModule } from './taux-company/taux-company.module';
     SaleTransactionModule,
     RentalContractModule,
     ServiceModule,
-    ReservServiceModule,
     RoomImageModule,
     RoomModule,
     BookingModule,

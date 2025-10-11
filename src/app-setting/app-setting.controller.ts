@@ -9,6 +9,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { AppSettingService } from './app-setting.service';
 import { CreateAppSettingDto } from './dto/create-app-setting.dto';
@@ -21,30 +22,19 @@ import { FileInterceptor } from '@nestjs/platform-express';
 export class AppSettingController {
   constructor(private readonly appSettingService: AppSettingService) {}
 
-  /** Créer la configuration globale */
+  /** Créer ou mettre à jour la configuration globale */
   @Post()
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
   async create(@Body() createDto: CreateAppSettingDto) {
-    const result = await this.appSettingService.create(createDto);
-    return result;
+    return this.appSettingService.createOrUpdate(createDto);
   }
 
   /** Récupérer la configuration globale */
   @Get()
   @UseGuards(AuthentificationGuard)
   async findOne() {
-    const result = await this.appSettingService.findOne();
-    return result; // { data, message }
-  }
-
-  /** Mettre à jour la configuration globale */
-  @Patch('update')
-  @UseGuards(AuthentificationGuard)
-  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
-  async update(@Body() updateDto: UpdateAppSettingDto) {
-    const result = await this.appSettingService.update(updateDto);
-    return result; // { data, message }
+    return this.appSettingService.findOne();
   }
 
   /** Supprimer la configuration globale */
@@ -52,20 +42,17 @@ export class AppSettingController {
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
   async remove() {
-    const result = await this.appSettingService.remove();
-    return result; // { data: null, message }
+    return this.appSettingService.remove();
   }
 
-  /** Calcul dynamique des frais restaurant */
+  /** Calcul dynamique des frais de livraison restaurant */
   @Get('restaurant-fee/:itemCount')
   @UseGuards(AuthentificationGuard)
-  async calculateRestaurantFee(@Param('itemCount') itemCount: string) {
-    const result = await this.appSettingService.calculateRestaurantDeliveryFee(
-      Number(itemCount),
-    );
-    return result; // { data, message }
+  async calculateRestaurantFee(@Param('itemCount', ParseIntPipe) itemCount: number) {
+    return this.appSettingService.calculateRestaurantDeliveryFee(itemCount);
   }
 
+  /** Upload d'un logo */
   @Post('upload-logo')
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
   @UseGuards(AuthentificationGuard)

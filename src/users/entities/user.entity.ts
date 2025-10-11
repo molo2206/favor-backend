@@ -20,7 +20,6 @@ import { AddressUser } from 'src/address-user/entities/address-user.entity';
 import { OrderEntity } from 'src/order/entities/order.entity';
 import { RentalContract } from 'src/rental-contract/entities/rental-contract.entity';
 import { SaleTransaction } from 'src/sale-transaction/entities/sale-transaction.entity';
-import { ReservService } from 'src/reserv-service/entities/reserv-service.entity';
 import { Booking } from 'src/booking/entities/booking.entity';
 
 @Entity('users')
@@ -130,9 +129,6 @@ export class UserEntity {
 
   @OneToMany(() => SaleTransaction, (sale) => sale.customer)
   saleTransactions: SaleTransaction[];
-
-  @OneToMany(() => ReservService, (reservation) => reservation.user)
-  reservations: ReservService[];
 
   @OneToMany(() => Booking, (booking) => booking.user)
   bookings: Booking[];

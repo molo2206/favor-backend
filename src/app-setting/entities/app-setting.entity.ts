@@ -11,72 +11,79 @@ export class AppSetting {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ default: 'My Platform' })
+  /** Informations basiques */
+  @Column({ type: 'text', default: 'My Platform' })
   appName: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   slogan?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   logo?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   email?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   phone?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   address?: string;
 
-  @Column({ default: 'USD' })
+  @Column({ type: 'text', default: 'USD' })
   defaultCurrency: string;
 
-  @Column({ default: 'fr' })
+  @Column({ type: 'text', default: 'fr' })
   defaultLanguage: string;
 
-  /** Modules activés */
-  @Column('json', { nullable: true })
-  modules?: {
-    ecommerce?: boolean;
-    restaurant?: boolean;
-    services?: boolean;
-    cars?: boolean;
-    rentals?: boolean;
-    delivery?: boolean;
-    tracking?: boolean;
-    booking?: boolean;
-  };
-
-  /** Intégrations principales */
-  @Column('json', { nullable: true })
-  integrations?: {
-    stripe?: boolean;
-    paypal?: boolean;
-    mobileMoney?: boolean;
-    sms?: boolean;
-    pushNotification?: boolean;
-    manualPayment?: boolean;
-  };
-
-  /** Apparence de la plateforme */
-  @Column('json', { nullable: true })
-  theme?: {
-    mode?: 'light' | 'dark';
-    primaryColor?: string;
-    secondaryColor?: string;
-    logoDark?: string;
-    logoLight?: string;
-  };
-
-  /** Réseaux sociaux */
-  @Column('json', { nullable: true })
-  socialLinks?: {
-    facebook?: string;
-    instagram?: string;
-    twitter?: string;
-    whatsapp?: string;
-    youtube?: string;
+  /** Paramètres configurables en JSON */
+  @Column({
+    type: 'longtext',
+    nullable: true,
+    transformer: {
+      to: (value: any) => JSON.stringify(value),
+      from: (value: string) => (value ? JSON.parse(value) : {}),
+    },
+  })
+  config?: {
+    modules?: {
+      ecommerce?: boolean;
+      restaurant?: boolean;
+      services?: boolean;
+      cars?: boolean;
+      rentals?: boolean;
+      delivery?: boolean;
+      tracking?: boolean;
+      booking?: boolean;
+    };
+    integrations?: {
+      stripe?: boolean;
+      paypal?: boolean;
+      mobileMoney?: boolean;
+      sms?: boolean;
+      pushNotification?: boolean;
+      manualPayment?: boolean;
+    };
+    theme?: {
+      mode?: 'light' | 'dark';
+      primaryColor?: string;
+      secondaryColor?: string;
+      logoDark?: string;
+      logoLight?: string;
+    };
+    socialLinks?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+      whatsapp?: string;
+      youtube?: string;
+    };
+    system?: {
+      maintenanceMode?: boolean;
+      maintenanceMessage?: string;
+      allowUserRegistration?: boolean;
+    };
+    advancedConfig?: Record<string, any>;
   };
 
   /** Paramètres financiers */
@@ -95,23 +102,11 @@ export class AppSetting {
   @Column('decimal', { precision: 10, scale: 2, default: 1 })
   restaurantExtraFeePerItem: number;
 
-  /** Paramètres système */
-  @Column('json', { nullable: true })
-  system?: {
-    maintenanceMode?: boolean;
-    maintenanceMessage?: string;
-    allowUserRegistration?: boolean;
-  };
-
-  /** Configuration avancée */
-  @Column('json', { nullable: true })
-  advancedConfig?: Record<string, any>;
-
   /** Politique et conditions d'utilisation */
-  @Column('text', { nullable: true })
+  @Column({ type: 'longtext', nullable: true })
   privacyPolicy?: string;
 
-  @Column('text', { nullable: true })
+  @Column({ type: 'longtext', nullable: true })
   termsOfUse?: string;
 
   @CreateDateColumn()
@@ -121,11 +116,13 @@ export class AppSetting {
   updatedAt: Date;
 
   constructor() {
-    this.modules = {};
-    this.integrations = {};
-    this.theme = {};
-    this.socialLinks = {};
-    this.system = {};
-    this.advancedConfig = {};
+    this.config = {
+      modules: {},
+      integrations: {},
+      theme: {},
+      socialLinks: {},
+      system: {},
+      advancedConfig: {},
+    };
   }
 }
