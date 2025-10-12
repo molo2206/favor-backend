@@ -118,6 +118,7 @@ export class CompanyService {
       // Relations ManyToOne
       country: dto.countryId ? ({ id: dto.countryId } as any) : null,
       city: dto.cityId ? ({ id: dto.cityId } as any) : null,
+
     });
 
     const savedCompany = await this.companyRepository.save(company);
@@ -237,6 +238,11 @@ export class CompanyService {
       'latitude',
       'longitude',
       'address',
+      'localCurrency',
+      'taux',
+      'typeCompany',
+      'countryId',
+      'cityId',
     ];
 
     for (const field of fieldsToUpdate) {
@@ -483,6 +489,12 @@ export class CompanyService {
               latitude: uhc.company.latitude,
               longitude: uhc.company.longitude,
               address: uhc.company.address,
+              country: uhc.company.country,
+              city: uhc.company.city,
+              localCurrency: uhc.company.localCurrency,
+              taux: uhc.company.taux,
+              open_time: uhc.company.open_time,
+              delivery_minutes: uhc.company.delivery_minutes,
             }
           : null,
         permissions:

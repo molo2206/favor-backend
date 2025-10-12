@@ -292,6 +292,10 @@ export class UsersService {
               longitude: uhc.company.longitude,
               address: uhc.company.address,
               tauxCompanies: uhc.company.tauxCompanies || [],
+              country: uhc.company.country,
+              city: uhc.company.city,
+              localCurrency: uhc.company.localCurrency,
+              taux: uhc.company.taux,
             }
           : null,
         permissions:
@@ -475,6 +479,10 @@ export class UsersService {
               longitude: uhc.company.longitude,
               address: uhc.company.address,
               tauxCompanies: uhc.company.tauxCompanies || [],
+              country: uhc.company.country,
+              city: uhc.company.city,
+              localCurrency: uhc.company.localCurrency,
+              taux: uhc.company.taux,
             }
           : null,
         permissions:
@@ -664,6 +672,10 @@ export class UsersService {
               longitude: uhc.company.longitude,
               address: uhc.company.address,
               tauxCompanies: uhc.company.tauxCompanies || [], // inclusion ici
+              country: uhc.company.country,
+              city: uhc.company.city,
+              localCurrency: uhc.company.localCurrency,
+              taux: uhc.company.taux,
             }
           : null,
         permissions:
