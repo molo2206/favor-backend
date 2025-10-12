@@ -636,20 +636,15 @@ export class CompanyService {
 
     const [companies, total] = await query.getManyAndCount();
 
-    if (companies.length === 0) {
-      throw new NotFoundException(
-        `Aucune entreprise validée trouvée${type ? ` pour le type : ${type}` : ''}${
-          countryId ? ` dans le pays : ${countryId}` : ''
-        }${cityId ? ` et la ville : ${cityId}` : ''}`,
-      );
-    }
-
     return {
-      message: `Entreprises validées récupérées avec succès${
-        type ? ` pour le type : ${type}` : ''
-      }${countryId ? ` dans le pays : ${countryId}` : ''}${
-        cityId ? ` et la ville : ${cityId}` : ''
-      }.`,
+      message:
+        total > 0
+          ? `Entreprises validées récupérées avec succès${
+              type ? ` pour le type : ${type}` : ''
+            }${countryId ? ` dans le pays : ${countryId}` : ''}${
+              cityId ? ` et la ville : ${cityId}` : ''
+            }.`
+          : 'Aucune entreprise validée trouvée pour les critères donnés.',
       data: {
         data: companies,
         total,
