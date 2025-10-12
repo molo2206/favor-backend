@@ -148,31 +148,22 @@ export class ServiceService {
     return { message: 'Service mis à jour avec succès', data: updated };
   }
 
-  async findAll(
-    page = 1,
-    limit = 10,
-  ): Promise<{
+  async findAll(): Promise<{
     message: string;
-    data: { data: Service[]; total: number; page: number; limit: number };
+    data: { data: Service[]; total: number };
   }> {
-    const skip = (page - 1) * limit;
-
-    const total = await this.serviceRepo.count();
-
     const services = await this.serviceRepo.find({
       relations: ['company', 'category', 'prestataires', 'measure', 'prestataires.prestataire'],
       order: { createdAt: 'DESC' },
-      skip,
-      take: limit,
     });
+
+    const total = services.length;
 
     return {
       message: 'Liste des services récupérée avec succès.',
       data: {
         data: services,
         total,
-        page,
-        limit,
       },
     };
   }

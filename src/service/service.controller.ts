@@ -57,8 +57,8 @@ export class ServiceController {
   // ================== Lecture ==================
   @Get()
   @Public()
-  async findAll(@Query('page') page = 1, @Query('limit') limit = 10) {
-    return this.serviceService.findAll(page, limit);
+  async findAll() {
+    return this.serviceService.findAll();
   }
 
   @Get(':id')
@@ -162,7 +162,7 @@ export class ServiceController {
   }
   @Post('prestataire')
   @UseGuards(AuthentificationGuard)
-  @UseInterceptors(FilesInterceptor('file', 1)) 
+  @UseInterceptors(FilesInterceptor('file', 1))
   async createPrestataire(
     @Body() dto: CreatePrestataireDto & { serviceIds?: string[] },
     @UploadedFiles() files?: Express.Multer.File[],
