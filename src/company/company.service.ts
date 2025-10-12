@@ -275,14 +275,6 @@ export class CompanyService {
       company.banner = dto.banner;
     }
 
-    // 🔸 Type de compagnie
-    if (
-      dto.typeCompany &&
-      Object.values(CompanyType).includes(dto.typeCompany as CompanyType)
-    ) {
-      company.typeCompany = dto.typeCompany as CompanyType;
-    }
-
     // 🔸 Relations Country et City
     if (dto.countryId) {
       company.country = { id: dto.countryId } as any;
