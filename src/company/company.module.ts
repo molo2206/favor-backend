@@ -16,6 +16,8 @@ import { TauxCompanyModule } from 'src/taux-company/taux-company.module';
 import { Product } from 'src/products/entities/product.entity';
 import { Service } from 'src/service/entities/service.entity';
 import { OrderEntity } from 'src/order/entities/order.entity';
+import { Country } from './entities/country.entity';
+import { City } from './entities/city.entity';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { OrderEntity } from 'src/order/entities/order.entity';
       Product,
       Service,
       OrderEntity,
+      Country,
+      City
     ]),
     TauxCompanyModule,
     CloudinaryModule,

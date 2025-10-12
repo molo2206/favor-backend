@@ -4,12 +4,21 @@ import { UserHasCompanyEntity } from 'src/user_has_company/entities/user_has_com
 import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 import { CompanyStatus } from 'src/company/enum/company-status.enum';
 import { CompanyType } from 'src/company/enum/type.company.enum';
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Service } from 'src/service/entities/service.entity';
 import { Room } from 'src/room/entities/room.entity';
 import { TauxCompany } from 'src/taux-company/entities/taux-company.entity';
 import { IsNumber, IsString } from 'class-validator';
 import { BranchEntity } from './branch.entity';
+import { Country } from './country.entity';
+import { City } from './city.entity';
 
 @Entity('company')
 export class CompanyEntity {
@@ -36,9 +45,8 @@ export class CompanyEntity {
   @Column({ nullable: true, type: 'varchar', length: 255 })
   banner: string | null;
 
-  // Modifié le type de la colonne logo en varchar
   @Column({ nullable: true, type: 'varchar', length: 255 })
-  logo: string | null; // Permet de stocker l'URL ou le chemin du logo
+  logo: string | null;
 
   @Column({ type: 'enum', enum: CompanyStatus, default: CompanyStatus.PENDING })
   status: CompanyStatus;
@@ -108,4 +116,18 @@ export class CompanyEntity {
 
   @Column({ type: 'varchar', nullable: true, length: 22 })
   localCurrency: string;
+
+  @ManyToOne(() => Country, { nullable: true })
+  @JoinColumn({ name: 'countryId' })
+  country?: Country;
+
+  @Column({ nullable: true })
+  countryId?: string;
+
+  @ManyToOne(() => City, { nullable: true })
+  @JoinColumn({ name: 'cityId' })
+  city?: City;
+
+  @Column({ nullable: true })
+  cityId?: string;
 }

@@ -26,6 +26,10 @@ import { OrderEntity } from 'src/order/entities/order.entity';
 import { OrderStatus } from 'src/order/enum/order.status.enum';
 import { Between } from 'typeorm';
 import { startOfDay, endOfDay, parseISO } from 'date-fns';
+import { Country } from './entities/country.entity';
+import { City } from './entities/city.entity';
+import { CreateCountryDto } from './dto/create-country.dto';
+import { CreateCityDto } from './dto/create-city.dto';
 
 @Injectable()
 export class CompanyService {
@@ -57,6 +61,11 @@ export class CompanyService {
     @InjectRepository(OrderEntity)
     private readonly orderRepo: Repository<OrderEntity>,
 
+    @InjectRepository(Country)
+    private countryRepo: Repository<Country>,
+    @InjectRepository(City)
+    private cityRepo: Repository<City>,
+
     private readonly cloudinary: CloudinaryService,
     private readonly mailService: MailService,
   ) {}
@@ -76,16 +85,15 @@ export class CompanyService {
       throw new BadRequestException('Le nom de l’entreprise est obligatoire');
     }
 
-    let logoUrl: string | null = null;
-    if (logoFile) {
-      logoUrl = await this.cloudinary.handleUploadImage(logoFile, 'company');
-    }
+    // Upload logo et banner
+    const logoUrl = logoFile
+      ? await this.cloudinary.handleUploadImage(logoFile, 'company')
+      : null;
+    const bannerUrl = bannerFile
+      ? await this.cloudinary.handleUploadImage(bannerFile, 'company/banner')
+      : null;
 
-    let bannerUrl: string | null = null;
-    if (bannerFile) {
-      bannerUrl = await this.cloudinary.handleUploadImage(bannerFile, 'company/banner');
-    }
-
+    // Création de la company avec country et city si fournis
     const company = this.companyRepository.create({
       companyName: dto.companyName,
       companyAddress: dto.companyAddress,
@@ -97,6 +105,7 @@ export class CompanyService {
       typeCompany: dto.typeCompany!,
       phone: dto.phone,
       email: dto.email,
+      website: dto.website,
       companyActivity: dto.companyActivity,
       open_time: dto.open_time,
       delivery_minutes: dto.delivery_minutes,
@@ -106,10 +115,14 @@ export class CompanyService {
       address: dto.address,
       taux: dto.taux || 0,
       localCurrency: dto.localCurrency,
+      // Relations ManyToOne
+      country: dto.countryId ? ({ id: dto.countryId } as any) : null,
+      city: dto.cityId ? ({ id: dto.cityId } as any) : null,
     });
 
     const savedCompany = await this.companyRepository.save(company);
 
+    // Lier la company au user
     const userHasCompany = this.userHasCompanyRepository.create({
       user,
       company: savedCompany,
@@ -121,11 +134,18 @@ export class CompanyService {
     user.activeCompanyId = savedCompany.id;
     await this.userRepository.save(user);
 
+    // Récupérer le user complet avec relations pour retour
     const fullUser = await this.userRepository.findOne({
       where: { id: user.id },
-      relations: ['activeCompany', 'userHasCompany.company'],
+      relations: [
+        'activeCompany',
+        'activeCompany.country',
+        'activeCompany.city',
+        'userHasCompany.company',
+      ],
     });
 
+    // Créer le taux initial
     const defaultTaux = this.tauxCompanyRepository.create({
       name: 'Taux initial de la société',
       value: dto.taux || 0,
@@ -133,7 +153,6 @@ export class CompanyService {
       isActive: true,
       company: savedCompany,
     });
-
     await this.tauxCompanyRepository.save(defaultTaux);
 
     return {
@@ -191,29 +210,16 @@ export class CompanyService {
 
     const company = await this.companyRepository.findOne({
       where: { id: current_user.activeCompanyId },
+      relations: ['country', 'city'], // récupérer les relations existantes
     });
+
     if (!company) {
       throw new NotFoundException(
         `Entreprise avec l'ID ${current_user.activeCompanyId} introuvable`,
       );
     }
 
-    const requiredFields: (keyof CreateCompanyDto)[] = ['address', 'latitude', 'longitude'];
-    for (const field of requiredFields) {
-      const value = dto[field];
-      if (
-        value === undefined ||
-        value === null ||
-        (typeof value === 'string' && value.trim() === '')
-      ) {
-        throw new BadRequestException(`Le champ '${field}' est obligatoire`);
-      }
-    }
-
-    if (dto.companyName !== undefined && dto.companyName.trim() === '') {
-      throw new BadRequestException("Le nom de l'entreprise est requis");
-    }
-
+    // Mise à jour dynamique des champs classiques
     const fieldsToUpdate: (keyof CreateCompanyDto)[] = [
       'companyName',
       'companyAddress',
@@ -234,39 +240,50 @@ export class CompanyService {
     ];
 
     for (const field of fieldsToUpdate) {
-      if (dto[field] !== undefined) {
-        (company as any)[field] = dto[field];
+      const value = dto[field];
+      if (value !== undefined && value !== null && value !== '') {
+        (company as any)[field] = value;
       }
     }
 
+    // Taux et devise
     if (dto.taux !== undefined) {
       const taux = Number(dto.taux);
-      if (isNaN(taux)) {
-        throw new BadRequestException("Le champ 'valueTaux' doit être un nombre valide");
-      }
-      company.taux = taux;
+      if (!isNaN(taux)) company.taux = taux;
     }
+
     if (dto.localCurrency !== undefined) {
       company.localCurrency = dto.localCurrency;
     }
 
+    // Logo et banner
     if (logoFile) {
       company.logo = await this.cloudinary.handleUploadImage(logoFile, 'company/logo');
-    } else if (dto.logo !== undefined) {
+    } else if (dto.logo !== undefined && dto.logo !== '') {
       company.logo = dto.logo;
     }
 
     if (bannerFile) {
       company.banner = await this.cloudinary.handleUploadImage(bannerFile, 'company/banner');
-    } else if (dto.banner !== undefined) {
+    } else if (dto.banner !== undefined && dto.banner !== '') {
       company.banner = dto.banner;
     }
 
-    if (dto.typeCompany) {
-      if (!Object.values(CompanyType).includes(dto.typeCompany as CompanyType)) {
-        throw new BadRequestException(`TypeCompany invalide: ${dto.typeCompany}`);
-      }
+    // Type de company
+    if (
+      dto.typeCompany &&
+      Object.values(CompanyType).includes(dto.typeCompany as CompanyType)
+    ) {
       company.typeCompany = dto.typeCompany as CompanyType;
+    }
+
+    // Relations Country et City
+    if (dto.countryId) {
+      company.country = { id: dto.countryId } as any; // lien ManyToOne
+    }
+
+    if (dto.cityId) {
+      company.city = { id: dto.cityId } as any; // lien ManyToOne
     }
 
     const updatedCompany = await this.companyRepository.save(company);
@@ -544,6 +561,8 @@ export class CompanyService {
 
   async findCompanyValidatedByType(
     type?: string,
+    countryId?: string,
+    cityId?: string,
     page = 1,
     limit = 10,
   ): Promise<{
@@ -562,11 +581,21 @@ export class CompanyService {
       .leftJoinAndSelect('userHasCompany.role', 'role')
       .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
       .leftJoinAndSelect('permissions.permission', 'permission')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .where('company.status = :status', { status: 'VALIDATED' })
       .orderBy('company.companyName', 'ASC');
 
     if (type) {
       query.andWhere('company.typeCompany = :type', { type });
+    }
+
+    if (countryId) {
+      query.andWhere('company.countryId = :countryId', { countryId });
+    }
+
+    if (cityId) {
+      query.andWhere('company.cityId = :cityId', { cityId });
     }
 
     query.skip((page - 1) * limit).take(limit);
@@ -575,12 +604,18 @@ export class CompanyService {
 
     if (companies.length === 0) {
       throw new NotFoundException(
-        `Aucune entreprise validée trouvée${type ? ` pour le type : ${type}` : ''}`,
+        `Aucune entreprise validée trouvée${type ? ` pour le type : ${type}` : ''}${
+          countryId ? ` dans le pays : ${countryId}` : ''
+        }${cityId ? ` et la ville : ${cityId}` : ''}`,
       );
     }
 
     return {
-      message: `Entreprises validées récupérées avec succès${type ? ` pour le type : ${type}` : ''}.`,
+      message: `Entreprises validées récupérées avec succès${
+        type ? ` pour le type : ${type}` : ''
+      }${countryId ? ` dans le pays : ${countryId}` : ''}${
+        cityId ? ` et la ville : ${cityId}` : ''
+      }.`,
       data: {
         data: companies,
         total,
@@ -658,5 +693,136 @@ export class CompanyService {
         totalTodayOrders,
       },
     };
+  }
+
+  async createCountry(dto: CreateCountryDto): Promise<Country> {
+    const country = this.countryRepo.create({ name: dto.name, code: dto.code });
+    return await this.countryRepo.save(country);
+  }
+
+  async createCity(dto: CreateCityDto): Promise<City> {
+    const country = await this.countryRepo.findOne({ where: { id: dto.countryId } });
+    if (!country) {
+      throw new NotFoundException(`Pays avec l'ID ${dto.countryId} introuvable`);
+    }
+
+    // Vérifier si la ville existe déjà pour ce pays
+    const existingCity = await this.cityRepo.findOne({
+      where: {
+        name: dto.name,
+        country: { id: dto.countryId },
+      },
+      relations: ['country'],
+    });
+
+    if (existingCity) {
+      throw new BadRequestException(`La ville "${dto.name}" existe déjà pour ce pays.`);
+    }
+
+    const city = this.cityRepo.create({
+      name: dto.name,
+      country,
+    });
+
+    return await this.cityRepo.save(city);
+  }
+
+  // Country
+  async updateCountry(id: string, dto: Partial<CreateCountryDto>) {
+    const country = await this.countryRepo.findOne({ where: { id } });
+    if (!country) {
+      throw new NotFoundException(`Pays avec l'ID ${id} introuvable`);
+    }
+
+    if (dto.name && dto.name.trim() !== '') {
+      country.name = dto.name;
+    }
+
+    const updated = await this.countryRepo.save(country);
+
+    return {
+      message: 'Pays mis à jour avec succès.',
+      data: updated,
+    };
+  }
+
+  // City
+  async updateCity(id: string, dto: Partial<CreateCityDto>) {
+    const city = await this.cityRepo.findOne({ where: { id }, relations: ['country'] });
+    if (!city) {
+      throw new NotFoundException(`Ville avec l'ID ${id} introuvable`);
+    }
+
+    if (dto.name && dto.name.trim() !== '') {
+      const existingCity = await this.cityRepo.findOne({
+        where: { name: dto.name, country: { id: city.country.id } },
+        relations: ['country'],
+      });
+
+      if (existingCity && existingCity.id !== id) {
+        throw new BadRequestException(`La ville "${dto.name}" existe déjà pour ce pays.`);
+      }
+
+      city.name = dto.name;
+    }
+
+    if (dto.countryId && dto.countryId !== city.country.id) {
+      const newCountry = await this.countryRepo.findOne({ where: { id: dto.countryId } });
+      if (!newCountry) {
+        throw new NotFoundException(`Pays avec l'ID ${dto.countryId} introuvable`);
+      }
+      city.country = newCountry;
+    }
+
+    const updated = await this.cityRepo.save(city);
+
+    return {
+      message: 'Ville mise à jour avec succès.',
+      data: updated,
+    };
+  }
+
+  async getAllCountries(): Promise<Country[]> {
+    return await this.countryRepo.find({ where: { status: true }, relations: ['cities'] });
+  }
+
+  // Récupérer toutes les villes actives
+  async getAllCities(): Promise<City[]> {
+    return await this.cityRepo.find({ where: { status: true }, relations: ['country'] });
+  }
+
+  // Récupérer toutes les villes d’un pays par ID
+  async getCitiesByCountry(countryId: string): Promise<City[]> {
+    const country = await this.countryRepo.findOne({ where: { id: countryId, status: true } });
+    if (!country) throw new NotFoundException(`Pays avec l'ID ${countryId} introuvable`);
+
+    return await this.cityRepo.find({ where: { countryId, status: true } });
+  }
+
+  async getCountryById(id: string): Promise<Country> {
+    const country = await this.countryRepo.findOne({
+      where: { id, status: true }, // seulement actif
+      relations: ['cities'],
+    });
+
+    if (!country) {
+      throw new NotFoundException(`Pays avec l'ID ${id} introuvable ou inactif`);
+    }
+
+    return country;
+  }
+
+  // Récupérer une ville par son id
+  async getCityById(id: string): Promise<City> {
+    const city = await this.cityRepo.findOne({
+      where: { id, status: true }, // seulement actif
+      relations: ['country'],
+    });
+
+    if (!city) {
+      throw new NotFoundException(`Ville avec l'ID ${id} introuvable ou inactive`);
+    }
+
+    return city;
   }
 }

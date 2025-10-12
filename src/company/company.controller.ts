@@ -25,6 +25,10 @@ import { UserHasCompanyEntity } from 'src/user_has_company/entities/user_has_com
 import { UserHasCompanyService } from 'src/user_has_company/user_has_company.service';
 import { UpdateCompanyStatusDto } from './dto/update-company-status.dto';
 import { MailService } from 'src/email/email.service';
+import { CreateCountryDto } from './dto/create-country.dto';
+import { CreateCityDto } from './dto/create-city.dto';
+import { UpdateCountryDto } from './dto/update-country.dto';
+import { UpdateCityDto } from './dto/update-city.dto';
 
 @Controller('company')
 export class CompanyController {
@@ -106,10 +110,18 @@ export class CompanyController {
   @Get('validated')
   async getValidatedCompanies(
     @Query('type') type?: string,
+    @Query('country') country?: string,
+    @Query('city') city?: string,
     @Query('page') page = 1,
     @Query('limit') limit = 10,
   ) {
-    return this.companyService.findCompanyValidatedByType(type, Number(page), Number(limit));
+    return this.companyService.findCompanyValidatedByType(
+      type,
+      country,
+      city,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @Get()
@@ -137,5 +149,69 @@ export class CompanyController {
   @UseGuards(AuthentificationGuard)
   async getDashboard(@CurrentUser() user: UserEntity) {
     return await this.companyService.getCompanyDashboard(user);
+  }
+
+  @Post('country')
+  async createCountry(@Body() dto: CreateCountryDto) {
+    const country = await this.companyService.createCountry(dto);
+    return { message: 'Pays créé avec succès', data: country };
+  }
+
+  @Post('city')
+  async createCity(@Body() dto: CreateCityDto) {
+    const city = await this.companyService.createCity(dto);
+    return { message: 'Ville créée avec succès', data: city };
+  }
+
+  @Patch('country/:id')
+  async updateCountry(@Param('id') id: string, @Body() dto: UpdateCountryDto) {
+    return await this.companyService.updateCountry(id, dto);
+  }
+
+  @Patch('city/:id')
+  async updateCity(@Param('id') id: string, @Body() dto: UpdateCityDto) {
+    return await this.companyService.updateCity(id, dto);
+  }
+
+  @Get('country/all')
+  async getAllCountries() {
+    return {
+      message: 'Liste des pays récupérée avec succès',
+      data: await this.companyService.getAllCountries(),
+    };
+  }
+
+  @Get('city/all')
+  async getAllCities() {
+    return {
+      message: 'Liste des villes récupérée avec succès',
+      data: await this.companyService.getAllCities(),
+    };
+  }
+
+  @Get('city/by-country/:countryId')
+  async getCitiesByCountry(@Param('countryId') countryId: string) {
+    return {
+      message: 'Liste des villes du pays récupérée avec succès',
+      data: await this.companyService.getCitiesByCountry(countryId),
+    };
+  }
+
+  @Get('country/one/:id')
+  async getCountry(@Param('id') id: string) {
+    const country = await this.companyService.getCountryById(id);
+    return {
+      message: 'Pays récupéré avec succès',
+      data: country,
+    };
+  }
+
+  @Get('city/one/:id')
+  async getCity(@Param('id') id: string) {
+    const city = await this.companyService.getCityById(id);
+    return {
+      message: 'Ville récupérée avec succès',
+      data: city,
+    };
   }
 }

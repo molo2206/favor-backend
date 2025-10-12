@@ -1,6 +1,6 @@
 // src/company/dto/update-company.dto.ts
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class UpdateCompanyDto {
   @IsOptional()
@@ -70,4 +70,12 @@ export class UpdateCompanyDto {
 
   @IsString()
   localCurrency: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: "Le champ 'countryId' doit être un UUID valide" })
+  countryId?: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: "Le champ 'cityId' doit être un UUID valide" })
+  cityId?: string;
 }

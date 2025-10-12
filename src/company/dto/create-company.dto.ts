@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsOptional, IsString, IsUrl, IsNotEmpty, IsEnum, IsNumber } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsNotEmpty,
+  IsEnum,
+  IsNumber,
+  IsUUID,
+} from 'class-validator';
 import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 import { CompanyType } from 'src/company/enum/type.company.enum';
 
@@ -85,4 +93,12 @@ export class CreateCompanyDto {
 
   @IsString()
   localCurrency: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: "Le champ 'countryId' doit être un UUID valide" })
+  countryId?: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: "Le champ 'cityId' doit être un UUID valide" })
+  cityId?: string;
 }
