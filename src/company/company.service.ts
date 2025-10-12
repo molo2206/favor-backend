@@ -825,4 +825,25 @@ export class CompanyService {
 
     return city;
   }
+  async toggleStatus(type: 'country' | 'city', id: string): Promise<Country | City> {
+    if (type === 'country') {
+      const country = await this.countryRepo.findOne({ where: { id } });
+      if (!country) {
+        throw new NotFoundException(`Pays avec l'ID ${id} introuvable`);
+      }
+      country.status = !country.status;
+      return await this.countryRepo.save(country);
+    }
+
+    if (type === 'city') {
+      const city = await this.cityRepo.findOne({ where: { id } });
+      if (!city) {
+        throw new NotFoundException(`Ville avec l'ID ${id} introuvable`);
+      }
+      city.status = !city.status;
+      return await this.cityRepo.save(city);
+    }
+
+    throw new NotFoundException(`Type "${type}" invalide. Utilisez "country" ou "city".`);
+  }
 }

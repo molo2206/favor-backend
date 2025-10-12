@@ -214,4 +214,13 @@ export class CompanyController {
       data: city,
     };
   }
+  @Patch(':type/:id/toggle-status')
+  @UseGuards(AuthentificationGuard)
+  async toggleStatus(@Param('type') type: 'country' | 'city', @Param('id') id: string) {
+    const entity = await this.companyService.toggleStatus(type, id);
+    return {
+      message: `Le statut du ${type === 'country' ? 'pays' : 'ville'} "${entity.name}" a été mis à jour avec succès.`,
+      data: entity,
+    };
+  }
 }
