@@ -85,7 +85,7 @@ export class UsersService {
     // Envoi email de bienvenue
     await this.mailService.sendHtmlEmail(
       email,
-      'Bienvenue dans FavorHelp 🎉',
+      'Bienvenue dans FavorHelp ',
       'createCount.html',
       { userWithoutPassword, year: new Date().getFullYear() },
     );
@@ -121,6 +121,8 @@ export class UsersService {
           'userHasCompany.permissions',
           'userHasCompany.permissions.permission',
           'userHasCompany.company.tauxCompanies',
+          'userHasCompany.company.country',
+          'userHasCompany.company.city',
         ],
       });
 
@@ -151,6 +153,11 @@ export class UsersService {
                 latitude: uhc.company.latitude,
                 longitude: uhc.company.longitude,
                 address: uhc.company.address,
+                tauxCompanies: uhc.company.tauxCompanies || [],
+                country: uhc.company.country,
+                city: uhc.company.city,
+                localCurrency: uhc.company.localCurrency,
+                taux: uhc.company.taux,
               }
             : null,
           permissions:
@@ -244,6 +251,8 @@ export class UsersService {
       .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
       .leftJoinAndSelect('permissions.permission', 'permission')
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .where('users.email = :email', { email: userSignInDto.email })
       .getOne();
 
@@ -636,6 +645,8 @@ export class UsersService {
         'userHasCompany.company.tauxCompanies', // chemin correct
         'userHasCompany.permissions',
         'userHasCompany.permissions.permission',
+        'userHasCompany.company.country',
+        'userHasCompany.company.city',
       ],
     });
 

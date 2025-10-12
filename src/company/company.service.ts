@@ -118,7 +118,6 @@ export class CompanyService {
       // Relations ManyToOne
       country: dto.countryId ? ({ id: dto.countryId } as any) : null,
       city: dto.cityId ? ({ id: dto.cityId } as any) : null,
-
     });
 
     const savedCompany = await this.companyRepository.save(company);
@@ -211,7 +210,7 @@ export class CompanyService {
 
     const company = await this.companyRepository.findOne({
       where: { id: current_user.activeCompanyId },
-      relations: ['country', 'city'], // récupérer les relations existantes
+      relations: ['country', 'city'],
     });
 
     if (!company) {
@@ -220,7 +219,7 @@ export class CompanyService {
       );
     }
 
-    // Mise à jour dynamique des champs classiques
+    // 🔸 Mise à jour dynamique
     const fieldsToUpdate: (keyof CreateCompanyDto)[] = [
       'companyName',
       'companyAddress',
@@ -252,30 +251,31 @@ export class CompanyService {
       }
     }
 
-    // Taux et devise
+    // 🔸 Taux
     if (dto.taux !== undefined) {
       const taux = Number(dto.taux);
       if (!isNaN(taux)) company.taux = taux;
     }
 
+    // 🔸 Devise locale
     if (dto.localCurrency !== undefined) {
       company.localCurrency = dto.localCurrency;
     }
 
-    // Logo et banner
+    // 🔸 Upload des fichiers logo / bannière
     if (logoFile) {
       company.logo = await this.cloudinary.handleUploadImage(logoFile, 'company/logo');
-    } else if (dto.logo !== undefined && dto.logo !== '') {
+    } else if (dto.logo) {
       company.logo = dto.logo;
     }
 
     if (bannerFile) {
       company.banner = await this.cloudinary.handleUploadImage(bannerFile, 'company/banner');
-    } else if (dto.banner !== undefined && dto.banner !== '') {
+    } else if (dto.banner) {
       company.banner = dto.banner;
     }
 
-    // Type de company
+    // 🔸 Type de compagnie
     if (
       dto.typeCompany &&
       Object.values(CompanyType).includes(dto.typeCompany as CompanyType)
@@ -283,17 +283,39 @@ export class CompanyService {
       company.typeCompany = dto.typeCompany as CompanyType;
     }
 
-    // Relations Country et City
+    // 🔸 Relations Country et City
     if (dto.countryId) {
-      company.country = { id: dto.countryId } as any; // lien ManyToOne
+      company.country = { id: dto.countryId } as any;
     }
-
     if (dto.cityId) {
-      company.city = { id: dto.cityId } as any; // lien ManyToOne
+      company.city = { id: dto.cityId } as any;
     }
 
-    const updatedCompany = await this.companyRepository.save(company);
+    await this.companyRepository.save(company);
 
+    // ✅ Rechargement complet avec toutes les relations utiles
+    const updatedCompany = await this.companyRepository.findOne({
+      where: { id: company.id },
+      relations: [
+        'country',
+        'city',
+        'products',
+        'branches',
+        'userHasCompany',
+        'userHasCompany.user',
+        'userHasCompany.role',
+        'userHasCompany.permissions',
+        'userHasCompany.permissions.permission',
+        'services',
+        'rooms',
+        'tauxCompanies',
+        'measures',
+      ],
+    });
+
+    if (!updatedCompany) {
+      throw new NotFoundException('Erreur lors du rechargement de l’entreprise mise à jour.');
+    }
     return {
       message: 'Companie mise à jour avec succès',
       data: updatedCompany,
