@@ -150,21 +150,16 @@ export class ServiceService {
 
   async findAll(): Promise<{
     message: string;
-    data: { data: Service[]; total: number };
+    data: any[];
   }> {
     const services = await this.serviceRepo.find({
       relations: ['company', 'category', 'prestataires', 'measure', 'prestataires.prestataire'],
       order: { createdAt: 'DESC' },
     });
 
-    const total = services.length;
-
     return {
       message: 'Liste des services récupérée avec succès.',
-      data: {
-        data: services,
-        total,
-      },
+      data: services,
     };
   }
 
