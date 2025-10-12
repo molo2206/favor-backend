@@ -280,7 +280,7 @@ export class CompanyService {
   async updateCompanyStatus(
     id: string,
     dto: UpdateCompanyStatusDto,
-  ): Promise<{ data: CompanyEntity }> {
+  ): Promise<{ data: CompanyEntity; message: string }> {
     const company = await this.companyRepository.findOne({ where: { id } });
 
     if (!company) {
@@ -317,7 +317,7 @@ export class CompanyService {
       );
     }
 
-    return { data: updatedCompany };
+    return { message: 'Mise à jour du statut avec succès', data: updatedCompany };
   }
 
   async findByType(type?: string): Promise<{ message: string; data: CompanyEntity[] }> {

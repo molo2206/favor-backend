@@ -9,6 +9,7 @@ import { Service } from 'src/service/entities/service.entity';
 import { Room } from 'src/room/entities/room.entity';
 import { TauxCompany } from 'src/taux-company/entities/taux-company.entity';
 import { IsNumber, IsString } from 'class-validator';
+import { BranchEntity } from './branch.entity';
 
 @Entity('company')
 export class CompanyEntity {
@@ -50,6 +51,9 @@ export class CompanyEntity {
 
   @OneToMany(() => Product, (product) => product.company)
   products: Product[];
+
+  @OneToMany(() => BranchEntity, (branch) => branch.company, { cascade: true })
+  branches: BranchEntity[];
 
   @Column({ nullable: true })
   email: string;
