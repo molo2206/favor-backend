@@ -470,11 +470,10 @@ export class ServiceService {
     limit = 10,
   ): Promise<{
     message: string;
-    data: { data: Service[]; total: number; page: number; limit: number };
+    data: { data: any[]; total: number; page: number; limit: number };
   }> {
     const skip = (page - 1) * limit;
 
-    // Construction de la query
     const query = this.serviceRepo
       .createQueryBuilder('service')
       .leftJoinAndSelect('service.company', 'company')
@@ -489,12 +488,37 @@ export class ServiceService {
       query.andWhere('service.categoryId = :categoryId', { categoryId });
     }
 
+    //  Récupération des services
     const [services, total] = await query.skip(skip).take(limit).getManyAndCount();
+
+    //  Regroupement par company
+    const groupedByCompany = Object.values(
+      services.reduce(
+        (acc, service) => {
+          const companyId = service.company.id;
+
+          if (!acc[companyId]) {
+            // Cloner l'objet company pour éviter des effets de bord
+            acc[companyId] = {
+              ...service.company,
+              services: [],
+            };
+          }
+
+          // Supprimer la propriété company de l'objet service pour éviter la duplication
+          const { company, ...serviceWithoutCompany } = service;
+
+          acc[companyId].services.push(serviceWithoutCompany);
+          return acc;
+        },
+        {} as Record<string, any>,
+      ),
+    );
 
     return {
       message: 'Liste des services publiés récupérée avec succès',
       data: {
-        data: services,
+        data: groupedByCompany,
         total,
         page,
         limit,
