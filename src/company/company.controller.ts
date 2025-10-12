@@ -110,15 +110,15 @@ export class CompanyController {
   @Get('validated')
   async getValidatedCompanies(
     @Query('type') type?: string,
-    @Query('country') country?: string,
-    @Query('city') city?: string,
+    @Query('countryId') countryId?: string,
+    @Query('cityId') cityId?: string,
     @Query('page') page = 1,
     @Query('limit') limit = 10,
   ) {
     return this.companyService.findCompanyValidatedByType(
       type,
-      country,
-      city,
+      countryId,
+      cityId,
       Number(page),
       Number(limit),
     );
