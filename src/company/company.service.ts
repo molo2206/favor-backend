@@ -783,25 +783,25 @@ export class CompanyService {
   }
 
   async getAllCountries(): Promise<Country[]> {
-    return await this.countryRepo.find({ where: { status: true }, relations: ['cities'] });
+    return await this.countryRepo.find({ relations: ['cities'] });
   }
 
   // Récupérer toutes les villes actives
   async getAllCities(): Promise<City[]> {
-    return await this.cityRepo.find({ where: { status: true }, relations: ['country'] });
+    return await this.cityRepo.find({ relations: ['country'] });
   }
 
   // Récupérer toutes les villes d’un pays par ID
   async getCitiesByCountry(countryId: string): Promise<City[]> {
-    const country = await this.countryRepo.findOne({ where: { id: countryId, status: true } });
+    const country = await this.countryRepo.findOne({ where: { id: countryId } });
     if (!country) throw new NotFoundException(`Pays avec l'ID ${countryId} introuvable`);
 
-    return await this.cityRepo.find({ where: { countryId, status: true } });
+    return await this.cityRepo.find({ where: { countryId } });
   }
 
   async getCountryById(id: string): Promise<Country> {
     const country = await this.countryRepo.findOne({
-      where: { id, status: true }, // seulement actif
+      where: { id }, // seulement actif
       relations: ['cities'],
     });
 
@@ -815,7 +815,7 @@ export class CompanyService {
   // Récupérer une ville par son id
   async getCityById(id: string): Promise<City> {
     const city = await this.cityRepo.findOne({
-      where: { id, status: true }, // seulement actif
+      where: { id }, // seulement actif
       relations: ['country'],
     });
 
