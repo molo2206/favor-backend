@@ -12,6 +12,7 @@ import { UsersService } from 'src/users/users.service';
 import { JwtPayload } from 'src/users/interfaces/jwt-payload.interface';
 import { ConfigService } from '@nestjs/config';
 import { JsonWebTokenError } from '@nestjs/jwt';
+import { CompanyStatus } from 'src/company/enum/company-status.enum';
 
 declare global {
   namespace Express {
@@ -34,77 +35,12 @@ declare global {
         plateNumber?: string;
         activeCompanyId?: string;
         defaultAddressId?: string;
+        companyStatus?: CompanyStatus;
       } | null;
     }
   }
 }
 
-// @Injectable()
-// export class CurrentUserMiddleware implements NestMiddleware {
-//   constructor(
-//     private readonly usersService: UsersService,
-//     private readonly configService: ConfigService,
-//   ) {}
-
-//   async use(req: Request, res: Response, next: NextFunction) {
-//     const rawAuthHeader = req.headers.authorization || req.headers.Authorization;
-//     const authHeader = Array.isArray(rawAuthHeader) ? rawAuthHeader[0] : rawAuthHeader;
-
-//     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-//       req.currentUser = null;
-//       return next();
-//     }
-
-//     const token = authHeader.split(' ')[1];
-
-//     try {
-//       const secretKey = this.configService.get<string>('ACCESS_TOKEN_SECRET_KEY');
-//       if (!secretKey) {
-//         throw new Error('ACCESS_TOKEN_SECRET_KEY is not defined in env');
-//       }
-
-//       const payload = verify(token, secretKey) as JwtPayload;
-
-//       const user = await this.usersService.findOne(payload.id);
-//       if (!user) {
-//         req.currentUser = null;
-//         return next();
-//       }
-
-//       const role = Array.isArray(payload.role) ? payload.role[0] : payload.role;
-
-//       req.currentUser = {
-//         id: user.data.id,
-//         fullName: user.data.fullName,
-//         email: user.data.email,
-//         phone: user.data.phone,
-//         image: user.data.image,
-//         isActive: user.data.isActive,
-//         country: user.data.country,
-//         city: user.data.city,
-//         preferredLanguage: user.data.preferredLanguage,
-//         loyaltyPoints: user.data.loyaltyPoints,
-//         dateOfBirth: user.data.dateOfBirth,
-//         vehicleType: user.data.vehicleType,
-//         plateNumber: user.data.plateNumber,
-//         activeCompanyId: user.data.activeCompanyId,
-//         defaultAddressId: user.data.defaultAddressId,
-//         role,
-//       };
-//     } catch (err) {
-//       if (err instanceof TokenExpiredError) {
-//         throw new ForbiddenException('Token expiré. Veuillez vous reconnecter.');
-//       } else if (err instanceof JsonWebTokenError) {
-//         throw new UnauthorizedException('Token invalide.');
-//       }
-
-//       // cas générique (ex: erreur de vérification inconnue)
-//       throw new UnauthorizedException('Erreur d’authentification.');
-//     }
-
-//     return next();
-//   }
-// }
 @Injectable()
 export class CurrentUserMiddleware implements NestMiddleware {
   constructor(
@@ -137,6 +73,11 @@ export class CurrentUserMiddleware implements NestMiddleware {
       } else {
         const role = Array.isArray(payload.role) ? payload.role[0] : payload.role;
 
+        let companyStatus: CompanyStatus | null = null;
+        if (user.data.activeCompanyId && user.data.activeCompany) {
+          companyStatus = user.data.activeCompany.status;
+        }
+
         req.currentUser = {
           id: user.data.id,
           fullName: user.data.fullName,
@@ -154,10 +95,10 @@ export class CurrentUserMiddleware implements NestMiddleware {
           activeCompanyId: user.data.activeCompanyId,
           defaultAddressId: user.data.defaultAddressId,
           role,
+          companyStatus: companyStatus ?? undefined,
         };
       }
     } catch (err) {
-      // Token invalide ou expiré → on n’interrompt pas, on ignore
       req.currentUser = null;
     }
 

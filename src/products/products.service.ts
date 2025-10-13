@@ -20,6 +20,8 @@ import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 import { FuelType } from './enum/fuelType_enum';
 import { Transmission } from './enum/transmission.enum';
 import { Type_rental_both_sale_car } from './enum/type_rental_both_sale_car';
+import { CompanyStatus } from 'src/company/enum/company-status.enum';
+import { UserWithCompanyStatus } from 'src/users/interfaces/user-with-company-status.interface';
 
 @Injectable()
 export class ProductService {
@@ -45,9 +47,15 @@ export class ProductService {
   async create(
     createProductDto: CreateProductDto,
     files: Express.Multer.File[],
-    user: UserEntity,
+    user: UserWithCompanyStatus,
   ): Promise<{ message: string; data: Product }> {
     const { categoryId, status, measureId, ...data } = createProductDto;
+
+    if (user['companyStatus'] !== CompanyStatus.VALIDATED) {
+      throw new ForbiddenException(
+        'Votre société n’est pas encore validée. Impossible de créer un produit.',
+      );
+    }
 
     if (!files || files.length < 2 || files.length > 4) {
       throw new BadRequestException('Vous devez fournir entre 2 et 4 images');
