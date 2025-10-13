@@ -11,7 +11,6 @@ import { UserHasCompanyModule } from './user_has_company/user_has_company.module
 import { PermissionsModule } from './permissions/permissions.module';
 import { UserHasCompanyPermissionsModule } from './user_has_company_permissions/user_has_company_permissions.module';
 import { TypeCompanyModule } from './type_company/type_company.module';
-import { RoleUserModule } from './role_user/role_user.module';
 import { CategoryModule } from './category/category.module';
 import { ProductModule } from './products/products.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -38,6 +37,9 @@ import { RoomModule } from './room/room.module';
 import { BookingModule } from './booking/booking.module';
 import { TauxCompanyModule } from './taux-company/taux-company.module';
 import { AppSettingModule } from './app-setting/app-setting.module';
+import { RoleModule } from './users/role.module';
+import { PlatformModule } from './users/platform.module';
+import { UserPlatformRoleModule } from './users/user-platform-role.module';
 
 @Module({
   imports: [
@@ -77,7 +79,6 @@ import { AppSettingModule } from './app-setting/app-setting.module';
     PermissionsModule,
     UserHasCompanyPermissionsModule,
     TypeCompanyModule,
-    RoleUserModule,
     CategoryModule,
     ProductModule,
     CloudinaryModule,
@@ -104,6 +105,9 @@ import { AppSettingModule } from './app-setting/app-setting.module';
     BookingModule,
     TauxCompanyModule,
     AppSettingModule,
+    RoleModule,
+    PlatformModule,
+    UserPlatformRoleModule
   ],
   controllers: [AppController],
   providers: [AppService],

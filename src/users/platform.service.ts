@@ -16,6 +16,11 @@ export class PlatformService {
     return await this.platformRepo.save(platform);
   }
 
+  async update(id: string, dto: Partial<CreatePlatformDto>) {
+    const platform = await this.findOne(id);
+    Object.assign(platform, dto);
+    return this.platformRepo.save(platform);
+  }
   async findAll() {
     return await this.platformRepo.find();
   }

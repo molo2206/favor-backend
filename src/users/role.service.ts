@@ -26,6 +26,12 @@ export class RoleService {
     return role;
   }
 
+  async update(id: string, dto: Partial<CreateRoleDto>) {
+    const role = await this.findOne(id); // Vérifie si le rôle existe
+    Object.assign(role, dto); // Merge les nouvelles valeurs
+    return await this.roleRepo.save(role);
+  }
+
   async delete(id: string) {
     const role = await this.findOne(id);
     return await this.roleRepo.remove(role);

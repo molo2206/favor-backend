@@ -2,11 +2,19 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserPlatformRoleEntity } from './entities/user_plateform_roles.entity';
-import { AssignRoleDto } from './dto/roles_plateforme_user/assign-role.dto';
 import { UserEntity } from './entities/user.entity';
 import { PlatformEntity } from './entities/plateforms.entity';
 import { RoleEntity } from './entities/roles.entity';
 
+interface AssignmentDto {
+  platformId: string;
+  roleId: string;
+}
+
+export interface AssignRoleDto {
+  userId: string;
+  platforms: AssignmentDto[];
+}
 @Injectable()
 export class UserPlatformRoleService {
   constructor(
@@ -15,25 +23,35 @@ export class UserPlatformRoleService {
   ) {}
 
   async assignRole(dto: AssignRoleDto) {
-    const existing = await this.uprRepo.findOne({
-      where: {
-        user: { id: dto.userId },
-        platform: { id: dto.platformId },
-        role: { id: dto.roleId },
-      },
-    });
+    const results: UserPlatformRoleEntity[] = [];
 
-    if (existing) {
-      throw new ConflictException('Ce rôle est déjà attribué à cet utilisateur pour cette plateforme');
+    for (const assign of dto.platforms) {
+      const existing = await this.uprRepo.findOne({
+        where: {
+          user: { id: dto.userId },
+          platform: { id: assign.platformId },
+          role: { id: assign.roleId },
+        },
+      });
+
+      if (existing) {
+        // Ignore les doublons
+        continue;
+      }
+
+      const entity = this.uprRepo.create({
+        user: { id: dto.userId } as UserEntity,
+        platform: { id: assign.platformId } as PlatformEntity,
+        role: { id: assign.roleId } as RoleEntity,
+      });
+
+      results.push(await this.uprRepo.save(entity));
     }
 
-    const entity = this.uprRepo.create({
-      user: { id: dto.userId } as UserEntity,
-      platform: { id: dto.platformId } as PlatformEntity,
-      role: { id: dto.roleId } as RoleEntity,
-    });
-
-    return await this.uprRepo.save(entity);
+    return {
+      message: `Rôles assignés avec succès (${results.length})`,
+      data: results,
+    };
   }
 
   async findRolesByUser(userId: string) {
