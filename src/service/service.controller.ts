@@ -184,11 +184,12 @@ export class ServiceController {
   @Get('published/public')
   @Public()
   async getPublishedService(
-    @Query('type') type?: string,
     @Query('categoryId') categoryId?: string,
+    @Query('countryId') countryId?: string,
+    @Query('cityId') cityId?: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit = 10,
   ) {
-    return this.serviceService.findPublished(type, categoryId, page, limit);
+    return this.serviceService.findPublished(categoryId, countryId, cityId, page, limit);
   }
 }

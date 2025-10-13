@@ -450,8 +450,9 @@ export class ServiceService {
   }
 
   async findPublished(
-    type?: string,
     categoryId?: string,
+    countryId?: string,
+    cityId?: string,
     page = 1,
     limit = 10,
   ): Promise<{
@@ -463,8 +464,8 @@ export class ServiceService {
     const query = this.serviceRepo
       .createQueryBuilder('service')
       .leftJoinAndSelect('service.company', 'company')
-      .leftJoinAndSelect('service.company.country', 'country')
-      .leftJoinAndSelect('service.company.city', 'city')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('service.category', 'category')
       .leftJoinAndSelect('service.prestataires', 'shp')
       .leftJoinAndSelect('service.measure', 'measure')
@@ -476,27 +477,28 @@ export class ServiceService {
       query.andWhere('service.categoryId = :categoryId', { categoryId });
     }
 
-    //  Récupération des services
+    if (countryId) {
+      query.andWhere('company.countryId = :countryId', { countryId });
+    }
+
+    if (cityId) {
+      query.andWhere('company.cityId = :cityId', { cityId });
+    }
+
     const [services, total] = await query.skip(skip).take(limit).getManyAndCount();
 
-    //  Regroupement par company
     const groupedByCompany = Object.values(
       services.reduce(
         (acc, service) => {
           const companyId = service.company.id;
 
           if (!acc[companyId]) {
-            // Cloner l'objet company pour éviter des effets de bord
-            acc[companyId] = {
-              ...service.company,
-              services: [],
-            };
+            acc[companyId] = { ...service.company, services: [] };
           }
 
-          // Supprimer la propriété company de l'objet service pour éviter la duplication
           const { company, ...serviceWithoutCompany } = service;
-
           acc[companyId].services.push(serviceWithoutCompany);
+
           return acc;
         },
         {} as Record<string, any>,
