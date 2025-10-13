@@ -37,6 +37,7 @@ import { RoomImageModule } from './room-image/room-image.module';
 import { RoomModule } from './room/room.module';
 import { BookingModule } from './booking/booking.module';
 import { TauxCompanyModule } from './taux-company/taux-company.module';
+import { AppSettingModule } from './app-setting/app-setting.module';
 
 @Module({
   imports: [
@@ -102,6 +103,7 @@ import { TauxCompanyModule } from './taux-company/taux-company.module';
     RoomImageModule,
     BookingModule,
     TauxCompanyModule,
+    AppSettingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
