@@ -463,6 +463,8 @@ export class ServiceService {
     const query = this.serviceRepo
       .createQueryBuilder('service')
       .leftJoinAndSelect('service.company', 'company')
+      .leftJoinAndSelect('service.company.country', 'country')
+      .leftJoinAndSelect('service.company.city', 'city')
       .leftJoinAndSelect('service.category', 'category')
       .leftJoinAndSelect('service.prestataires', 'shp')
       .leftJoinAndSelect('service.measure', 'measure')
