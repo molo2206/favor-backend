@@ -21,6 +21,7 @@ import { OrderEntity } from 'src/order/entities/order.entity';
 import { RentalContract } from 'src/rental-contract/entities/rental-contract.entity';
 import { SaleTransaction } from 'src/sale-transaction/entities/sale-transaction.entity';
 import { Booking } from 'src/booking/entities/booking.entity';
+import { UserPlatformRoleEntity } from './user_plateform_roles.entity';
 
 @Entity('users')
 export class UserEntity {
@@ -54,7 +55,7 @@ export class UserEntity {
 
   @Column({ nullable: true })
   provider: string;
-  
+
   @Column({ default: true })
   isActive: boolean;
 
@@ -133,4 +134,6 @@ export class UserEntity {
   @OneToMany(() => Booking, (booking) => booking.user)
   bookings: Booking[];
 
+  @OneToMany(() => UserPlatformRoleEntity, (upr) => upr.user)
+  userPlatformRoles: UserPlatformRoleEntity[];
 }

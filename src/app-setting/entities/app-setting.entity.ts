@@ -11,7 +11,7 @@ export class AppSetting {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  /** 🏷️ Informations basiques */
+  /** Informations basiques */
   @Column({ type: 'varchar', length: 255 })
   appName: string;
 
@@ -54,7 +54,7 @@ export class AppSetting {
   @Column({ type: 'varchar', length: 10, default: 'fr' })
   defaultLanguage: string;
 
-  /** ⚙️ Paramètres configurables en JSON */
+  /** Paramètres configurables en JSON */
   @Column({
     type: 'longtext',
     nullable: true,
@@ -104,7 +104,40 @@ export class AppSetting {
     advancedConfig?: Record<string, any>;
   };
 
-  /** 💰 Paramètres financiers */
+  @Column({
+    type: 'longtext',
+    nullable: true,
+    transformer: {
+      to: (value: any) => JSON.stringify(value),
+      from: (value: string) => (value ? JSON.parse(value) : {}),
+    },
+  })
+  support?: {
+    email?: string;
+    phone?: string;
+    workingHours?: string;
+    faqUrl?: string;
+    liveChatEnabled?: boolean;
+  };
+
+  /** SEO */
+  @Column({
+    type: 'longtext',
+    nullable: true,
+    transformer: {
+      to: (value: any) => JSON.stringify(value),
+      from: (value: string) => (value ? JSON.parse(value) : {}),
+    },
+  })
+  seo?: {
+    metaTitle?: string;
+    metaDescription?: string;
+    keywords?: string[];
+    ogImage?: string;
+    favicon?: string;
+  };
+
+  /** Paramètres financiers */
   @Column('decimal', { precision: 10, scale: 2, default: 1 })
   exchangeRate: number;
 
@@ -120,7 +153,7 @@ export class AppSetting {
   @Column('decimal', { precision: 10, scale: 2, default: 1 })
   restaurantExtraFeePerItem: number;
 
-  /** 📝 Politique et conditions */
+  /** Politique et conditions */
   @Column({ type: 'longtext', nullable: true })
   privacyPolicy?: string;
 

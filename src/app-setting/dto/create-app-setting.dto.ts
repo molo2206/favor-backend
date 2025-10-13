@@ -57,12 +57,12 @@ export class CreateAppSettingDto {
   @IsOptional()
   defaultLanguage?: string;
 
-  /** ⚙️ Modules activés */
+  /** ⚙️ Modules activés / configuration générale */
   @IsObject()
   @IsOptional()
   config?: any;
 
-  /** 🛠 Support client */
+  /** Support client */
   @IsObject()
   @IsOptional()
   support?: {
@@ -71,6 +71,16 @@ export class CreateAppSettingDto {
     workingHours?: string;
     faqUrl?: string;
     liveChatEnabled?: boolean;
+  };
+
+  @IsObject()
+  @IsOptional()
+  legal?: {
+    companyName?: string;
+    registrationNumber?: string;
+    taxNumber?: string;
+    country?: string;
+    city?: string;
   };
 
   /** SEO */
@@ -113,15 +123,4 @@ export class CreateAppSettingDto {
   @IsString()
   @IsOptional()
   termsOfUse?: string;
-
-  /** 🏛 Informations légales */
-  @IsObject()
-  @IsOptional()
-  legal?: {
-    companyName?: string;
-    registrationNumber?: string;
-    taxNumber?: string;
-    country?: string;
-    city?: string;
-  };
 }

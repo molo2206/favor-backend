@@ -13,7 +13,6 @@ import {
 } from '@nestjs/common';
 import { AppSettingService } from './app-setting.service';
 import { CreateAppSettingDto } from './dto/create-app-setting.dto';
-import { UpdateAppSettingDto } from './dto/update-app-setting.dto';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { AuthorizeRoles } from 'src/users/utility/decorators/authorize.roles.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -27,12 +26,13 @@ export class AppSettingController {
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
   async create(@Body() createDto: CreateAppSettingDto) {
-    return this.appSettingService.createOrUpdate(createDto);
+    // Transformation en Record<string, any> pour éviter les erreurs de typage
+    const config: Record<string, any> = { ...createDto };
+    return this.appSettingService.createOrUpdate(config);
   }
 
   /** Récupérer la configuration globale */
   @Get()
-  @UseGuards(AuthentificationGuard)
   async findOne() {
     return this.appSettingService.findOne();
   }

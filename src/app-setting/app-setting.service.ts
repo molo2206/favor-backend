@@ -19,43 +19,91 @@ export class AppSettingService {
     return setting;
   }
 
+  /** Formatage des données pour le frontend */
+  private formatSetting(setting: AppSetting) {
+    return {
+      appName: setting.appName ?? '',
+      slogan: setting.slogan ?? '',
+      logo: setting.logo ?? '',
+      email: setting.email ?? '',
+      phone: setting.phone ?? '',
+      service_phone: setting.service_phone ?? '',
+      market_phone: setting.market_phone ?? '',
+      restaurant_phone: setting.restaurant_phone ?? '',
+      car_phone: setting.car_phone ?? '',
+      rental_phone: setting.rental_phone ?? '',
+      booking_phone: setting.booking_phone ?? '',
+      address: setting.address ?? '',
+      defaultCurrency: setting.defaultCurrency ?? 'USD',
+      defaultLanguage: setting.defaultLanguage ?? 'fr',
+      seo: setting.seo ?? {},
+      config: setting.config ?? {},
+      exchangeRate: setting.exchangeRate ?? 1,
+      ecommerceDeliveryFee: setting.ecommerceDeliveryFee ?? 0,
+      marketDeliveryFee: setting.marketDeliveryFee ?? 0,
+      restaurantBaseDeliveryFee: setting.restaurantBaseDeliveryFee ?? 0,
+      restaurantExtraFeePerItem: setting.restaurantExtraFeePerItem ?? 0,
+      privacyPolicy: setting.privacyPolicy ?? '',
+      termsOfUse: setting.termsOfUse ?? '',
+      support: setting.support ?? {},
+    };
+  }
+
   /** Créer ou mettre à jour la configuration globale */
-  async createOrUpdate(
-    config: Record<string, any>,
-  ): Promise<{ data: AppSetting; message: string }> {
+  async createOrUpdate(config: Partial<AppSetting>): Promise<{ data: any; message: string }> {
+    // Conversion des champs numériques envoyés en string
+    const numericFields = [
+      'exchangeRate',
+      'ecommerceDeliveryFee',
+      'marketDeliveryFee',
+      'restaurantBaseDeliveryFee',
+      'restaurantExtraFeePerItem',
+    ];
+
+    numericFields.forEach((key) => {
+      if (config[key] !== undefined && config[key] !== null) {
+        const value = Number(config[key]);
+        if (!isNaN(value)) {
+          config[key] = value;
+        }
+      }
+    });
+
     let setting = await this.appSettingRepo.findOne({ where: {} });
 
     if (setting) {
-      setting.config = { ...setting.config, ...config };
+      // Fusionne les anciennes données avec les nouvelles
+      setting = Object.assign(setting, config);
       const updated = await this.appSettingRepo.save(setting);
-      return { data: updated, message: 'Configuration mise à jour avec succès' };
+      return {
+        data: this.formatSetting(updated),
+        message: 'Configuration mise à jour avec succès',
+      };
     }
 
-    setting = this.appSettingRepo.create({ config });
+    setting = this.appSettingRepo.create(config);
     const saved = await this.appSettingRepo.save(setting);
-    return { data: saved, message: 'Configuration créée avec succès' };
+    return { data: this.formatSetting(saved), message: 'Configuration créée avec succès' };
   }
 
   /** Récupérer toute la configuration globale */
-  async findOne(): Promise<{ data: Record<string, any>; message: string }> {
+  async findOne(): Promise<{ data: any; message: string }> {
     const setting = await this.getSetting();
-    if (!setting.config) setting.config = {};
-    return { data: setting.config, message: 'Configuration globale récupérée avec succès' };
+    return {
+      data: this.formatSetting(setting),
+      message: 'Configuration globale récupérée avec succès',
+    };
   }
 
-  /** Mettre à jour une valeur spécifique dans la config */
-  async updateKey(key: string, value: any): Promise<{ data: AppSetting; message: string }> {
+  /** Mettre à jour une clé spécifique */
+  async updateKey(key: string, value: any): Promise<{ data: any; message: string }> {
     const setting = await this.getSetting();
-    setting.config = { ...setting.config, [key]: value };
+    (setting as any)[key] = value;
     const updated = await this.appSettingRepo.save(setting);
-    return { data: updated, message: `Valeur '${key}' mise à jour avec succès` };
-  }
-
-  /** Récupérer une valeur spécifique */
-  async getKey(key: string): Promise<{ data: any; message: string }> {
-    const setting = await this.getSetting();
-    const value = setting.config?.[key];
-    return { data: value, message: `Valeur '${key}' récupérée avec succès` };
+    return {
+      data: this.formatSetting(updated),
+      message: `Valeur '${key}' mise à jour avec succès`,
+    };
   }
 
   /** Supprimer la configuration globale */
@@ -70,10 +118,8 @@ export class AppSettingService {
     itemCount: number,
   ): Promise<{ data: number; message: string }> {
     const setting = await this.getSetting();
-    const config = setting.config as any; // <--- ou un type plus précis si tu veux
-
-    const baseFee = Number(config.restaurantBaseDeliveryFee ?? 3);
-    const extraFee = Number(config.restaurantExtraFeePerItem ?? 1);
+    const baseFee = Number(setting.restaurantBaseDeliveryFee ?? 3);
+    const extraFee = Number(setting.restaurantExtraFeePerItem ?? 1);
     const totalFee = itemCount <= 1 ? baseFee : baseFee + (itemCount - 1) * extraFee;
 
     return { data: totalFee, message: `Frais de livraison calculés pour ${itemCount} plat(s)` };
