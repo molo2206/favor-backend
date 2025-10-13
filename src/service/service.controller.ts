@@ -192,4 +192,14 @@ export class ServiceController {
   ) {
     return this.serviceService.findPublished(categoryId, countryId, cityId, page, limit);
   }
+
+  @Get('published/by-company/:companyId')
+  @Public()
+  async getPublishedByCompany(
+    @Param('companyId') companyId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit = 10,
+  ) {
+    return this.serviceService.findPublishedByCompany(companyId, page, limit);
+  }
 }

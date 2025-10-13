@@ -51,7 +51,7 @@ export class ProductService {
   ): Promise<{ message: string; data: Product }> {
     const { categoryId, status, measureId, ...data } = createProductDto;
 
-    if (user['companyStatus'] !== CompanyStatus.VALIDATED) {
+    if (user.companyStatus !== CompanyStatus.VALIDATED) {
       throw new ForbiddenException(
         'Votre société n’est pas encore validée. Impossible de créer un produit.',
       );

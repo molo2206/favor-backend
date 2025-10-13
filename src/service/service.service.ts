@@ -523,4 +523,44 @@ export class ServiceService {
       },
     };
   }
+
+  async findPublishedByCompany(
+    companyId: string, 
+    page = 1,
+    limit = 10,
+  ): Promise<{
+    message: string;
+    data: { data: any[]; total: number; page: number; limit: number };
+  }> {
+    if (!companyId) {
+      throw new BadRequestException('L’ID de la société est requis');
+    }
+
+    const skip = (page - 1) * limit;
+
+    const query = this.serviceRepo
+      .createQueryBuilder('service')
+      .leftJoinAndSelect('service.company', 'company')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('service.category', 'category')
+      .leftJoinAndSelect('service.prestataires', 'shp')
+      .leftJoinAndSelect('service.measure', 'measure')
+      .leftJoinAndSelect('shp.prestataire', 'prestataire')
+      .where('service.status = :status', { status: ProductStatus.PUBLISHED })
+      .andWhere('company.id = :companyId', { companyId })
+      .orderBy('service.createdAt', 'DESC');
+
+    const [services, total] = await query.skip(skip).take(limit).getManyAndCount();
+
+    return {
+      message: 'Liste des services publiés de la société récupérée avec succès',
+      data: {
+        data: services,
+        total,
+        page,
+        limit,
+      },
+    };
+  }
 }
