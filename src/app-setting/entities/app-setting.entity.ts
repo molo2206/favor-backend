@@ -12,7 +12,7 @@ export class AppSetting {
   id: string;
 
   /** 🏷️ Informations basiques */
-  @Column({ type: 'varchar', length: 255, default: 'My Platform' })
+  @Column({ type: 'varchar', length: 255 })
   appName: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
