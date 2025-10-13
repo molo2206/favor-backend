@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Param,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 import { CreatePlatformDto } from './dto/roles_plateforme_user/create-platform.dto';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
@@ -70,6 +61,20 @@ export class PlatformController {
     return {
       message: 'Plateforme supprimée avec succès',
       data: deletedPlatform,
+    };
+  }
+
+  @Patch(':id/status')
+  @UseGuards(AuthentificationGuard)
+  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
+  async changeStatus(
+    @Param('id') id: string,
+    @Body() dto: Partial<CreatePlatformDto> & { status?: boolean },
+  ) {
+    const updated = await this.platformService.changeStatus(id, dto);
+    return {
+      message: `Status de la plateforme mis à jour avec succès`,
+      data: updated,
     };
   }
 }

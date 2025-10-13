@@ -32,6 +32,16 @@ export class RoleService {
     return await this.roleRepo.save(role);
   }
 
+  async changerStatus(id: string, dto: Partial<CreateRoleDto> & { status?: boolean }) {
+    const role = await this.findOne(id); // Vérifie si le rôle existe
+    // Si le front envoie status en string, on le convertit en boolean
+    if (dto.status !== undefined) {
+      dto.status = dto.status === true;
+    }
+    Object.assign(role, dto); // Merge les nouvelles valeurs
+    return await this.roleRepo.save(role);
+  }
+
   async delete(id: string) {
     const role = await this.findOne(id);
     return await this.roleRepo.remove(role);

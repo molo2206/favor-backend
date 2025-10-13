@@ -31,6 +31,15 @@ export class PlatformService {
     return platform;
   }
 
+  async changeStatus(id: string, dto: Partial<CreatePlatformDto> & { status?: boolean }) {
+    const platform = await this.findOne(id);
+    if (dto.status !== undefined) {
+      dto.status = dto.status === true;
+    }
+    Object.assign(platform, dto);
+    return await this.platformRepo.save(platform);
+  }
+
   async delete(id: string) {
     const platform = await this.findOne(id);
     return await this.platformRepo.remove(platform);

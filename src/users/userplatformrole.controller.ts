@@ -1,15 +1,9 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Delete,
-  Param,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Get, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { UserPlatformRoleService, AssignRoleDto } from './user-platform-role.service';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { AuthorizeRoles } from 'src/users/utility/decorators/authorize.roles.decorator';
+import { CurrentUser } from './utility/decorators/current-user-decorator';
+import { UserEntity } from './entities/user.entity';
 
 @Controller('user-platform-roles')
 export class UserPlatformRoleController {
@@ -25,10 +19,10 @@ export class UserPlatformRoleController {
   }
 
   /** Récupérer tous les rôles d'un utilisateur */
-  @Get('user/:userId')
+  @Get('user/me')
   @UseGuards(AuthentificationGuard)
-  async findRolesByUser(@Param('userId') userId: string) {
-    const roles = await this.uprService.findRolesByUser(userId);
+  async findRolesByUser(@CurrentUser() user: UserEntity) {
+    const roles = await this.uprService.findRolesByUser(user.id);
     return {
       message: `Rôles de l'utilisateur récupérés avec succès`,
       data: roles,

@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserPlatformRoleEntity } from './entities/user_plateform_roles.entity';
@@ -20,13 +20,36 @@ export class UserPlatformRoleService {
   constructor(
     @InjectRepository(UserPlatformRoleEntity)
     private readonly uprRepo: Repository<UserPlatformRoleEntity>,
+
+    @InjectRepository(PlatformEntity)
+    private readonly platformRepo: Repository<PlatformEntity>,
+
+    @InjectRepository(UserEntity)
+    private readonly userRepo: Repository<UserEntity>,
+
+    @InjectRepository(RoleEntity)
+    private readonly roleRepo: Repository<RoleEntity>,
   ) {}
 
   async assignRole(dto: AssignRoleDto) {
     const results: UserPlatformRoleEntity[] = [];
 
+    // Vérifie que l'utilisateur existe
+    const user = await this.userRepo.findOne({ where: { id: dto.userId } });
+    if (!user) throw new NotFoundException(`Utilisateur avec ID ${dto.userId} introuvable`);
+
     for (const assign of dto.platforms) {
-      const existing = await this.uprRepo.findOne({
+      // Vérifie que la plateforme existe
+      const platform = await this.platformRepo.findOne({ where: { id: assign.platformId } });
+      if (!platform)
+        throw new NotFoundException(`Plateforme avec ID ${assign.platformId} introuvable`);
+
+      // Vérifie que le rôle existe
+      const role = await this.roleRepo.findOne({ where: { id: assign.roleId } });
+      if (!role) throw new NotFoundException(`Rôle avec ID ${assign.roleId} introuvable`);
+
+      // Cherche si une assignation spécifique existe
+      let entity = await this.uprRepo.findOne({
         where: {
           user: { id: dto.userId },
           platform: { id: assign.platformId },
@@ -34,28 +57,28 @@ export class UserPlatformRoleService {
         },
       });
 
-      if (existing) {
-        // Ignore les doublons
-        continue;
+      if (entity) {
+        // ⚡ Mise à jour éventuelle si nécessaire
+        Object.assign(entity, assign);
+        results.push(await this.uprRepo.save(entity));
+      } else {
+        // Crée une nouvelle assignation
+        entity = this.uprRepo.create({ user, platform, role });
+        results.push(await this.uprRepo.save(entity));
       }
-
-      const entity = this.uprRepo.create({
-        user: { id: dto.userId } as UserEntity,
-        platform: { id: assign.platformId } as PlatformEntity,
-        role: { id: assign.roleId } as RoleEntity,
-      });
-
-      results.push(await this.uprRepo.save(entity));
     }
 
     return {
-      message: `Rôles assignés avec succès (${results.length})`,
+      message: `Rôles assignés ou mis à jour avec succès (${results.length})`,
       data: results,
     };
   }
 
   async findRolesByUser(userId: string) {
-    return this.uprRepo.find({ where: { user: { id: userId } } });
+    return this.uprRepo.find({
+      where: { user: { id: userId } },
+      relations: ['role', 'platform'], // ⚡ Ajoute les relations pour récupérer les données complètes
+    });
   }
 
   async remove(id: string) {

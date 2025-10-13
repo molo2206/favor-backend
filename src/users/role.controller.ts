@@ -62,4 +62,18 @@ export class RoleController {
       data: deletedRole,
     };
   }
+
+  @Patch(':id/status')
+  @UseGuards(AuthentificationGuard)
+  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
+  async changerStatus(
+    @Param('id') id: string,
+    @Body() dto: Partial<CreateRoleDto> & { status?: boolean },
+  ) {
+    const updated = await this.roleService.changerStatus(id, dto);
+    return {
+      message: `Status du rôle mis à jour avec succès`,
+      data: updated,
+    };
+  }
 }
