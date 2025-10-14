@@ -869,6 +869,26 @@ export class UsersService {
       order: { createdAt: 'DESC' },
     });
 
-    return users;
+    const sanitizedUsers = users.map((user) => {
+      const { password, ...rest } = user;
+      return rest;
+    });
+
+    return sanitizedUsers;
+  }
+
+  async setUserActiveStatus(userId: string, isActive: boolean) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    user.isActive = isActive;
+    await this.usersRepository.save(user);
+
+    return {
+      message: `Utilisateur ${isActive ? 'activé' : 'désactivé'} avec succès`,
+      data: { id: user.id, fullName: user.fullName, isActive: user.isActive },
+    };
   }
 }

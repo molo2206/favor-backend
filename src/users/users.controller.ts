@@ -233,4 +233,10 @@ export class UsersController {
       data: users,
     };
   }
+
+  @Patch(':id/user/active')
+  @UseGuards(AuthentificationGuard)
+  async setActiveStatus(@Param('id') id: string, @Body('isActive') isActive: boolean) {
+    return this.usersService.setUserActiveStatus(id, isActive);
+  }
 }
