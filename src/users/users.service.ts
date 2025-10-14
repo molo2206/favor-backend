@@ -877,8 +877,8 @@ export class UsersService {
     return sanitizedUsers;
   }
 
-  async setUserActiveStatus(userId: string, isActive: boolean) {
-    // Récupérer l'utilisateur avec toutes ses relations
+  async toggleUserActiveStatus(userId: string) {
+    // 1️⃣ Récupérer l'utilisateur avec toutes ses relations
     const user = await this.usersRepository.findOne({
       where: { id: userId },
       relations: [
@@ -899,15 +899,15 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    // Mettre à jour le statut
-    user.isActive = isActive;
+    // 2️ Basculer automatiquement le statut (true → false, false → true)
+    user.isActive = !user.isActive;
     await this.usersRepository.save(user);
 
-    // Supprimer le mot de passe avant retour
+    // 3️⃣ Supprimer le mot de passe avant retour
     const { password, ...rest } = user;
 
     return {
-      message: `Utilisateur ${isActive ? 'activé' : 'désactivé'} avec succès`,
+      message: `Utilisateur ${user.isActive ? 'activé' : 'désactivé'} avec succès`,
       data: rest,
     };
   }
