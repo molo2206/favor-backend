@@ -878,17 +878,37 @@ export class UsersService {
   }
 
   async setUserActiveStatus(userId: string, isActive: boolean) {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    // Récupérer l'utilisateur avec toutes ses relations
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: [
+        'userHasCompany',
+        'activeCompany',
+        'travelReservations',
+        'addresses',
+        'defaultAddress',
+        'orders',
+        'rentalContracts',
+        'saleTransactions',
+        'bookings',
+        'userPlatformRoles',
+      ],
+    });
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
+    // Mettre à jour le statut
     user.isActive = isActive;
     await this.usersRepository.save(user);
 
+    // Supprimer le mot de passe avant retour
+    const { password, ...rest } = user;
+
     return {
       message: `Utilisateur ${isActive ? 'activé' : 'désactivé'} avec succès`,
-      data: { id: user.id, fullName: user.fullName, isActive: user.isActive },
+      data: rest,
     };
   }
 }
