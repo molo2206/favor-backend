@@ -1,9 +1,10 @@
 import { Controller, Post, Get, Delete, Param, Body, UseGuards } from '@nestjs/common';
-import { UserPlatformRoleService, AssignRoleDto } from './user-platform-role.service';
+import { UserPlatformRoleService } from './user-platform-role.service';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { AuthorizeRoles } from 'src/users/utility/decorators/authorize.roles.decorator';
 import { CurrentUser } from './utility/decorators/current-user-decorator';
 import { UserEntity } from './entities/user.entity';
+import { AssignRoleDto } from './dto/roles_plateforme_user/assign-role.dto';
 
 @Controller('user-platform-roles')
 export class UserPlatformRoleController {

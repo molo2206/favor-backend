@@ -71,7 +71,7 @@ export class UsersController {
     };
   }
 
-  // ────── 🔐 Authentification à deux facteurs ──────
+  // ──────  Authentification à deux facteurs ──────
   @UseGuards(AuthentificationGuard)
   @Get('generate-2fa')
   async generate2FA(@CurrentUser() currentUser: UserEntity) {

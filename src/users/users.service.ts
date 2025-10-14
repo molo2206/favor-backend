@@ -254,6 +254,8 @@ export class UsersService {
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
+      .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
+      .leftJoinAndSelect('userPlatformRoles.role', 'role')
       .where('users.email = :email', { email: userSignInDto.email })
       .getOne();
 
@@ -855,16 +857,11 @@ export class UsersService {
   async findAllWithDetails() {
     const users = await this.usersRepository.find({
       relations: [
-        'userHasCompany',
         'activeCompany',
-        'travelReservations',
         'addresses',
-        'defaultAddress',
-        'orders',
-        'rentalContracts',
-        'saleTransactions',
-        'bookings',
         'userPlatformRoles',
+        'userPlatformRoles.platform',
+        'userPlatformRoles.role',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -882,16 +879,11 @@ export class UsersService {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
       relations: [
-        'userHasCompany',
         'activeCompany',
-        'travelReservations',
         'addresses',
-        'defaultAddress',
-        'orders',
-        'rentalContracts',
-        'saleTransactions',
-        'bookings',
         'userPlatformRoles',
+        'userPlatformRoles.platform',
+        'userPlatformRoles.role',
       ],
     });
 
