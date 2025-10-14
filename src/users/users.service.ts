@@ -253,6 +253,7 @@ export class UsersService {
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
       .where('users.email = :email', { email: userSignInDto.email })
       .getOne();
 
