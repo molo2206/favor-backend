@@ -224,4 +224,13 @@ export class UsersController {
     );
     return { message: 'Email envoyé' };
   }
+
+  @Get('/get/all-users')
+  async getAllUsers() {
+    const users = await this.usersService.findAllWithDetails();
+    return {
+      message: 'Liste des utilisateurs récupérée avec succès',
+      data: users,
+    };
+  }
 }

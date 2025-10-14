@@ -682,7 +682,7 @@ export class UsersService {
               latitude: uhc.company.latitude,
               longitude: uhc.company.longitude,
               address: uhc.company.address,
-              tauxCompanies: uhc.company.tauxCompanies || [], // inclusion ici
+              tauxCompanies: uhc.company.tauxCompanies || [],
               country: uhc.company.country,
               city: uhc.company.city,
               localCurrency: uhc.company.localCurrency,
@@ -849,5 +849,25 @@ export class UsersService {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user.data);
     return { message: `User #${id} removed.` };
+  }
+
+  async findAllWithDetails() {
+    const users = await this.usersRepository.find({
+      relations: [
+        'userHasCompany',
+        'activeCompany',
+        'travelReservations',
+        'addresses',
+        'defaultAddress',
+        'orders',
+        'rentalContracts',
+        'saleTransactions',
+        'bookings',
+        'userPlatformRoles',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+
+    return users;
   }
 }
