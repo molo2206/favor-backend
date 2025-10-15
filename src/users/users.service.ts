@@ -36,10 +36,12 @@ export class UsersService {
     private readonly mailService: MailService,
   ) {}
 
-  async signup(createUserDto: CreateUserDto): Promise<{ message: string; data: any }> {
+  async signup(
+    createUserDto: CreateUserDto,
+  ): Promise<{ message: string; data: any; access_token: string; refresh_token: string }> {
     const { email, phone, otpCode, password } = createUserDto;
-
     // Vérification doublons
+
     if (phone && (await this.usersRepository.findOne({ where: { phone } }))) {
       throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
     }
@@ -49,10 +51,12 @@ export class UsersService {
 
     // Étape 1 → envoi OTP si otpCode vide
     if (!otpCode) {
-      await this.sendOtp(email); // envoi OTP
+      await this.sendOtp(email);
       return {
         message: 'Un code OTP a été envoyé à votre adresse e-mail.',
-        data: { email }, // on renvoie juste l'email pour l'info
+        data: { email },
+        access_token: '',
+        refresh_token: '',
       };
     }
 
@@ -74,7 +78,8 @@ export class UsersService {
     });
 
     const savedUser = await this.usersRepository.save(user);
-
+    const token = await this.accessToken(user);
+    const refresh_t = await this.refreshToken(user);
     // Marquer OTP comme utilisé
     otpEntry.isUsed = true;
     otpEntry.user = savedUser;
@@ -93,6 +98,8 @@ export class UsersService {
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: userWithoutPassword,
+      access_token: token,
+      refresh_token: refresh_t,
     };
   }
 
@@ -366,7 +373,7 @@ export class UsersService {
   async googleLoginByClientData(dto: GoogleLoginDto): Promise<{
     message: string;
     data: any;
-    token: string;
+    access_token: string;
     refresh_token: string;
   }> {
     const { email, fullName, image } = dto;
@@ -428,8 +435,8 @@ export class UsersService {
         ? 'Compte créé et connexion réussie via Google.'
         : 'Connexion réussie via Google.',
       data: userWithoutPassword,
-      token,
-      refresh_token,
+      access_token: token,
+      refresh_token: refresh_token,
     };
   }
 
