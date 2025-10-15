@@ -36,105 +36,85 @@ export class UsersService {
     private readonly mailService: MailService,
   ) {}
 
-
-  async signup(
-    createUserDto: CreateUserDto,
-  ): Promise<{ message: string; data: any }> {
+  async signup(createUserDto: CreateUserDto): Promise<{
+    message: string;
+    data: any;
+    access_token: string;
+    refresh_token: string;
+  }> {
     const { email, phone, otpCode, password } = createUserDto;
 
-    // 🔎 Vérification doublons
+    // 1️⃣ Vérification doublons
     if (phone && (await this.usersRepository.findOne({ where: { phone } }))) {
-      throw new BadRequestException(
-        'Un compte avec ce numéro de téléphone existe déjà.',
-      );
+      throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
     }
-    if (await this.usersRepository.findOne({ where: { email } })) {
+
+    const normalizedEmail = email.toLowerCase();
+    if (await this.usersRepository.findOne({ where: { email: normalizedEmail } })) {
       throw new BadRequestException('Un compte avec cet email existe déjà.');
     }
 
-    // 📩 Étape 1 → Envoi OTP si pas encore envoyé
+    // 2️⃣ Envoi OTP si otpCode absent
     if (!otpCode) {
       await this.sendOtp(email);
       return {
         message: 'Un code OTP a été envoyé à votre adresse e-mail.',
         data: { email },
+        access_token: '',
+        refresh_token: '',
       };
     }
 
-    // 🔐 Étape 2 → Vérification OTP
+    // 3️⃣ Vérification OTP
     const otpEntry = await this.otpRepository.findOne({
-      where: { email, otpCode, isUsed: false },
+      where: { email: normalizedEmail, otpCode, isUsed: false },
     });
 
     if (!otpEntry || new Date() > otpEntry.expiresAt) {
       throw new BadRequestException('OTP invalide ou expiré.');
     }
 
-    // 🔒 Étape 3 → Hash mot de passe
+    // 4️⃣ Création utilisateur
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // 👤 Étape 4 → Création utilisateur
-    const user = this.usersRepository.create({
+    const newUser = this.usersRepository.create({
       ...createUserDto,
+      email: normalizedEmail,
+      phone: phone || undefined, // <--- ici
       password: hashedPassword,
       role: UserRole.CUSTOMER,
+      isActive: true,
+      provider: 'otp',
     });
 
-    const savedUser = await this.usersRepository.save(user);
+    const savedUser = await this.usersRepository.save(newUser);
 
-    // 🧾 Marquer OTP comme utilisé
+    // 5️⃣ Marquer OTP utilisé
     otpEntry.isUsed = true;
     otpEntry.user = savedUser;
     await this.otpRepository.save(otpEntry);
 
-    // ✉️ Envoi email de bienvenue
+    // 6️⃣ Préparer userWithoutPassword
     const { password: _pw, ...userWithoutPassword } = savedUser;
+
+    // 7️⃣ Envoyer email de bienvenue
     await this.mailService.sendHtmlEmail(
       email,
       'Bienvenue dans FavorHelp',
       'createCount.html',
-      { user: userWithoutPassword, year: new Date().getFullYear() },
+      { userWithoutPassword, year: new Date().getFullYear() },
     );
 
-    // 🎫 Étape 5 → Génération tokens JWT
-    const access_token = await this.generateAccessToken(savedUser);
-    const refresh_token = await this.generateRefreshToken(savedUser);
+    // 8️⃣ Générer tokens JWT
+    const access_token = await this.accessToken(savedUser);
+    const refresh_token = await this.refreshToken(savedUser);
 
-    // ✅ Étape 6 → Retour complet
     return {
       message: 'Inscription réussie. Bienvenue !',
-      data: {
-        ...userWithoutPassword,
-        access_token,
-        refresh_token,
-      },
+      data: userWithoutPassword,
+      access_token,
+      refresh_token,
     };
   }
-
-  // ==========================
-  // 🔹 Génération du token ACCESS
-  // ==========================
-  private async generateAccessToken(user: UserEntity): Promise<string> {
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-    };
-    return this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_SECRET,
-      expiresIn: '1h',
-    });
-  }
-
-  private async generateRefreshToken(user: UserEntity): Promise<string> {
-    const payload = { sub: user.id };
-    return this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_REFRESH_SECRET,
-      expiresIn: '30d',
-    });
-  }
-
-
   async update(
     updateUserDto: Partial<UpdateUserDto>,
     currentUser: UserEntity,
