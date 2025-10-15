@@ -394,11 +394,12 @@ export class UsersService {
       user = this.usersRepository.create({
         email,
         fullName,
-        role: UserRole.CUSTOMER, // ou UserRole.CUSTOMER si enum
+        role: UserRole.CUSTOMER,
         provider: 'google',
         password: '',
         isActive: true,
         image: image || undefined,
+        phone: '', // ✅ valeur par défaut
       });
 
       user = await this.usersRepository.save(user);

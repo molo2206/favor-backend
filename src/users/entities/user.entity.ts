@@ -38,7 +38,7 @@ export class UserEntity {
   @Exclude()
   password: string;
 
-  @Column({ unique: true })
+  @Column({ nullable: true })
   phone: string;
 
   @Column({ nullable: true })
