@@ -36,55 +36,16 @@ export class UsersService {
     private readonly mailService: MailService,
   ) {}
 
-  async signup(
-    createUserDto: CreateUserDto,
-  ): Promise<{ message: string; data: any; access_token: string; refresh_token: string }> {
-    const { email, phone, otpCode, password } = createUserDto;
+  async signup(dto: CreateUserDto): Promise<{
+    message: string;
+    data: any;
+    access_token: string;
+    refresh_token: string;
+  }> {
+    // 1️⃣ Création de l'utilisateur
+    const savedUser = await this.usersRepository.save(this.usersRepository.create(dto));
 
-    // 1️⃣ Vérification doublons
-    if (phone && (await this.usersRepository.findOne({ where: { phone } }))) {
-      throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
-    }
-
-    if (await this.usersRepository.findOne({ where: { email } })) {
-      throw new BadRequestException('Un compte avec cet email existe déjà.');
-    }
-
-    // 2️⃣ Envoi OTP si otpCode absent
-    if (!otpCode) {
-      await this.sendOtp(email);
-      return {
-        message: 'Un code OTP a été envoyé à votre adresse e-mail.',
-        data: { email },
-        access_token: '',
-        refresh_token: '',
-      };
-    }
-
-    // 3️⃣ Vérification OTP
-    const otpEntry = await this.otpRepository.findOne({
-      where: { email, otpCode, isUsed: false },
-    });
-
-    if (!otpEntry || new Date() > otpEntry.expiresAt) {
-      throw new BadRequestException('OTP invalide ou expiré.');
-    }
-
-    // 4️⃣ Création utilisateur
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = this.usersRepository.create({
-      ...createUserDto,
-      password: hashedPassword,
-      role: UserRole.CUSTOMER,
-    });
-    const savedUser = await this.usersRepository.save(user);
-
-    // 5️⃣ Marquer OTP utilisé
-    otpEntry.isUsed = true;
-    otpEntry.user = savedUser;
-    await this.otpRepository.save(otpEntry);
-
-    // 6️⃣ Récupération complète du user (avec relations)
+    // 2️⃣ Récupération complète du user créé
     const fullUser = await this.usersRepository
       .createQueryBuilder('users')
       .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
@@ -105,15 +66,13 @@ export class UsersService {
       throw new BadRequestException('Utilisateur introuvable après création.');
     }
 
+    // 3️⃣ Génération des tokens
     const access_token = await this.accessToken(fullUser);
     const refresh_token = await this.refreshToken(fullUser);
 
-    // 8️⃣ Retirer password
-    const { password: _pw, ...userWithoutPassword } = fullUser;
-
-    // 9️⃣ Mapper userHasCompany
+    // 4️⃣ Construction de la réponse
     const userHasCompany =
-      userWithoutPassword.userHasCompany?.map((uhc) => ({
+      fullUser.userHasCompany?.map((uhc) => ({
         id: uhc.id,
         isOwner: uhc.isOwner,
         company: uhc.company
@@ -165,41 +124,31 @@ export class UsersService {
           })) ?? [],
       })) ?? [];
 
-    // 🔟 Déterminer activeCompany
     const activeCompany = userHasCompany.find(
-      (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
+      (uhc) => uhc.company?.id === fullUser.activeCompanyId,
     )?.company;
 
-    // 1️⃣1️⃣ Envoi email de bienvenue
-    await this.mailService.sendHtmlEmail(
-      email,
-      'Bienvenue dans FavorHelp',
-      'createCount.html',
-      { userWithoutPassword, year: new Date().getFullYear() },
-    );
-
-    // 1️⃣2️⃣ Réponse finale identique à signin
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: {
-        id: userWithoutPassword.id,
-        fullName: userWithoutPassword.fullName,
-        email: userWithoutPassword.email,
-        phone: userWithoutPassword.phone,
-        image: userWithoutPassword.image,
-        role: userWithoutPassword.role,
-        isActive: userWithoutPassword.isActive,
-        country: userWithoutPassword.country,
-        city: userWithoutPassword.city,
-        activeCompanyId: userWithoutPassword.activeCompanyId,
-        address: userWithoutPassword.address,
-        preferredLanguage: userWithoutPassword.preferredLanguage,
-        loyaltyPoints: userWithoutPassword.loyaltyPoints,
-        dateOfBirth: userWithoutPassword.dateOfBirth,
-        vehicleType: userWithoutPassword.vehicleType,
-        plateNumber: userWithoutPassword.plateNumber,
-        defaultAddressId: userWithoutPassword.defaultAddressId,
-        defaultAddress: userWithoutPassword.defaultAddress,
+        id: fullUser.id,
+        fullName: fullUser.fullName,
+        email: fullUser.email,
+        phone: fullUser.phone,
+        image: fullUser.image,
+        role: fullUser.role,
+        isActive: fullUser.isActive,
+        country: fullUser.country,
+        city: fullUser.city,
+        activeCompanyId: fullUser.activeCompanyId,
+        address: fullUser.address,
+        preferredLanguage: fullUser.preferredLanguage,
+        loyaltyPoints: fullUser.loyaltyPoints,
+        dateOfBirth: fullUser.dateOfBirth,
+        vehicleType: fullUser.vehicleType,
+        plateNumber: fullUser.plateNumber,
+        defaultAddressId: fullUser.defaultAddressId,
+        defaultAddress: fullUser.defaultAddress,
         userHasCompany,
         activeCompany,
       },
@@ -207,6 +156,7 @@ export class UsersService {
       refresh_token,
     };
   }
+
   async update(
     updateUserDto: Partial<UpdateUserDto>,
     currentUser: UserEntity,
