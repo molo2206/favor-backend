@@ -45,9 +45,15 @@ export class UsersController {
   @Post('signup')
   async signup(
     @Body() createUserDto: CreateUserDto,
-  ): Promise<{ message: string; data: Omit<UserEntity, 'password'> }> {
-    const { message, data } = await this.usersService.signup(createUserDto);
-    return { message, data };
+  ): Promise<{
+    message: string;
+    data: Omit<UserEntity, 'password'>;
+    access_token: string;
+    refresh_token: string;
+  }> {
+    const { message, data, access_token, refresh_token } =
+      await this.usersService.signup(createUserDto);
+    return { message, data, access_token, refresh_token };
   }
 
   @Post('signin')
