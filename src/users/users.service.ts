@@ -40,8 +40,8 @@ export class UsersService {
     createUserDto: CreateUserDto,
   ): Promise<{ message: string; data: any; access_token: string; refresh_token: string }> {
     const { email, phone, otpCode, password } = createUserDto;
-    // Vérification doublons
 
+    // Vérification doublons
     if (phone && (await this.usersRepository.findOne({ where: { phone } }))) {
       throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
     }
@@ -71,13 +71,17 @@ export class UsersService {
 
     // Création utilisateur
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = this.usersRepository.create({
+    const newUser = this.usersRepository.create({
       ...createUserDto,
       password: hashedPassword,
       role: UserRole.CUSTOMER,
     });
 
-    const savedUser = await this.usersRepository.save(user);
+    const savedUser = await this.usersRepository.save(newUser);
+
+    // ✅ Générer les tokens avec savedUser
+    const token = await this.accessToken(savedUser);
+    const refresh_t = await this.refreshToken(savedUser);
 
     // Marquer OTP comme utilisé
     otpEntry.isUsed = true;
@@ -93,8 +97,7 @@ export class UsersService {
       'createCount.html',
       { userWithoutPassword, year: new Date().getFullYear() },
     );
-    const token = await this.accessToken(user);
-    const refresh_t = await this.refreshToken(user);
+
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: userWithoutPassword,
