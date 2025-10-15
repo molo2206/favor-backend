@@ -36,11 +36,12 @@ export class UsersService {
     private readonly mailService: MailService,
   ) {}
 
+  // users.service.ts
   async signup(createUserDto: CreateUserDto): Promise<{
     message: string;
-    data: any;
-    access_token: string;
-    refresh_token: string;
+    data: Omit<UserEntity, 'password'> | { email: string };
+    access_token: string | null;
+    refresh_token: string | null;
   }> {
     const { email, phone, otpCode, password } = createUserDto;
 
@@ -60,8 +61,8 @@ export class UsersService {
       return {
         message: 'Un code OTP a été envoyé à votre adresse e-mail.',
         data: { email },
-        access_token: '',
-        refresh_token: '',
+        access_token: null,
+        refresh_token: null,
       };
     }
 
@@ -79,7 +80,7 @@ export class UsersService {
     const newUser = this.usersRepository.create({
       ...createUserDto,
       email: normalizedEmail,
-      phone: phone || undefined, // <--- ici
+      phone: phone || undefined,
       password: hashedPassword,
       role: UserRole.CUSTOMER,
       isActive: true,
@@ -115,6 +116,7 @@ export class UsersService {
       refresh_token,
     };
   }
+
   async update(
     updateUserDto: Partial<UpdateUserDto>,
     currentUser: UserEntity,

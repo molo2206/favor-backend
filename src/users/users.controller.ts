@@ -41,19 +41,15 @@ export class UsersController {
     private readonly mailService: MailService,
   ) {}
 
-  // ────── 🟢 Authentification / Inscription ──────
+  // users.controller.ts
   @Post('signup')
-  async signup(
-    @Body() createUserDto: CreateUserDto,
-  ): Promise<{
+  async signup(@Body() createUserDto: CreateUserDto): Promise<{
     message: string;
-    data: Omit<UserEntity, 'password'>;
-    access_token: string;
-    refresh_token: string;
+    data: Omit<UserEntity, 'password'> | { email: string };
+    access_token: string | null;
+    refresh_token: string | null;
   }> {
-    const { message, data, access_token, refresh_token } =
-      await this.usersService.signup(createUserDto);
-    return { message, data, access_token, refresh_token };
+    return this.usersService.signup(createUserDto);
   }
 
   @Post('signin')
