@@ -56,7 +56,7 @@ export class UsersController {
     return await this.usersService.signin(loginUserDto);
   }
 
-  @Post('/auth/google-login')
+  @Post('/google-login')
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   async googleLogin(@Body() dto: GoogleLoginDto) {
     return this.usersService.googleLoginByClientData(dto);
