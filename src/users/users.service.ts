@@ -39,9 +39,9 @@ export class UsersService {
   async signup(
     createUserDto: CreateUserDto,
   ): Promise<{ message: string; data: any; access_token: string; refresh_token: string }> {
-    const { email, phone, otpCode, password } = createUserDto;
-    // Vérification doublons
+    const { email, phone, otpCode, password, fullName } = createUserDto;
 
+    // Vérification des doublons
     if (phone && (await this.usersRepository.findOne({ where: { phone } }))) {
       throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
     }
@@ -51,12 +51,33 @@ export class UsersService {
 
     // Étape 1 → envoi OTP si otpCode vide
     if (!otpCode) {
+      // Créer un utilisateur temporaire si n'existe pas
+      let tempUser = await this.usersRepository.findOne({ where: { email } });
+      if (!tempUser) {
+        tempUser = this.usersRepository.create({
+          email,
+          fullName,
+          phone: phone || '', // <-- ici
+          role: UserRole.CUSTOMER,
+          isActive: true,
+          provider: 'otp',
+        });
+
+        tempUser = await this.usersRepository.save(tempUser);
+      }
+
+      // Envoi OTP
       await this.sendOtp(email);
+
+      // Générer tokens
+      const access_token = await this.accessToken(tempUser);
+      const refresh_token = await this.refreshToken(tempUser);
+
       return {
         message: 'Un code OTP a été envoyé à votre adresse e-mail.',
         data: { email },
-        access_token: '',
-        refresh_token: '',
+        access_token,
+        refresh_token,
       };
     }
 
@@ -69,28 +90,32 @@ export class UsersService {
       throw new BadRequestException('OTP invalide ou expiré.');
     }
 
-    // Création utilisateur
+    // Création utilisateur final
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = this.usersRepository.create({
       ...createUserDto,
       password: hashedPassword,
       role: UserRole.CUSTOMER,
+      provider: 'standard',
     });
 
     const savedUser = await this.usersRepository.save(user);
-    const token = await this.accessToken(savedUser);
-    const refresh_t = await this.refreshToken(savedUser);
+
     // Marquer OTP comme utilisé
     otpEntry.isUsed = true;
     otpEntry.user = savedUser;
     await this.otpRepository.save(otpEntry);
+
+    // Générer tokens
+    const token = await this.accessToken(savedUser);
+    const refresh_t = await this.refreshToken(savedUser);
 
     const { password: _pw, ...userWithoutPassword } = savedUser;
 
     // Envoi email de bienvenue
     await this.mailService.sendHtmlEmail(
       email,
-      'Bienvenue dans FavorHelp ',
+      'Bienvenue dans FavorHelp',
       'createCount.html',
       { userWithoutPassword, year: new Date().getFullYear() },
     );
