@@ -78,8 +78,7 @@ export class UsersService {
     });
 
     const savedUser = await this.usersRepository.save(user);
-    const token = await this.accessToken(user);
-    const refresh_t = await this.refreshToken(user);
+
     // Marquer OTP comme utilisé
     otpEntry.isUsed = true;
     otpEntry.user = savedUser;
@@ -94,7 +93,8 @@ export class UsersService {
       'createCount.html',
       { userWithoutPassword, year: new Date().getFullYear() },
     );
-
+    const token = await this.accessToken(user);
+    const refresh_t = await this.refreshToken(user);
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: userWithoutPassword,
