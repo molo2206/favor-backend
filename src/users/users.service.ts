@@ -36,126 +36,104 @@ export class UsersService {
     private readonly mailService: MailService,
   ) {}
 
-  async signup(dto: CreateUserDto): Promise<{
-    message: string;
-    data: any;
-    access_token: string;
-    refresh_token: string;
-  }> {
-    // 1️⃣ Création de l'utilisateur
-    const savedUser = await this.usersRepository.save(this.usersRepository.create(dto));
 
-    // 2️⃣ Récupération complète du user créé
-    const fullUser = await this.usersRepository
-      .createQueryBuilder('users')
-      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
-      .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
-      .leftJoinAndSelect('userHasCompany.company', 'company')
-      .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
-      .leftJoinAndSelect('permissions.permission', 'permission')
-      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
-      .leftJoinAndSelect('company.country', 'country')
-      .leftJoinAndSelect('company.city', 'city')
-      .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
-      .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
-      .leftJoinAndSelect('userPlatformRoles.role', 'role')
-      .where('users.id = :id', { id: savedUser.id })
-      .getOne();
+  async signup(
+    createUserDto: CreateUserDto,
+  ): Promise<{ message: string; data: any }> {
+    const { email, phone, otpCode, password } = createUserDto;
 
-    if (!fullUser) {
-      throw new BadRequestException('Utilisateur introuvable après création.');
+    // 🔎 Vérification doublons
+    if (phone && (await this.usersRepository.findOne({ where: { phone } }))) {
+      throw new BadRequestException(
+        'Un compte avec ce numéro de téléphone existe déjà.',
+      );
+    }
+    if (await this.usersRepository.findOne({ where: { email } })) {
+      throw new BadRequestException('Un compte avec cet email existe déjà.');
     }
 
-    // 3️⃣ Génération des tokens
-    const access_token = await this.accessToken(fullUser);
-    const refresh_token = await this.refreshToken(fullUser);
+    // 📩 Étape 1 → Envoi OTP si pas encore envoyé
+    if (!otpCode) {
+      await this.sendOtp(email);
+      return {
+        message: 'Un code OTP a été envoyé à votre adresse e-mail.',
+        data: { email },
+      };
+    }
 
-    // 4️⃣ Construction de la réponse
-    const userHasCompany =
-      fullUser.userHasCompany?.map((uhc) => ({
-        id: uhc.id,
-        isOwner: uhc.isOwner,
-        company: uhc.company
-          ? {
-              id: uhc.company.id,
-              companyName: uhc.company.companyName || '',
-              logo: uhc.company.logo,
-              banner: uhc.company.banner,
-              companyAddress: uhc.company.companyAddress || '',
-              typeCompany: uhc.company.typeCompany,
-              phone: uhc.company.phone,
-              vatNumber: uhc.company.vatNumber,
-              registrationDocumentUrl: uhc.company.registrationDocumentUrl,
-              warehouseLocation: uhc.company.warehouseLocation,
-              email: uhc.company.email,
-              website: uhc.company.website,
-              status: uhc.company.status,
-              companyActivity: uhc.company.companyActivity,
-              open_time: uhc.company.open_time,
-              delivery_minutes: uhc.company.delivery_minutes,
-              distance_km: uhc.company.distance_km,
-              latitude: uhc.company.latitude,
-              longitude: uhc.company.longitude,
-              address: uhc.company.address,
-              tauxCompanies: uhc.company.tauxCompanies || [],
-              country: uhc.company.country,
-              city: uhc.company.city,
-              localCurrency: uhc.company.localCurrency,
-              taux: uhc.company.taux,
-            }
-          : null,
-        permissions:
-          uhc.permissions?.map((p) => ({
-            id: p.permission?.id,
-            name: p.permission?.name,
-            create: p.create,
-            read: p.read,
-            update: p.update,
-            delete: p.delete,
-            status: p.status,
-            createdAt:
-              p.permission?.createdAt instanceof Date
-                ? p.permission.createdAt
-                : new Date(p.permission?.createdAt),
-            updatedAt:
-              p.permission?.updatedAt instanceof Date
-                ? p.permission.updatedAt
-                : new Date(p.permission?.updatedAt),
-          })) ?? [],
-      })) ?? [];
+    // 🔐 Étape 2 → Vérification OTP
+    const otpEntry = await this.otpRepository.findOne({
+      where: { email, otpCode, isUsed: false },
+    });
 
-    const activeCompany = userHasCompany.find(
-      (uhc) => uhc.company?.id === fullUser.activeCompanyId,
-    )?.company;
+    if (!otpEntry || new Date() > otpEntry.expiresAt) {
+      throw new BadRequestException('OTP invalide ou expiré.');
+    }
 
+    // 🔒 Étape 3 → Hash mot de passe
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 👤 Étape 4 → Création utilisateur
+    const user = this.usersRepository.create({
+      ...createUserDto,
+      password: hashedPassword,
+      role: UserRole.CUSTOMER,
+    });
+
+    const savedUser = await this.usersRepository.save(user);
+
+    // 🧾 Marquer OTP comme utilisé
+    otpEntry.isUsed = true;
+    otpEntry.user = savedUser;
+    await this.otpRepository.save(otpEntry);
+
+    // ✉️ Envoi email de bienvenue
+    const { password: _pw, ...userWithoutPassword } = savedUser;
+    await this.mailService.sendHtmlEmail(
+      email,
+      'Bienvenue dans FavorHelp',
+      'createCount.html',
+      { user: userWithoutPassword, year: new Date().getFullYear() },
+    );
+
+    // 🎫 Étape 5 → Génération tokens JWT
+    const access_token = await this.generateAccessToken(savedUser);
+    const refresh_token = await this.generateRefreshToken(savedUser);
+
+    // ✅ Étape 6 → Retour complet
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: {
-        id: fullUser.id,
-        fullName: fullUser.fullName,
-        email: fullUser.email,
-        phone: fullUser.phone,
-        image: fullUser.image,
-        role: fullUser.role,
-        isActive: fullUser.isActive,
-        country: fullUser.country,
-        city: fullUser.city,
-        activeCompanyId: fullUser.activeCompanyId,
-        address: fullUser.address,
-        preferredLanguage: fullUser.preferredLanguage,
-        loyaltyPoints: fullUser.loyaltyPoints,
-        dateOfBirth: fullUser.dateOfBirth,
-        vehicleType: fullUser.vehicleType,
-        plateNumber: fullUser.plateNumber,
-        defaultAddressId: fullUser.defaultAddressId,
-        defaultAddress: fullUser.defaultAddress,
-        userHasCompany,
-        activeCompany,
+        ...userWithoutPassword,
+        access_token,
+        refresh_token,
       },
-      access_token,
-      refresh_token,
     };
   }
+
+  // ==========================
+  // 🔹 Génération du token ACCESS
+  // ==========================
+  private async generateAccessToken(user: UserEntity): Promise<string> {
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+    return this.jwtService.signAsync(payload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: '1h',
+    });
+  }
+
+  private async generateRefreshToken(user: UserEntity): Promise<string> {
+    const payload = { sub: user.id };
+    return this.jwtService.signAsync(payload, {
+      secret: process.env.JWT_REFRESH_SECRET,
+      expiresIn: '30d',
+    });
+  }
+
 
   async update(
     updateUserDto: Partial<UpdateUserDto>,
