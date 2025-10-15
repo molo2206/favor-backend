@@ -40,8 +40,8 @@ export class UsersService {
     createUserDto: CreateUserDto,
   ): Promise<{ message: string; data: any; access_token: string; refresh_token: string }> {
     const { email, phone, otpCode, password } = createUserDto;
+    // Vérification doublons
 
-    // 🔹 1. Vérification doublons
     if (phone && (await this.usersRepository.findOne({ where: { phone } }))) {
       throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
     }
@@ -49,26 +49,9 @@ export class UsersService {
       throw new BadRequestException('Un compte avec cet email existe déjà.');
     }
 
-    // 🔹 2. Envoi OTP si otpCode non fourni
+    // Étape 1 → envoi OTP si otpCode vide
     if (!otpCode) {
-      // Générer OTP
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 10); // OTP valide 10 minutes
-
-      const otp = this.otpRepository.create({
-        email,
-        otpCode: generatedOtp,
-        expiresAt,
-        isUsed: false,
-      });
-      await this.otpRepository.save(otp);
-
-      // Envoyer email OTP
-      await this.mailService.sendHtmlEmail(email, 'Votre code OTP', 'otpCode.html', {
-        otpCode: generatedOtp,
-      });
-
+      await this.sendOtp(email);
       return {
         message: 'Un code OTP a été envoyé à votre adresse e-mail.',
         data: { email },
@@ -77,50 +60,46 @@ export class UsersService {
       };
     }
 
-    // 🔹 3. Vérification OTP
+    // Étape 2 → vérification OTP
     const otpEntry = await this.otpRepository.findOne({
       where: { email, otpCode, isUsed: false },
     });
+
     if (!otpEntry || new Date() > otpEntry.expiresAt) {
       throw new BadRequestException('OTP invalide ou expiré.');
     }
 
-    // 🔹 4. Création utilisateur
+    // Création utilisateur
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = this.usersRepository.create({
+    const user = this.usersRepository.create({
       ...createUserDto,
       password: hashedPassword,
       role: UserRole.CUSTOMER,
-      isActive: true,
     });
-    const savedUser = await this.usersRepository.save(newUser);
 
-    // 🔹 5. Générer les tokens
-    const access_token = await this.accessToken(savedUser);
-    const refresh_token = await this.refreshToken(savedUser);
-
-    // 🔹 6. Marquer OTP comme utilisé
+    const savedUser = await this.usersRepository.save(user);
+    const token = await this.accessToken(savedUser);
+    const refresh_t = await this.refreshToken(savedUser);
+    // Marquer OTP comme utilisé
     otpEntry.isUsed = true;
     otpEntry.user = savedUser;
     await this.otpRepository.save(otpEntry);
 
-    // 🔹 7. Nettoyer objet utilisateur
     const { password: _pw, ...userWithoutPassword } = savedUser;
 
-    // 🔹 8. Envoyer email de bienvenue
+    // Envoi email de bienvenue
     await this.mailService.sendHtmlEmail(
       email,
-      'Bienvenue dans FavorHelp',
+      'Bienvenue dans FavorHelp ',
       'createCount.html',
       { userWithoutPassword, year: new Date().getFullYear() },
     );
 
-    // 🔹 9. Retourner la réponse
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: userWithoutPassword,
-      access_token,
-      refresh_token,
+      access_token: token,
+      refresh_token: refresh_t,
     };
   }
 
