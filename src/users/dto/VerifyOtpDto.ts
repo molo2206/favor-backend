@@ -11,5 +11,5 @@ export class VerifyOtpDto {
   @IsString()
   @Length(4, 4)
   @IsNotEmpty()
-  code: string;
+  otpCode: string;
 }

@@ -621,12 +621,12 @@ export class UsersService {
     return { message: 'Mot de passe réinitialisé avec succès.' };
   }
 
-  async verifyOtp(email: string, code: string): Promise<{ message: string }> {
+  async verifyOtp(email: string, otpCode: string): Promise<{ message: string }> {
     // 1. Recherche d’un OTP valide (non utilisé et non expiré)
     const otpEntry = await this.otpRepository.findOne({
       where: {
         email: email.toLowerCase(),
-        otpCode: code,
+        otpCode: otpCode,
         isUsed: false,
         expiresAt: MoreThan(new Date()),
       },

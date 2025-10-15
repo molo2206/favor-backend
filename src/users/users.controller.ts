@@ -188,11 +188,11 @@ export class UsersController {
     }),
   )
   async verifyOtpCode(@Body() dto: VerifyOtpDto) {
-    if (!dto.email || !dto.code) {
+    if (!dto.email || !dto.otpCode) {
       VerifyOtpDto;
       throw new BadRequestException('Email et code sont requis');
     }
-    return this.usersService.verifyOtp(dto.email, dto.code);
+    return this.usersService.verifyOtp(dto.email, dto.otpCode);
   }
   // ────── 👥 Gestion des utilisateurs (admin) ──────
 
