@@ -41,17 +41,18 @@ export class UsersService {
   ): Promise<{ message: string; data: any; access_token: string; refresh_token: string }> {
     const { email, phone, otpCode, password } = createUserDto;
 
-    // 1️⃣ Vérification doublons
+    // 1️⃣ Vérification des doublons téléphone et email
     if (phone && (await this.usersRepository.findOne({ where: { phone } }))) {
       throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
     }
+
     if (await this.usersRepository.findOne({ where: { email } })) {
       throw new BadRequestException('Un compte avec cet email existe déjà.');
     }
 
     // 2️⃣ Envoi OTP si otpCode absent
     if (!otpCode) {
-      await this.sendOtp(email); // envoi OTP
+      await this.sendOtp(email);
       return {
         message: 'Un code OTP a été envoyé à votre adresse e-mail.',
         data: { email },
@@ -69,7 +70,7 @@ export class UsersService {
       throw new BadRequestException('OTP invalide ou expiré.');
     }
 
-    // 4️⃣ Création utilisateur
+    // 4️⃣ Création de l'utilisateur
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = this.usersRepository.create({
       ...createUserDto,
@@ -84,9 +85,10 @@ export class UsersService {
     otpEntry.user = savedUser;
     await this.otpRepository.save(otpEntry);
 
+    // 6️⃣ Supprimer le mot de passe de la réponse
     const { password: _pw, ...userWithoutPassword } = savedUser;
 
-    // 6️⃣ Envoi email de bienvenue
+    // 7️⃣ Envoi email de bienvenue
     await this.mailService.sendHtmlEmail(
       email,
       'Bienvenue dans FavorHelp',
@@ -94,11 +96,11 @@ export class UsersService {
       { userWithoutPassword, year: new Date().getFullYear() },
     );
 
-    // 7️⃣ Générer tokens JWT
+    // 8️⃣ Générer les tokens JWT
     const access_token = await this.accessToken(savedUser);
     const refresh_token = await this.refreshToken(savedUser);
 
-    // 8️⃣ Retourner réponse complète
+    // 9️⃣ Retourner la réponse complète
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: userWithoutPassword,
