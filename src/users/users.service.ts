@@ -41,7 +41,7 @@ export class UsersService {
   ): Promise<{ message: string; data: any; access_token: string; refresh_token: string }> {
     const { email, phone, otpCode, password } = createUserDto;
 
-    // 1️⃣ Vérification des doublons téléphone et email
+    // 1️⃣ Vérification doublons
     if (phone && (await this.usersRepository.findOne({ where: { phone } }))) {
       throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
     }
@@ -70,25 +70,107 @@ export class UsersService {
       throw new BadRequestException('OTP invalide ou expiré.');
     }
 
-    // 4️⃣ Création de l'utilisateur
+    // 4️⃣ Création utilisateur
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = this.usersRepository.create({
       ...createUserDto,
       password: hashedPassword,
       role: UserRole.CUSTOMER,
     });
-
     const savedUser = await this.usersRepository.save(user);
 
-    // 5️⃣ Marquer OTP comme utilisé
+    // 5️⃣ Marquer OTP utilisé
     otpEntry.isUsed = true;
     otpEntry.user = savedUser;
     await this.otpRepository.save(otpEntry);
 
-    // 6️⃣ Supprimer le mot de passe de la réponse
-    const { password: _pw, ...userWithoutPassword } = savedUser;
+    // 6️⃣ Récupération complète du user (avec relations)
+    const fullUser = await this.usersRepository
+      .createQueryBuilder('users')
+      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+      .leftJoinAndSelect('userHasCompany.company', 'company')
+      .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
+      .leftJoinAndSelect('permissions.permission', 'permission')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
+      .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
+      .leftJoinAndSelect('userPlatformRoles.role', 'role')
+      .where('users.id = :id', { id: savedUser.id })
+      .getOne();
 
-    // 7️⃣ Envoi email de bienvenue
+    if (!fullUser) {
+      throw new BadRequestException('Utilisateur introuvable après création.');
+    }
+
+    const access_token = await this.accessToken(fullUser);
+    const refresh_token = await this.refreshToken(fullUser);
+
+    // 8️⃣ Retirer password
+    const { password: _pw, ...userWithoutPassword } = fullUser;
+
+    // 9️⃣ Mapper userHasCompany
+    const userHasCompany =
+      userWithoutPassword.userHasCompany?.map((uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+        company: uhc.company
+          ? {
+              id: uhc.company.id,
+              companyName: uhc.company.companyName || '',
+              logo: uhc.company.logo,
+              banner: uhc.company.banner,
+              companyAddress: uhc.company.companyAddress || '',
+              typeCompany: uhc.company.typeCompany,
+              phone: uhc.company.phone,
+              vatNumber: uhc.company.vatNumber,
+              registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+              warehouseLocation: uhc.company.warehouseLocation,
+              email: uhc.company.email,
+              website: uhc.company.website,
+              status: uhc.company.status,
+              companyActivity: uhc.company.companyActivity,
+              open_time: uhc.company.open_time,
+              delivery_minutes: uhc.company.delivery_minutes,
+              distance_km: uhc.company.distance_km,
+              latitude: uhc.company.latitude,
+              longitude: uhc.company.longitude,
+              address: uhc.company.address,
+              tauxCompanies: uhc.company.tauxCompanies || [],
+              country: uhc.company.country,
+              city: uhc.company.city,
+              localCurrency: uhc.company.localCurrency,
+              taux: uhc.company.taux,
+            }
+          : null,
+        permissions:
+          uhc.permissions?.map((p) => ({
+            id: p.permission?.id,
+            name: p.permission?.name,
+            create: p.create,
+            read: p.read,
+            update: p.update,
+            delete: p.delete,
+            status: p.status,
+            createdAt:
+              p.permission?.createdAt instanceof Date
+                ? p.permission.createdAt
+                : new Date(p.permission?.createdAt),
+            updatedAt:
+              p.permission?.updatedAt instanceof Date
+                ? p.permission.updatedAt
+                : new Date(p.permission?.updatedAt),
+          })) ?? [],
+      })) ?? [];
+
+    // 🔟 Déterminer activeCompany
+    const activeCompany = userHasCompany.find(
+      (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
+    )?.company;
+
+    // 1️⃣1️⃣ Envoi email de bienvenue
     await this.mailService.sendHtmlEmail(
       email,
       'Bienvenue dans FavorHelp',
@@ -96,19 +178,35 @@ export class UsersService {
       { userWithoutPassword, year: new Date().getFullYear() },
     );
 
-    // 8️⃣ Générer les tokens JWT
-    const access_token = await this.accessToken(savedUser);
-    const refresh_token = await this.refreshToken(savedUser);
-
-    // 9️⃣ Retourner la réponse complète
+    // 1️⃣2️⃣ Réponse finale identique à signin
     return {
       message: 'Inscription réussie. Bienvenue !',
-      data: userWithoutPassword,
+      data: {
+        id: userWithoutPassword.id,
+        fullName: userWithoutPassword.fullName,
+        email: userWithoutPassword.email,
+        phone: userWithoutPassword.phone,
+        image: userWithoutPassword.image,
+        role: userWithoutPassword.role,
+        isActive: userWithoutPassword.isActive,
+        country: userWithoutPassword.country,
+        city: userWithoutPassword.city,
+        activeCompanyId: userWithoutPassword.activeCompanyId,
+        address: userWithoutPassword.address,
+        preferredLanguage: userWithoutPassword.preferredLanguage,
+        loyaltyPoints: userWithoutPassword.loyaltyPoints,
+        dateOfBirth: userWithoutPassword.dateOfBirth,
+        vehicleType: userWithoutPassword.vehicleType,
+        plateNumber: userWithoutPassword.plateNumber,
+        defaultAddressId: userWithoutPassword.defaultAddressId,
+        defaultAddress: userWithoutPassword.defaultAddress,
+        userHasCompany,
+        activeCompany,
+      },
       access_token,
       refresh_token,
     };
   }
-
   async update(
     updateUserDto: Partial<UpdateUserDto>,
     currentUser: UserEntity,
