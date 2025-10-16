@@ -238,8 +238,7 @@
             </tr>
             <tr>
               <td colspan="4" style="text-align: right"><strong>Total:</strong></td>
-              <td><strong><%= (Number(order.totalAmount) + Number(order.shippingCost)).toFixed(2) %> <%= order.currency %></strong>
-</td>
+              <td><strong><%= (Number(order.totalAmount) + Number(order.shippingCost || 0)).toFixed(2) %> <%= order.currency %></strong></td>
             </tr>
           </tfoot>
         </table>
