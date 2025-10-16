@@ -208,39 +208,42 @@ export class DeliveryService {
   }
 
   async confirmDeliveryByPin(pin: string): Promise<{ message: string; data: DeliveryEntity }> {
-    // 1. Chercher la commande correspondant au PIN
+    if (!pin || pin.length !== 6) {
+      throw new BadRequestException('PIN invalide.');
+    }
+
+    // 🔹 Chercher l'ordre uniquement par le PIN
     const order = await this.orderRepository.findOne({
       where: { pin },
-      relations: ['delivery', 'delivery.livreur', 'delivery.trackings'],
     });
 
-    if (!order || !order.delivery) {
+    if (!order) {
       throw new NotFoundException('Aucune livraison trouvée pour ce PIN.');
     }
 
-    const delivery = order.delivery;
+    if (!order.delivery.id) {
+      throw new NotFoundException('Aucune livraison associée à cet ordre.');
+    }
 
-    // 2. Vérifier que la livraison n'a pas déjà été effectuée
+    // 🔹 Charger seulement la livraison via son ID
+    const delivery = await this.deliveryRepository.findOne({
+      where: { id: order.delivery.id },
+    });
+
+    if (!delivery) {
+      throw new NotFoundException('Livraison introuvable.');
+    }
+
     if (delivery.status === DeliveryStatus.DELIVERED) {
       throw new BadRequestException('La livraison a déjà été confirmée.');
     }
 
-    // 3. Mettre à jour la livraison
+    // 🔹 Mettre à jour le statut et la date
     delivery.status = DeliveryStatus.DELIVERED;
     delivery.deliveredAt = new Date();
-
     const updatedDelivery = await this.deliveryRepository.save(delivery);
 
-    // 4. Ajouter un suivi final
-    const tracking = this.trackingRepository.create({
-      status: DeliveryStatus.DELIVERED,
-      location: 'Livraison terminée',
-      notes: 'Livraison confirmée par le client via PIN',
-      delivery: updatedDelivery,
-    });
-    await this.trackingRepository.save(tracking);
-
-    // 5. Réinitialiser le PIN pour sécurité
+    // 🔹 Réinitialiser le PIN et mettre à jour le statut de l'ordre
     order.pin = '';
     order.status = OrderStatus.DELIVERED;
     await this.orderRepository.save(order);
