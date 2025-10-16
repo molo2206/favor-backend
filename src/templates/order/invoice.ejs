@@ -234,7 +234,7 @@
             </tr>
             <tr>
               <td colspan="4" style="text-align: right">Frais de livraison:</td>
-              <td><%= order.shippingFee || 0 %> <%= order.currency %></td>
+              <td><%= order.shippingCost || 0 %> <%= order.currency %></td>
             </tr>
             <tr>
               <td colspan="4" style="text-align: right"><strong>Total:</strong></td>
@@ -243,13 +243,6 @@
           </tfoot>
         </table>
       </div>
-      <!-- QR Code section -->
-      <% if (paymentQrCode) { %>
-      <div class="qr-code-container">
-        <p><strong>Scannez ce QR code pour accéder au paiement :</strong></p>
-        <img src="<%= paymentQrCode %>" alt="QR Code de paiement" />
-      </div>
-      <% } %>
       <div class="footer">
         <div>
           <strong>Contact</strong>
