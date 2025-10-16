@@ -20,26 +20,23 @@ export class DeliveryEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => CompanyEntity)
-  deliveryCompany: CompanyEntity;
-
   @ManyToOne(() => UserEntity, { nullable: true, eager: true })
   @JoinColumn({ name: 'user_id' })
   livreur: UserEntity;
 
-  @OneToOne(() => OrderEntity, { nullable: false, eager: true })
+  @OneToOne(() => OrderEntity, { nullable: true, eager: true })
   @JoinColumn({ name: 'order_id' })
-  order: OrderEntity;
+  order?: OrderEntity | null;
 
   @Column({
     type: 'enum',
     enum: DeliveryStatus,
     default: DeliveryStatus.IN_TRANSIT,
   })
-  currentStatus: DeliveryStatus;
+  status: DeliveryStatus;
 
   @Column({ nullable: true })
-  deliveryNotes?: string;
+  notes?: string;
 
   @Column({ type: 'timestamp', nullable: true })
   deliveredAt?: Date;

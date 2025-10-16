@@ -2,17 +2,14 @@ import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validato
 import { DeliveryStatus } from '../enums/delivery.enum.status';
 
 export class CreateDeliveryDto {
-  @IsUUID()
-  @IsNotEmpty()
-  deliveryCompanyId: string;
-
-  @IsNotEmpty()
+  
+  @IsOptional()
   @IsString()
   invoiceNumber: string;
 
   @IsEnum(DeliveryStatus)
   @IsOptional()
-  currentStatus?: DeliveryStatus;
+  status?: DeliveryStatus;
 
   @IsString()
   @IsOptional()

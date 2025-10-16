@@ -20,6 +20,8 @@ import { AuthorizeRoles } from 'src/users/utility/decorators/authorize-roles.dec
 import { UserRole } from 'src/users/enum/user-role-enum';
 import { CreateTrackingDto } from 'src/tracking/dto/create-tracking.dto';
 import { TrackingEntity } from 'src/tracking/entities/tracking.entity';
+import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
+import { UserEntity } from 'src/users/entities/user.entity';
 
 @Controller('delivery')
 export class DeliveryController {
@@ -33,31 +35,15 @@ export class DeliveryController {
     return this.deliveryService.create(dto);
   }
 
-  @Post('tracking/:deliveryId')
-  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
-  async addTracking(
-    @Param('deliveryId') deliveryId: string,
-    @Body() dto: CreateTrackingDto,
-  ): Promise<{ message: string; data: TrackingEntity }> {
-    const tracking = await this.deliveryService.addTrackingToDelivery(deliveryId, dto);
-    return { message: 'Traitement réussi avec succès', data: tracking };
-  }
-
-  @Get('/tracking/:deliveryId')
-  async getTrackingsForDelivery(
-    @Param('deliveryId') deliveryId: string,
-  ): Promise<{ data: TrackingEntity[] }> {
-    const data = await this.deliveryService.getTrackingsByDelivery(deliveryId);
-    return { data };
-  }
-
-  @Get('/tracking/order/:orderId')
-  async getTrackingByOrderId(
-    @Param('orderId') orderId: string,
-  ): Promise<{ data: TrackingEntity[] }> {
-    const data = await this.deliveryService.getTrackingByOrderId(orderId);
-    return { data };
-  }
+  // @Post('tracking/:deliveryId')
+  // @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
+  // async addTracking(
+  //   @Param('deliveryId') deliveryId: string,
+  //   @Body() dto: CreateTrackingDto,
+  // ): Promise<{ message: string; data: TrackingEntity }> {
+  //   const tracking = await this.deliveryService.addTrackingToDelivery(deliveryId, dto);
+  //   return { message: 'Traitement réussi avec succès', data: tracking };
+  // }
 
   @Get()
   @UseGuards(AuthentificationGuard)
@@ -78,13 +64,6 @@ export class DeliveryController {
     return this.deliveryService.update(id, dto);
   }
 
-  @Delete(':id')
-  @UseGuards(AuthentificationGuard)
-  @AuthorizeRoles(UserRole.ADMIN)
-  remove(@Param('id') id: string): Promise<void> {
-    return this.deliveryService.remove(id);
-  }
-
   @Post('confirm/:pin')
   async confirmDelivery(
     @Param('pin') pin: string,
@@ -94,5 +73,11 @@ export class DeliveryController {
     }
 
     return this.deliveryService.confirmDeliveryByPin(pin);
+  }
+
+  @Get('/my/deliveries')
+  @UseGuards(AuthentificationGuard)
+  async getMyDeliveries(@CurrentUser() user: UserEntity) {
+    return this.deliveryService.findAllForUser(user);
   }
 }

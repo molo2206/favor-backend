@@ -18,7 +18,7 @@ export class TrackingEntity {
     status: string;
 
     @Column({ nullable: true })
-    location: string; // ex: GPS coordinates or city name
+    location: string; 
 
     @Column({ nullable: true })
     notes?: string;
