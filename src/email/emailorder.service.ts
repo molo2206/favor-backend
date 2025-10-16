@@ -210,19 +210,7 @@ export class MailOrderService {
     await this.mailerService.sendMail({
       to,
       subject,
-      html: `
-        <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 30px;">
-          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);">
-            <div style="text-align: center; margin-bottom: 20px;">
-              <img src="https://cosamed.org/1%20Favor.png" alt="Logo" style="max-width: 200px; height: auto; display: inline-block;" />
-            </div>
-            <h2 style="color: #1d4ed8; text-align: center;">Votre Facture payée</h2>
-            <p style="font-size: 14px; color: #999; margin-top: 30px; text-align: center;">
-              Merci pour votre confiance,<br/>L’équipe FavorHelp
-            </p>
-          </div>
-        </div>
-      `,
+
       attachments: [
         {
           filename: 'facture.pdf',
