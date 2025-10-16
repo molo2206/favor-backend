@@ -212,23 +212,20 @@ export class DeliveryService {
       throw new BadRequestException('PIN invalide.');
     }
 
-    // 🔹 Chercher l'ordre uniquement par le PIN
     const order = await this.orderRepository.findOne({
       where: { pin },
+      relations: ['delivery'], // 🔹 charge juste la livraison
     });
 
     if (!order) {
-      throw new NotFoundException('Aucune livraison trouvée pour ce PIN.');
+      throw new NotFoundException('Aucun ordre trouvé pour ce PIN.');
     }
 
-    if (!order.delivery.id) {
-      throw new NotFoundException('Aucune livraison associée à cet ordre.');
+    if (!order.delivery) {
+      throw new NotFoundException("La livraison pour cet ordre n'a pas encore été créée.");
     }
 
-    // 🔹 Charger seulement la livraison via son ID
-    const delivery = await this.deliveryRepository.findOne({
-      where: { id: order.delivery.id },
-    });
+    const delivery = order.delivery;
 
     if (!delivery) {
       throw new NotFoundException('Livraison introuvable.');
