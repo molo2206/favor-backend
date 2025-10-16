@@ -24,12 +24,12 @@ export class OrderEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('decimal')
+  @Column('decimal', { precision: 10, scale: 2 })
   totalAmount: number;
 
-  @Column('decimal')
+  @Column('decimal', { precision: 10, scale: 2 })
   shippingCost: number;
-
+  
   @Column({ type: 'enum', enum: CompanyType })
   type: CompanyType;
 

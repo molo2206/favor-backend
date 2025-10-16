@@ -76,7 +76,7 @@ export class OrderService {
     });
     if (!addressUser) throw new NotFoundException('Address not found');
 
-    const grandTotal = totalAmount + shippingCost;
+    const grandTotal = Number(totalAmount) + Number(shippingCost);
     const invoiceNumb = this.invoiceService.generateInvoiceNumber();
 
     const order = this.orderRepo.create({
