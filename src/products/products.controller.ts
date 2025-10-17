@@ -268,11 +268,11 @@ export class ProductController {
   async getBestSellingProducts(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-    @Query('type') type?: string, 
+    @Query('type') type?: string,
   ) {
     const currentPage = page ? Number(page) : 1;
     const currentLimit = limit ? Number(limit) : 5;
-    const shopType = type || CompanyType.SHOP; 
+    const shopType = type || CompanyType.SHOP;
 
     const result = await this.productService.getBestSellingProducts(
       currentPage,
@@ -281,12 +281,8 @@ export class ProductController {
     );
 
     return {
-      message: `Produits PUBLIÉS récupérés avec succès pour le type : ${shopType}.`,
-      data: {
-        ...result,
-        page: currentPage,
-        limit: currentLimit,
-      },
+      message: result.message,
+      data: result.data,
     };
   }
 
