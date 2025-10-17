@@ -264,14 +264,28 @@ export class ProductController {
 
   @Get('best-selling')
   @UseGuards(AuthentificationGuard)
-  async getBestSellingProducts(@Query('limit') limit?: number) {
-    const data = await this.productService.getBestSellingProducts(limit ? Number(limit) : 10);
+  async getBestSellingProducts(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('type') shopType?: string, // ex: SHOP, WHOLESALER, etc.
+  ) {
+    const currentPage = page ? Number(page) : 1;
+    const currentLimit = limit ? Number(limit) : 5;
+
+    const { data, total } = await this.productService.getBestSellingProducts(
+      currentPage,
+      currentLimit,
+      shopType,
+    );
+
     return {
-      message:
-        data.length > 0
-          ? 'Liste des produits les plus vendus récupérée avec succès.'
-          : 'Aucun produit vendu pour le moment.',
-      data,
+      message: `Produits PUBLIÉS récupérés avec succès${shopType ? ` pour le type : ${shopType}` : ''}.`,
+      data: {
+        data,
+        total,
+        page: currentPage,
+        limit: currentLimit,
+      },
     };
   }
 

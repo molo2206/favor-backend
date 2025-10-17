@@ -795,17 +795,40 @@ export class ProductService {
     };
   }
 
-  async getBestSellingProducts(limit = 10) {
-    const result = await this.orderItemRepo
+  async getBestSellingProducts(page = 1, limit = 5, shopType?: string) {
+    const offset = (page - 1) * limit;
+
+    let query = this.orderItemRepo
       .createQueryBuilder('orderItem')
       .select('orderItem.productId', 'productId')
       .addSelect('SUM(orderItem.quantity)', 'totalSold')
+      .leftJoin('orderItem.product', 'product');
+
+    let activityEnum: CompanyActivity | undefined;
+    if (shopType) {
+      // Convertir la string en enum
+      activityEnum = (CompanyActivity as any)[shopType];
+      if (!activityEnum) {
+        throw new Error(`Type de shop invalide: ${shopType}`);
+      }
+      query = query.where('product.companyActivity = :shopType', { shopType: activityEnum });
+    }
+
+    query = query
       .groupBy('orderItem.productId')
       .orderBy('totalSold', 'DESC')
-      .limit(limit)
-      .getRawMany();
+      .offset(offset)
+      .limit(limit);
 
+    const result = await query.getRawMany();
     const productIds = result.map((r) => r.productId);
+
+    if (productIds.length === 0) {
+      return {
+        data: [],
+        total: 0,
+      };
+    }
 
     const products = await this.productRepo.find({
       where: { id: In(productIds) },
@@ -817,6 +840,14 @@ export class ProductService {
       totalSold: Number(result.find((r) => r.productId === p.id)?.totalSold || 0),
     }));
 
-    return productsWithSales.sort((a, b) => b.totalSold - a.totalSold);
+    // Nombre total de produits correspondant à ce type
+    const totalCount = await this.productRepo.count(
+      activityEnum ? { where: { companyActivity: activityEnum } } : {},
+    );
+
+    return {
+      data: productsWithSales.sort((a, b) => b.totalSold - a.totalSold),
+      total: totalCount,
+    };
   }
 }
