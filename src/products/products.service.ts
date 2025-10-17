@@ -24,6 +24,7 @@ import { CompanyStatus } from 'src/company/enum/company-status.enum';
 import { UserWithCompanyStatus } from 'src/users/interfaces/user-with-company-status.interface';
 import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
 import { In } from 'typeorm';
+import { CompanyType } from 'src/company/enum/type.company.enum';
 
 @Injectable()
 export class ProductService {
@@ -795,24 +796,19 @@ export class ProductService {
     };
   }
 
-  async getBestSellingProducts(page = 1, limit = 5, shopType?: string) {
+  async getBestSellingProducts(
+    page = 1,
+    limit = 5,
+    type: string = CompanyType.SHOP, // valeur par défaut
+  ) {
     const offset = (page - 1) * limit;
 
     let query = this.orderItemRepo
       .createQueryBuilder('orderItem')
       .select('orderItem.productId', 'productId')
       .addSelect('SUM(orderItem.quantity)', 'totalSold')
-      .leftJoin('orderItem.product', 'product');
-
-    let activityEnum: CompanyActivity | undefined;
-    if (shopType) {
-      // Convertir la string en enum
-      activityEnum = (CompanyActivity as any)[shopType];
-      if (!activityEnum) {
-        throw new Error(`Type de shop invalide: ${shopType}`);
-      }
-      query = query.where('product.companyActivity = :shopType', { shopType: activityEnum });
-    }
+      .leftJoin('orderItem.product', 'product')
+      .where('product.type = :type', { type }); // toujours filtrer par type
 
     query = query
       .groupBy('orderItem.productId')
@@ -825,8 +821,13 @@ export class ProductService {
 
     if (productIds.length === 0) {
       return {
-        data: [],
-        total: 0,
+        message: `Aucun produit vendu pour le type : ${type}.`,
+        data: {
+          data: [],
+          total: 0,
+          page,
+          limit,
+        },
       };
     }
 
@@ -840,14 +841,16 @@ export class ProductService {
       totalSold: Number(result.find((r) => r.productId === p.id)?.totalSold || 0),
     }));
 
-    // Nombre total de produits correspondant à ce type
-    const totalCount = await this.productRepo.count(
-      activityEnum ? { where: { companyActivity: activityEnum } } : {},
-    );
+    const totalCount = await this.productRepo.count({ where: { type } });
 
     return {
-      data: productsWithSales.sort((a, b) => b.totalSold - a.totalSold),
-      total: totalCount,
+      message: `Produits PUBLIÉS récupérés avec succès pour le type : ${type}.`,
+      data: {
+        data: productsWithSales.sort((a, b) => b.totalSold - a.totalSold),
+        total: totalCount,
+        page,
+        limit,
+      },
     };
   }
 }

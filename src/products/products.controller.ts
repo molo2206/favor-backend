@@ -29,6 +29,7 @@ import { Public } from 'src/users/utility/decorators/public.decorator';
 import { FuelType } from './enum/fuelType_enum';
 import { Transmission } from './enum/transmission.enum';
 import { Type_rental_both_sale_car } from './enum/type_rental_both_sale_car';
+import { CompanyType } from 'src/company/enum/type.company.enum';
 
 @Controller('products')
 export class ProductController {
@@ -267,22 +268,22 @@ export class ProductController {
   async getBestSellingProducts(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-    @Query('type') shopType?: string, // ex: SHOP, WHOLESALER, etc.
+    @Query('type') type?: string, 
   ) {
     const currentPage = page ? Number(page) : 1;
     const currentLimit = limit ? Number(limit) : 5;
+    const shopType = type || CompanyType.SHOP; 
 
-    const { data, total } = await this.productService.getBestSellingProducts(
+    const result = await this.productService.getBestSellingProducts(
       currentPage,
       currentLimit,
       shopType,
     );
 
     return {
-      message: `Produits PUBLIÉS récupérés avec succès${shopType ? ` pour le type : ${shopType}` : ''}.`,
+      message: `Produits PUBLIÉS récupérés avec succès pour le type : ${shopType}.`,
       data: {
-        data,
-        total,
+        ...result,
         page: currentPage,
         limit: currentLimit,
       },
