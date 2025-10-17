@@ -57,12 +57,11 @@ export class ProductService {
   ): Promise<{ message: string; data: Product }> {
     const { categoryId, status, measureId, min_quantity, ...data } = createProductDto;
 
-// if (user.companyStatus !== CompanyStatus.VALIDATED) {
-//   throw new ForbiddenException(
-//     'Votre société n’est pas encore validée. Impossible de créer un produit.',
-//   );
-// }
-
+    // if (user.companyStatus !== CompanyStatus.VALIDATED) {
+    //   throw new ForbiddenException(
+    //     'Votre société n’est pas encore validée. Impossible de créer un produit.',
+    //   );
+    // }
 
     if (!files || files.length < 2 || files.length > 4) {
       throw new BadRequestException('Vous devez fournir entre 2 et 4 images');
@@ -149,9 +148,10 @@ export class ProductService {
         'images',
         'measure',
         'company.tauxCompanies',
+        'company.country',
+        'company.city',
       ],
     });
-
     if (!product) {
       throw new NotFoundException(`Produit introuvable avec l'ID: ${id}`);
     }
@@ -166,6 +166,8 @@ export class ProductService {
     const queryBuilder = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('category.parent', 'categoryParent')
@@ -191,6 +193,9 @@ export class ProductService {
     const queryBuilder = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
+
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('category.parent', 'categoryParent')
       .leftJoinAndSelect('category.children', 'categoryChildren')
@@ -242,6 +247,8 @@ export class ProductService {
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
@@ -425,6 +432,8 @@ export class ProductService {
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
@@ -564,6 +573,8 @@ export class ProductService {
         'images',
         'measure',
         'company.tauxCompanies',
+        'company.country',
+        'company.city',
       ],
       skip,
       take: limit,
@@ -591,6 +602,8 @@ export class ProductService {
         'measure',
         'company',
         'company.tauxCompanies',
+        'company.country',
+        'company.city',
       ],
     });
 
@@ -624,6 +637,8 @@ export class ProductService {
         'images',
         'company',
         'company.tauxCompanies',
+        'company.country',
+        'company.city',
       ],
     });
 
@@ -658,7 +673,14 @@ export class ProductService {
 
   async groupByType_First_Product(): Promise<Record<string, Product>> {
     const products = await this.productRepo.find({
-      relations: ['company', 'category', 'images', 'company.tauxCompanies'],
+      relations: [
+        'company',
+        'category',
+        'images',
+        'company.tauxCompanies',
+        'company.country',
+        'company.city',
+      ],
       order: { createdAt: 'ASC' }, // pour s'assurer que le "premier" est bien le plus ancien
     });
 
@@ -686,6 +708,8 @@ export class ProductService {
         'measure',
         'company',
         'company.tauxCompanies',
+        'company.country',
+        'company.city',
       ],
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
@@ -732,6 +756,8 @@ export class ProductService {
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.images', 'images');
 
@@ -781,6 +807,8 @@ export class ProductService {
       relations: [
         'company',
         'company.tauxCompanies',
+        'company.country',
+        'company.city',
         'category',
         'category.parent',
         'category.children',
@@ -834,7 +862,15 @@ export class ProductService {
 
     const products = await this.productRepo.find({
       where: { id: In(productIds) },
-      relations: ['company', 'category', 'measure', 'images'],
+      relations: [
+        'company',
+        'category',
+        'measure',
+        'images',
+        'company.tauxCompanies',
+        'company.country',
+        'company.city',
+      ],
     });
 
     const productsWithSales = products.map((p) => ({
