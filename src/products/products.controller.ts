@@ -265,7 +265,14 @@ export class ProductController {
   @Get('best-selling')
   @UseGuards(AuthentificationGuard)
   async getBestSellingProducts(@Query('limit') limit?: number) {
-    return this.productService.getBestSellingProducts(limit ? Number(limit) : 10);
+    const data = await this.productService.getBestSellingProducts(limit ? Number(limit) : 10);
+    return {
+      message:
+        data.length > 0
+          ? 'Liste des produits les plus vendus récupérée avec succès.'
+          : 'Aucun produit vendu pour le moment.',
+      data,
+    };
   }
 
   // Supprimer un produit
