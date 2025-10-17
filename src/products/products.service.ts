@@ -57,11 +57,12 @@ export class ProductService {
   ): Promise<{ message: string; data: Product }> {
     const { categoryId, status, measureId, min_quantity, ...data } = createProductDto;
 
-    if (user.companyStatus !== CompanyStatus.VALIDATED) {
-      throw new ForbiddenException(
-        'Votre société n’est pas encore validée. Impossible de créer un produit.',
-      );
-    }
+// if (user.companyStatus !== CompanyStatus.VALIDATED) {
+//   throw new ForbiddenException(
+//     'Votre société n’est pas encore validée. Impossible de créer un produit.',
+//   );
+// }
+
 
     if (!files || files.length < 2 || files.length > 4) {
       throw new BadRequestException('Vous devez fournir entre 2 et 4 images');
