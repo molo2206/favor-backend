@@ -10,6 +10,7 @@ import { ImageProductEntity } from './entities/imageProduct.entity';
 import { MeasureService } from 'src/measure/measure.service';
 import { MeasureEntity } from 'src/measure/entities/measure.entity';
 import { TauxCompany } from 'src/taux-company/entities/taux-company.entity';
+import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -19,6 +20,7 @@ import { TauxCompany } from 'src/taux-company/entities/taux-company.entity';
       ImageProductEntity,
       MeasureEntity,
       TauxCompany,
+      OrderItemEntity,
     ]),
     CloudinaryModule,
   ],

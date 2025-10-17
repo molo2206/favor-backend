@@ -262,6 +262,12 @@ export class ProductController {
     return this.productService.searchProducts(query);
   }
 
+  @Get('best-selling')
+  @UseGuards(AuthentificationGuard)
+  async getBestSellingProducts(@Query('limit') limit?: number) {
+    return this.productService.getBestSellingProducts(limit ? Number(limit) : 10);
+  }
+
   // Supprimer un produit
   // @Delete(':id')
   // remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {

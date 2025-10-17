@@ -23,17 +23,12 @@ import { Res } from '@nestjs/common';
 
 @ApiBearerAuth()
 @Controller('orders')
-
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
-
   @Post()
   @UseGuards(AuthentificationGuard)
-  async createOrder(
-    @Body() createOrderDto: CreateOrderDto,
-    @CurrentUser() user: UserEntity,
-  ) {
+  async createOrder(@Body() createOrderDto: CreateOrderDto, @CurrentUser() user: UserEntity) {
     const order = await this.orderService.createOrder(createOrderDto, user);
     return {
       message: 'Order created successfully',
@@ -52,18 +47,11 @@ export class OrderController {
   }
 
   @Get('invoice/pdf/:invoiceNumber')
-  async getInvoicePdf(
-    @Param('invoiceNumber') invoiceNumber: string,
-    @Res() res: Response,
-  ) {
-    const { pdfBuffer } =
-      await this.orderService.generateInvoiceByInvoiceNumber(invoiceNumber);
+  async getInvoicePdf(@Param('invoiceNumber') invoiceNumber: string, @Res() res: Response) {
+    const { pdfBuffer } = await this.orderService.generateInvoiceByInvoiceNumber(invoiceNumber);
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename=invoice-${invoiceNumber}.pdf`,
-    );
+    res.setHeader('Content-Disposition', `attachment; filename=invoice-${invoiceNumber}.pdf`);
     return res.send(pdfBuffer);
   }
 
@@ -117,4 +105,5 @@ export class OrderController {
 
     return this.orderService.findSubOrdersByCompanys(user.activeCompanyId);
   }
+
 }

@@ -22,6 +22,8 @@ import { Transmission } from './enum/transmission.enum';
 import { Type_rental_both_sale_car } from './enum/type_rental_both_sale_car';
 import { CompanyStatus } from 'src/company/enum/company-status.enum';
 import { UserWithCompanyStatus } from 'src/users/interfaces/user-with-company-status.interface';
+import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
+import { In } from 'typeorm';
 
 @Injectable()
 export class ProductService {
@@ -42,6 +44,9 @@ export class ProductService {
 
     @InjectRepository(MeasureEntity)
     private readonly measureRepo: Repository<MeasureEntity>,
+
+    @InjectRepository(OrderItemEntity)
+    private readonly orderItemRepo: Repository<OrderItemEntity>,
   ) {}
 
   async create(
@@ -49,7 +54,7 @@ export class ProductService {
     files: Express.Multer.File[],
     user: UserWithCompanyStatus,
   ): Promise<{ message: string; data: Product }> {
-    const { categoryId, status, measureId, ...data } = createProductDto;
+    const { categoryId, status, measureId, min_quantity, ...data } = createProductDto;
 
     if (user.companyStatus !== CompanyStatus.VALIDATED) {
       throw new ForbiddenException(
@@ -89,21 +94,31 @@ export class ProductService {
 
     const productStatus = status || ProductStatus.PENDING;
 
+    if (
+      (company.companyActivity === CompanyActivity.WHOLESALER ||
+        company.companyActivity === CompanyActivity.WHOLESALER_RETAILER) &&
+      (min_quantity === undefined || min_quantity === null)
+    ) {
+      throw new BadRequestException(
+        'Le champ "min_quantity" est obligatoire pour les entreprises de type grossiste ou mixte.',
+      );
+    }
+
     const product = this.productRepo.create({
       ...data,
+      min_quantity: min_quantity ?? 0, // si ce n’est pas grossiste, on met 0
       company,
       category,
       measure,
       image: mainImage,
       type: company.typeCompany,
       status: productStatus,
-      companyActivity: company?.companyActivity,
+      companyActivity: company.companyActivity,
     });
 
     await this.productRepo.save(product);
 
     const secondaryImages: ImageProductEntity[] = [];
-
     for (const file of files) {
       const uploaded = await this.cloudinary.handleUploadImage(file, 'product');
       const imageEntity = new ImageProductEntity();
@@ -253,8 +268,6 @@ export class ProductService {
     if (transmission) {
       queryBuilder.andWhere('product.transmission = :transmission', { transmission });
     }
-
-    // Filtrage selon typecar
 
     if (typecar === Type_rental_both_sale_car.SALE) {
       if (minSalePrice !== undefined && maxSalePrice !== undefined) {
@@ -782,9 +795,28 @@ export class ProductService {
     };
   }
 
-  // Supprimer un produit
-  // async remove(id: string): Promise<void> {
-  //   const product = await this.findOne(id);
-  //   await this.productRepo.remove(product);
-  // }
+  async getBestSellingProducts(limit = 10) {
+    const result = await this.orderItemRepo
+      .createQueryBuilder('orderItem')
+      .select('orderItem.productId', 'productId')
+      .addSelect('SUM(orderItem.quantity)', 'totalSold')
+      .groupBy('orderItem.productId')
+      .orderBy('totalSold', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    const productIds = result.map((r) => r.productId);
+
+    const products = await this.productRepo.find({
+      where: { id: In(productIds) },
+      relations: ['company', 'category', 'measure', 'images'],
+    });
+
+    const productsWithSales = products.map((p) => ({
+      ...p,
+      totalSold: Number(result.find((r) => r.productId === p.id)?.totalSold || 0),
+    }));
+
+    return productsWithSales.sort((a, b) => b.totalSold - a.totalSold);
+  }
 }

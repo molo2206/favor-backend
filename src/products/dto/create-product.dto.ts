@@ -1,4 +1,11 @@
-import { IsString, IsNumber, IsOptional, IsUUID, IsEnum, IsNumberString } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsUUID,
+  IsEnum,
+  IsNumberString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
 import { Type_rental_both_sale_car } from '../enum/type_rental_both_sale_car';
@@ -29,6 +36,11 @@ export class CreateProductDto {
   @Type(() => Number)
   @IsNumber()
   quantity?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  min_quantity?: number;
 
   @IsOptional()
   @Type(() => Number)

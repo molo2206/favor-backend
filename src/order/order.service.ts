@@ -22,6 +22,7 @@ import { CreateTransactionDto } from 'src/transaction/dto/create-transaction.dto
 import { TransactionType } from 'src/transaction/transaction.enum';
 import { InvoiceService } from './invoice/invoice.util';
 import * as QRCode from 'qrcode';
+import { In } from 'typeorm';
 
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -67,14 +68,37 @@ export class OrderService {
   private generatePin(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
+
   async createOrder(createOrderDto: CreateOrderDto, user: UserEntity): Promise<OrderEntity> {
-    const { totalAmount, shippingCost, currency, orderItems, addressUserId, type } =
+    const { totalAmount, shippingCost, currency, orderItems, addressUserId, type, shopType } =
       createOrderDto;
 
-    const addressUser = await this.addressUserRepo.findOne({
-      where: { id: addressUserId },
-    });
-    if (!addressUser) throw new NotFoundException('Address not found');
+    const addressUser = await this.addressUserRepo.findOne({ where: { id: addressUserId } });
+    if (!addressUser) throw new NotFoundException('Adresse introuvable');
+
+    if (
+      shopType === CompanyActivity.WHOLESALER ||
+      shopType === CompanyActivity.WHOLESALER_RETAILER
+    ) {
+      for (const item of orderItems) {
+        const product = await this.productRepo.findOne({
+          where: { id: item.productId },
+        });
+        if (!product) throw new NotFoundException(`Produit introuvable : ${item.productId}`);
+
+        if (!product.min_quantity) {
+          throw new BadRequestException(
+            `Le produit "${product.name}" doit avoir une quantité minimale définie pour l'achat en gros.`,
+          );
+        }
+
+        if (item.quantity < product.min_quantity) {
+          throw new BadRequestException(
+            `Pour acheter en gros, la quantité minimale pour le produit "${product.name}" est de ${product.min_quantity} unités.`,
+          );
+        }
+      }
+    }
 
     const grandTotal = Number(totalAmount) + Number(shippingCost);
     const invoiceNumb = this.invoiceService.generateInvoiceNumber();
@@ -104,13 +128,13 @@ export class OrderService {
         where: { id: item.productId },
         relations: ['company'],
       });
-      if (!product) throw new NotFoundException(`Product not found: ${item.productId}`);
+      if (!product) throw new NotFoundException(`Produit introuvable : ${item.productId}`);
 
       const orderItem = this.orderItemRepo.create({
         order,
         product,
         quantity: item.quantity,
-        price: item.price, // on utilise selectedPrice ici pour cohérence
+        price: item.price,
       });
       orderItemEntities.push(orderItem);
 
@@ -127,7 +151,7 @@ export class OrderService {
       const subOrderItem = this.subOrderItemRepo.create({
         product,
         quantity: item.quantity,
-        price: item.price, // idem ici
+        price: item.price,
       });
 
       group.items.push(subOrderItem);
@@ -136,17 +160,15 @@ export class OrderService {
 
     await this.orderItemRepo.save(orderItemEntities);
 
+    // ✅ Étape 5 : Création des subOrders
     for (const [, group] of groupedByCompany) {
       const subOrder = this.subOrderRepo.create({
         order,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         company: { id: group.companyId } as any,
         totalAmount: group.total,
       });
 
       await this.subOrderRepo.save(subOrder);
-
-      // Génération du numéro de facture unique
       subOrder.invoiceNumber = invoiceNumb;
       await this.subOrderRepo.save(subOrder);
 
@@ -156,6 +178,7 @@ export class OrderService {
       await this.subOrderItemRepo.save(group.items);
     }
 
+    // ✅ Étape 6 : Récupération de la commande finale
     const finalOrder = await this.orderRepo.findOne({
       where: { id: order.id },
       relations: [
@@ -172,7 +195,7 @@ export class OrderService {
       ],
     });
 
-    if (!finalOrder) throw new NotFoundException('Order not found after creation');
+    if (!finalOrder) throw new NotFoundException('Commande introuvable après création');
 
     const subOrders = await this.subOrderRepo.find({
       where: { order: { id: finalOrder.id } },

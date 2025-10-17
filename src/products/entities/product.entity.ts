@@ -97,6 +97,9 @@ export class Product {
   @Column({ type: 'int', default: 0 })
   quantity: number;
 
+  @Column({ type: 'int', default: 0 })
+  min_quantity: number;
+
   @Column({ nullable: true })
   image?: string;
 
