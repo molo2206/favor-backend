@@ -83,35 +83,15 @@ export class CategoryController {
   @Get('parent/:parentId')
   async getCategoriesByParentId(
     @Param('parentId') parentId: string,
-    @Query('page') page: string, // Paramètre page
-    @Query('limit') limit: string, // Paramètre limit
-  ): Promise<{
-    message: string;
-    data: {
-      data: CategoryEntity[];
-      total: number;
-      page: number;
-      limit: number;
-    };
-  }> {
+  ): Promise<{ message: string; data: CategoryEntity[] }> {
     const parent = parentId === 'null' ? null : parentId;
 
-    const pageNumber = parseInt(page, 10) || 1;
-    const limitNumber = parseInt(limit, 10) || 10;
-
-    const { categories, pagination } = await this.categoryService.findByParentId(parent, {
-      page: pageNumber,
-      limit: limitNumber,
-    });
+    // Appel de la méthode pour obtenir les catégories par parentId sans pagination
+    const categories = await this.categoryService.findByParentId(parent);
 
     return {
       message: `Catégories récupérées avec succès pour le parent : ${parent ?? 'null'}.`,
-      data: {
-        data: categories,
-        total: pagination.totalItems,
-        page: pagination.currentPage,
-        limit: pagination.itemsPerPage,
-      },
+      data: categories,
     };
   }
 

@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -13,10 +18,13 @@ export class CategoryService {
   constructor(
     @InjectRepository(CategoryEntity)
     private readonly categoryRepo: Repository<CategoryEntity>,
-    private readonly cloudinary: CloudinaryService
-  ) { }
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
-  async create(createCategoryDto: CreateCategoryDto, file: Express.Multer.File): Promise<{ message: string, data: CategoryEntity }> {
+  async create(
+    createCategoryDto: CreateCategoryDto,
+    file: Express.Multer.File,
+  ): Promise<{ message: string; data: CategoryEntity }> {
     const { name, parentId, type, color } = createCategoryDto;
 
     const existingCategory = await this.categoryRepo.findOne({ where: { name, type } });
@@ -61,8 +69,9 @@ export class CategoryService {
   async update(
     id: string,
     updateCategoryDto: UpdateCategoryDto,
-    file?: Express.Multer.File
-  ): Promise<{ message: string; data: CategoryEntity }> { // <- attention ici
+    file?: Express.Multer.File,
+  ): Promise<{ message: string; data: CategoryEntity }> {
+    // <- attention ici
     const category = await this.categoryRepo.findOne({ where: { id } });
 
     if (!category) {
@@ -75,7 +84,8 @@ export class CategoryService {
       where: { name, type },
     });
 
-    if (existingCategory && existingCategory.id !== id) {  // pour éviter de se bloquer soi-même
+    if (existingCategory && existingCategory.id !== id) {
+      // pour éviter de se bloquer soi-même
       throw new ConflictException('Une catégorie avec ce nom et ce type existe déjà');
     }
 
@@ -111,11 +121,11 @@ export class CategoryService {
       message: 'Catégorie mise à jour avec succès',
       data: updatedCategory,
     };
-    
   }
 
   async findAll(type?: string): Promise<CategoryEntity[]> {
-    const queryBuilder = this.categoryRepo.createQueryBuilder('category')
+    const queryBuilder = this.categoryRepo
+      .createQueryBuilder('category')
       .leftJoinAndSelect('category.parent', 'parent')
       .leftJoinAndSelect('category.children', 'children');
 
@@ -127,7 +137,8 @@ export class CategoryService {
   }
 
   async findAllParent(type?: string): Promise<CategoryEntity[]> {
-    const queryBuilder = this.categoryRepo.createQueryBuilder('category')
+    const queryBuilder = this.categoryRepo
+      .createQueryBuilder('category')
       .where('category.parent IS NULL');
     if (type) {
       queryBuilder.andWhere('category.type = :type', { type });
@@ -156,53 +167,33 @@ export class CategoryService {
     });
 
     if (!categories.length) {
-      throw new NotFoundException(`Aucune catégorie trouvée pour le type d’entreprise avec l'id: ${type}`);
+      throw new NotFoundException(
+        `Aucune catégorie trouvée pour le type d’entreprise avec l'id: ${type}`,
+      );
     }
 
     return categories;
   }
 
+  async findByParentId(parentId: string | null): Promise<CategoryEntity[]> {
+    const whereClause = parentId ? { parent: { id: parentId } } : { parent: IsNull() };
 
-  async findByParentId(
-    parentId: string | null,
-    options?: { page?: number; limit?: number }
-  ): Promise<CategoryWithPagination> {
-    const { page = 1, limit = 10 } = options || {};
-
-    const whereClause = parentId
-      ? { parent: { id: parentId } }
-      : { parent: IsNull() };
-
-    // Effectuer la recherche des catégories avec pagination
-    const [categories, total] = await this.categoryRepo.findAndCount({
+    const categories = await this.categoryRepo.find({
       where: whereClause,
       relations: ['children'],
-      take: limit, // Limiter le nombre de catégories récupérées
-      skip: (page - 1) * limit, // Décaler les résultats selon la page
     });
 
     if (!categories.length) {
       throw new NotFoundException(
-        `Aucune catégorie trouvée avec le parent "${parentId ?? 'null'}"`
+        `Aucune catégorie trouvée avec le parent "${parentId ?? 'null'}"`,
       );
     }
 
-    // Enrichir les catégories : ajouter le nombre d'enfants pour chaque catégorie
-    const enrichedCategories = categories.map(category => ({
+    // Ajouter le nombre d'enfants pour chaque catégorie
+    return categories.map((category) => ({
       ...category,
       numberOfChildren: category.children.length,
     }));
-
-    // Retourner les catégories enrichies avec les informations de pagination
-    return {
-      categories: enrichedCategories,
-      pagination: {
-        totalItems: total,
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        itemsPerPage: limit,
-      },
-    };
   }
 
   async remove(id: string): Promise<{ data: string }> {
