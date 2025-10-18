@@ -24,7 +24,7 @@ import { CategoryEntity } from './entities/category.entity';
 
 @Controller('category')
 export class CategoryController {
-  constructor(private readonly categoryService: CategoryService) { }
+  constructor(private readonly categoryService: CategoryService) {}
 
   @Post()
   @UseGuards(AuthentificationGuard)
@@ -39,24 +39,24 @@ export class CategoryController {
   }
   @Get()
   async findAll(
-    @Query('type') type?: string,  // type est un paramètre de requête
-  ): Promise<{ data: CategoryEntity[] }> {  // Retourne un objet avec "data" contenant un tableau
+    @Query('type') type?: string, // type est un paramètre de requête
+  ): Promise<{ data: CategoryEntity[] }> {
+    // Retourne un objet avec "data" contenant un tableau
     const categories = await this.categoryService.findAll(type);
-    return { data: categories };  // Encapsule le tableau de catégories dans "data"
+    return { data: categories }; // Encapsule le tableau de catégories dans "data"
   }
 
   @Get('parents')
-  async findAllParents(
-    @Query('type') type?: string,  
-  ): Promise<{ data: CategoryEntity[] }> {  
+  async findAllParents(@Query('type') type?: string): Promise<{ data: CategoryEntity[] }> {
     const categories = await this.categoryService.findAllParent(type);
-    return { data: categories }; 
+    return { data: categories };
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<{ data: CategoryEntity }> {  // Retourne un objet avec "data"
+  async findOne(@Param('id') id: string): Promise<{ data: CategoryEntity }> {
+    // Retourne un objet avec "data"
     const category = await this.categoryService.findOne(id);
-    return { data: category };  // Retourne la catégorie encapsulée dans "data"
+    return { data: category }; // Retourne la catégorie encapsulée dans "data"
   }
 
   // Mettre à jour une catégorie existante
@@ -74,7 +74,6 @@ export class CategoryController {
     return { message, data };
   }
 
-
   @Get('/by-type/:type')
   async findByTypeCompany(@Param('type') type: string): Promise<{ data: CategoryEntity[] }> {
     const categories = await this.categoryService.findByTypeCompany(type);
@@ -84,24 +83,36 @@ export class CategoryController {
   @Get('parent/:parentId')
   async getCategoriesByParentId(
     @Param('parentId') parentId: string,
-    @Query('page') page: string,   // Paramètre page
+    @Query('page') page: string, // Paramètre page
     @Query('limit') limit: string, // Paramètre limit
-  ): Promise<{ data: CategoryEntity[]; pagination: { totalItems: number; currentPage: number; totalPages: number; itemsPerPage: number } }> {
-    // Si parentId est 'null', on le convertit en null. Sinon, on le garde comme chaîne.
+  ): Promise<{
+    message: string;
+    data: {
+      data: CategoryEntity[];
+      total: number;
+      page: number;
+      limit: number;
+    };
+  }> {
     const parent = parentId === 'null' ? null : parentId;
 
-    // Convertir les paramètres page et limit en nombres, ou définir des valeurs par défaut
-    const pageNumber = parseInt(page, 10) || 1;  // Valeur par défaut 1
-    const limitNumber = parseInt(limit, 10) || 10;  // Valeur par défaut 10
+    const pageNumber = parseInt(page, 10) || 1;
+    const limitNumber = parseInt(limit, 10) || 10;
 
-    // Appel de la méthode pour obtenir les catégories par parentId avec pagination
-    const { categories, pagination } = await this.categoryService.findByParentId(
-      parent,
-      { page: pageNumber, limit: limitNumber },
-    );
+    const { categories, pagination } = await this.categoryService.findByParentId(parent, {
+      page: pageNumber,
+      limit: limitNumber,
+    });
 
-    // Retourner les catégories sous la clé 'data' et inclure les informations de pagination
-    return { data: categories, pagination };
+    return {
+      message: `Catégories récupérées avec succès pour le parent : ${parent ?? 'null'}.`,
+      data: {
+        data: categories,
+        total: pagination.totalItems,
+        page: pagination.currentPage,
+        limit: pagination.itemsPerPage,
+      },
+    };
   }
 
   @Delete(':id')

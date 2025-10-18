@@ -265,6 +265,10 @@ export class ProductService {
         queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
           activities: [CompanyActivity.WHOLESALER, CompanyActivity.WHOLESALER_RETAILER],
         });
+      } else if (shopType === CompanyActivity.RETAILER) {
+        queryBuilder.andWhere('product.companyActivity = :companyActivity', {
+          companyActivity: CompanyActivity.RETAILER,
+        });
       } else {
         queryBuilder.andWhere('product.companyActivity = :shopType', { shopType });
       }
