@@ -264,7 +264,6 @@ export class ProductController {
   }
 
   @Get('best-selling')
-  @UseGuards(AuthentificationGuard)
   async getBestSellingProducts(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
