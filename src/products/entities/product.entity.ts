@@ -153,9 +153,12 @@ export class Product {
   @OneToMany(() => ProductSpecificationValue, (pv) => pv.product, { cascade: true })
   specificationValues: ProductSpecificationValue[];
 
-   @OneToMany(() => ProductAttribute, (attr) => attr.product, { cascade: true })
+  @OneToMany(() => ProductAttribute, (attr) => attr.product, { cascade: true })
   attributes: ProductAttribute[];
 
-    @OneToMany(() => Sku, (sku) => sku.product, { cascade: true })
+  @OneToMany(() => Sku, (sku) => sku.product, { cascade: true })
   skus: Sku[];
+
+  @Column({ type: 'boolean', default: false })
+  isProducthasCombition: boolean; 
 }

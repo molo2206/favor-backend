@@ -7,6 +7,7 @@ import {
   IsNumberString,
   IsArray,
   ValidateNested,
+  IsBoolean,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
@@ -131,17 +132,20 @@ export class CreateProductDto {
   @IsString()
   color?: string;
 
-@IsOptional()
-@IsArray()
-@Transform(({ value }) => {
-  if (typeof value === 'string') {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return value;
+  @IsOptional()
+  @IsArray()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value;
+      }
     }
-  }
-  return value;
-})
-specifications?: ProductSpecificationDto[];
+    return value;
+  })
+  specifications?: ProductSpecificationDto[];
+
+  @IsBoolean()
+  isProducthasCombition?: boolean;
 }

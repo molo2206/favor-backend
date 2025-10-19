@@ -60,8 +60,15 @@ export class ProductService {
     files: Express.Multer.File[],
     user: UserWithCompanyStatus,
   ): Promise<{ message: string; data: Product }> {
-    const { categoryId, status, measureId, min_quantity, specifications, ...data } =
-      createProductDto;
+    const {
+      categoryId,
+      status,
+      measureId,
+      min_quantity,
+      isProducthasCombition,
+      specifications,
+      ...data
+    } = createProductDto;
     // if (user.companyStatus !== CompanyStatus.VALIDATED) {
     //   throw new ForbiddenException(
     //     'Votre société n’est pas encore validée. Impossible de créer un produit.',
@@ -120,6 +127,7 @@ export class ProductService {
       type: company.typeCompany,
       status: productStatus,
       companyActivity: company.companyActivity,
+      isProducthasCombition: isProducthasCombition ?? false,
     });
 
     await this.productRepo.save(product);
@@ -148,7 +156,23 @@ export class ProductService {
         await this.productSpecificationValueService.create(specValueDto);
       }
     }
-    const serializedProduct = plainToInstance(Product, product, {
+    const fullProduct = await this.productRepo.findOne({
+      where: { id: product.id },
+      relations: [
+        'category',
+        'category.parent',
+        'category.children',
+        'images',
+        'measure',
+        'company',
+        'company.tauxCompanies',
+        'company.country',
+        'company.city',
+        'specificationValues',
+        'specificationValues.specification',
+      ],
+    });
+    const serializedProduct = plainToInstance(Product, fullProduct, {
       excludeExtraneousValues: true,
     });
     return {
@@ -776,8 +800,10 @@ export class ProductService {
   }
 
   async update(id: string, dto: CreateProductDto, user: UserEntity) {
-    const { categoryId, status, measureId, specifications, ...data } = dto;
+    const { categoryId, status, measureId, specifications, isProducthasCombition, ...data } =
+      dto;
 
+    // 🔸 1. Charger le produit existant avec relations
     const product = await this.productRepo.findOne({
       where: { id },
       relations: [
@@ -796,17 +822,17 @@ export class ProductService {
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
+    // 🔸 2. Mettre à jour les champs simples
     if (status) product.status = status;
-
     Object.assign(product, data);
 
-    // Lien avec la société active
+    // 🔸 3. Lien avec la société active
     const company = await this.companyRepo.findOne({ where: { id: user.activeCompanyId } });
     if (!company) throw new NotFoundException('Entreprise active non trouvée');
     product.company = company;
     product.type = company.typeCompany;
 
-    // Lien avec la catégorie
+    // 🔸 4. Lien avec la catégorie
     if (categoryId) {
       const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
       if (!category) throw new NotFoundException('Catégorie non trouvée');
@@ -815,7 +841,7 @@ export class ProductService {
       product.category = undefined;
     }
 
-    // Lien avec la mesure
+    // 🔸 5. Lien avec la mesure
     if (measureId) {
       const measure = await this.measureRepo.findOne({ where: { id: measureId } });
       if (!measure) throw new NotFoundException('Mesure non trouvée');
@@ -824,14 +850,13 @@ export class ProductService {
       product.measure = undefined;
     }
 
+    // 🔸 6. Sauvegarder le produit
     const updatedProduct = await this.productRepo.save(product);
 
-    // ✅ Gestion des valeurs de spécifications
+    // 🔸 7. Gérer les spécifications
     if (specifications && Array.isArray(specifications)) {
-      // 1. Supprimer toutes les anciennes valeurs pour ce produit
       await this.productSpecificationValueService.removeAllValuesFromProduct(updatedProduct.id);
 
-      // 2. Ajouter ou mettre à jour les nouvelles
       for (const spec of specifications) {
         if (!spec.specificationId) {
           throw new BadRequestException(
@@ -845,12 +870,28 @@ export class ProductService {
         });
       }
     }
-    const serializedProduct = plainToInstance(Product, updatedProduct, {
-      excludeExtraneousValues: true,
+
+    // 🔸 8. Recharger le produit avec toutes les relations pour le retour complet
+    const fullProduct = await this.productRepo.findOne({
+      where: { id: updatedProduct.id },
+      relations: [
+        'category',
+        'category.parent',
+        'category.children',
+        'images',
+        'measure',
+        'company',
+        'company.tauxCompanies',
+        'company.country',
+        'company.city',
+        'specificationValues',
+        'specificationValues.specification',
+      ],
     });
+
     return {
       message: 'Produit mis à jour avec succès',
-      data: serializedProduct,
+      data: fullProduct,
     };
   }
 
