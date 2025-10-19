@@ -21,6 +21,8 @@ import { Transmission } from '../enum/transmission.enum';
 import { RentalContract } from 'src/rental-contract/entities/rental-contract.entity';
 import { SaleTransaction } from 'src/sale-transaction/entities/sale-transaction.entity';
 import { ProductSpecificationValue } from 'src/specification/entities/ProductSpecificationValue.entity';
+import { Sku } from 'src/Attribut/entities/skus.entity';
+import { ProductAttribute } from 'src/Attribut/entities/product_attributes.entity';
 
 @Entity('products')
 export class Product {
@@ -150,4 +152,10 @@ export class Product {
 
   @OneToMany(() => ProductSpecificationValue, (pv) => pv.product, { cascade: true })
   specificationValues: ProductSpecificationValue[];
+
+   @OneToMany(() => ProductAttribute, (attr) => attr.product, { cascade: true })
+  attributes: ProductAttribute[];
+
+    @OneToMany(() => Sku, (sku) => sku.product, { cascade: true })
+  skus: Sku[];
 }

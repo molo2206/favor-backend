@@ -143,7 +143,15 @@ export class CategoryController {
   }
 
   @Get(':id/specifications/by-category')
-  async getSpecificationsByCategory(@Param('id') id: string) {
-    return this.categoryService.getSpecificationsByCategoryId(id);
+  async getSpecificationsByCategory(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    // Convertir page et limit en nombre si présents
+    const pageNumber = page ? parseInt(page, 10) : undefined;
+    const limitNumber = limit ? parseInt(limit, 10) : undefined;
+
+    return this.categoryService.getSpecificationsByCategoryId(id, pageNumber, limitNumber);
   }
 }

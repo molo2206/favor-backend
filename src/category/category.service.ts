@@ -248,7 +248,8 @@ export class CategoryService {
     return { data: `Category with id ${id} removed successfully` };
   }
 
-  async getSpecificationsByCategoryId(categoryId: string) {
+  async getSpecificationsByCategoryId(categoryId: string, page?: number, limit?: number) {
+    // Vérifier que la catégorie existe
     const category = await this.categoryRepo.findOne({
       where: { id: categoryId },
     });
@@ -257,22 +258,37 @@ export class CategoryService {
       throw new NotFoundException(`Catégorie avec l'ID ${categoryId} non trouvée`);
     }
 
-    // Utiliser Query Builder avec le bon nom de relation
-    const categorySpecs = await this.categorySpecificationRepo
+    const query = this.categorySpecificationRepo
       .createQueryBuilder('cs')
-      .leftJoinAndSelect('cs.specification', 'spec') // Utiliser leftJoinAndSelect au lieu de innerJoinAndSelect
+      .leftJoinAndSelect('cs.specification', 'spec')
       .where('cs.categoryId = :categoryId', { categoryId })
       .andWhere('spec.deleted = :deleted', { deleted: false })
-      .orderBy('cs.displayOrder', 'ASC')
-      .getMany();
+      .orderBy('cs.displayOrder', 'ASC');
 
+    // ✅ Si page et limit sont fournis, appliquer la pagination
+    let total = await query.getCount();
+
+    if (page && limit) {
+      const skip = (page - 1) * limit;
+      query.skip(skip).take(limit);
+    }
+
+    const categorySpecs = await query.getMany();
+
+    // ✅ Si aucune spécification trouvée
     if (!categorySpecs.length) {
       return {
         message: `Aucune spécification trouvée pour la catégorie "${category.name}"`,
-        data: [],
+        data: {
+          data: [],
+          total: 0,
+          page: page ?? null,
+          limit: limit ?? null,
+        },
       };
     }
 
+    // ✅ Formater les données
     const data = categorySpecs.map((cs) => ({
       categorySpecificationId: cs.id,
       categoryId: cs.categoryId,
@@ -292,9 +308,13 @@ export class CategoryService {
     }));
 
     return {
-      message: `Spécifications récupérées avec succès`,
-      data,
-      count: data.length,
+      message: `Spécifications récupérées avec succès pour la catégorie : ${category.name}`,
+      data: {
+        data,
+        total,
+        page: page ?? null,
+        limit: limit ?? null,
+      },
     };
   }
 }
