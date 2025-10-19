@@ -11,6 +11,7 @@ import { MeasureService } from 'src/measure/measure.service';
 import { MeasureEntity } from 'src/measure/entities/measure.entity';
 import { TauxCompany } from 'src/taux-company/entities/taux-company.entity';
 import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
+import { ProductSpecificationValueModule } from 'src/specification/product-specification.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -22,6 +23,7 @@ import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
       TauxCompany,
       OrderItemEntity,
     ]),
+    ProductSpecificationValueModule,
     CloudinaryModule,
   ],
   controllers: [ProductController],

@@ -71,7 +71,15 @@ export class CategoryService {
       }
     }
 
-    return { message: 'Catégorie enregistrée avec succès', data: savedCategory };
+    const categoryWithRelations = await this.categoryRepo.findOne({
+      where: { id: savedCategory.id },
+      relations: ['parent', 'children', 'specifications', 'specifications.specification'],
+    });
+
+    return {
+      message: 'Catégorie enregistrée avec succès',
+      data: categoryWithRelations!,
+    };
   }
 
   async update(
@@ -80,19 +88,21 @@ export class CategoryService {
     file?: Express.Multer.File,
   ): Promise<{ message: string; data: CategoryEntity }> {
     const category = await this.categoryRepo.findOne({ where: { id } });
-    if (!category) {
-      throw new NotFoundException('Catégorie introuvable');
-    }
+    if (!category) throw new NotFoundException('Catégorie introuvable');
 
     const { name, parentId, type, color, specifications } = updateCategoryDto;
 
-    // Vérifier l'unicité du nom + type
-    const existingCategory = await this.categoryRepo.findOne({ where: { name, type } });
-    if (existingCategory && existingCategory.id !== id) {
-      throw new ConflictException('Une catégorie avec ce nom et ce type existe déjà');
+    // ✅ Vérifier unicité nom + type
+    if (name && type) {
+      const existingCategory = await this.categoryRepo.findOne({
+        where: { name, type },
+      });
+      if (existingCategory && existingCategory.id !== id) {
+        throw new ConflictException('Une catégorie avec ce nom et ce type existe déjà');
+      }
     }
 
-    // Mise à jour des champs de base
+    // ✅ Mise à jour des champs de base
     if (name) {
       category.name = name;
       category.slug = slugify(name, { lower: true, strict: true });
@@ -101,7 +111,9 @@ export class CategoryService {
     if (color) category.color = color;
 
     if (parentId) {
-      const parent = await this.categoryRepo.findOne({ where: { id: parentId } });
+      const parent = await this.categoryRepo.findOne({
+        where: { id: parentId },
+      });
       if (!parent) throw new NotFoundException('Catégorie parente non trouvée');
       category.parent = parent;
     }
@@ -113,20 +125,31 @@ export class CategoryService {
 
     const updatedCategory = await this.categoryRepo.save(category);
 
-    // Mettre à jour les spécifications si elles sont fournies
+    // ✅ Mettre à jour les spécifications (si fournies)
     if (specifications && Array.isArray(specifications)) {
       for (const spec of specifications) {
+        if (!spec.specificationId) {
+          throw new BadRequestException(
+            'Chaque specification doit contenir un specificationId',
+          );
+        }
         await this.categorySpecification.addSpecificationToCategory(
           updatedCategory.id,
           spec.specificationId,
-          spec.required ?? false, // false si undefined
+          spec.required ?? false,
         );
       }
     }
 
+    // ✅ Charger les relations pour la réponse
+    const categoryWithRelations = await this.categoryRepo.findOne({
+      where: { id: updatedCategory.id },
+      relations: ['parent', 'children', 'specifications', 'specifications.specification'],
+    });
+
     return {
       message: 'Catégorie mise à jour avec succès',
-      data: updatedCategory,
+      data: categoryWithRelations!,
     };
   }
 

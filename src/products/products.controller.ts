@@ -35,22 +35,17 @@ import { CompanyType } from 'src/company/enum/type.company.enum';
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
-  @UseInterceptors(ClassSerializerInterceptor)
   @Post()
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(FilesInterceptor('images', 4)) // Limite max à 4
+  @UseInterceptors(FilesInterceptor('images', 4))
   async create(
     @UploadedFiles() files: Express.Multer.File[],
-    @Body() dto: CreateProductDto,
+    @Body() body: any,
     @CurrentUser() user: UserEntity,
   ) {
-    if (!files || files.length === 0) {
-      throw new BadRequestException('Vous devez fournir au moins deux images');
-    }
-
-    if (files.length < 2 || files.length > 4) {
+    if (!files || files.length < 2 || files.length > 4) {
       throw new BadRequestException("Le nombre d'images doit être compris entre 2 et 4");
     }
 
@@ -58,11 +53,22 @@ export class ProductController {
       throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
     }
 
-    const result = await this.productService.create(dto, files, user);
-    return {
-      message: result.message,
-      data: result.data,
+    let specifications;
+    if (body.specifications) {
+      try {
+        specifications = JSON.parse(body.specifications); // parse seulement si fourni
+      } catch (error) {
+        throw new BadRequestException('Le champ specifications doit être un JSON valide');
+      }
+    }
+
+    const dto: CreateProductDto = {
+      ...body,
+      specifications, // undefined si non fourni
     };
+
+    const result = await this.productService.create(dto, files, user);
+    return { message: result.message, data: result.data };
   }
 
   @Patch(':id')

@@ -5,12 +5,14 @@ import {
   IsUUID,
   IsEnum,
   IsNumberString,
+  IsArray,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
 import { Type_rental_both_sale_car } from '../enum/type_rental_both_sale_car';
 import { FuelType } from '../enum/fuelType_enum';
 import { Transmission } from '../enum/transmission.enum';
+import { ProductSpecificationDto } from './create-product-specification.dto';
 
 export class CreateProductDto {
   // Obligatoire
@@ -127,4 +129,8 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @IsOptional()
+  @IsArray()
+  specifications?: ProductSpecificationDto[];
 }

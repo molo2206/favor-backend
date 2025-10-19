@@ -25,6 +25,8 @@ import { UserWithCompanyStatus } from 'src/users/interfaces/user-with-company-st
 import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
 import { In } from 'typeorm';
 import { CompanyType } from 'src/company/enum/type.company.enum';
+import { ProductSpecificationValueService } from 'src/specification/product-specification.service';
+import { CreateProductSpecificationValueDto } from 'src/specification/dto/create-product-specification-value.dto';
 
 @Injectable()
 export class ProductService {
@@ -43,6 +45,8 @@ export class ProductService {
 
     private readonly cloudinary: CloudinaryService,
 
+    private readonly productSpecificationValueService: ProductSpecificationValueService,
+
     @InjectRepository(MeasureEntity)
     private readonly measureRepo: Repository<MeasureEntity>,
 
@@ -55,8 +59,8 @@ export class ProductService {
     files: Express.Multer.File[],
     user: UserWithCompanyStatus,
   ): Promise<{ message: string; data: Product }> {
-    const { categoryId, status, measureId, min_quantity, ...data } = createProductDto;
-
+    const { categoryId, status, measureId, min_quantity, specifications, ...data } =
+      createProductDto;
     // if (user.companyStatus !== CompanyStatus.VALIDATED) {
     //   throw new ForbiddenException(
     //     'Votre société n’est pas encore validée. Impossible de créer un produit.',
@@ -131,6 +135,19 @@ export class ProductService {
     await this.imageRepository.save(secondaryImages);
     product.images = secondaryImages;
 
+    if (specifications && Array.isArray(specifications)) {
+      for (const spec of specifications) {
+        // Crée un DTO conforme à CreateProductSpecificationValueDto
+        const specValueDto: CreateProductSpecificationValueDto = {
+          productId: product.id, // ← on utilise productId et non product
+          specificationId: spec.specificationId,
+          value: spec.value ?? undefined, // undefined si non fourni
+        };
+
+        await this.productSpecificationValueService.create(specValueDto);
+      }
+    }
+
     return {
       message: 'Produit créé avec succès',
       data: product,
@@ -150,6 +167,8 @@ export class ProductService {
         'company.tauxCompanies',
         'company.country',
         'company.city',
+        'specificationValues',
+        'specificationValues.specification',
       ],
     });
     if (!product) {
@@ -173,7 +192,9 @@ export class ProductService {
       .leftJoinAndSelect('category.parent', 'categoryParent')
       .leftJoinAndSelect('category.children', 'categoryChildren')
       .leftJoinAndSelect('product.images', 'images')
-      .leftJoinAndSelect('product.measure', 'measure');
+      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('specificationValues.specification', 'specification');
 
     if (type) {
       queryBuilder.where('product.type = :type', { type });
@@ -193,16 +214,16 @@ export class ProductService {
     const queryBuilder = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
-
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('category.parent', 'categoryParent')
       .leftJoinAndSelect('category.children', 'categoryChildren')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
-      .leftJoinAndSelect('product.company', 'company')
-      .leftJoinAndSelect('product.company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('specificationValues.specification', 'specification')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     if (type) {
@@ -247,6 +268,8 @@ export class ProductService {
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('specificationValues.specification', 'specification')
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
@@ -452,6 +475,8 @@ export class ProductService {
     const queryBuilder = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('specificationValues.specification', 'specification')
       .leftJoinAndSelect('category.parent', 'categoryParent')
       .leftJoinAndSelect('category.children', 'categoryChildren')
       .leftJoinAndSelect('product.images', 'images')

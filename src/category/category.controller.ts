@@ -86,13 +86,18 @@ export class CategoryController {
   @UseInterceptors(FileInterceptor('image'))
   async update(
     @Param('id') id: string,
-    @Body() body: any, // on parse manuellement les JSON pour les specs
+    @Body() body: any,
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<{ message: string; data: CategoryEntity }> {
     let specifications;
+
+    // ✅ On parse seulement si `specifications` est fourni
     if (body.specifications) {
       try {
-        specifications = JSON.parse(body.specifications); // parse seulement si fourni
+        specifications = JSON.parse(body.specifications);
+        if (!Array.isArray(specifications)) {
+          throw new BadRequestException('Le champ specifications doit être un tableau JSON');
+        }
       } catch (error) {
         throw new BadRequestException('Le champ specifications doit être un JSON valide');
       }

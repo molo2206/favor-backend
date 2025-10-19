@@ -15,12 +15,12 @@ export class ProductSpecificationValue {
   @Column()
   specificationId: string;
 
-  @Column({ nullable: true })
-  value: string;
+  @Column({ type: 'text', nullable: true })
+  value?: string;
 
-  @ManyToOne(() => Product, product => product.specificationValues, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Product, (product) => product.specificationValues, { onDelete: 'CASCADE' })
   product: Product;
 
-  @ManyToOne(() => Specification, specification => specification.specificationValues)
+  @ManyToOne(() => Specification, (specification) => specification.specificationValues)
   specification: Specification;
 }
