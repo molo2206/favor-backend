@@ -249,18 +249,25 @@ export class CategoryService {
   }
 
   async getSpecificationsByCategoryId(categoryId: string) {
-    // Récupérer la catégorie avec toutes les liaisons CategorySpecification
+    // Récupérer la catégorie avec toutes les liaisons CategorySpecification et la specification
     const category = await this.categoryRepo.findOne({
       where: { id: categoryId },
-      relations: ['specifications'], // ✅ ici
+      relations: ['specifications', 'specifications.specification'],
     });
 
     if (!category) {
       throw new NotFoundException(`Catégorie ${categoryId} introuvable`);
     }
 
-    // Retourner uniquement les spécifications
-    const specifications = category.specifications.map((cs) => cs.specification);
+    // Mapper pour inclure les infos de CategorySpecification + Specification
+    const specifications = category.specifications.map((cs) => ({
+      categorySpecificationId: cs.id, // id de la table pivot
+      categoryId: cs.categoryId,
+      specificationId: cs.specificationId,
+      required: cs.required,
+      displayOrder: cs.displayOrder,
+      specification: cs.specification, // objet Specification complet
+    }));
 
     return {
       message: `Spécifications de la catégorie ${categoryId} récupérées avec succès`,
