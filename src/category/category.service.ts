@@ -252,7 +252,7 @@ export class CategoryService {
     // Récupérer la catégorie avec toutes les liaisons CategorySpecification
     const category = await this.categoryRepo.findOne({
       where: { id: categoryId },
-      relations: ['specifications', 'specifications.specification'], // ✅ ici
+      relations: ['specifications'], // ✅ ici
     });
 
     if (!category) {
