@@ -19,9 +19,8 @@ export class CategorySpecificationController {
 
   @Delete()
   removeSpecification(@Body() dto: DeleteCategorySpecificationDto) {
-    return this.catSpecService.removeSpecificationFromCategory(
+    return this.catSpecService.removeAllSpecificationsFromCategory(
       dto.categoryId,
-      dto.specificationId
     );
   }
 
