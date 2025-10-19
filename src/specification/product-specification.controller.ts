@@ -17,7 +17,7 @@ export class ProductSpecificationValueController {
   }
 
   @Delete('product/:productId/spec/:specId')
-  remove(@Param('productId') productId: string, @Param('specId') specificationId: string) {
-    return this.psValueService.remove(productId, specificationId);
+  remove(@Param('productId') productId: string) {
+    return this.psValueService.removeAllValuesFromProduct(productId);
   }
 }
