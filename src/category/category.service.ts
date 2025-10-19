@@ -249,7 +249,6 @@ export class CategoryService {
   }
 
   async getSpecificationsByCategoryId(categoryId: string) {
-    // Récupérer d'abord la catégorie
     const category = await this.categoryRepo.findOne({
       where: { id: categoryId },
     });
@@ -258,11 +257,14 @@ export class CategoryService {
       throw new NotFoundException(`Catégorie avec l'ID ${categoryId} non trouvée`);
     }
 
-    // Récupérer les CategorySpecification
-    const categorySpecs = await this.categorySpecificationRepo.find({
-      where: { categoryId },
-      order: { displayOrder: 'ASC' },
-    });
+    // Utiliser Query Builder avec le bon nom de relation
+    const categorySpecs = await this.categorySpecificationRepo
+      .createQueryBuilder('cs')
+      .leftJoinAndSelect('cs.specification', 'spec') // Utiliser leftJoinAndSelect au lieu de innerJoinAndSelect
+      .where('cs.categoryId = :categoryId', { categoryId })
+      .andWhere('spec.deleted = :deleted', { deleted: false })
+      .orderBy('cs.displayOrder', 'ASC')
+      .getMany();
 
     if (!categorySpecs.length) {
       return {
@@ -271,46 +273,26 @@ export class CategoryService {
       };
     }
 
-    // Récupérer les Specification correspondantes
-    const specificationIds = categorySpecs.map((cs) => cs.specificationId);
-    const specifications = await this.categorySpecificationRepo.find({
-      where: { id: In(specificationIds) },
-    });
-
-    // Créer un map pour un accès rapide
-    const specMap = new Map();
-    specifications.forEach((spec) => specMap.set(spec.id, spec));
-
-    // Combiner les données
-    const data = categorySpecs.map((cs) => {
-      const specification = specMap.get(cs.specificationId);
-
-      return {
-        categorySpecificationId: cs.id,
-        categoryId: cs.categoryId,
-        specificationId: cs.specificationId,
-        required: cs.required,
-        displayOrder: cs.displayOrder,
-        specification: specification
-          ? {
-              id: specification.id,
-              key: specification.key,
-              label: specification.label,
-              type: specification.type,
-              unit: specification.unit,
-              options: specification.options,
-            }
-          : null,
-      };
-    });
+    const data = categorySpecs.map((cs) => ({
+      categorySpecificationId: cs.id,
+      categoryId: cs.categoryId,
+      specificationId: cs.specificationId,
+      required: cs.required,
+      displayOrder: cs.displayOrder,
+      specification: cs.specification
+        ? {
+            id: cs.specification.id,
+            key: cs.specification.key,
+            label: cs.specification.label,
+            type: cs.specification.type,
+            unit: cs.specification.unit,
+            options: cs.specification.options,
+          }
+        : null,
+    }));
 
     return {
-      message: `Spécifications de la catégorie "${category.name}" récupérées avec succès`,
-      category: {
-        id: category.id,
-        name: category.name,
-        slug: category.slug,
-      },
+      message: `Spécifications récupérées avec succès`,
       data,
       count: data.length,
     };
