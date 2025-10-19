@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsNumberString,
   IsArray,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
@@ -132,5 +133,7 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductSpecificationDto)
   specifications?: ProductSpecificationDto[];
 }
