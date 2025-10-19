@@ -111,22 +111,25 @@ export class CategoryService {
     if (color) category.color = color;
 
     if (parentId) {
-      const parent = await this.categoryRepo.findOne({
-        where: { id: parentId },
-      });
+      const parent = await this.categoryRepo.findOne({ where: { id: parentId } });
       if (!parent) throw new NotFoundException('Catégorie parente non trouvée');
       category.parent = parent;
     }
 
+    // ✅ Image
     if (file) {
       const imageUrl = await this.cloudinary.handleUploadImage(file, 'category');
       category.image = imageUrl;
     }
 
+    // ✅ Sauvegarder la catégorie
     const updatedCategory = await this.categoryRepo.save(category);
 
-    // ✅ Mettre à jour les spécifications (si fournies)
     if (specifications && Array.isArray(specifications)) {
+      // Supprimer toutes les anciennes spécifications via le service
+      await this.categorySpecification.removeSpecificationFromCategory(updatedCategory.id);
+
+      // Ajouter ou mettre à jour les nouvelles spécifications
       for (const spec of specifications) {
         if (!spec.specificationId) {
           throw new BadRequestException(
