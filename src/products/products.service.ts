@@ -647,6 +647,8 @@ export class ProductService {
         'company.tauxCompanies',
         'company.country',
         'company.city',
+        'specificationValues',
+        'specificationValues.specification',
       ],
       skip,
       take: limit,
@@ -676,6 +678,8 @@ export class ProductService {
         'company.tauxCompanies',
         'company.country',
         'company.city',
+        'specificationValues',
+        'specificationValues.specification',
       ],
     });
 
@@ -711,6 +715,8 @@ export class ProductService {
         'company.tauxCompanies',
         'company.country',
         'company.city',
+        'specificationValues',
+        'specificationValues.specification',
       ],
     });
 
@@ -752,6 +758,8 @@ export class ProductService {
         'company.tauxCompanies',
         'company.country',
         'company.city',
+        'specificationValues',
+        'specificationValues.specification',
       ],
       order: { createdAt: 'ASC' }, // pour s'assurer que le "premier" est bien le plus ancien
     });
@@ -782,6 +790,8 @@ export class ProductService {
         'company.tauxCompanies',
         'company.country',
         'company.city',
+        'specificationValues',
+        'specificationValues.specification',
       ],
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
@@ -848,6 +858,8 @@ export class ProductService {
     const qb = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('specificationValues.specification', 'specification')
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
@@ -907,6 +919,8 @@ export class ProductService {
         'category.children',
         'images',
         'measure',
+        'specificationValues',
+        'specificationValues.specification',
       ],
     });
     if (!updated) {
@@ -963,6 +977,8 @@ export class ProductService {
         'company.tauxCompanies',
         'company.country',
         'company.city',
+        'specificationValues',
+        'specificationValues.specification',
       ],
     });
 
