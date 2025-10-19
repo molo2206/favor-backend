@@ -248,22 +248,22 @@ export class CategoryService {
     return { data: `Category with id ${id} removed successfully` };
   }
 
-  async getSpecificationsByCategoryId(categoryId: string) {
+ async getSpecificationsByCategoryId(categoryId: string) {
     // Vérifier que la catégorie existe
     const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
     if (!category) throw new NotFoundException(`Catégorie ${categoryId} introuvable`);
 
-    // Récupérer toutes les spécifications liées
+    // Récupérer toutes les liaisons CategorySpecification avec les détails de la spécification
     const catSpecs = await this.categorySpecificationRepo.find({
       where: { categoryId },
-      relations: ['specification'], // inclure les détails de la spécification
+      relations: ['specification'], // charger la relation Specification
       order: { displayOrder: 'ASC' },
     });
 
-    // Retourner uniquement les spécifications
+    // Retourner uniquement les détails de la spécification
     return {
       message: `Spécifications de la catégorie ${categoryId} récupérées avec succès`,
-      data: catSpecs.map((cs) => cs.specification),
+      data: catSpecs.map(cs => cs.specification),
     };
   }
 }
