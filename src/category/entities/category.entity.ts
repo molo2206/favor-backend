@@ -1,5 +1,6 @@
 import { Product } from 'src/products/entities/product.entity';
 import { Service } from 'src/service/entities/service.entity';
+import { CategorySpecification } from 'src/specification/entities/CategorySpecification.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -41,4 +42,7 @@ export class CategoryEntity {
 
   @OneToMany(() => Service, (provider) => provider.category)
   providers: Service[];
+
+  @OneToMany(() => CategorySpecification, (cs) => cs.category, { cascade: true })
+  specifications: CategorySpecification[];
 }

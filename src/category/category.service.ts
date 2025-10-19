@@ -12,12 +12,17 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { slugify } from 'src/users/utility/slug/slugify';
 import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
 import { CategoryWithPagination } from 'src/users/interfaces/category';
+import { CategorySpecification } from 'src/specification/entities/CategorySpecification.entity';
+import { CategorySpecificationService } from 'src/specification/category-specification.service';
 
 @Injectable()
 export class CategoryService {
   constructor(
     @InjectRepository(CategoryEntity)
     private readonly categoryRepo: Repository<CategoryEntity>,
+
+    private readonly categorySpecification: CategorySpecificationService,
+
     private readonly cloudinary: CloudinaryService,
   ) {}
 
@@ -25,7 +30,7 @@ export class CategoryService {
     createCategoryDto: CreateCategoryDto,
     file: Express.Multer.File,
   ): Promise<{ message: string; data: CategoryEntity }> {
-    const { name, parentId, type, color } = createCategoryDto;
+    const { name, parentId, type, color, specifications } = createCategoryDto;
 
     const existingCategory = await this.categoryRepo.findOne({ where: { name, type } });
     if (existingCategory) {
@@ -33,24 +38,15 @@ export class CategoryService {
     }
 
     let parent: CategoryEntity | undefined = undefined;
-
     if (parentId) {
       const foundParent = await this.categoryRepo.findOne({ where: { id: parentId } });
-
-      if (!foundParent) {
-        throw new NotFoundException('Catégorie parente non trouvée');
-      }
-
+      if (!foundParent) throw new NotFoundException('Catégorie parente non trouvée');
       parent = foundParent;
     }
 
     const slug = slugify(name, { lower: true, strict: true });
 
-    // Vérification : image obligatoire
-    if (!file) {
-      throw new BadRequestException('Une image est requise pour créer une catégorie.');
-    }
-
+    if (!file) throw new BadRequestException('Une image est requise pour créer une catégorie.');
     const imageUrl = await this.cloudinary.handleUploadImage(file, 'category');
 
     const category = this.categoryRepo.create({
@@ -63,6 +59,18 @@ export class CategoryService {
     });
 
     const savedCategory = await this.categoryRepo.save(category);
+
+    // Lier les spécifications si elles existent
+    if (specifications && Array.isArray(specifications)) {
+      for (const spec of specifications) {
+        await this.categorySpecification.addSpecificationToCategory(
+          savedCategory.id,
+          spec.specificationId,
+          spec.required || false,
+        );
+      }
+    }
+
     return { message: 'Catégorie enregistrée avec succès', data: savedCategory };
   }
 
@@ -71,42 +79,30 @@ export class CategoryService {
     updateCategoryDto: UpdateCategoryDto,
     file?: Express.Multer.File,
   ): Promise<{ message: string; data: CategoryEntity }> {
-    // <- attention ici
     const category = await this.categoryRepo.findOne({ where: { id } });
-
     if (!category) {
       throw new NotFoundException('Catégorie introuvable');
     }
 
-    const { name, parentId, type, color } = updateCategoryDto;
+    const { name, parentId, type, color, specifications } = updateCategoryDto;
 
-    const existingCategory = await this.categoryRepo.findOne({
-      where: { name, type },
-    });
-
+    // Vérifier l'unicité du nom + type
+    const existingCategory = await this.categoryRepo.findOne({ where: { name, type } });
     if (existingCategory && existingCategory.id !== id) {
-      // pour éviter de se bloquer soi-même
       throw new ConflictException('Une catégorie avec ce nom et ce type existe déjà');
     }
 
+    // Mise à jour des champs de base
     if (name) {
       category.name = name;
       category.slug = slugify(name, { lower: true, strict: true });
     }
-
-    if (type) {
-      category.type = type;
-    }
-
-    if (color) {
-      category.color = color;
-    }
+    if (type) category.type = type;
+    if (color) category.color = color;
 
     if (parentId) {
       const parent = await this.categoryRepo.findOne({ where: { id: parentId } });
-      if (!parent) {
-        throw new NotFoundException('Catégorie parente non trouvée');
-      }
+      if (!parent) throw new NotFoundException('Catégorie parente non trouvée');
       category.parent = parent;
     }
 
@@ -116,6 +112,17 @@ export class CategoryService {
     }
 
     const updatedCategory = await this.categoryRepo.save(category);
+
+    // Mettre à jour les spécifications si elles sont fournies
+    if (specifications && Array.isArray(specifications)) {
+      for (const spec of specifications) {
+        await this.categorySpecification.addSpecificationToCategory(
+          updatedCategory.id,
+          spec.specificationId,
+          spec.required ?? false, // false si undefined
+        );
+      }
+    }
 
     return {
       message: 'Catégorie mise à jour avec succès',

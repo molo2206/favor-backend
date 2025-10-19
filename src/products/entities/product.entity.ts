@@ -20,6 +20,7 @@ import { FuelType } from 'src/products/enum/fuelType_enum';
 import { Transmission } from '../enum/transmission.enum';
 import { RentalContract } from 'src/rental-contract/entities/rental-contract.entity';
 import { SaleTransaction } from 'src/sale-transaction/entities/sale-transaction.entity';
+import { ProductSpecificationValue } from 'src/specification/entities/ProductSpecificationValue.entity';
 
 @Entity('products')
 export class Product {
@@ -100,6 +101,9 @@ export class Product {
   @Column({ type: 'int', default: 0 })
   min_quantity: number;
 
+  @Column({ type: 'int', default: 0 })
+  stockAlert: number;
+
   @Column({ nullable: true })
   image?: string;
 
@@ -143,4 +147,7 @@ export class Product {
 
   @OneToMany(() => SaleTransaction, (sale) => sale.vehicle)
   saleTransactions: SaleTransaction[];
+
+  @OneToMany(() => ProductSpecificationValue, (pv) => pv.product, { cascade: true })
+  specificationValues: ProductSpecificationValue[];
 }

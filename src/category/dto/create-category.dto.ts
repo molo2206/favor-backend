@@ -1,4 +1,6 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsArray, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { SpecificationDto } from './SpecificationDto.dto';
+import { Type } from 'class-transformer';
 
 export class CreateCategoryDto {
   @IsString()
@@ -14,4 +16,9 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => SpecificationDto)
+  specifications?: SpecificationDto[];
 }

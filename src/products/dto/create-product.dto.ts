@@ -45,6 +45,11 @@ export class CreateProductDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  stockAlert?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   detail_price_original?: number;
 
   @IsOptional()

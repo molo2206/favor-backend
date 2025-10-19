@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -32,11 +33,29 @@ export class CategoryController {
   @UsePipes(new ValidationPipe({ whitelist: true }))
   @UseInterceptors(FileInterceptor('image'))
   async create(
-    @Body() createCategoryDto: CreateCategoryDto,
+    @Body() body: any, // on parse manuellement les JSON
     @UploadedFile() file: Express.Multer.File,
   ) {
+    let specifications;
+    if (body.specifications) {
+      try {
+        specifications = JSON.parse(body.specifications);
+      } catch (error) {
+        throw new BadRequestException('Le champ specifications doit être un JSON valide');
+      }
+    }
+
+    const createCategoryDto: CreateCategoryDto = {
+      name: body.name,
+      parentId: body.parentId,
+      type: body.type,
+      color: body.color,
+      specifications, // undefined si non fourni
+    };
+
     return await this.categoryService.create(createCategoryDto, file);
   }
+
   @Get()
   async findAll(
     @Query('type') type?: string, // type est un paramètre de requête
@@ -67,11 +86,27 @@ export class CategoryController {
   @UseInterceptors(FileInterceptor('image'))
   async update(
     @Param('id') id: string,
-    @Body() updateCategoryDto: UpdateCategoryDto,
+    @Body() body: any, // on parse manuellement les JSON pour les specs
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<{ message: string; data: CategoryEntity }> {
-    const { message, data } = await this.categoryService.update(id, updateCategoryDto, file);
-    return { message, data };
+    let specifications;
+    if (body.specifications) {
+      try {
+        specifications = JSON.parse(body.specifications); // parse seulement si fourni
+      } catch (error) {
+        throw new BadRequestException('Le champ specifications doit être un JSON valide');
+      }
+    }
+
+    const updateCategoryDto: UpdateCategoryDto = {
+      name: body.name,
+      parentId: body.parentId,
+      type: body.type,
+      color: body.color,
+      specifications, // undefined si non fourni
+    };
+
+    return await this.categoryService.update(id, updateCategoryDto, file);
   }
 
   @Get('/by-type/:type')

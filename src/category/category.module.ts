@@ -4,11 +4,15 @@ import { CategoryService } from './category.service';
 import { CategoryController } from './category.controller';
 import { CategoryEntity } from './entities/category.entity';
 import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
+import { CategorySpecificationModule } from 'src/specification/category-specification.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CategoryEntity])], // 👈 Importation de l'entité
+  imports: [
+    TypeOrmModule.forFeature([CategoryEntity]),
+    CategorySpecificationModule, // <-- IMPORT du module qui contient le service et ses repositories
+  ],
   controllers: [CategoryController],
-  providers: [CategoryService,CloudinaryService],
-  exports: [CategoryService], // 👈 Optionnel si tu veux utiliser ce service ailleurs
+  providers: [CategoryService, CloudinaryService],
+  exports: [CategoryService],
 })
 export class CategoryModule {}

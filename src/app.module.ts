@@ -40,6 +40,9 @@ import { AppSettingModule } from './app-setting/app-setting.module';
 import { RoleModule } from './users/role.module';
 import { PlatformModule } from './users/platform.module';
 import { UserPlatformRoleModule } from './users/user-platform-role.module';
+import { SpecificationModule } from './specification/specification.module';
+import { CategorySpecificationModule } from './specification/category-specification.module';
+import { ProductSpecificationValueModule } from './specification/product-specification.module';
 
 @Module({
   imports: [
@@ -107,7 +110,10 @@ import { UserPlatformRoleModule } from './users/user-platform-role.module';
     AppSettingModule,
     RoleModule,
     PlatformModule,
-    UserPlatformRoleModule
+    UserPlatformRoleModule,
+    SpecificationModule,
+    CategorySpecificationModule,
+    ProductSpecificationValueModule,
   ],
   controllers: [AppController],
   providers: [AppService],
