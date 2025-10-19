@@ -31,7 +31,8 @@ export class CategorySpecificationService {
 
     // Vérifier que la spécification existe
     const specification = await this.specRepo.findOne({ where: { id: specificationId } });
-    if (!specification) throw new NotFoundException(`Spécification ${specificationId} introuvable`);
+    if (!specification)
+      throw new NotFoundException(`Spécification ${specificationId} introuvable`);
 
     // Vérifier si une liaison existe déjà
     let catSpec = await this.catSpecRepo.findOne({
@@ -80,11 +81,12 @@ export class CategorySpecificationService {
   /**
    * Supprimer une spécification d'une catégorie
    */
-  async removeSpecificationFromCategory(categoryId: string) {
-    const catSpec = await this.catSpecRepo.findOne({ where: { categoryId} });
-    if (!catSpec) throw new NotFoundException('Spécification non trouvée pour cette catégorie');
+  async removeAllSpecificationsFromCategory(categoryId: string) {
+    const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
+    if (!category) throw new NotFoundException(`Catégorie ${categoryId} introuvable`);
 
-    await this.catSpecRepo.remove(catSpec);
-    return { message: 'Spécification supprimée de la catégorie avec succès', data: null };
+    await this.catSpecRepo.delete({ categoryId });
+
+    return { message: 'Toutes les spécifications supprimées pour cette catégorie' };
   }
 }

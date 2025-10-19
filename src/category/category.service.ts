@@ -126,8 +126,8 @@ export class CategoryService {
     const updatedCategory = await this.categoryRepo.save(category);
 
     if (specifications && Array.isArray(specifications)) {
-      // Supprimer toutes les anciennes spécifications via le service
-      await this.categorySpecification.removeSpecificationFromCategory(updatedCategory.id);
+      // Supprimer toutes les anciennes spécifications pour cette catégorie
+      await this.categorySpecification.removeAllSpecificationsFromCategory(updatedCategory.id);
 
       // Ajouter ou mettre à jour les nouvelles spécifications
       for (const spec of specifications) {
