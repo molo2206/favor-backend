@@ -249,29 +249,32 @@ export class CategoryService {
   }
 
   async getSpecificationsByCategoryId(categoryId: string) {
-    // Récupérer la catégorie avec toutes les liaisons CategorySpecification et la specification
-    const category = await this.categoryRepo.findOne({
-      where: { id: categoryId },
-      relations: ['specifications', 'specifications.specification'],
-    });
+    const specifications = await this.categorySpecificationRepo
+      .createQueryBuilder('cs')
+      .leftJoinAndSelect('cs.specification', 'spec')
+      .where('cs.categoryId = :categoryId', { categoryId })
+      .orderBy('cs.displayOrder', 'ASC') // optionnel : trier selon le pivot
+      .getMany();
 
-    if (!category) {
-      throw new NotFoundException(`Catégorie ${categoryId} introuvable`);
+    if (!specifications || specifications.length === 0) {
+      throw new NotFoundException(
+        `Aucune spécification trouvée pour la catégorie ${categoryId}`,
+      );
     }
 
-    // Mapper pour inclure les infos de CategorySpecification + Specification
-    const specifications = category.specifications.map((cs) => ({
-      categorySpecificationId: cs.id, // id de la table pivot
+    // Mapper pour renvoyer un JSON clair
+    const data = specifications.map((cs) => ({
+      categorySpecificationId: cs.id,
       categoryId: cs.categoryId,
       specificationId: cs.specificationId,
       required: cs.required,
       displayOrder: cs.displayOrder,
-      specification: cs.specification, // objet Specification complet
+      specification: cs.specification,
     }));
 
     return {
       message: `Spécifications de la catégorie ${categoryId} récupérées avec succès`,
-      data: specifications,
+      data,
     };
   }
 }
