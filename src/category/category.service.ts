@@ -248,33 +248,32 @@ export class CategoryService {
     return { data: `Category with id ${id} removed successfully` };
   }
 
-  async getSpecificationsByCategoryId(categoryId: string) {
-    const specifications = await this.categorySpecificationRepo
-      .createQueryBuilder('cs')
-      .leftJoinAndSelect('cs.specification', 'spec')
-      .where('cs.categoryId = :categoryId', { categoryId })
-      .orderBy('cs.displayOrder', 'ASC') // optionnel : trier selon le pivot
-      .getMany();
+  // category.service.ts
+  // async findAllCategoriesWithSpecifications(): Promise<CreateCategoryDto[]> {
+  //   const categories = await this.categoryRepo.find({
+  //     relations: ['parent', 'children'],
+  //   });
 
-    if (!specifications || specifications.length === 0) {
-      throw new NotFoundException(
-        `Aucune spécification trouvée pour la catégorie ${categoryId}`,
-      );
-    }
+  //   const categoriesWithSpecs = await Promise.all(
+  //     categories.map(async (category) => {
+  //       const specifications = await this.categorySpecificationRepo.find({
+  //         where: { categoryId: category.id },
+  //         relations: ['specification'],
+  //         order: { displayOrder: 'ASC' },
+  //       });
 
-    // Mapper pour renvoyer un JSON clair
-    const data = specifications.map((cs) => ({
-      categorySpecificationId: cs.id,
-      categoryId: cs.categoryId,
-      specificationId: cs.specificationId,
-      required: cs.required,
-      displayOrder: cs.displayOrder,
-      specification: cs.specification,
-    }));
+  //       return {
+  //         ...category,
+  //         specifications: specifications.map((cs) => ({
+  //           id: cs.id,
+  //           required: cs.required,
+  //           displayOrder: cs.displayOrder,
+  //           specification: cs.specification,
+  //         })),
+  //       };
+  //     }),
+  //   );
 
-    return {
-      message: `Spécifications de la catégorie ${categoryId} récupérées avec succès`,
-      data,
-    };
-  }
+  //   return categoriesWithSpecs;
+  // }
 }
