@@ -262,6 +262,7 @@ export class ProductService {
 
     if (shopType?.trim()) {
       if (shopType === CompanyActivity.WHOLESALER) {
+        // Un grossiste peut aussi voir les produits des mixtes
         queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
           activities: [CompanyActivity.WHOLESALER, CompanyActivity.WHOLESALER_RETAILER],
         });
@@ -269,25 +270,27 @@ export class ProductService {
         queryBuilder.andWhere(
           '(product.gros_price_original IS NOT NULL AND product.gros_price_original > 0)',
         );
-      } else if (shopType === CompanyActivity.WHOLESALER_RETAILER) {
-        queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
-          activities: [
-            CompanyActivity.WHOLESALER_RETAILER,
-            CompanyActivity.RETAILER,
-            CompanyActivity.WHOLESALER,
-          ],
-        });
-
-        queryBuilder.andWhere(
-          '(product.gros_price_original IS NOT NULL AND product.gros_price_original > 0)',
-        );
       } else if (shopType === CompanyActivity.RETAILER) {
+        // Un détaillant peut aussi voir les produits des mixtes
         queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
           activities: [CompanyActivity.RETAILER, CompanyActivity.WHOLESALER_RETAILER],
         });
 
         queryBuilder.andWhere(
           '(product.detail_price_original IS NOT NULL AND product.detail_price_original > 0)',
+        );
+      } else if (shopType === CompanyActivity.WHOLESALER_RETAILER) {
+        // Mixte → inclut les trois
+        queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
+          activities: [
+            CompanyActivity.WHOLESALER_RETAILER,
+            CompanyActivity.WHOLESALER,
+            CompanyActivity.RETAILER,
+          ],
+        });
+
+        queryBuilder.andWhere(
+          '((product.gros_price_original IS NOT NULL AND product.gros_price_original > 0) OR (product.detail_price_original IS NOT NULL AND product.detail_price_original > 0))',
         );
       }
     }
