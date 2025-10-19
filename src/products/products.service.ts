@@ -270,8 +270,12 @@ export class ProductService {
           '(product.gros_price_original IS NOT NULL AND product.gros_price_original > 0)',
         );
       } else if (shopType === CompanyActivity.WHOLESALER_RETAILER) {
-        queryBuilder.andWhere('product.companyActivity = :shopType', {
-          shopType: CompanyActivity.WHOLESALER_RETAILER,
+        queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
+          activities: [
+            CompanyActivity.WHOLESALER_RETAILER,
+            CompanyActivity.RETAILER,
+            CompanyActivity.WHOLESALER,
+          ],
         });
 
         queryBuilder.andWhere(
