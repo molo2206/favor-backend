@@ -1,6 +1,6 @@
 import { IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { SpecificationDto } from './SpecificationDto.dto';
+import { SpecificationsDto } from './specification.dto';
 
 export class CreateCategoryDto {
   @IsString()
@@ -19,6 +19,6 @@ export class CreateCategoryDto {
 
   @IsOptional()
   @ValidateNested({ each: true })
-  @Type(() => SpecificationDto)
-  specifications?: SpecificationDto[];
+  @Type(() => SpecificationsDto)
+  specifications?: SpecificationsDto[];
 }

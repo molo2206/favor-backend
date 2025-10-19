@@ -1,7 +1,7 @@
 import { IsOptional, IsString, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class SpecificationDto {
+export class SpecificationsDto {
   @IsString()
   specificationId: string;
 
