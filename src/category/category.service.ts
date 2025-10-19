@@ -134,7 +134,9 @@ export class CategoryService {
     const queryBuilder = this.categoryRepo
       .createQueryBuilder('category')
       .leftJoinAndSelect('category.parent', 'parent')
-      .leftJoinAndSelect('category.children', 'children');
+      .leftJoinAndSelect('category.children', 'children')
+      .leftJoinAndSelect('category.specifications', 'categorySpec') // relation CategorySpecification
+      .leftJoinAndSelect('categorySpec.specification', 'specification'); // récupérer les détails de la spécification
 
     if (type) {
       queryBuilder.where('category.type = :type', { type });
@@ -146,10 +148,15 @@ export class CategoryService {
   async findAllParent(type?: string): Promise<CategoryEntity[]> {
     const queryBuilder = this.categoryRepo
       .createQueryBuilder('category')
+      .leftJoinAndSelect('category.children', 'children')
+      .leftJoinAndSelect('category.specifications', 'categorySpec')
+      .leftJoinAndSelect('categorySpec.specification', 'specification')
       .where('category.parent IS NULL');
+
     if (type) {
       queryBuilder.andWhere('category.type = :type', { type });
     }
+
     const categories = await queryBuilder.getMany();
     return categories;
   }
@@ -157,7 +164,7 @@ export class CategoryService {
   async findOne(id: string): Promise<CategoryEntity> {
     const category = await this.categoryRepo.findOne({
       where: { id },
-      relations: ['parent', 'children'],
+      relations: ['parent', 'children', 'specifications', 'specifications.specification'],
     });
 
     if (!category) {
@@ -169,8 +176,8 @@ export class CategoryService {
 
   async findByTypeCompany(type: string): Promise<CategoryEntity[]> {
     const categories = await this.categoryRepo.find({
-      where: { type: type },
-      relations: ['parent', 'children'],
+      where: { type },
+      relations: ['parent', 'children', 'specifications', 'specifications.specification'],
     });
 
     if (!categories.length) {
@@ -187,7 +194,7 @@ export class CategoryService {
 
     const categories = await this.categoryRepo.find({
       where: whereClause,
-      relations: ['children'],
+      relations: ['children', 'specifications', 'specifications.specification'],
     });
 
     if (!categories.length) {
@@ -196,7 +203,6 @@ export class CategoryService {
       );
     }
 
-    // Ajouter le nombre d'enfants pour chaque catégorie
     return categories.map((category) => ({
       ...category,
       numberOfChildren: category.children.length,
