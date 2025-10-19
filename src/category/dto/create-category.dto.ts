@@ -1,6 +1,6 @@
-import { IsArray, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { SpecificationDto } from './SpecificationDto.dto';
+import { IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { SpecificationDto } from './SpecificationDto.dto';
 
 export class CreateCategoryDto {
   @IsString()
