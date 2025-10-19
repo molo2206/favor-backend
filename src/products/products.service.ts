@@ -148,23 +148,7 @@ export class ProductService {
         await this.productSpecificationValueService.create(specValueDto);
       }
     }
-    const fullProduct = await this.productRepo.findOne({
-      where: { id: product.id },
-      relations: [
-        'category',
-        'category.parent',
-        'category.children',
-        'images',
-        'measure',
-        'company',
-        'company.tauxCompanies',
-        'company.country',
-        'company.city',
-        'specificationValues',
-        'specificationValues.specification',
-      ],
-    });
-    const serializedProduct = plainToInstance(Product, fullProduct, {
+    const serializedProduct = plainToInstance(Product, product, {
       excludeExtraneousValues: true,
     });
     return {
