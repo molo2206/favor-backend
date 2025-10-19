@@ -249,18 +249,22 @@ export class CategoryService {
   }
 
   async getSpecificationsByCategoryId(categoryId: string) {
-    const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
-    if (!category) throw new NotFoundException(`Catégorie ${categoryId} introuvable`);
-
-    const catSpecs = await this.categorySpecificationRepo.find({
-      where: { categoryId },
-      relations: ['specification'], // ici c'est ok
-      order: { displayOrder: 'ASC' },
+    // Récupérer la catégorie avec toutes les liaisons CategorySpecification
+    const category = await this.categoryRepo.findOne({
+      where: { id: categoryId },
+      relations: ['specifications', 'specifications.specification'], // ✅ ici
     });
+
+    if (!category) {
+      throw new NotFoundException(`Catégorie ${categoryId} introuvable`);
+    }
+
+    // Retourner uniquement les spécifications
+    const specifications = category.specifications.map((cs) => cs.specification);
 
     return {
       message: `Spécifications de la catégorie ${categoryId} récupérées avec succès`,
-      data: catSpecs.map((cs) => cs.specification),
+      data: specifications,
     };
   }
 }
