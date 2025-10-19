@@ -27,6 +27,7 @@ import { In } from 'typeorm';
 import { CompanyType } from 'src/company/enum/type.company.enum';
 import { ProductSpecificationValueService } from 'src/specification/product-specification.service';
 import { CreateProductSpecificationValueDto } from 'src/specification/dto/create-product-specification-value.dto';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class ProductService {
@@ -147,10 +148,12 @@ export class ProductService {
         await this.productSpecificationValueService.create(specValueDto);
       }
     }
-
+    const serializedProduct = plainToInstance(Product, product, {
+      excludeExtraneousValues: true,
+    });
     return {
       message: 'Produit créé avec succès',
-      data: product,
+      data: serializedProduct,
     };
   }
 
@@ -832,10 +835,12 @@ export class ProductService {
         });
       }
     }
-
+    const serializedProduct = plainToInstance(Product, updatedProduct, {
+      excludeExtraneousValues: true,
+    });
     return {
       message: 'Produit mis à jour avec succès',
-      data: updatedProduct,
+      data: serializedProduct,
     };
   }
 
