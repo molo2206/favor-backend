@@ -13,6 +13,7 @@ import {
   UploadedFile,
   Query,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -139,5 +140,17 @@ export class CategoryController {
   async remove(@Param('id') id: string): Promise<{ data: string }> {
     await this.categoryService.remove(id);
     return { data: `Category with id ${id} removed successfully` };
+  }
+
+  @Get(':id/specifications')
+  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
+  async getSpecificationsByCategory(@Param('id') categoryId: string) {
+    const result = await this.categoryService.getSpecificationsByCategoryId(categoryId);
+    if (!result.data.length) {
+      throw new NotFoundException(
+        `Aucune spécification trouvée pour la catégorie ${categoryId}`,
+      );
+    }
+    return result;
   }
 }

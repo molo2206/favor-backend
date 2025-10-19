@@ -43,12 +43,8 @@ export class ProductSpecificationValueService {
     return { message: 'Valeurs de spécifications récupérées avec succès', data: values };
   }
 
-  async remove(productId: string, specificationId: string) {
-    const value = await this.psValueRepo.findOne({ where: { productId, specificationId } });
-    if (!value) {
-      throw new NotFoundException('Valeur de spécification introuvable');
-    }
-    await this.psValueRepo.remove(value);
-    return { message: 'Valeur de spécification supprimée avec succès', data: value };
+  async removeAllValuesFromProduct(productId: string) {
+    await this.psValueRepo.delete({ productId });
+    return { message: 'Toutes les valeurs de spécifications supprimées pour ce produit' };
   }
 }

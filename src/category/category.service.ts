@@ -21,6 +21,9 @@ export class CategoryService {
     @InjectRepository(CategoryEntity)
     private readonly categoryRepo: Repository<CategoryEntity>,
 
+    @InjectRepository(CategoryEntity)
+    private readonly categorySpecificationRepo: Repository<CategorySpecification>,
+
     private readonly categorySpecification: CategorySpecificationService,
 
     private readonly cloudinary: CloudinaryService,
@@ -243,5 +246,24 @@ export class CategoryService {
     await this.categoryRepo.remove(category);
 
     return { data: `Category with id ${id} removed successfully` };
+  }
+
+  async getSpecificationsByCategoryId(categoryId: string) {
+    // Vérifier que la catégorie existe
+    const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
+    if (!category) throw new NotFoundException(`Catégorie ${categoryId} introuvable`);
+
+    // Récupérer toutes les spécifications liées
+    const catSpecs = await this.categorySpecificationRepo.find({
+      where: { categoryId },
+      relations: ['specification'], // inclure les détails de la spécification
+      order: { displayOrder: 'ASC' },
+    });
+
+    // Retourner uniquement les spécifications
+    return {
+      message: `Spécifications de la catégorie ${categoryId} récupérées avec succès`,
+      data: catSpecs.map((cs) => cs.specification),
+    };
   }
 }

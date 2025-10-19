@@ -765,7 +765,7 @@ export class ProductService {
   }
 
   async update(id: string, dto: CreateProductDto, user: UserEntity) {
-    const { categoryId, status, measureId, ...data } = dto;
+    const { categoryId, status, measureId, specifications, ...data } = dto;
 
     const product = await this.productRepo.findOne({
       where: { id },
@@ -783,19 +783,17 @@ export class ProductService {
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
-    if (status) {
-      product.status = status;
-    }
+    if (status) product.status = status;
 
     Object.assign(product, data);
 
-    const company = await this.companyRepo.findOne({
-      where: { id: user.activeCompanyId },
-    });
+    // Lien avec la société active
+    const company = await this.companyRepo.findOne({ where: { id: user.activeCompanyId } });
     if (!company) throw new NotFoundException('Entreprise active non trouvée');
     product.company = company;
     product.type = company.typeCompany;
 
+    // Lien avec la catégorie
     if (categoryId) {
       const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
       if (!category) throw new NotFoundException('Catégorie non trouvée');
@@ -804,6 +802,7 @@ export class ProductService {
       product.category = undefined;
     }
 
+    // Lien avec la mesure
     if (measureId) {
       const measure = await this.measureRepo.findOne({ where: { id: measureId } });
       if (!measure) throw new NotFoundException('Mesure non trouvée');
@@ -813,6 +812,26 @@ export class ProductService {
     }
 
     const updatedProduct = await this.productRepo.save(product);
+
+    // ✅ Gestion des valeurs de spécifications
+    if (specifications && Array.isArray(specifications)) {
+      // 1. Supprimer toutes les anciennes valeurs pour ce produit
+      await this.productSpecificationValueService.removeAllValuesFromProduct(updatedProduct.id);
+
+      // 2. Ajouter ou mettre à jour les nouvelles
+      for (const spec of specifications) {
+        if (!spec.specificationId) {
+          throw new BadRequestException(
+            'Chaque spécification doit contenir un specificationId',
+          );
+        }
+        await this.productSpecificationValueService.create({
+          productId: updatedProduct.id,
+          specificationId: spec.specificationId,
+          value: spec.value,
+        });
+      }
+    }
 
     return {
       message: 'Produit mis à jour avec succès',
