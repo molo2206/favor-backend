@@ -8,7 +8,7 @@ import {
   IsArray,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
 import { Type_rental_both_sale_car } from '../enum/type_rental_both_sale_car';
 import { FuelType } from '../enum/fuelType_enum';
@@ -131,9 +131,17 @@ export class CreateProductDto {
   @IsString()
   color?: string;
 
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ProductSpecificationDto)
-  specifications?: ProductSpecificationDto[];
+@IsOptional()
+@IsArray()
+@Transform(({ value }) => {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+})
+specifications?: ProductSpecificationDto[];
 }
