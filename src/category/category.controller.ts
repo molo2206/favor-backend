@@ -142,8 +142,8 @@ export class CategoryController {
     return { data: `Category with id ${id} removed successfully` };
   }
 
-  // @Get(':id/specifications')
-  // async getSpecificationsByCategory(@Param('id') id: string) {
-  //   return this.categoryService.getSpecificationsByCategoryId(id);
-  // }
+  @Get(':id/specifications/by-category')
+  async getSpecificationsByCategory(@Param('id') id: string) {
+    return this.categoryService.getSpecificationsByCategoryId(id);
+  }
 }

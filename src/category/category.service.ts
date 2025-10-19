@@ -11,7 +11,7 @@ import { CategoryEntity } from './entities/category.entity';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { slugify } from 'src/users/utility/slug/slugify';
 import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
-import { CategoryWithPagination } from 'src/users/interfaces/category';
+import { In } from 'typeorm';
 import { CategorySpecification } from 'src/specification/entities/CategorySpecification.entity';
 import { CategorySpecificationService } from 'src/specification/category-specification.service';
 
@@ -21,7 +21,7 @@ export class CategoryService {
     @InjectRepository(CategoryEntity)
     private readonly categoryRepo: Repository<CategoryEntity>,
 
-    @InjectRepository(CategoryEntity)
+    @InjectRepository(CategorySpecification)
     private readonly categorySpecificationRepo: Repository<CategorySpecification>,
 
     private readonly categorySpecification: CategorySpecificationService,
@@ -248,32 +248,71 @@ export class CategoryService {
     return { data: `Category with id ${id} removed successfully` };
   }
 
-  // category.service.ts
-  // async findAllCategoriesWithSpecifications(): Promise<CreateCategoryDto[]> {
-  //   const categories = await this.categoryRepo.find({
-  //     relations: ['parent', 'children'],
-  //   });
+  async getSpecificationsByCategoryId(categoryId: string) {
+    // Récupérer d'abord la catégorie
+    const category = await this.categoryRepo.findOne({
+      where: { id: categoryId },
+    });
 
-  //   const categoriesWithSpecs = await Promise.all(
-  //     categories.map(async (category) => {
-  //       const specifications = await this.categorySpecificationRepo.find({
-  //         where: { categoryId: category.id },
-  //         relations: ['specification'],
-  //         order: { displayOrder: 'ASC' },
-  //       });
+    if (!category) {
+      throw new NotFoundException(`Catégorie avec l'ID ${categoryId} non trouvée`);
+    }
 
-  //       return {
-  //         ...category,
-  //         specifications: specifications.map((cs) => ({
-  //           id: cs.id,
-  //           required: cs.required,
-  //           displayOrder: cs.displayOrder,
-  //           specification: cs.specification,
-  //         })),
-  //       };
-  //     }),
-  //   );
+    // Récupérer les CategorySpecification
+    const categorySpecs = await this.categorySpecificationRepo.find({
+      where: { categoryId },
+      order: { displayOrder: 'ASC' },
+    });
 
-  //   return categoriesWithSpecs;
-  // }
+    if (!categorySpecs.length) {
+      return {
+        message: `Aucune spécification trouvée pour la catégorie "${category.name}"`,
+        data: [],
+      };
+    }
+
+    // Récupérer les Specification correspondantes
+    const specificationIds = categorySpecs.map((cs) => cs.specificationId);
+    const specifications = await this.categorySpecificationRepo.find({
+      where: { id: In(specificationIds) },
+    });
+
+    // Créer un map pour un accès rapide
+    const specMap = new Map();
+    specifications.forEach((spec) => specMap.set(spec.id, spec));
+
+    // Combiner les données
+    const data = categorySpecs.map((cs) => {
+      const specification = specMap.get(cs.specificationId);
+
+      return {
+        categorySpecificationId: cs.id,
+        categoryId: cs.categoryId,
+        specificationId: cs.specificationId,
+        required: cs.required,
+        displayOrder: cs.displayOrder,
+        specification: specification
+          ? {
+              id: specification.id,
+              key: specification.key,
+              label: specification.label,
+              type: specification.type,
+              unit: specification.unit,
+              options: specification.options,
+            }
+          : null,
+      };
+    });
+
+    return {
+      message: `Spécifications de la catégorie "${category.name}" récupérées avec succès`,
+      category: {
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+      },
+      data,
+      count: data.length,
+    };
+  }
 }
