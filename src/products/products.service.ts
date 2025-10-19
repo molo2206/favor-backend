@@ -462,11 +462,12 @@ export class ProductService {
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
-    // Filtre par companyId
+    // 🔸 Filtre companyId
     if (companyId) {
       queryBuilder.andWhere('product.companyId = :companyId', { companyId });
     }
-    // Filtre catégorie
+
+    // 🔸 Filtre catégorie
     if (categoryId) {
       queryBuilder.andWhere(
         '(category.id = :categoryId OR categoryParent.id = :categoryId OR categoryChildren.id = :categoryId)',
@@ -474,46 +475,64 @@ export class ProductService {
       );
     }
 
-    // Filtre type produit
+    // 🔸 Filtre type produit
     if (type) {
       queryBuilder.andWhere('product.type = :type', { type });
     }
 
-    // Filtre shopType
+    // 🔸 Filtre shopType avec logique WHOLESALER / RETAILER / WHOLESALER_RETAILER
     if (shopType?.trim()) {
       if (shopType === CompanyActivity.WHOLESALER) {
         queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
           activities: [CompanyActivity.WHOLESALER, CompanyActivity.WHOLESALER_RETAILER],
         });
-      } else {
-        queryBuilder.andWhere('product.companyActivity = :shopType', { shopType });
+
+        queryBuilder.andWhere(
+          '(product.gros_price_original IS NOT NULL AND product.gros_price_original > 0)',
+        );
+      } else if (shopType === CompanyActivity.RETAILER) {
+        queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
+          activities: [CompanyActivity.RETAILER, CompanyActivity.WHOLESALER_RETAILER],
+        });
+
+        queryBuilder.andWhere(
+          '(product.detail_price_original IS NOT NULL AND product.detail_price_original > 0)',
+        );
+      } else if (shopType === CompanyActivity.WHOLESALER_RETAILER) {
+        queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
+          activities: [
+            CompanyActivity.WHOLESALER_RETAILER,
+            CompanyActivity.WHOLESALER,
+            CompanyActivity.RETAILER,
+          ],
+        });
+
+        queryBuilder.andWhere(
+          '((product.gros_price_original IS NOT NULL AND product.gros_price_original > 0) OR (product.detail_price_original IS NOT NULL AND product.detail_price_original > 0))',
+        );
       }
     }
 
-    // Filtre fuelType
+    // 🔸 Filtre fuelType
     if (fuelType) {
       queryBuilder.andWhere('product.fuelType = :fuelType', { fuelType });
     }
 
-    // Filtre transmission
+    // 🔸 Filtre transmission
     if (transmission) {
       queryBuilder.andWhere('product.transmission = :transmission', { transmission });
     }
 
-    // Filtre year exact
+    // 🔸 Filtre année
     if (year) {
       queryBuilder.andWhere('product.year = :year', { year });
     }
 
-    // Filtre intervalle de year (cast en number pour éviter lexicographique)
     if (yearStart !== undefined || yearEnd !== undefined) {
       if (yearStart !== undefined && yearEnd !== undefined) {
         queryBuilder.andWhere(
           'CAST(product.year AS UNSIGNED) BETWEEN :yearStart AND :yearEnd',
-          {
-            yearStart,
-            yearEnd,
-          },
+          { yearStart, yearEnd },
         );
       } else if (yearStart !== undefined) {
         queryBuilder.andWhere('CAST(product.year AS UNSIGNED) >= :yearStart', { yearStart });
@@ -522,7 +541,7 @@ export class ProductService {
       }
     }
 
-    // Logique typecar et filtres prix/dailyRate
+    // 🔸 Filtre prix & typecar
     if (typecar) {
       if (typecar === Type_rental_both_sale_car.SALE) {
         if (minSalePrice !== undefined)
@@ -555,10 +574,10 @@ export class ProductService {
       }
     }
 
-    // Tri par date de création
+    //  Tri par date
     queryBuilder.orderBy('product.createdAt', 'DESC');
 
-    // Pagination
+    //  Pagination
     if (limit > 0) {
       queryBuilder.skip((page - 1) * limit).take(limit);
     }
