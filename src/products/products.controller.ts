@@ -55,18 +55,41 @@ export class ProductController {
       throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
     }
 
+    // 🔹 Parse specifications si fournies
     let specifications;
     if (body.specifications) {
       try {
-        specifications = JSON.parse(body.specifications); // parse seulement si fourni
+        specifications = JSON.parse(body.specifications);
       } catch (error) {
         throw new BadRequestException('Le champ specifications doit être un JSON valide');
       }
     }
 
+    // 🔹 Parse attributes si fournies
+    let attributes;
+    if (body.attributes) {
+      try {
+        attributes = JSON.parse(body.attributes);
+      } catch (error) {
+        throw new BadRequestException('Le champ attributes doit être un JSON valide');
+      }
+    }
+
+    // 🔹 Parse skus si fournies
+    let skus;
+    if (body.skus) {
+      try {
+        skus = JSON.parse(body.skus);
+      } catch (error) {
+        throw new BadRequestException('Le champ skus doit être un JSON valide');
+      }
+    }
+
     const dto: CreateProductDto = {
       ...body,
-      specifications, // undefined si non fourni
+      specifications,
+      attributes,
+      skus,
     };
 
     const result = await this.productService.create(dto, files, user);

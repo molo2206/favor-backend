@@ -190,35 +190,52 @@ export class ProductService {
     // 🔹 Création des attributs et valeurs produits
     if (attributes && Array.isArray(attributes)) {
       for (const attr of attributes as CreateProductAttributeDto[]) {
-        const productAttr = this.productAttributeRepo.create({
+        // Préparer les données à insérer
+        const productAttrData: Partial<ProductAttribute> = {
           productId: product.id,
-          globalAttrId: attr.globalAttrId ?? undefined,
           name: attr.name,
-        });
+        };
+
+        // Ajouter globalAttrId uniquement s'il existe
+        if (attr.globalAttrId && attr.globalAttrId.trim() !== '') {
+          productAttrData.globalAttrId = attr.globalAttrId;
+        }
+
+        // Créer et sauvegarder l'attribut
+        const productAttr = this.productAttributeRepo.create(productAttrData);
         await this.productAttributeRepo.save(productAttr);
 
-        if ((attr as any).values && Array.isArray((attr as any).values)) {
-          for (const val of (attr as any).values) {
-            const attributeValue = this.attributeValueRepo.create({
-              attributeId: productAttr.id,
-              value: val.value,
-            });
-            await this.attributeValueRepo.save(attributeValue);
+        // Créer et sauvegarder les valeurs associées
+        if (attr.values && Array.isArray(attr.values)) {
+          for (const val of attr.values) {
+            if (val.value && val.value.trim() !== '') {
+              const attributeValue = this.attributeValueRepo.create({
+                attributeId: productAttr.id, // lier à l'attribut créé
+                value: val.value,
+              });
+              await this.attributeValueRepo.save(attributeValue);
+            }
           }
         }
       }
     }
+    function generateUniqueSku(base: string): string {
+      return `${base}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    }
 
-    // 🔹 Création des SKU
+    // 🔹 Création des SKUs avec génération automatique pour éviter les doublons
     if (skus && Array.isArray(skus)) {
       for (const skuDto of skus as CreateSkuDto[]) {
+        const skuCode = skuDto.skuCode
+          ? generateUniqueSku(skuDto.skuCode)
+          : generateUniqueSku('SKU');
         const sku = this.skuRepo.create({
           productId: product.id,
-          skuCode: skuDto.skuCode ?? null,
+          skuCode,
           price: skuDto.price,
           stock: skuDto.stock,
           attributesJson: skuDto.attributesJson ?? {},
-          imageUrl: skuDto.imageUrl ?? null,
+          imageUrl: skuDto.imageUrl ?? undefined, // 🔹 Remplace null par undefined
         } as DeepPartial<Sku>);
         await this.skuRepo.save(sku);
       }
@@ -854,7 +871,7 @@ export class ProductService {
   }
 
   async update(id: string, dto: CreateProductDto, user: UserEntity) {
-    const { categoryId, status, measureId, specifications, ...data } = dto;
+    const { categoryId, status, measureId, specifications, skus, attributes, ...data } = dto;
 
     const product = await this.productRepo.findOne({
       where: { id },
@@ -870,21 +887,23 @@ export class ProductService {
         'company.city',
         'specificationValues',
         'specificationValues.specification',
+        'skus',
+        'attributes', // ajouter si tu as une relation product.attributes
+        'attributes.values', // pour récupérer les valeurs existantes
       ],
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
 
     if (status) product.status = status;
-
     Object.assign(product, data);
 
-    // Lien avec la société active
+    // 🔹 Lien avec la société active
     const company = await this.companyRepo.findOne({ where: { id: user.activeCompanyId } });
     if (!company) throw new NotFoundException('Entreprise active non trouvée');
     product.company = company;
     product.type = company.typeCompany;
 
-    // Lien avec la catégorie
+    // 🔹 Lien avec la catégorie
     if (categoryId) {
       const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
       if (!category) throw new NotFoundException('Catégorie non trouvée');
@@ -893,7 +912,7 @@ export class ProductService {
       product.category = undefined;
     }
 
-    // Lien avec la mesure
+    // 🔹 Lien avec la mesure
     if (measureId) {
       const measure = await this.measureRepo.findOne({ where: { id: measureId } });
       if (!measure) throw new NotFoundException('Mesure non trouvée');
@@ -904,18 +923,24 @@ export class ProductService {
 
     const updatedProduct = await this.productRepo.save(product);
 
-    // ✅ Gestion des valeurs de spécifications
+    // 🔹 Gestion des valeurs de spécifications
     if (specifications && Array.isArray(specifications)) {
-      // 1. Supprimer toutes les anciennes valeurs pour ce produit
-      await this.productSpecificationValueService.removeAllValuesFromProduct(updatedProduct.id);
-
-      // 2. Ajouter ou mettre à jour les nouvelles
       for (const spec of specifications) {
-        if (!spec.specificationId) {
+        if (!spec.specificationId)
           throw new BadRequestException(
             'Chaque spécification doit contenir un specificationId',
           );
+
+        // Vérifier que la spécification existe dans la base
+        const specExists = await this.specRepo.findOne({
+          where: { id: spec.specificationId },
+        });
+        if (!specExists) {
+          throw new BadRequestException(
+            `La spécification avec id ${spec.specificationId} n'existe pas`,
+          );
         }
+
         await this.productSpecificationValueService.create({
           productId: updatedProduct.id,
           specificationId: spec.specificationId,
@@ -923,9 +948,76 @@ export class ProductService {
         });
       }
     }
+
+    // 🔹 Gestion des attributs
+    if (attributes && Array.isArray(attributes)) {
+      // Supprimer les anciens attributs et valeurs
+      if (product.attributes && product.attributes.length > 0) {
+        for (const attr of product.attributes) {
+          if (attr.values && attr.values.length > 0) {
+            await this.attributeValueRepo.remove(attr.values);
+          }
+        }
+        await this.productAttributeRepo.remove(product.attributes);
+      }
+
+      // Créer les nouveaux attributs et valeurs
+      for (const attr of attributes as CreateProductAttributeDto[]) {
+        const productAttrData: Partial<ProductAttribute> = {
+          productId: updatedProduct.id,
+          name: attr.name,
+          globalAttrId: attr.globalAttrId?.trim() || undefined,
+        };
+        const productAttr = this.productAttributeRepo.create(productAttrData);
+        await this.productAttributeRepo.save(productAttr);
+
+        if (attr.values && Array.isArray(attr.values)) {
+          for (const val of attr.values) {
+            const value = val.value?.trim();
+            if (value) {
+              const attributeValue = this.attributeValueRepo.create({
+                attributeId: productAttr.id,
+                value,
+              } as DeepPartial<AttributeValue>);
+              await this.attributeValueRepo.save(attributeValue);
+            }
+          }
+        }
+      }
+    }
+
+    // 🔹 Gestion des SKUs
+    if (skus && Array.isArray(skus)) {
+      // Supprimer les anciens SKUs
+      if (updatedProduct.skus && updatedProduct.skus.length > 0) {
+        await this.skuRepo.remove(updatedProduct.skus);
+      }
+
+      // Générer SKUs uniques
+      const generateUniqueSku = (base: string) =>
+        `${base}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      for (const skuDto of skus as CreateSkuDto[]) {
+        const skuCode = skuDto.skuCode
+          ? generateUniqueSku(skuDto.skuCode)
+          : generateUniqueSku('SKU');
+
+        const sku = this.skuRepo.create({
+          productId: updatedProduct.id,
+          skuCode,
+          price: skuDto.price,
+          stock: skuDto.stock,
+          attributesJson: skuDto.attributesJson ?? {},
+          imageUrl: skuDto.imageUrl ?? undefined,
+        } as DeepPartial<Sku>);
+        await this.skuRepo.save(sku);
+      }
+    }
+
     const serializedProduct = plainToInstance(Product, updatedProduct, {
       excludeExtraneousValues: true,
     });
+
     return {
       message: 'Produit mis à jour avec succès',
       data: serializedProduct,
@@ -1212,6 +1304,7 @@ export class ProductService {
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('category.parent', 'parentCategory')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
       .leftJoinAndSelect('specificationValues.specification', 'specification')
@@ -1233,6 +1326,7 @@ export class ProductService {
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('service.category', 'category')
+      .leftJoinAndSelect('category.parent', 'parentCategory')
       .leftJoinAndSelect('service.measure', 'measure')
       .leftJoinAndSelect('service.prestataires', 'prestataires')
       .leftJoinAndSelect('prestataires.prestataire', 'prestataire')

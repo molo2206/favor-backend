@@ -156,11 +156,13 @@ export class CreateProductDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateProductAttributeDto)
+  @Transform(({ value }) => (typeof value === 'string' ? JSON.parse(value) : value))
   attributes?: CreateProductAttributeDto[];
 
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateSkuDto)
+  @Transform(({ value }) => (typeof value === 'string' ? JSON.parse(value) : value))
   skus?: CreateSkuDto[];
 }
