@@ -1186,6 +1186,15 @@ export class ProductService {
     // 🔹 1. Recherche des companies
     const companyQuery = this.companyRepo
       .createQueryBuilder('company')
+      .leftJoinAndSelect('company.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('company.products', 'products')
+      .leftJoinAndSelect('company.branches', 'branches')
+      .leftJoinAndSelect('company.measures', 'measures')
+      .leftJoinAndSelect('company.services', 'services')
+      .leftJoinAndSelect('company.rooms', 'rooms')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .where('company.companyName LIKE :searchKey', { searchKey });
 
     if (type) {
