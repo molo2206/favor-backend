@@ -146,8 +146,9 @@ export class CreateProductDto {
   })
   specifications?: ProductSpecificationDto[];
 
+  @IsOptional()
   @IsString()
-  type: string;
+  type?: string;
 
   @IsOptional()
   @IsArray()

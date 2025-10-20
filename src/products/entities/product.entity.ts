@@ -53,7 +53,7 @@ export class Product {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   gros?: number;
 
-  @Column()
+  @Column({ nullable: true })
   type: string;
 
   // Champs spécifiques aux cars
