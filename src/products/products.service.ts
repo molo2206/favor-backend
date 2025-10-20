@@ -1126,6 +1126,7 @@ export class ProductService {
     // 🔹 2. Recherche des produits
     const productQuery = this.productRepo
       .createQueryBuilder('product')
+      .leftJoinAndSelect('product.company', 'company') // 🔹 nécessaire
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.measure', 'measure')
@@ -1186,7 +1187,7 @@ export class ProductService {
       groupedResults.SERVICE_LIST.push(serv);
     }
 
-    //  8. Retour
+    // 🔹 8. Retour
     return {
       message:
         companies.length === 0 && products.length === 0 && services.length === 0
