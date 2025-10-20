@@ -31,6 +31,7 @@ import { CreateProductSpecificationValueDto } from 'src/specification/dto/create
 import { plainToInstance } from 'class-transformer';
 import { Wishlist } from './entities/wishlists.entity';
 import { CreateWishlistDto } from './dto/create-wishlist.dto';
+import { Service } from 'src/service/entities/service.entity';
 
 @Injectable()
 export class ProductService {
@@ -46,6 +47,9 @@ export class ProductService {
 
     @InjectRepository(ImageProductEntity)
     private imageRepository: Repository<ImageProductEntity>,
+
+    @InjectRepository(Service)
+    private readonly serviceRepo: Repository<Service>,
 
     private readonly cloudinary: CloudinaryService,
 
@@ -1103,5 +1107,108 @@ export class ProductService {
     await this.wishlistRepo.save(item);
 
     return { message: 'Produit retiré de la wishlist' };
+  }
+
+  async search(keyword?: string, type?: CompanyType) {
+    const searchKey = keyword ? `%${keyword}%` : '%';
+
+    // 🟡 1. Recherche des COMPANIES
+    const companyQuery = this.companyRepo
+      .createQueryBuilder('company')
+      .where('company.companyName LIKE :searchKey', { searchKey });
+
+    if (type) {
+      companyQuery.andWhere('company.typeCompany = :type', { type });
+    }
+
+    const companies = await companyQuery.getMany();
+
+    // 🟡 2. Recherche des PRODUITS
+    const productQuery = this.productRepo
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('specificationValues.specification', 'specification')
+      .where('(product.name LIKE :searchKey OR product.description LIKE :searchKey)', {
+        searchKey,
+      });
+
+    if (type) {
+      productQuery.andWhere('company.typeCompany = :type', { type });
+    }
+
+    const products = await productQuery.orderBy('product.createdAt', 'DESC').getMany();
+
+    // 🟡 3. Recherche des SERVICES
+    const serviceQuery = this.serviceRepo
+      .createQueryBuilder('service')
+      .leftJoinAndSelect('service.company', 'company')
+      .leftJoinAndSelect('service.category', 'category')
+      .leftJoinAndSelect('service.measure', 'measure')
+      .leftJoinAndSelect('service.prestataires', 'prestataires')
+      .leftJoinAndSelect('prestataires.prestataire', 'prestataire')
+      .where('(service.name LIKE :searchKey OR service.description LIKE :searchKey)', {
+        searchKey,
+      });
+
+    if (type) {
+      serviceQuery.andWhere('company.typeCompany = :type', { type });
+    }
+
+    const services = await serviceQuery.orderBy('service.createdAt', 'DESC').getMany();
+
+    // 🟡 4. Initialiser les groupes selon l'enum CompanyType
+    const groupedResults: Record<
+      CompanyType,
+      { companies: any[]; products: any[]; services: any[] }
+    > = {
+      [CompanyType.RESTAURANT]: { companies: [], products: [], services: [] },
+      [CompanyType.CAR]: { companies: [], products: [], services: [] },
+      [CompanyType.GROCERY]: { companies: [], products: [], services: [] },
+      [CompanyType.SHOP]: { companies: [], products: [], services: [] },
+      [CompanyType.SERVICE]: { companies: [], products: [], services: [] },
+      [CompanyType.HOTEL]: { companies: [], products: [], services: [] },
+      [CompanyType.SHIPPING]: { companies: [], products: [], services: [] },
+    };
+
+    // 🟡 5. Ajouter les companies dans les bons groupes
+    for (const comp of companies) {
+      if (groupedResults[comp.typeCompany]) {
+        groupedResults[comp.typeCompany].companies.push(comp);
+      }
+    }
+
+    // 🟡 6. Ajouter les produits dans les bons groupes
+    for (const prod of products) {
+      if (groupedResults[prod.company.typeCompany]) {
+        groupedResults[prod.company.typeCompany].products.push(prod);
+      }
+    }
+
+    // 🟡 7. Ajouter les services dans les bons groupes
+    for (const serv of services) {
+      if (groupedResults[serv.company.typeCompany]) {
+        groupedResults[serv.company.typeCompany].services.push(serv);
+      }
+    }
+
+    // 🟡 8. Nettoyer les groupes vides (si souhaité)
+    const filteredGroups = Object.entries(groupedResults)
+      .filter(
+        ([, content]) =>
+          content.companies.length || content.products.length || content.services.length,
+      )
+      .reduce((obj, [key, value]) => ({ ...obj, [key]: value }), {});
+
+    return {
+      message:
+        companies.length === 0 && products.length === 0 && services.length === 0
+          ? 'Aucun résultat trouvé.'
+          : 'Résultats de la recherche récupérés avec succès.',
+      data: filteredGroups,
+    };
   }
 }

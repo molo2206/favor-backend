@@ -314,6 +314,10 @@ export class ProductController {
     return this.productService.removeFromWishlist(user, productId);
   }
 
+  @Get('search/all')
+  async searchAll(@Query('keyword') keyword?: string, @Query('type') type?: CompanyType) {
+    return this.productService.search(keyword, type);
+  }
   // Supprimer un produit
   // @Delete(':id')
   // remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
