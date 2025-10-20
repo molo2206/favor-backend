@@ -15,6 +15,8 @@ import { Type_rental_both_sale_car } from '../enum/type_rental_both_sale_car';
 import { FuelType } from '../enum/fuelType_enum';
 import { Transmission } from '../enum/transmission.enum';
 import { ProductSpecificationDto } from './create-product-specification.dto';
+import { CreateSkuDto } from 'src/Attribut/dto/create-sku.dto';
+import { CreateProductAttributeDto } from 'src/Attribut/dto/create-product-attribute.dto';
 
 export class CreateProductDto {
   // Obligatoire
@@ -153,47 +155,12 @@ export class CreateProductDto {
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => ProductAttributeDto)
-  attributes?: ProductAttributeDto[];
+  @Type(() => CreateProductAttributeDto)
+  attributes?: CreateProductAttributeDto[];
 
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => SkuDto)
-  skus?: SkuDto[];
-}
-
-class AttributeValueDto {
-  @IsString()
-  value: string;
-}
-
-class ProductAttributeDto {
-  @IsString()
-  name: string;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AttributeValueDto)
-  values?: AttributeValueDto[];
-}
-
-class SkuDto {
-  @IsOptional()
-  @IsString()
-  skuCode?: string;
-
-  @IsNumber()
-  price: number;
-
-  @IsInt()
-  stock: number;
-
-  @IsOptional()
-  attributesJson?: Record<string, string>;
-
-  @IsOptional()
-  @IsString()
-  imageUrl?: string;
+  @Type(() => CreateSkuDto)
+  skus?: CreateSkuDto[];
 }

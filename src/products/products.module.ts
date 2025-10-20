@@ -14,6 +14,10 @@ import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
 import { ProductSpecificationValueModule } from 'src/specification/product-specification.module';
 import { Wishlist } from './entities/wishlists.entity';
 import { Service } from 'src/service/entities/service.entity';
+import { AttributeValue } from 'src/Attribut/entities/attribute_values.entity';
+import { Sku } from 'src/Attribut/entities/skus.entity';
+import { ProductAttribute } from 'src/Attribut/entities/product_attributes.entity';
+import { Specification } from 'src/specification/entities/Specification.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -25,7 +29,11 @@ import { Service } from 'src/service/entities/service.entity';
       TauxCompany,
       OrderItemEntity,
       Wishlist,
-      Service
+      Service,
+      ProductAttribute, // <-- ajoute ici
+      AttributeValue,
+      Sku,
+      Specification
     ]),
     ProductSpecificationValueModule,
     CloudinaryModule,

@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DeepPartial, Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { CompanyEntity } from 'src/company/entities/company.entity';
@@ -32,6 +32,12 @@ import { plainToInstance } from 'class-transformer';
 import { Wishlist } from './entities/wishlists.entity';
 import { CreateWishlistDto } from './dto/create-wishlist.dto';
 import { Service } from 'src/service/entities/service.entity';
+import { ProductAttribute } from 'src/Attribut/entities/product_attributes.entity';
+import { AttributeValue } from 'src/Attribut/entities/attribute_values.entity';
+import { Sku } from 'src/Attribut/entities/skus.entity';
+import { CreateSkuDto } from 'src/Attribut/dto/create-sku.dto';
+import { CreateProductAttributeDto } from 'src/Attribut/dto/create-product-attribute.dto';
+import { Specification } from 'src/specification/entities/Specification.entity';
 
 @Injectable()
 export class ProductService {
@@ -63,6 +69,19 @@ export class ProductService {
 
     @InjectRepository(Wishlist)
     private readonly wishlistRepo: Repository<Wishlist>,
+
+    // 🔹 Injection pour ProductAttribute et AttributeValue
+    @InjectRepository(ProductAttribute)
+    private readonly productAttributeRepo: Repository<ProductAttribute>,
+
+    @InjectRepository(AttributeValue)
+    private readonly attributeValueRepo: Repository<AttributeValue>,
+
+    @InjectRepository(Sku)
+    private skuRepo: Repository<Sku>,
+
+    @InjectRepository(Specification)
+    private specRepo: Repository<Specification>,
   ) {}
 
   async create(
@@ -70,14 +89,18 @@ export class ProductService {
     files: Express.Multer.File[],
     user: UserWithCompanyStatus,
   ): Promise<{ message: string; data: Product }> {
-    const { categoryId, status, measureId, min_quantity, specifications, ...data } =
-      createProductDto;
-    // if (user.companyStatus !== CompanyStatus.VALIDATED) {
-    //   throw new ForbiddenException(
-    //     'Votre société n’est pas encore validée. Impossible de créer un produit.',
-    //   );
-    // }
+    const {
+      categoryId,
+      status,
+      measureId,
+      min_quantity,
+      specifications,
+      attributes,
+      skus,
+      ...data
+    } = createProductDto;
 
+    // 🔹 Validation images
     if (!files || files.length < 2 || files.length > 4) {
       throw new BadRequestException('Vous devez fournir entre 2 et 4 images');
     }
@@ -86,30 +109,28 @@ export class ProductService {
       throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
     }
 
-    const company = await this.companyRepo.findOne({
-      where: { id: user.activeCompanyId },
-    });
+    const company = await this.companyRepo.findOne({ where: { id: user.activeCompanyId } });
+    if (!company) throw new NotFoundException('Entreprise active introuvable');
 
-    if (!company) {
-      throw new NotFoundException('Entreprise active introuvable');
-    }
-
-    let category: CategoryEntity | null | undefined = undefined;
+    // 🔹 Récupération catégorie
+    let category: CategoryEntity | null | undefined;
     if (categoryId) {
       category = await this.categoryRepo.findOne({ where: { id: categoryId } });
       if (!category) throw new NotFoundException('Catégorie non trouvée');
     }
 
-    let measure: MeasureEntity | null | undefined = undefined;
+    // 🔹 Récupération mesure
+    let measure: MeasureEntity | null | undefined;
     if (measureId) {
       measure = await this.measureRepo.findOne({ where: { id: measureId } });
       if (!measure) throw new NotFoundException('Mesure non trouvée');
     }
 
+    // 🔹 Upload image principale
     const mainImage = await this.cloudinary.handleUploadImage(files[0], 'product');
-
     const productStatus = status || ProductStatus.PENDING;
 
+    // 🔹 Vérification min_quantity pour grossiste
     if (
       (company.companyActivity === CompanyActivity.WHOLESALER ||
         company.companyActivity === CompanyActivity.WHOLESALER_RETAILER) &&
@@ -120,9 +141,10 @@ export class ProductService {
       );
     }
 
+    // 🔹 Création du produit
     const product = this.productRepo.create({
       ...data,
-      min_quantity: min_quantity ?? 0, // si ce n’est pas grossiste, on met 0
+      min_quantity: min_quantity ?? 0,
       company,
       category,
       measure,
@@ -130,37 +152,83 @@ export class ProductService {
       type: company.typeCompany,
       status: productStatus,
       companyActivity: company.companyActivity,
-    });
-
+    } as DeepPartial<Product>);
     await this.productRepo.save(product);
 
+    // 🔹 Upload des images secondaires
     const secondaryImages: ImageProductEntity[] = [];
     for (const file of files) {
       const uploaded = await this.cloudinary.handleUploadImage(file, 'product');
-      const imageEntity = new ImageProductEntity();
-      imageEntity.url = uploaded;
-      imageEntity.product = product;
-      secondaryImages.push(imageEntity);
+      const imageEntity = this.imageRepository.create({ url: uploaded, product });
+      secondaryImages.push(await this.imageRepository.save(imageEntity));
     }
-
-    await this.imageRepository.save(secondaryImages);
     product.images = secondaryImages;
 
+    // 🔹 Création des spécifications
     if (specifications && Array.isArray(specifications)) {
       for (const spec of specifications) {
-        // Crée un DTO conforme à CreateProductSpecificationValueDto
-        const specValueDto: CreateProductSpecificationValueDto = {
-          productId: product.id, // ← on utilise productId et non product
-          specificationId: spec.specificationId,
-          value: spec.value ?? undefined, // undefined si non fourni
-        };
+        const specification = await this.specRepo.findOne({
+          where: { id: spec.specificationId },
+        });
 
+        if (!specification) {
+          // 🚨 La spécification n'existe pas, on renvoie une erreur
+          throw new BadRequestException(
+            `La spécification avec l'ID ${spec.specificationId} n'existe pas.`,
+          );
+        }
+
+        const specValueDto: CreateProductSpecificationValueDto = {
+          productId: product.id,
+          specificationId: specification.id,
+          value: spec.value ?? undefined,
+        };
         await this.productSpecificationValueService.create(specValueDto);
       }
     }
+
+    // 🔹 Création des attributs et valeurs produits
+    if (attributes && Array.isArray(attributes)) {
+      for (const attr of attributes as CreateProductAttributeDto[]) {
+        const productAttr = this.productAttributeRepo.create({
+          productId: product.id,
+          globalAttrId: attr.globalAttrId ?? undefined,
+          name: attr.name,
+        });
+        await this.productAttributeRepo.save(productAttr);
+
+        if ((attr as any).values && Array.isArray((attr as any).values)) {
+          for (const val of (attr as any).values) {
+            const attributeValue = this.attributeValueRepo.create({
+              attributeId: productAttr.id,
+              value: val.value,
+            });
+            await this.attributeValueRepo.save(attributeValue);
+          }
+        }
+      }
+    }
+
+    // 🔹 Création des SKU
+    if (skus && Array.isArray(skus)) {
+      for (const skuDto of skus as CreateSkuDto[]) {
+        const sku = this.skuRepo.create({
+          productId: product.id,
+          skuCode: skuDto.skuCode ?? null,
+          price: skuDto.price,
+          stock: skuDto.stock,
+          attributesJson: skuDto.attributesJson ?? {},
+          imageUrl: skuDto.imageUrl ?? null,
+        } as DeepPartial<Sku>);
+        await this.skuRepo.save(sku);
+      }
+    }
+
+    // 🔹 Sérialisation finale
     const serializedProduct = plainToInstance(Product, product, {
       excludeExtraneousValues: true,
     });
+
     return {
       message: 'Produit créé avec succès',
       data: serializedProduct,
@@ -1080,6 +1148,9 @@ export class ProductService {
         'product.category',
         'product.measure',
         'product.company',
+        'product.company.tauxCompanies',
+        'product.company.country',
+        'product.company.city',
         'product.specificationValues',
         'product.specificationValues.specification',
         'product.rentalContracts',
@@ -1127,6 +1198,9 @@ export class ProductService {
     const productQuery = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company') // 🔹 nécessaire
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.measure', 'measure')
@@ -1146,6 +1220,9 @@ export class ProductService {
     const serviceQuery = this.serviceRepo
       .createQueryBuilder('service')
       .leftJoinAndSelect('service.company', 'company')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('service.category', 'category')
       .leftJoinAndSelect('service.measure', 'measure')
       .leftJoinAndSelect('service.prestataires', 'prestataires')
@@ -1179,7 +1256,9 @@ export class ProductService {
 
     // 🔹 6. Ajouter tous les produits dans PRODUCT
     for (const prod of products) {
-      groupedResults.PRODUCT.push(prod);
+      if (prod.company?.typeCompany === CompanyType.SHOP) {
+        groupedResults.PRODUCT.push(prod);
+      }
     }
 
     // 🔹 7. Ajouter tous les services dans SERVICE_LIST

@@ -1,8 +1,11 @@
 // create-global-attribute-value.dto.ts
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
 
 export class CreateGlobalAttributeValueDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
   @IsString()
-  @IsNotEmpty()
   value: string;
 }

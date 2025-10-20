@@ -15,7 +15,6 @@ export class CreateGlobalAttributeDto {
   platform: string;
 
   @IsOptional()
-  @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateGlobalAttributeValueDto)
   values?: CreateGlobalAttributeValueDto[];

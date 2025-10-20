@@ -82,38 +82,34 @@ export class GlobalAttributeService {
 
   //  Mettre à jour un attribut
   async updateWithValues(id: string, data: UpdateGlobalAttributeDto) {
-    // 1️⃣ Mettre à jour l'attribut global
+    // 1️⃣ Récupérer l'attribut global avec ses valeurs
     const attribute = await this.globalAttrRepo.findOne({
       where: { id },
       relations: ['values'],
     });
     if (!attribute) throw new NotFoundException(`GlobalAttribute avec l'id ${id} introuvable`);
 
+    // 2️⃣ Mettre à jour l'attribut
     if (data.name) attribute.name = data.name;
     if (data.platform) attribute.platform = data.platform;
-
     await this.globalAttrRepo.save(attribute);
 
-    // 2️⃣ Gérer les valeurs
-    let updatedValues: GlobalAttributeValue[] = [];
+    // 3️⃣ Supprimer toutes les valeurs existantes
+    if (attribute.values && attribute.values.length > 0) {
+      const valueIds = attribute.values.map((v) => v.id);
+      await this.globalAttrValueRepo.delete(valueIds);
+    }
+
+    // 4️⃣ Créer les nouvelles valeurs
+    let newValues: GlobalAttributeValue[] = [];
     if (data.values && data.values.length > 0) {
       for (const val of data.values) {
-        if (val.id) {
-          // Mettre à jour une valeur existante
-          const existing = attribute.values.find((v) => v.id === val.id);
-          if (existing) {
-            existing.value = val.value ?? existing.value; // garde l'ancienne valeur si undefined
-            updatedValues.push(await this.globalAttrValueRepo.save(existing));
-          }
-        } else {
-          // Ajouter une nouvelle valeur
-          const newVal = this.globalAttrValueRepo.create({ value: val.value, attribute });
-          updatedValues.push(await this.globalAttrValueRepo.save(newVal));
-        }
+        const newVal = this.globalAttrValueRepo.create({ value: val.value, attribute });
+        newValues.push(await this.globalAttrValueRepo.save(newVal));
       }
     }
 
-    // 3️⃣ Retourner l’attribut avec ses valeurs mises à jour
+    // 5️⃣ Retourner l’attribut avec ses nouvelles valeurs
     const refreshedAttribute = await this.globalAttrRepo.findOne({
       where: { id },
       relations: ['values'],
