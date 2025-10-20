@@ -22,6 +22,7 @@ import { RentalContract } from 'src/rental-contract/entities/rental-contract.ent
 import { SaleTransaction } from 'src/sale-transaction/entities/sale-transaction.entity';
 import { Booking } from 'src/booking/entities/booking.entity';
 import { UserPlatformRoleEntity } from './user_plateform_roles.entity';
+import { Wishlist } from 'src/products/entities/wishlists.entity';
 
 @Entity('users')
 export class UserEntity {
@@ -136,4 +137,7 @@ export class UserEntity {
 
   @OneToMany(() => UserPlatformRoleEntity, (upr) => upr.user)
   userPlatformRoles: UserPlatformRoleEntity[];
+
+  @OneToMany(() => Wishlist, (wishlist) => wishlist.user)
+  wishlist: Wishlist[];
 }

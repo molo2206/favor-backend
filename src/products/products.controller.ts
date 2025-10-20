@@ -13,6 +13,7 @@ import {
   ClassSerializerInterceptor,
   Query,
   BadRequestException,
+  Delete,
 } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { Product } from './entities/product.entity';
@@ -30,6 +31,7 @@ import { FuelType } from './enum/fuelType_enum';
 import { Transmission } from './enum/transmission.enum';
 import { Type_rental_both_sale_car } from './enum/type_rental_both_sale_car';
 import { CompanyType } from 'src/company/enum/type.company.enum';
+import { CreateWishlistDto } from './dto/create-wishlist.dto';
 
 @Controller('products')
 export class ProductController {
@@ -289,6 +291,27 @@ export class ProductController {
       message: result.message,
       data: result.data,
     };
+  }
+
+  @Post('/add/new/wishlist')
+  @UseGuards(AuthentificationGuard)
+  async addToWishlist(@CurrentUser() user: UserEntity, @Body() dto: CreateWishlistDto) {
+    return this.productService.addToWishlist(user, dto);
+  }
+
+  @Get('/get/wishlist')
+  @UseGuards(AuthentificationGuard)
+  async getUserWishlist(@CurrentUser() user: UserEntity) {
+    return this.productService.getUserWishlist(user);
+  }
+
+  @Delete(':productId/wishlist/delete')
+  @UseGuards(AuthentificationGuard)
+  async removeFromWishlist(
+    @CurrentUser() user: UserEntity,
+    @Param('productId') productId: string,
+  ) {
+    return this.productService.removeFromWishlist(user, productId);
   }
 
   // Supprimer un produit

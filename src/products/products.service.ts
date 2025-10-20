@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -28,6 +29,8 @@ import { CompanyType } from 'src/company/enum/type.company.enum';
 import { ProductSpecificationValueService } from 'src/specification/product-specification.service';
 import { CreateProductSpecificationValueDto } from 'src/specification/dto/create-product-specification-value.dto';
 import { plainToInstance } from 'class-transformer';
+import { Wishlist } from './entities/wishlists.entity';
+import { CreateWishlistDto } from './dto/create-wishlist.dto';
 
 @Injectable()
 export class ProductService {
@@ -53,6 +56,9 @@ export class ProductService {
 
     @InjectRepository(OrderItemEntity)
     private readonly orderItemRepo: Repository<OrderItemEntity>,
+
+    @InjectRepository(Wishlist)
+    private readonly wishlistRepo: Repository<Wishlist>,
   ) {}
 
   async create(
@@ -998,5 +1004,104 @@ export class ProductService {
         limit,
       },
     };
+  }
+
+  async addToWishlist(user: UserEntity, dto: CreateWishlistDto) {
+    // Vérification utilisateur
+    if (!user || !user.id) {
+      throw new BadRequestException('Utilisateur non trouvé ou non connecté');
+    }
+
+    // Vérification productId
+    if (!dto.productId) {
+      throw new BadRequestException('productId est obligatoire');
+    }
+
+    // Vérification existence du produit
+    const product = await this.productRepo.findOne({ where: { id: dto.productId } });
+    if (!product) throw new NotFoundException('Produit introuvable');
+
+    // Vérification si le produit est déjà dans la wishlist
+    const existing = await this.wishlistRepo.findOne({
+      where: { user: { id: user.id }, product: { id: product.id } },
+    });
+
+    // Déjà dans la wishlist
+    if (existing && !existing.deleted) {
+      throw new ConflictException('Ce produit est déjà dans la wishlist');
+    }
+
+    // Restaurer un item supprimé
+    if (existing && existing.deleted) {
+      existing.deleted = false;
+      existing.status = true;
+      const restored = await this.wishlistRepo.save(existing);
+      return {
+        message: 'Produit restauré dans la wishlist avec succès',
+        data: restored,
+      };
+    }
+
+    // Créer un nouvel item wishlist
+    const wishlistItem = this.wishlistRepo.create({
+      user,
+      product,
+      deleted: false,
+      status: true,
+      shopType: dto.shopType,
+    });
+
+    const savedItem = await this.wishlistRepo.save(wishlistItem);
+
+    return {
+      message: 'Produit ajouté à la wishlist avec succès',
+      data: savedItem,
+    };
+  }
+
+  async getUserWishlist(user: UserEntity) {
+    if (!user || !user.id) {
+      throw new BadRequestException('Utilisateur non trouvé ou non connecté');
+    }
+
+    const wishlistItems = await this.wishlistRepo.find({
+      where: {
+        user: { id: user.id },
+        deleted: false,
+        status: true,
+      },
+      relations: [
+        'product',
+        'product.images',
+        'product.category',
+        'product.measure',
+        'product.company',
+        'product.specificationValues',
+        'product.specificationValues.specification',
+        'product.rentalContracts',
+        'product.saleTransactions',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      message: 'Wishlist récupérée avec succès',
+      data: wishlistItems,
+    };
+  }
+
+  async removeFromWishlist(user: UserEntity, productId: string) {
+    const item = await this.wishlistRepo.findOne({
+      where: { user: { id: user.id }, product: { id: productId }, deleted: false },
+    });
+
+    if (!item) throw new NotFoundException('Ce produit n’est pas dans la wishlist');
+
+    // Soft delete
+    item.deleted = true;
+    item.status = false;
+    await this.wishlistRepo.save(item);
+
+    return { message: 'Produit retiré de la wishlist' };
   }
 }

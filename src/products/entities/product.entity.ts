@@ -23,6 +23,7 @@ import { SaleTransaction } from 'src/sale-transaction/entities/sale-transaction.
 import { ProductSpecificationValue } from 'src/specification/entities/ProductSpecificationValue.entity';
 import { Sku } from 'src/Attribut/entities/skus.entity';
 import { ProductAttribute } from 'src/Attribut/entities/product_attributes.entity';
+import { Wishlist } from './wishlists.entity';
 
 @Entity('products')
 export class Product {
@@ -153,10 +154,12 @@ export class Product {
   @OneToMany(() => ProductSpecificationValue, (pv) => pv.product, { cascade: true })
   specificationValues: ProductSpecificationValue[];
 
-   @OneToMany(() => ProductAttribute, (attr) => attr.product, { cascade: true })
+  @OneToMany(() => ProductAttribute, (attr) => attr.product, { cascade: true })
   attributes: ProductAttribute[];
 
-    @OneToMany(() => Sku, (sku) => sku.product, { cascade: true })
+  @OneToMany(() => Sku, (sku) => sku.product, { cascade: true })
   skus: Sku[];
-  
+
+  @OneToMany(() => Wishlist, (wishlist) => wishlist.product)
+  wishlist: Wishlist[];
 }

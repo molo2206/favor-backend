@@ -7,6 +7,7 @@ import {
   IsNumberString,
   IsArray,
   ValidateNested,
+  IsInt,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
@@ -131,17 +132,67 @@ export class CreateProductDto {
   @IsString()
   color?: string;
 
-@IsOptional()
-@IsArray()
-@Transform(({ value }) => {
-  if (typeof value === 'string') {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return value;
+  @IsOptional()
+  @IsArray()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value;
+      }
     }
-  }
-  return value;
-})
-specifications?: ProductSpecificationDto[];
+    return value;
+  })
+  specifications?: ProductSpecificationDto[];
+
+  @IsString()
+  type: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductAttributeDto)
+  attributes?: ProductAttributeDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SkuDto)
+  skus?: SkuDto[];
+}
+
+class AttributeValueDto {
+  @IsString()
+  value: string;
+}
+
+class ProductAttributeDto {
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AttributeValueDto)
+  values?: AttributeValueDto[];
+}
+
+class SkuDto {
+  @IsOptional()
+  @IsString()
+  skuCode?: string;
+
+  @IsNumber()
+  price: number;
+
+  @IsInt()
+  stock: number;
+
+  @IsOptional()
+  attributesJson?: Record<string, string>;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }

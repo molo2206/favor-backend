@@ -119,7 +119,7 @@ export class UsersController {
     return { message: '2FA activé avec succès.' };
   }
 
-  // ────── 🧑‍💻 Mise à jour de profil et image ──────
+  // ────── Mise à jour de profil et image ──────
 
   @UseGuards(AuthentificationGuard)
   @Patch('me')
