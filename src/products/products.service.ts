@@ -1112,7 +1112,7 @@ export class ProductService {
   async search(keyword?: string, type?: CompanyType) {
     const searchKey = keyword ? `%${keyword}%` : '%';
 
-    // 🟡 1. Recherche des COMPANIES
+    // 🔹 1. Recherche des companies
     const companyQuery = this.companyRepo
       .createQueryBuilder('company')
       .where('company.companyName LIKE :searchKey', { searchKey });
@@ -1123,10 +1123,9 @@ export class ProductService {
 
     const companies = await companyQuery.getMany();
 
-    // 🟡 2. Recherche des PRODUITS
+    // 🔹 2. Recherche des produits
     const productQuery = this.productRepo
       .createQueryBuilder('product')
-      .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.measure', 'measure')
@@ -1142,7 +1141,7 @@ export class ProductService {
 
     const products = await productQuery.orderBy('product.createdAt', 'DESC').getMany();
 
-    // 🟡 3. Recherche des SERVICES
+    // 🔹 3. Recherche des services
     const serviceQuery = this.serviceRepo
       .createQueryBuilder('service')
       .leftJoinAndSelect('service.company', 'company')
@@ -1160,55 +1159,40 @@ export class ProductService {
 
     const services = await serviceQuery.orderBy('service.createdAt', 'DESC').getMany();
 
-    // 🟡 4. Initialiser les groupes selon l'enum CompanyType
-    const groupedResults: Record<
-      CompanyType,
-      { companies: any[]; products: any[]; services: any[] }
-    > = {
-      [CompanyType.RESTAURANT]: { companies: [], products: [], services: [] },
-      [CompanyType.CAR]: { companies: [], products: [], services: [] },
-      [CompanyType.GROCERY]: { companies: [], products: [], services: [] },
-      [CompanyType.SHOP]: { companies: [], products: [], services: [] },
-      [CompanyType.SERVICE]: { companies: [], products: [], services: [] },
-      [CompanyType.HOTEL]: { companies: [], products: [], services: [] },
-      [CompanyType.SHIPPING]: { companies: [], products: [], services: [] },
+    // 🔹 4. Préparer la structure finale
+    const groupedResults: Record<string, any> = {
+      [CompanyType.RESTAURANT]: [],
+      [CompanyType.GROCERY]: [],
+      [CompanyType.SHOP]: [],
+      [CompanyType.SERVICE]: [],
+      PRODUCT: [],
+      SERVICE_LIST: [],
     };
 
-    // 🟡 5. Ajouter les companies dans les bons groupes
-    for (const comp of companies) {
-      if (groupedResults[comp.typeCompany]) {
-        groupedResults[comp.typeCompany].companies.push(comp);
+    // 🔹 5. Ajouter les companies dans les bons groupes
+    for (const company of companies) {
+      if (groupedResults[company.typeCompany]) {
+        groupedResults[company.typeCompany].push(company);
       }
     }
 
-    // 🟡 6. Ajouter les produits dans les bons groupes
+    // 🔹 6. Ajouter tous les produits dans PRODUCT
     for (const prod of products) {
-      if (groupedResults[prod.company.typeCompany]) {
-        groupedResults[prod.company.typeCompany].products.push(prod);
-      }
+      groupedResults.PRODUCT.push(prod);
     }
 
-    // 🟡 7. Ajouter les services dans les bons groupes
+    // 🔹 7. Ajouter tous les services dans SERVICE_LIST
     for (const serv of services) {
-      if (groupedResults[serv.company.typeCompany]) {
-        groupedResults[serv.company.typeCompany].services.push(serv);
-      }
+      groupedResults.SERVICE_LIST.push(serv);
     }
 
-    // 🟡 8. Nettoyer les groupes vides (si souhaité)
-    const filteredGroups = Object.entries(groupedResults)
-      .filter(
-        ([, content]) =>
-          content.companies.length || content.products.length || content.services.length,
-      )
-      .reduce((obj, [key, value]) => ({ ...obj, [key]: value }), {});
-
+    //  8. Retour
     return {
       message:
         companies.length === 0 && products.length === 0 && services.length === 0
           ? 'Aucun résultat trouvé.'
           : 'Résultats de la recherche récupérés avec succès.',
-      data: filteredGroups,
+      data: groupedResults,
     };
   }
 }
