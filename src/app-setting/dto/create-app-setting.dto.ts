@@ -3,7 +3,8 @@ import { IsOptional, IsString, IsObject, IsNumber } from 'class-validator';
 export class CreateAppSettingDto {
   /** Seul champ obligatoire */
   @IsString()
-  appName: string;
+  @IsOptional()
+  appName?: string;
 
   @IsString()
   @IsOptional()

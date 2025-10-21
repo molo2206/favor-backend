@@ -1,49 +1,89 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { GlobalAttribute } from './entities/global_attributes.entity';
 import { GlobalAttributeValue } from './entities/global_attribute_values.entity';
 import { UpdateGlobalAttributeDto } from './dto/update-global-attribute.dto';
+import { GlobalAttributesSpecification } from './entities/global_attributes_specification.entity';
+import { Specification } from 'src/specification/entities/Specification.entity';
 
 @Injectable()
 export class GlobalAttributeService {
   constructor(
+    private readonly dataSource: DataSource,
     @InjectRepository(GlobalAttribute)
     private readonly globalAttrRepo: Repository<GlobalAttribute>,
 
     @InjectRepository(GlobalAttributeValue)
     private readonly globalAttrValueRepo: Repository<GlobalAttributeValue>,
+
+    @InjectRepository(GlobalAttributesSpecification)
+    private readonly gasRepo: Repository<GlobalAttributesSpecification>,
+
+    @InjectRepository(Specification)
+    private readonly specRepo: Repository<Specification>,
   ) {}
 
   // Créer un nouvel attribut global
-  async createWithValues(data: {
+  async createWithValuesAndSpecs(data: {
     name: string;
-    platform: string;
     values?: Partial<GlobalAttributeValue>[];
+    specifications?: {
+      specificationId: string;
+      isRequired?: boolean;
+      status?: boolean;
+    }[];
   }) {
-    // 🔹 Création de l'attribut global
-    const attribute = this.globalAttrRepo.create({
-      name: data.name,
-      platform: data.platform,
+    return await this.dataSource.transaction(async (manager) => {
+      // 🔹 1️⃣ Créer l'attribut global
+      const attribute = manager.create(GlobalAttribute, { name: data.name });
+      const savedAttribute = await manager.save(attribute);
+
+      // 🔹 2️⃣ Créer les valeurs associées (optionnelles)
+      let savedValues: GlobalAttributeValue[] = [];
+      if (data.values?.length) {
+        const valuesEntities = data.values.map((val) =>
+          manager.create(GlobalAttributeValue, { ...val, attribute: savedAttribute }),
+        );
+        savedValues = await manager.save(valuesEntities);
+      }
+
+      // 🔹 3️⃣ Créer les liaisons vers les spécifications (optionnelles)
+      let savedSpecs: GlobalAttributesSpecification[] = [];
+      if (data.specifications?.length) {
+        // Vérifie que toutes les spécifications existent
+        const specsFound = await this.specRepo.findByIds(
+          data.specifications.map((s) => s.specificationId),
+        );
+
+        const validSpecIds = specsFound.map((s) => s.id);
+        if (validSpecIds.length === 0) {
+          throw new NotFoundException('Aucune spécification valide trouvée pour liaison.');
+        }
+
+        const specsEntities = data.specifications
+          .filter((s) => validSpecIds.includes(s.specificationId))
+          .map((specData) =>
+            manager.create(GlobalAttributesSpecification, {
+              globalAttribute: savedAttribute,
+              specification: { id: specData.specificationId } as Specification,
+              isRequired: specData.isRequired ?? true,
+              status: specData.status ?? true,
+            }),
+          );
+
+        savedSpecs = await manager.save(specsEntities);
+      }
+
+      return {
+        message: 'Attribut global créé avec succès.',
+        data: {
+          ...savedAttribute,
+          values: savedValues,
+          specifications: savedSpecs,
+        },
+      };
     });
-    const savedAttribute = await this.globalAttrRepo.save(attribute);
-
-    let savedValues: GlobalAttributeValue[] = [];
-    // 🔹 Si des valeurs sont fournies, les créer
-    if (data.values && data.values.length > 0) {
-      const valuesEntities = data.values.map((val) =>
-        this.globalAttrValueRepo.create({ ...val, attribute: savedAttribute }),
-      );
-      savedValues = await this.globalAttrValueRepo.save(valuesEntities);
-    }
-
-    return {
-      message: 'Attribut global créé avec succès.',
-      data: {
-        ...savedAttribute,
-        values: savedValues,
-      },
-    };
   }
 
   //  Récupérer tous les attributs avec leurs valeurs
@@ -91,7 +131,6 @@ export class GlobalAttributeService {
 
     // 2️⃣ Mettre à jour l'attribut
     if (data.name) attribute.name = data.name;
-    if (data.platform) attribute.platform = data.platform;
     await this.globalAttrRepo.save(attribute);
 
     // 3️⃣ Supprimer toutes les valeurs existantes
