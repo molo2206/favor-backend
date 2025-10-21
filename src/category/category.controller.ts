@@ -37,6 +37,7 @@ export class CategoryController {
     @Body() body: any, // on parse manuellement les JSON
     @UploadedFile() file: Express.Multer.File,
   ) {
+    // 🔹 Parse les specifications si fournies
     let specifications;
     if (body.specifications) {
       try {
@@ -46,12 +47,23 @@ export class CategoryController {
       }
     }
 
+    // 🔹 Parse les attributs si fournis
+    let attributes;
+    if (body.attributes) {
+      try {
+        attributes = JSON.parse(body.attributes);
+      } catch (error) {
+        throw new BadRequestException('Le champ attributes doit être un JSON valide');
+      }
+    }
+
     const createCategoryDto: CreateCategoryDto = {
       name: body.name,
       parentId: body.parentId,
       type: body.type,
       color: body.color,
       specifications, // undefined si non fourni
+      attributes, // undefined si non fourni
     };
 
     return await this.categoryService.create(createCategoryDto, file);
