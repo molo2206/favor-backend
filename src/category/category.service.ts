@@ -306,13 +306,14 @@ export class CategoryService {
       .leftJoinAndSelect('category.specifications', 'categorySpec')
       .leftJoinAndSelect('categorySpec.specification', 'specification')
       .innerJoinAndSelect('category.products', 'product') // seulement catégories avec produits
-      .leftJoinAndSelect('product.images', 'images'); // tu peux ajouter d'autres relations produit ici
+      .leftJoinAndSelect('product.images', 'images');
 
     if (type) {
       queryBuilder.andWhere('category.type = :type', { type });
     }
 
-    queryBuilder.orderBy('category.createdAt', 'DESC');
+    // Tri sur un champ existant
+    queryBuilder.orderBy('category.name', 'ASC');
 
     const categories = await queryBuilder.getMany();
 
