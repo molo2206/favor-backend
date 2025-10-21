@@ -305,10 +305,21 @@ export class CategoryService {
       .leftJoinAndSelect('category.children', 'children')
       .leftJoinAndSelect('category.specifications', 'categorySpec')
       .leftJoinAndSelect('categorySpec.specification', 'specification')
+      // join avec produits filtrés par companyId
       .leftJoinAndSelect('category.products', 'product', 'product.companyId = :companyId', {
         companyId,
-      }) // join avec filtre companyId
-      .leftJoinAndSelect('product.images', 'images');
+      })
+      // toutes les relations du produit
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.rentalContracts', 'rentalContracts')
+      .leftJoinAndSelect('product.saleTransactions', 'saleTransactions')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('specificationValues.specification', 'specificationDetail') // si tu veux le détail
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('product.skus', 'skus')
+      .leftJoinAndSelect('product.wishlist', 'wishlist')
+      .leftJoinAndSelect('product.company', 'company');
 
     if (type) {
       queryBuilder.andWhere('category.type = :type', { type });
@@ -318,7 +329,7 @@ export class CategoryService {
 
     const categories = await queryBuilder.getMany();
 
-    // Supprimer les catégories sans produit
+    // On ne garde que les catégories avec au moins un produit
     const categoriesWithProducts = categories.filter((c) => c.products?.length);
 
     return {
