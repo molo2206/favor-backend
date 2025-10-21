@@ -40,14 +40,16 @@ export class CategoryService {
   async create(
     createCategoryDto: CreateCategoryDto,
     file: Express.Multer.File,
-  ): Promise<{ message: string; data: any }> {
+  ): Promise<{ message: string; data: CategoryEntity }> {
     const { name, parentId, type, color, specifications, attributes } = createCategoryDto;
 
+    // Vérifie si une catégorie avec ce nom et type existe déjà
     const existingCategory = await this.categoryRepo.findOne({ where: { name, type } });
     if (existingCategory) {
       throw new ConflictException('Une catégorie avec ce nom et ce type existe déjà');
     }
 
+    // Vérifie la catégorie parente
     let parent: CategoryEntity | undefined = undefined;
     if (parentId) {
       const foundParent = await this.categoryRepo.findOne({ where: { id: parentId } });
@@ -55,11 +57,19 @@ export class CategoryService {
       parent = foundParent;
     }
 
-    const slug = slugify(name, { lower: true, strict: true });
+    // Génère un slug unique
+    let slug = slugify(name, { lower: true, strict: true });
+    const existingSlug = await this.categoryRepo.findOne({ where: { slug } });
+    if (existingSlug) {
+      const uniqueSuffix = Date.now().toString().slice(-5);
+      slug = `${slug}-${uniqueSuffix}`;
+    }
 
+    // Vérifie la présence du fichier image
     if (!file) throw new BadRequestException('Une image est requise pour créer une catégorie.');
     const imageUrl = await this.cloudinary.handleUploadImage(file, 'category');
 
+    // Crée la catégorie
     const category = this.categoryRepo.create({
       name,
       slug,
@@ -71,7 +81,7 @@ export class CategoryService {
 
     const savedCategory = await this.categoryRepo.save(category);
 
-    // 🔹 Lier les spécifications si elles existent
+    // 🔹 Lier les spécifications
     if (specifications && Array.isArray(specifications)) {
       for (const spec of specifications) {
         await this.categorySpecification.addSpecificationToCategory(
@@ -82,8 +92,9 @@ export class CategoryService {
       }
     }
 
-    // 🔹 Lier les attributs globaux si fournis
+    // 🔹 Lier les attributs globaux
     if (attributes && Array.isArray(attributes)) {
+      // Supprimer les anciennes relations si existantes
       await this.categoryAttributeRepo.delete({ category: { id: savedCategory.id } });
 
       const relations: CategoryAttribute[] = [];
@@ -103,6 +114,7 @@ export class CategoryService {
       await this.categoryAttributeRepo.save(relations);
     }
 
+    // 🔹 Charger toutes les relations
     const categoryWithRelations = await this.categoryRepo.findOne({
       where: { id: savedCategory.id },
       relations: [
@@ -115,15 +127,9 @@ export class CategoryService {
       ],
     });
 
-    // ✅ Retour enrichi : ajout du champ `attributes` au même niveau que `specifications`
-    const formattedCategory = {
-      ...categoryWithRelations,
-      attributes: categoryWithRelations?.categoryAttributes?.map((ca) => ca.attribute) || [],
-    };
-
     return {
       message: 'Catégorie enregistrée avec succès',
-      data: formattedCategory,
+      data: categoryWithRelations!,
     };
   }
 
