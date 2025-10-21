@@ -61,4 +61,9 @@ export class GlobalAttributeController {
   async createCategoryAttribut(@Body() dto: CreateCategoryAttributeDto) {
     return this.attrService.createMany(dto);
   }
+
+  @Get('category/:categoryId/attributes')
+  findAttributesByCategory(@Param('categoryId') categoryId: string) {
+    return this.attrService.findAttributesByCategory(categoryId);
+  }
 }

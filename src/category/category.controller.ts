@@ -179,4 +179,9 @@ export class CategoryController {
   async getSpecificationsByCategory(@Param('id') id: string) {
     return this.categoryService.getSpecificationsByCategoryId(id);
   }
+
+  @Get(':categoryId/attributes/by-category')
+  findAttributesByCategory(@Param('categoryId') categoryId: string) {
+    return this.categoryService.getAttributesByCategoryId(categoryId);
+  }
 }

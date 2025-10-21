@@ -395,6 +395,51 @@ export class CategoryService {
     };
   }
 
+  async getAttributesByCategoryId(categoryId: string) {
+    const category = await this.categoryRepo.findOne({
+      where: { id: categoryId },
+    });
+
+    if (!category) {
+      throw new NotFoundException(`Catégorie avec l'ID ${categoryId} non trouvée`);
+    }
+
+    const categoryAttrs = await this.categoryAttributeRepo
+      .createQueryBuilder('ca')
+      .leftJoinAndSelect('ca.attribute', 'attr') // jointure pour récupérer les détails de l'attribut
+      .where('ca.categoryId = :categoryId', { categoryId })
+      .orderBy('attr.label', 'ASC') // tu peux changer l'ordre selon ton besoin
+      .getMany();
+
+    if (!categoryAttrs.length) {
+      return {
+        message: `Aucun attribut trouvé pour la catégorie "${category.name}"`,
+        data: [],
+      };
+    }
+
+    const data = categoryAttrs.map((ca) => ({
+      categoryAttributeId: ca.id,
+      categoryId: ca.category.id,
+      attributeId: ca.attribute.id,
+      attribute: {
+        id: ca.attribute.id,
+        key: ca.attribute.key,
+        label: ca.attribute.label,
+        type: ca.attribute.type,
+        options: ca.attribute.options,
+      },
+      createdAt: ca.createdAt,
+      updatedAt: ca.updatedAt,
+    }));
+
+    return {
+      message: `Attributs récupérés avec succès`,
+      data,
+      count: data.length,
+    };
+  }
+
   async findAllWithProducts(companyId: string, type?: string) {
     const queryBuilder = this.categoryRepo
       .createQueryBuilder('category')

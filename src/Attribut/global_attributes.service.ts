@@ -141,4 +141,16 @@ export class GlobalAttributeService {
       data: saved,
     };
   }
+
+  async findAttributesByCategory(categoryId: string) {
+    const catAttrs = await this.categoryAttributeRepo.find({
+      where: { category: { id: categoryId } },
+      relations: ['attribute'],
+    });
+
+    return {
+      message: `Attributs de la catégorie ${categoryId} récupérés`,
+      data: catAttrs.map((ca) => ca.attribute),
+    };
+  }
 }
