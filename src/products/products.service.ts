@@ -1171,42 +1171,33 @@ export class ProductService {
   }
 
   async addToWishlist(user: UserEntity, dto: CreateWishlistDto) {
-    // Vérification utilisateur
+    // 🔹 Vérification utilisateur
     if (!user || !user.id) {
       throw new BadRequestException('Utilisateur non trouvé ou non connecté');
     }
 
-    // Vérification productId
+    // 🔹 Vérification productId
     if (!dto.productId) {
       throw new BadRequestException('productId est obligatoire');
     }
 
-    // Vérification existence du produit
+    // 🔹 Vérification existence du produit
     const product = await this.productRepo.findOne({ where: { id: dto.productId } });
     if (!product) throw new NotFoundException('Produit introuvable');
 
-    // Vérification si le produit est déjà dans la wishlist
+    // 🔹 Vérifier si déjà présent dans la wishlist (actif ou supprimé)
     const existing = await this.wishlistRepo.findOne({
       where: { user: { id: user.id }, product: { id: product.id } },
     });
 
-    // Déjà dans la wishlist
-    if (existing && !existing.deleted) {
-      throw new ConflictException('Ce produit est déjà dans la wishlist');
+    if (existing) {
+      // Soft delete de l'ancien
+      existing.deleted = true;
+      existing.status = false;
+      await this.wishlistRepo.save(existing);
     }
 
-    // Restaurer un item supprimé
-    if (existing && existing.deleted) {
-      existing.deleted = false;
-      existing.status = true;
-      const restored = await this.wishlistRepo.save(existing);
-      return {
-        message: 'Produit restauré dans la wishlist avec succès',
-        data: restored,
-      };
-    }
-
-    // Créer un nouvel item wishlist
+    // 🔹 Créer une nouvelle entrée wishlist propre
     const wishlistItem = this.wishlistRepo.create({
       user,
       product,
@@ -1217,9 +1208,46 @@ export class ProductService {
 
     const savedItem = await this.wishlistRepo.save(wishlistItem);
 
+    // 🔹 Récupération complète de la wishlist mise à jour
+    const updatedWishlist = await this.wishlistRepo.find({
+      where: {
+        user: { id: user.id },
+        deleted: false,
+      },
+      relations: [
+        'user',
+        'product',
+
+        // 🔹 Relations du produit
+        'product.images',
+        'product.category',
+        'product.measure',
+        'product.company',
+        'product.company.tauxCompanies',
+        'product.company.country',
+        'product.company.city',
+
+        // 🔹 Spécifications & Attributs
+        'product.specificationValues',
+        'product.specificationValues.specification',
+        'product.attributes',
+        'product.skus',
+
+        // 🔹 Liens métiers
+        'product.rentalContracts',
+        'product.saleTransactions',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+
     return {
-      message: 'Produit ajouté à la wishlist avec succès',
-      data: savedItem,
+      message: existing
+        ? 'Produit remplacé dans la wishlist avec succès'
+        : 'Produit ajouté à la wishlist avec succès',
+      data: {
+        total: updatedWishlist.length,
+        wishlist: updatedWishlist,
+      },
     };
   }
 
@@ -1269,7 +1297,7 @@ export class ProductService {
         createdAt: item.createdAt,
         shopType: item.shopType,
         product: {
-          ...item.product
+          ...item.product,
         },
       })),
     };
@@ -1277,17 +1305,61 @@ export class ProductService {
 
   async removeFromWishlist(user: UserEntity, productId: string) {
     const item = await this.wishlistRepo.findOne({
-      where: { user: { id: user.id }, product: { id: productId }, deleted: false },
+      where: {
+        user: { id: user.id },
+        product: { id: productId },
+        deleted: false,
+      },
     });
 
-    if (!item) throw new NotFoundException('Ce produit n’est pas dans la wishlist');
+    if (!item) {
+      throw new NotFoundException('Ce produit n’est pas dans la wishlist');
+    }
 
-    // Soft delete
+    // 🔹 Soft delete
     item.deleted = true;
     item.status = false;
     await this.wishlistRepo.save(item);
 
-    return { message: 'Produit retiré de la wishlist' };
+    // 🔹 Récupération complète de la wishlist mise à jour
+    const updatedWishlist = await this.wishlistRepo.find({
+      where: {
+        user: { id: user.id },
+        deleted: false,
+      },
+      relations: [
+        'user',
+        'product',
+
+        // 🔹 Relations du produit
+        'product.images',
+        'product.category',
+        'product.measure',
+        'product.company',
+        'product.company.tauxCompanies',
+        'product.company.country',
+        'product.company.city',
+
+        // 🔹 Spécifications & Attributs
+        'product.specificationValues',
+        'product.specificationValues.specification',
+        'product.attributes',
+        'product.skus',
+
+        // 🔹 Liens métiers
+        'product.rentalContracts',
+        'product.saleTransactions',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      message: 'Produit retiré de la wishlist',
+      data: {
+        total: updatedWishlist.length,
+        wishlist: updatedWishlist,
+      },
+    };
   }
 
   async search(keyword?: string, type?: CompanyType) {
