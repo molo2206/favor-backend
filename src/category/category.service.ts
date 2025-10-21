@@ -319,6 +319,9 @@ export class CategoryService {
       .leftJoinAndSelect('product.attributes', 'attributes')
       .leftJoinAndSelect('product.skus', 'skus')
       .leftJoinAndSelect('product.wishlist', 'wishlist')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city');
 
     if (type) {
       queryBuilder.andWhere('category.type = :type', { type });

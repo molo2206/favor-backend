@@ -3,11 +3,10 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { GlobalAttributeValue } from './global_attribute_values.entity';
+import { AttributeType } from '../enum/attribute_type.enum';
 
 @Entity('global_attributes')
 export class GlobalAttribute {
@@ -18,9 +17,6 @@ export class GlobalAttribute {
 
   @Column()
   label: string;
-  
-  @Column({ nullable: true })
-  unit?: string;
 
   @Column({ type: 'json', nullable: true })
   options?: any;
@@ -37,6 +33,6 @@ export class GlobalAttribute {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @OneToMany(() => GlobalAttributeValue, (val) => val.attribute, { cascade: true })
-  values: GlobalAttributeValue[];
+  @Column({ type: 'enum', enum: AttributeType })
+  type: AttributeType;
 }

@@ -1,10 +1,7 @@
 import { Type } from 'class-transformer';
-import {
-  IsString,
-  IsOptional,
-  IsArray,
-  IsEnum,
-} from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested, IsEnum } from 'class-validator';
+import { CreateGlobalAttributeValueDto } from './create-global-attribute-value.dto';
+import { AttributeType } from '../enum/attribute_type.enum';
 
 export class CreateGlobalAttributeDto {
   @IsString()
@@ -14,10 +11,12 @@ export class CreateGlobalAttributeDto {
   label: string;
 
   @IsOptional()
-  @IsString()
-  unit?: string;
+  @IsEnum(AttributeType)
+  type?: AttributeType;
 
+  // options peut être une chaîne CSV ou un tableau
   @IsOptional()
-  @IsString() // on reçoit une chaîne type "option1, option2, option3"
-  options?: string;
+  @IsArray()
+  @IsString({ each: true })
+  options?: string[];
 }
