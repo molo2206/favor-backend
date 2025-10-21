@@ -40,7 +40,7 @@ export class CategoryService {
   async create(
     createCategoryDto: CreateCategoryDto,
     file: Express.Multer.File,
-  ): Promise<{ message: string; data: CategoryEntity }> {
+  ): Promise<{ message: string; data: any }> {
     const { name, parentId, type, color, specifications, attributes } = createCategoryDto;
 
     const existingCategory = await this.categoryRepo.findOne({ where: { name, type } });
@@ -84,7 +84,6 @@ export class CategoryService {
 
     // 🔹 Lier les attributs globaux si fournis
     if (attributes && Array.isArray(attributes)) {
-      // Supprimer les anciennes relations si existantes
       await this.categoryAttributeRepo.delete({ category: { id: savedCategory.id } });
 
       const relations: CategoryAttribute[] = [];
@@ -116,9 +115,15 @@ export class CategoryService {
       ],
     });
 
+    // ✅ Retour enrichi : ajout du champ `attributes` au même niveau que `specifications`
+    const formattedCategory = {
+      ...categoryWithRelations,
+      attributes: categoryWithRelations?.categoryAttributes?.map((ca) => ca.attribute) || [],
+    };
+
     return {
       message: 'Catégorie enregistrée avec succès',
-      data: categoryWithRelations!,
+      data: formattedCategory,
     };
   }
 
