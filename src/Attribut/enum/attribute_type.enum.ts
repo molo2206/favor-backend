@@ -1,4 +1,4 @@
 export enum AttributeType {
-  RAIDIO,
-  SELECT,
+  RADIO = 'RADIO',
+  SELECT = 'SELECT',
 }
