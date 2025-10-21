@@ -1169,42 +1169,39 @@ export class ProductService {
       },
     };
   }
-
   async addToWishlist(user: UserEntity, dto: CreateWishlistDto) {
-    if (!user || !user.id) throw new BadRequestException('Utilisateur non trouvé');
-    if (!dto.productId) throw new BadRequestException('productId est obligatoire');
+    if (!user || !user.id) {
+      throw new BadRequestException('Utilisateur non trouvé ou non connecté');
+    }
+
+    if (!dto.productId) {
+      throw new BadRequestException('productId est obligatoire');
+    }
 
     const product = await this.productRepo.findOne({ where: { id: dto.productId } });
     if (!product) throw new NotFoundException('Produit introuvable');
 
-    // 🔹 Vérifier s’il existe déjà
-    let existing = await this.wishlistRepo.findOne({
+    const existing = await this.wishlistRepo.findOne({
       where: { user: { id: user.id }, product: { id: product.id } },
     });
 
     if (existing) {
-      // Réactiver l’entrée existante au lieu de recréer
-      existing.deleted = false;
-      existing.status = true;
-      existing.shopType = dto.shopType;
-      await this.wishlistRepo.save(existing);
-    } else {
-      // Créer une nouvelle entrée
-      existing = this.wishlistRepo.create({
-        user,
-        product,
-        shopType: dto.shopType,
-        deleted: false,
-        status: true,
-      });
-      await this.wishlistRepo.save(existing);
+      await this.wishlistRepo.remove(existing);
     }
 
-    // 🔹 Récupérer la wishlist mise à jour
+    const wishlistItem = this.wishlistRepo.create({
+      user,
+      product,
+      deleted: false,
+      status: true,
+      shopType: dto.shopType,
+    });
+
+    await this.wishlistRepo.save(wishlistItem);
+
     const updatedWishlist = await this.wishlistRepo.find({
       where: { user: { id: user.id }, deleted: false },
       relations: [
-        'user',
         'product',
         'product.images',
         'product.category',
@@ -1224,11 +1221,8 @@ export class ProductService {
     });
 
     return {
-      message: 'Produit ajouté ou réactivé dans la wishlist avec succès',
-      data: {
-        total: updatedWishlist.length,
-        wishlist: updatedWishlist,
-      },
+      message: 'Produit ajouté à la wishlist avec succès',
+      data: updatedWishlist, // ← tableau directement ici
     };
   }
 
