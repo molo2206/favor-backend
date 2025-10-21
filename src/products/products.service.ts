@@ -1275,7 +1275,7 @@ export class ProductService {
   async search(keyword?: string, type?: CompanyType) {
     const searchKey = keyword ? `%${keyword}%` : '%';
 
-    // 🔹 1. Recherche des companies
+    // 1. Recherche des companies
     const companyQuery = this.companyRepo
       .createQueryBuilder('company')
       .leftJoinAndSelect('company.userHasCompany', 'userHasCompany')
@@ -1295,10 +1295,10 @@ export class ProductService {
 
     const companies = await companyQuery.getMany();
 
-    // 🔹 2. Recherche des produits
+    //  2. Recherche des produits avec catégories et parents
     const productQuery = this.productRepo
       .createQueryBuilder('product')
-      .leftJoinAndSelect('product.company', 'company') // 🔹 nécessaire
+      .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
@@ -1308,9 +1308,15 @@ export class ProductService {
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
       .leftJoinAndSelect('specificationValues.specification', 'specification')
-      .where('(product.name LIKE :searchKey OR product.description LIKE :searchKey)', {
-        searchKey,
-      });
+      .where(
+        `
+      product.name LIKE :searchKey
+      OR product.description LIKE :searchKey
+      OR category.name LIKE :searchKey
+      OR parentCategory.name LIKE :searchKey
+    `,
+        { searchKey },
+      );
 
     if (type) {
       productQuery.andWhere('company.typeCompany = :type', { type });
@@ -1318,7 +1324,7 @@ export class ProductService {
 
     const products = await productQuery.orderBy('product.createdAt', 'DESC').getMany();
 
-    // 🔹 3. Recherche des services
+    //  3. Recherche des services avec catégories et parents
     const serviceQuery = this.serviceRepo
       .createQueryBuilder('service')
       .leftJoinAndSelect('service.company', 'company')
@@ -1330,9 +1336,15 @@ export class ProductService {
       .leftJoinAndSelect('service.measure', 'measure')
       .leftJoinAndSelect('service.prestataires', 'prestataires')
       .leftJoinAndSelect('prestataires.prestataire', 'prestataire')
-      .where('(service.name LIKE :searchKey OR service.description LIKE :searchKey)', {
-        searchKey,
-      });
+      .where(
+        `
+      service.name LIKE :searchKey
+      OR service.description LIKE :searchKey
+      OR category.name LIKE :searchKey
+      OR parentCategory.name LIKE :searchKey
+    `,
+        { searchKey },
+      );
 
     if (type) {
       serviceQuery.andWhere('company.typeCompany = :type', { type });
@@ -1340,7 +1352,7 @@ export class ProductService {
 
     const services = await serviceQuery.orderBy('service.createdAt', 'DESC').getMany();
 
-    // 🔹 4. Préparer la structure finale
+    //  4. Préparer la structure finale
     const groupedResults: Record<string, any> = {
       [CompanyType.RESTAURANT]: [],
       [CompanyType.GROCERY]: [],
@@ -1350,26 +1362,26 @@ export class ProductService {
       SERVICE_LIST: [],
     };
 
-    // 🔹 5. Ajouter les companies dans les bons groupes
+    // 5. Grouper les entreprises par type
     for (const company of companies) {
       if (groupedResults[company.typeCompany]) {
         groupedResults[company.typeCompany].push(company);
       }
     }
 
-    // 🔹 6. Ajouter tous les produits dans PRODUCT
+    // 6. Ajouter les produits dans PRODUCT
     for (const prod of products) {
       if (prod.company?.typeCompany === CompanyType.SHOP) {
         groupedResults.PRODUCT.push(prod);
       }
     }
 
-    // 🔹 7. Ajouter tous les services dans SERVICE_LIST
+    // 7. Ajouter les services dans SERVICE_LIST
     for (const serv of services) {
       groupedResults.SERVICE_LIST.push(serv);
     }
 
-    // 🔹 8. Retour
+    // 8. Retour final
     return {
       message:
         companies.length === 0 && products.length === 0 && services.length === 0
