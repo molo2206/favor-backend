@@ -49,7 +49,7 @@ export class CategoryEntity {
   @OneToMany(() => CategorySpecification, (cs) => cs.category, { cascade: true })
   specifications: CategorySpecification[];
 
-  @OneToMany(() => CategoryAttribute, (ca) => ca.category, { cascade: true })
+  @OneToMany(() => CategoryAttribute, (ca) => ca.category, { cascade: true, eager: true })
   categoryAttributes: CategoryAttribute[];
 
   @CreateDateColumn()

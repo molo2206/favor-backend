@@ -75,7 +75,7 @@ export class CategoryService {
       slug,
       type,
       color,
-      parent,
+      parent: parent ?? undefined, // 🔹 correction pour TypeORM
       image: imageUrl,
     });
 
@@ -94,9 +94,6 @@ export class CategoryService {
 
     // 🔹 Lier les attributs globaux
     if (attributes && Array.isArray(attributes)) {
-      // Supprimer les anciennes relations si existantes
-      await this.categoryAttributeRepo.delete({ category: { id: savedCategory.id } });
-
       const relations: CategoryAttribute[] = [];
       for (const attr of attributes) {
         const attribute = await this.globalAttrRepo.findOne({
@@ -106,15 +103,15 @@ export class CategoryService {
           throw new NotFoundException(`Attribut ${attr.attribute_id} introuvable`);
 
         const relation = this.categoryAttributeRepo.create({
-          category: savedCategory,
+          category: { id: savedCategory.id }, // 🔹 correction ici
           attribute,
         });
         relations.push(relation);
       }
-      await this.categoryAttributeRepo.save(relations);
+      await this.categoryAttributeRepo.save(relations); // insertion réelle
     }
 
-    // 🔹 Charger toutes les relations
+    // 🔹 Charger toutes les relations pour le retour
     const categoryWithRelations = await this.categoryRepo.findOne({
       where: { id: savedCategory.id },
       relations: [

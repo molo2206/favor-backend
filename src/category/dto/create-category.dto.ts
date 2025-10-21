@@ -27,7 +27,6 @@ export class CreateCategoryDto {
   @Type(() => SpecificationsDto)
   specifications?: SpecificationsDto[];
 
-  // 🔹 Ajouter les attributs globaux
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
