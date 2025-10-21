@@ -14,6 +14,8 @@ import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service'
 import { In } from 'typeorm';
 import { CategorySpecification } from 'src/specification/entities/CategorySpecification.entity';
 import { CategorySpecificationService } from 'src/specification/category-specification.service';
+import { CategoryAttribute } from 'src/Attribut/entities/category_attributes.entity';
+import { GlobalAttribute } from 'src/Attribut/entities/global_attributes.entity';
 
 @Injectable()
 export class CategoryService {
@@ -24,6 +26,12 @@ export class CategoryService {
     @InjectRepository(CategorySpecification)
     private readonly categorySpecificationRepo: Repository<CategorySpecification>,
 
+    @InjectRepository(CategoryAttribute)
+    private readonly categoryAttributeRepo: Repository<CategoryAttribute>,
+
+    @InjectRepository(GlobalAttribute)
+    private readonly globalAttrRepo: Repository<GlobalAttribute>,
+
     private readonly categorySpecification: CategorySpecificationService,
 
     private readonly cloudinary: CloudinaryService,
@@ -33,7 +41,7 @@ export class CategoryService {
     createCategoryDto: CreateCategoryDto,
     file: Express.Multer.File,
   ): Promise<{ message: string; data: CategoryEntity }> {
-    const { name, parentId, type, color, specifications } = createCategoryDto;
+    const { name, parentId, type, color, specifications, attributes } = createCategoryDto;
 
     const existingCategory = await this.categoryRepo.findOne({ where: { name, type } });
     if (existingCategory) {
@@ -63,7 +71,7 @@ export class CategoryService {
 
     const savedCategory = await this.categoryRepo.save(category);
 
-    // Lier les spécifications si elles existent
+    // 🔹 Lier les spécifications si elles existent
     if (specifications && Array.isArray(specifications)) {
       for (const spec of specifications) {
         await this.categorySpecification.addSpecificationToCategory(
@@ -74,9 +82,38 @@ export class CategoryService {
       }
     }
 
+    // 🔹 Lier les attributs globaux si fournis
+    if (attributes && Array.isArray(attributes)) {
+      // Supprimer les anciennes relations si existantes
+      await this.categoryAttributeRepo.delete({ category: { id: savedCategory.id } });
+
+      const relations: CategoryAttribute[] = [];
+      for (const attr of attributes) {
+        const attribute = await this.globalAttrRepo.findOne({
+          where: { id: attr.attribute_id },
+        });
+        if (!attribute)
+          throw new NotFoundException(`Attribut ${attr.attribute_id} introuvable`);
+
+        const relation = this.categoryAttributeRepo.create({
+          category: savedCategory,
+          attribute,
+        });
+        relations.push(relation);
+      }
+      await this.categoryAttributeRepo.save(relations);
+    }
+
     const categoryWithRelations = await this.categoryRepo.findOne({
       where: { id: savedCategory.id },
-      relations: ['parent', 'children', 'specifications', 'specifications.specification'],
+      relations: [
+        'parent',
+        'children',
+        'specifications',
+        'specifications.specification',
+        'categoryAttributes',
+        'categoryAttributes.attribute',
+      ],
     });
 
     return {
@@ -150,7 +187,14 @@ export class CategoryService {
     // ✅ Charger les relations pour la réponse
     const categoryWithRelations = await this.categoryRepo.findOne({
       where: { id: updatedCategory.id },
-      relations: ['parent', 'children', 'specifications', 'specifications.specification'],
+      relations: [
+        'parent',
+        'children',
+        'specifications',
+        'specifications.specification',
+        'categoryAttributes',
+        'categoryAttributes.attribute',
+      ],
     });
 
     return {
@@ -164,12 +208,15 @@ export class CategoryService {
       .createQueryBuilder('category')
       .leftJoinAndSelect('category.parent', 'parent')
       .leftJoinAndSelect('category.children', 'children')
-      .leftJoinAndSelect('category.specifications', 'categorySpec') // relation CategorySpecification
-      .leftJoinAndSelect('categorySpec.specification', 'specification'); // récupérer les détails de la spécification
+      .leftJoinAndSelect('category.specifications', 'categorySpec')
+      .leftJoinAndSelect('categorySpec.specification', 'specification')
+      .leftJoinAndSelect('category.categoryAttributes', 'categoryAttribute')
+      .leftJoinAndSelect('categoryAttribute.attribute', 'attribute'); // attribut global
 
     if (type) {
       queryBuilder.where('category.type = :type', { type });
     }
+
     const categories = await queryBuilder.getMany();
     return categories;
   }
@@ -180,6 +227,8 @@ export class CategoryService {
       .leftJoinAndSelect('category.children', 'children')
       .leftJoinAndSelect('category.specifications', 'categorySpec')
       .leftJoinAndSelect('categorySpec.specification', 'specification')
+      .leftJoinAndSelect('category.categoryAttributes', 'categoryAttribute')
+      .leftJoinAndSelect('categoryAttribute.attribute', 'attribute')
       .where('category.parent IS NULL');
 
     if (type) {
@@ -193,7 +242,14 @@ export class CategoryService {
   async findOne(id: string): Promise<CategoryEntity> {
     const category = await this.categoryRepo.findOne({
       where: { id },
-      relations: ['parent', 'children', 'specifications', 'specifications.specification'],
+      relations: [
+        'parent',
+        'children',
+        'specifications',
+        'specifications.specification',
+        'categoryAttributes',
+        'categoryAttributes.attribute',
+      ],
     });
 
     if (!category) {
@@ -206,7 +262,14 @@ export class CategoryService {
   async findByTypeCompany(type: string): Promise<CategoryEntity[]> {
     const categories = await this.categoryRepo.find({
       where: { type },
-      relations: ['parent', 'children', 'specifications', 'specifications.specification'],
+      relations: [
+        'parent',
+        'children',
+        'specifications',
+        'specifications.specification',
+        'categoryAttributes',
+        'categoryAttributes.attribute',
+      ],
     });
 
     if (!categories.length) {
@@ -223,7 +286,14 @@ export class CategoryService {
 
     const categories = await this.categoryRepo.find({
       where: whereClause,
-      relations: ['children', 'specifications', 'specifications.specification'],
+      relations: [
+        'parent',
+        'children',
+        'specifications',
+        'specifications.specification',
+        'categoryAttributes',
+        'categoryAttributes.attribute',
+      ],
     });
 
     if (!categories.length) {
@@ -305,6 +375,8 @@ export class CategoryService {
       .leftJoinAndSelect('category.children', 'children')
       .leftJoinAndSelect('category.specifications', 'categorySpec')
       .leftJoinAndSelect('categorySpec.specification', 'specification')
+      .leftJoinAndSelect('category.categoryAttributes', 'categoryAttribute')
+      .leftJoinAndSelect('categoryAttribute.attribute', 'attribute')
       // join avec produits filtrés par companyId
       .leftJoinAndSelect('category.products', 'product', 'product.companyId = :companyId', {
         companyId,

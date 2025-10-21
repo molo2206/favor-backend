@@ -6,11 +6,20 @@ import { GlobalAttributeValue } from './entities/global_attribute_values.entity'
 import { CreateGlobalAttributeDto } from './dto/create-global-attribute.dto';
 import { UpdateGlobalAttributeDto } from './dto/update-global-attribute.dto';
 import { SpecFieldType } from 'src/specification/enum/SpecFieldType';
+import { CreateCategoryAttributeDto } from './dto/create-category-attribute.dto';
+import { CategoryAttribute } from './entities/category_attributes.entity';
+import { CategoryEntity } from 'src/category/entities/category.entity';
 
 @Injectable()
 export class GlobalAttributeService {
   constructor(
     private readonly dataSource: DataSource,
+    @InjectRepository(CategoryAttribute)
+    private readonly categoryAttributeRepo: Repository<CategoryAttribute>,
+
+    @InjectRepository(CategoryEntity)
+    private readonly categoryRepo: Repository<CategoryEntity>,
+
     @InjectRepository(GlobalAttribute)
     private readonly globalAttrRepo: Repository<GlobalAttribute>,
 
@@ -100,5 +109,36 @@ export class GlobalAttributeService {
     if (!value) throw new NotFoundException(`Valeur avec l'id ${valueId} introuvable`);
     await this.globalAttrValueRepo.remove(value);
     return { message: 'Valeur supprimée avec succès.', data: null };
+  }
+
+  async createMany(dto: CreateCategoryAttributeDto) {
+    const category = await this.categoryRepo.findOne({ where: { id: dto.category_id } });
+    if (!category) throw new NotFoundException('Catégorie introuvable');
+
+    // 🔹 Supprimer les anciennes relations de cette catégorie
+    await this.categoryAttributeRepo.delete({ category: { id: category.id } });
+
+    const relations: CategoryAttribute[] = [];
+
+    for (const attr of dto.attributes) {
+      const attribute = await this.globalAttrRepo.findOne({
+        where: { id: attr.attribute_id },
+      });
+      if (!attribute) throw new NotFoundException(`Attribut ${attr.attribute_id} introuvable`);
+
+      const relation = this.categoryAttributeRepo.create({
+        category,
+        attribute,
+      });
+
+      relations.push(relation);
+    }
+
+    const saved = await this.categoryAttributeRepo.save(relations);
+
+    return {
+      message: 'Attributs liés à la catégorie avec succès',
+      data: saved,
+    };
   }
 }

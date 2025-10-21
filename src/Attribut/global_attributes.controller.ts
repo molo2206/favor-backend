@@ -12,6 +12,7 @@ import {
 import { GlobalAttributeService } from './global_attributes.service';
 import { CreateGlobalAttributeDto } from './dto/create-global-attribute.dto';
 import { UpdateGlobalAttributeDto } from './dto/update-global-attribute.dto';
+import { CreateCategoryAttributeDto } from './dto/create-category-attribute.dto';
 
 @Controller('global-attributes')
 export class GlobalAttributeController {
@@ -49,9 +50,15 @@ export class GlobalAttributeController {
     return this.attrService.remove(id);
   }
 
-  // 🔹 Supprimer une valeur spécifique d'un attribut
+  //  Supprimer une valeur spécifique d'un attribut
   @Delete('values/:valueId')
   async removeValue(@Param('valueId') valueId: string) {
     return this.attrService.removeValue(valueId);
+  }
+
+  @Post('')
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async createCategoryAttribut(@Body() dto: CreateCategoryAttributeDto) {
+    return this.attrService.createMany(dto);
   }
 }

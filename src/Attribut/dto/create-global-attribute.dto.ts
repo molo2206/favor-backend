@@ -14,7 +14,6 @@ export class CreateGlobalAttributeDto {
   @IsEnum(AttributeType)
   type?: AttributeType;
 
-  // options peut être une chaîne CSV ou un tableau
   @IsOptional()
   @IsString() // on reçoit une chaîne CSV
   options?: string;

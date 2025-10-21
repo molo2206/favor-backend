@@ -1,3 +1,4 @@
+import { CategoryAttribute } from 'src/Attribut/entities/category_attributes.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { Service } from 'src/service/entities/service.entity';
 import { CategorySpecification } from 'src/specification/entities/CategorySpecification.entity';
@@ -47,6 +48,9 @@ export class CategoryEntity {
 
   @OneToMany(() => CategorySpecification, (cs) => cs.category, { cascade: true })
   specifications: CategorySpecification[];
+
+  @OneToMany(() => CategoryAttribute, (ca) => ca.category, { cascade: true })
+  categoryAttributes: CategoryAttribute[];
 
   @CreateDateColumn()
   createdAt: Date;

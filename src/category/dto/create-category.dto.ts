@@ -1,6 +1,11 @@
-import { IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsOptional, IsString, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SpecificationsDto } from './specification.dto';
+
+class AttributeDto {
+  @IsString()
+  attribute_id: string;
+}
 
 export class CreateCategoryDto {
   @IsString()
@@ -21,5 +26,11 @@ export class CreateCategoryDto {
   @ValidateNested({ each: true })
   @Type(() => SpecificationsDto)
   specifications?: SpecificationsDto[];
-  
+
+  // 🔹 Ajouter les attributs globaux
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AttributeDto)
+  attributes?: AttributeDto[];
 }

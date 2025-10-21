@@ -1,22 +1,25 @@
-// category.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { CategoryEntity } from './entities/category.entity';
+import { CategorySpecification } from 'src/specification/entities/CategorySpecification.entity';
+import { Specification } from 'src/specification/entities/Specification.entity';
 import { CategoryService } from './category.service';
 import { CategoryController } from './category.controller';
-import { CategoryEntity } from './entities/category.entity';
-import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
+import { CategoryAttribute } from 'src/Attribut/entities/category_attributes.entity';
 import { CategorySpecificationModule } from 'src/specification/category-specification.module';
-import { CategorySpecification } from 'src/specification/entities/CategorySpecification.entity'; // Ajoutez
-import { Specification } from 'src/specification/entities/Specification.entity'; // Ajoutez
+import { GlobalAttributesModule } from 'src/Attribut/global-attributes.module';
+import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       CategoryEntity,
-      CategorySpecification, // Ajoutez cette entité
-      Specification, // Ajoutez cette entité
+      CategorySpecification,
+      CategoryAttribute,
+      Specification,
     ]),
     CategorySpecificationModule,
+    GlobalAttributesModule, // ✅ très important
   ],
   controllers: [CategoryController],
   providers: [CategoryService, CloudinaryService],

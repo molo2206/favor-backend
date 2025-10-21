@@ -5,8 +5,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
 import { AttributeType } from '../enum/attribute_type.enum';
+import { CategoryAttribute } from './category_attributes.entity';
 
 @Entity('global_attributes')
 export class GlobalAttribute {
@@ -33,6 +35,9 @@ export class GlobalAttribute {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @Column({ type: 'varchar', length: 20 }) // ou plus si tu veux
+  @Column({ type: 'varchar', length: 20 }) 
   type: string;
+
+  @OneToMany(() => CategoryAttribute, (ca) => ca.attribute)
+  categoryLinks: CategoryAttribute[];
 }
