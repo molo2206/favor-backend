@@ -16,7 +16,6 @@ export class CreateGlobalAttributeDto {
 
   // options peut être une chaîne CSV ou un tableau
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  options?: string[];
+  @IsString() // on reçoit une chaîne CSV
+  options?: string;
 }

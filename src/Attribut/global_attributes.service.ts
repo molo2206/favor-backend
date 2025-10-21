@@ -21,11 +21,16 @@ export class GlobalAttributeService {
   // 🔹 Créer un attribut global avec valeurs optionnelles
   async create(data: CreateGlobalAttributeDto) {
     return await this.dataSource.transaction(async (manager) => {
+      let optionsArray: string[] | undefined = undefined;
+      if (data.options) {
+        optionsArray = data.options.split(',').map((opt) => opt.trim());
+      }
+
       const attribute = manager.create(GlobalAttribute, {
         key: data.key,
         label: data.label,
         type: data.type,
-        options: data.options,
+        options: optionsArray, // sauvegarde en JSON
       });
 
       const savedAttribute = await manager.save(attribute);
@@ -52,7 +57,7 @@ export class GlobalAttributeService {
 
   async findOne(id: string) {
     const attribute = await this.globalAttrRepo.findOne({
-      where: { id }
+      where: { id },
     });
     if (!attribute) throw new NotFoundException(`GlobalAttribute avec l'id ${id} introuvable`);
     return { message: 'Attribut récupéré avec succès.', data: attribute };
@@ -60,7 +65,7 @@ export class GlobalAttributeService {
 
   async update(id: string, data: UpdateGlobalAttributeDto) {
     const attribute = await this.globalAttrRepo.findOne({
-      where: { id }
+      where: { id },
     });
     if (!attribute) throw new NotFoundException(`GlobalAttribute avec l'id ${id} introuvable`);
 
