@@ -1,20 +1,23 @@
 import { Type } from 'class-transformer';
-import { IsString, IsOptional, IsArray, ValidateNested } from 'class-validator';
-import { CreateGlobalAttributeValueDto } from './create-global-attribute-value.dto';
-import { CreateGlobalAttributesSpecificationDto } from './create-global_attributes_specification.dto';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsEnum,
+} from 'class-validator';
 
 export class CreateGlobalAttributeDto {
   @IsString()
-  name: string;
+  key: string;
+
+  @IsString()
+  label: string;
 
   @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => CreateGlobalAttributeValueDto)
-  values?: CreateGlobalAttributeValueDto[];
+  @IsString()
+  unit?: string;
 
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateGlobalAttributesSpecificationDto)
-  specifications?: CreateGlobalAttributesSpecificationDto[];
+  @IsString() // on reçoit une chaîne type "option1, option2, option3"
+  options?: string;
 }

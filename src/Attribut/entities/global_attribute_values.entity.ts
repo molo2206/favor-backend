@@ -11,4 +11,7 @@ export class GlobalAttributeValue {
 
   @Column()
   attributeId: string;
+
+  @ManyToOne(() => GlobalAttribute, (attr) => attr.values, { onDelete: 'CASCADE' })
+  attribute: GlobalAttribute;
 }

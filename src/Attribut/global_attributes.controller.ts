@@ -6,30 +6,28 @@ import {
   Delete,
   Param,
   Body,
-  Query,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { GlobalAttributeService } from './global_attributes.service';
 import { CreateGlobalAttributeDto } from './dto/create-global-attribute.dto';
 import { UpdateGlobalAttributeDto } from './dto/update-global-attribute.dto';
-import { CreateGlobalAttributeValueDto } from './dto/create-global-attribute-value.dto';
 
 @Controller('global-attributes')
 export class GlobalAttributeController {
   constructor(private readonly attrService: GlobalAttributeService) {}
 
-  // 🔹 Créer un nouvel attribut global avec valeurs et spécifications
-  // @Post()
-  // @UsePipes(new ValidationPipe({ whitelist: false }))
-  // async create(@Body() data: CreateGlobalAttributeDto) {
-  //   return this.attrService.createWithValuesAndSpecs(data);
-  // }
+  // 🔹 Créer un nouvel attribut global avec valeurs optionnelles
+  @Post()
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async create(@Body() data: CreateGlobalAttributeDto) {
+    return this.attrService.create(data);
+  }
 
-  // 🔹 Récupérer tous les attributs (optionnel : filtrer par platform)
+  // 🔹 Récupérer tous les attributs globaux
   @Get()
-  async findAll(@Query('platform') platform?: string) {
-    return this.attrService.findAll(platform);
+  async findAll() {
+    return this.attrService.findAll();
   }
 
   // 🔹 Récupérer un attribut global par ID
@@ -38,12 +36,12 @@ export class GlobalAttributeController {
     return this.attrService.findOne(id);
   }
 
-  // 🔹 Mettre à jour un attribut global avec valeurs et spécifications
-  // @Patch(':id')
-  // @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  // async update(@Param('id') id: string, @Body() data: UpdateGlobalAttributeDto) {
-  //   return this.attrService.updateWithValues(id, data);
-  // }
+  // 🔹 Mettre à jour un attribut global et ses valeurs
+  @Patch(':id')
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async update(@Param('id') id: string, @Body() data: UpdateGlobalAttributeDto) {
+    return this.attrService.update(id, data);
+  }
 
   // 🔹 Supprimer un attribut global
   @Delete(':id')
@@ -51,14 +49,7 @@ export class GlobalAttributeController {
     return this.attrService.remove(id);
   }
 
-  // 🔹 Ajouter une valeur à un attribut existant
-  // @Post('values')
-  // @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  // async addValue(@Body() valueData: CreateGlobalAttributeValueDto) {
-  //   return this.attrService.addValue(valueData);
-  // }
-
-  // 🔹 Supprimer une valeur d'un attribut
+  // 🔹 Supprimer une valeur spécifique d'un attribut
   @Delete('values/:valueId')
   async removeValue(@Param('valueId') valueId: string) {
     return this.attrService.removeValue(valueId);

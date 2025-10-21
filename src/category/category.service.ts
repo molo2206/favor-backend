@@ -297,4 +297,30 @@ export class CategoryService {
       count: data.length,
     };
   }
+
+  async findAllWithProducts(type?: string) {
+    const queryBuilder = this.categoryRepo
+      .createQueryBuilder('category')
+      .leftJoinAndSelect('category.parent', 'parent')
+      .leftJoinAndSelect('category.children', 'children')
+      .leftJoinAndSelect('category.specifications', 'categorySpec')
+      .leftJoinAndSelect('categorySpec.specification', 'specification')
+      .innerJoinAndSelect('category.products', 'product') // seulement catégories avec produits
+      .leftJoinAndSelect('product.images', 'images'); // tu peux ajouter d'autres relations produit ici
+
+    if (type) {
+      queryBuilder.andWhere('category.type = :type', { type });
+    }
+
+    queryBuilder.orderBy('category.createdAt', 'DESC');
+
+    const categories = await queryBuilder.getMany();
+
+    return {
+      message: categories.length
+        ? 'Catégories récupérées avec succès.'
+        : 'Aucune catégorie avec produit trouvée.',
+      data: categories,
+    };
+  }
 }

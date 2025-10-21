@@ -7,6 +7,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { GlobalAttributeValue } from './global_attribute_values.entity';
 
 @Entity('global_attributes')
 export class GlobalAttribute {
@@ -17,10 +18,7 @@ export class GlobalAttribute {
 
   @Column()
   label: string;
-
-  @Column({ type: 'enum', enum: SpecFieldType })
-  type: SpecFieldType;
-
+  
   @Column({ nullable: true })
   unit?: string;
 
@@ -38,4 +36,7 @@ export class GlobalAttribute {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => GlobalAttributeValue, (val) => val.attribute, { cascade: true })
+  values: GlobalAttributeValue[];
 }

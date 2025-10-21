@@ -66,6 +66,11 @@ export class CategoryController {
     return { data: categories }; // Encapsule le tableau de catégories dans "data"
   }
 
+  @Get('with-products')
+  async findAllWithProducts(@Query('type') type?: string) {
+    return this.categoryService.findAllWithProducts(type);
+  }
+
   @Get('parents')
   async findAllParents(@Query('type') type?: string): Promise<{ data: CategoryEntity[] }> {
     const categories = await this.categoryService.findAllParent(type);

@@ -1,16 +1,23 @@
-import { PartialType, OmitType } from '@nestjs/mapped-types';
-import { CreateGlobalAttributeDto } from './create-global-attribute.dto';
-import { Type } from 'class-transformer';
-import { ValidateNested, IsOptional, IsArray } from 'class-validator';
-import { UpdateGlobalAttributeValueDto } from './update-global-attribute-value.dto';
+import { IsOptional, IsArray } from 'class-validator';
+import { UpdateAttributeValueDto } from './update-attribute-value.dto';
 
-// On retire 'values' du PartialType pour pouvoir le redéfinir
-export class UpdateGlobalAttributeDto extends PartialType(
-  OmitType(CreateGlobalAttributeDto, ['values'] as const),
-) {
+export class UpdateGlobalAttributeDto {
+  @IsOptional()
+  key?: string;
+
+  @IsOptional()
+  label?: string;
+
+  @IsOptional()
+  type?: string;
+
+  @IsOptional()
+  unit?: string;
+
+  @IsOptional()
+  options?: any;
+
   @IsOptional()
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => UpdateGlobalAttributeValueDto)
-  values?: UpdateGlobalAttributeValueDto[];
+  values?: UpdateAttributeValueDto[]; // <- ajoute cette propriété
 }
