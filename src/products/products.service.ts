@@ -1310,14 +1310,14 @@ export class ProductService {
       .leftJoinAndSelect('specificationValues.specification', 'specification')
       .where(
         `
-      product.name LIKE :searchKey
-      OR product.description LIKE :searchKey
-      OR category.name LIKE :searchKey
-      OR parentCategory.name LIKE :searchKey
-    `,
-        { searchKey },
+    (product.name LIKE :searchKey
+    OR product.description LIKE :searchKey
+    OR category.name LIKE :searchKey
+    OR parentCategory.name LIKE :searchKey)
+    AND product.status = :status
+  `,
+        { searchKey, status: 'PUBLISHED' },
       );
-
     if (type) {
       productQuery.andWhere('company.typeCompany = :type', { type });
     }
