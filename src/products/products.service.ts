@@ -1202,10 +1202,12 @@ export class ProductService {
 
     const savedItem = await this.wishlistRepo.save(wishlistItem);
 
-    // Retourner seulement ce qu'on vient de créer
+    // Supprimer la propriété user pour le retour
+    const { user: _, ...itemWithoutUser } = savedItem;
+
     return {
       message: 'Produit ajouté à la wishlist avec succès',
-      data: savedItem, // ← uniquement l'item créé
+      data: itemWithoutUser, // ← objet principal sans user
     };
   }
 
