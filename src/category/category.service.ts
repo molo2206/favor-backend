@@ -298,18 +298,25 @@ export class CategoryService {
     };
   }
 
-  async findAllWithProducts(type?: string) {
+  async findAllWithProducts(companyId?: string, type?: string) {
     const queryBuilder = this.categoryRepo
       .createQueryBuilder('category')
       .leftJoinAndSelect('category.parent', 'parent')
       .leftJoinAndSelect('category.children', 'children')
       .leftJoinAndSelect('category.specifications', 'categorySpec')
       .leftJoinAndSelect('categorySpec.specification', 'specification')
-      .innerJoinAndSelect('category.products', 'product') // seulement catégories avec produits
-      .leftJoinAndSelect('product.images', 'images');
+      .innerJoin('category.products', 'product') // seulement catégories avec produits
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.company', 'company'); // join sur la company du produit
 
+    // Filtrer par type de catégorie si fourni
     if (type) {
       queryBuilder.andWhere('category.type = :type', { type });
+    }
+
+    // Filtrer par companyId si fourni
+    if (companyId) {
+      queryBuilder.andWhere('company.id = :companyId', { companyId });
     }
 
     // Tri sur un champ existant
@@ -320,7 +327,7 @@ export class CategoryService {
     return {
       message: categories.length
         ? 'Catégories récupérées avec succès.'
-        : 'Aucune catégorie avec produit trouvée.',
+        : 'Aucune catégorie avec produit trouvée pour cette entreprise.',
       data: categories,
     };
   }
