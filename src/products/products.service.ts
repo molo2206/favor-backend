@@ -1171,54 +1171,41 @@ export class ProductService {
   }
 
   async addToWishlist(user: UserEntity, dto: CreateWishlistDto) {
-    // 🔹 Vérification utilisateur
-    if (!user || !user.id) {
-      throw new BadRequestException('Utilisateur non trouvé ou non connecté');
-    }
+    if (!user || !user.id) throw new BadRequestException('Utilisateur non trouvé');
+    if (!dto.productId) throw new BadRequestException('productId est obligatoire');
 
-    // 🔹 Vérification productId
-    if (!dto.productId) {
-      throw new BadRequestException('productId est obligatoire');
-    }
-
-    // 🔹 Vérification existence du produit
     const product = await this.productRepo.findOne({ where: { id: dto.productId } });
     if (!product) throw new NotFoundException('Produit introuvable');
 
-    // 🔹 Vérifier si déjà présent dans la wishlist (actif ou supprimé)
-    const existing = await this.wishlistRepo.findOne({
+    // 🔹 Vérifier s’il existe déjà
+    let existing = await this.wishlistRepo.findOne({
       where: { user: { id: user.id }, product: { id: product.id } },
     });
 
     if (existing) {
-      // Soft delete de l'ancien
-      existing.deleted = true;
-      existing.status = false;
+      // Réactiver l’entrée existante au lieu de recréer
+      existing.deleted = false;
+      existing.status = true;
+      existing.shopType = dto.shopType;
+      await this.wishlistRepo.save(existing);
+    } else {
+      // Créer une nouvelle entrée
+      existing = this.wishlistRepo.create({
+        user,
+        product,
+        shopType: dto.shopType,
+        deleted: false,
+        status: true,
+      });
       await this.wishlistRepo.save(existing);
     }
 
-    // 🔹 Créer une nouvelle entrée wishlist propre
-    const wishlistItem = this.wishlistRepo.create({
-      user,
-      product,
-      deleted: false,
-      status: true,
-      shopType: dto.shopType,
-    });
-
-    const savedItem = await this.wishlistRepo.save(wishlistItem);
-
-    // 🔹 Récupération complète de la wishlist mise à jour
+    // 🔹 Récupérer la wishlist mise à jour
     const updatedWishlist = await this.wishlistRepo.find({
-      where: {
-        user: { id: user.id },
-        deleted: false,
-      },
+      where: { user: { id: user.id }, deleted: false },
       relations: [
         'user',
         'product',
-
-        // 🔹 Relations du produit
         'product.images',
         'product.category',
         'product.measure',
@@ -1226,14 +1213,10 @@ export class ProductService {
         'product.company.tauxCompanies',
         'product.company.country',
         'product.company.city',
-
-        // 🔹 Spécifications & Attributs
         'product.specificationValues',
         'product.specificationValues.specification',
         'product.attributes',
         'product.skus',
-
-        // 🔹 Liens métiers
         'product.rentalContracts',
         'product.saleTransactions',
       ],
@@ -1241,9 +1224,7 @@ export class ProductService {
     });
 
     return {
-      message: existing
-        ? 'Produit remplacé dans la wishlist avec succès'
-        : 'Produit ajouté à la wishlist avec succès',
+      message: 'Produit ajouté ou réactivé dans la wishlist avec succès',
       data: {
         total: updatedWishlist.length,
         wishlist: updatedWishlist,
