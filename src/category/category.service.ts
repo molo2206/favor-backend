@@ -396,18 +396,18 @@ export class CategoryService {
   }
 
   async getAttributesByCategoryId(categoryId: string) {
-    const category = await this.categoryRepo.findOne({
-      where: { id: categoryId },
-    });
-
+    // Vérifie si la catégorie existe
+    const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
     if (!category) {
       throw new NotFoundException(`Catégorie avec l'ID ${categoryId} non trouvée`);
     }
 
+    // Récupère les attributs liés à la catégorie avec jointure sur la catégorie et l'attribut
     const categoryAttrs = await this.categoryAttributeRepo
       .createQueryBuilder('ca')
-      .leftJoinAndSelect('ca.attribute', 'attr')
-      .where('ca.category_id = :categoryId', { categoryId }) // ← utiliser le nom exact de la colonne
+      .leftJoinAndSelect('ca.attribute', 'attr') // jointure pour les attributs
+      .leftJoinAndSelect('ca.category', 'category') // jointure pour la catégorie
+      .where('ca.category_id = :categoryId', { categoryId }) // utilise le nom correct de la colonne
       .orderBy('attr.label', 'ASC')
       .getMany();
 
@@ -418,9 +418,10 @@ export class CategoryService {
       };
     }
 
+    // Transforme les résultats pour la réponse
     const data = categoryAttrs.map((ca) => ({
       categoryAttributeId: ca.id,
-      categoryId: ca.category.id,
+      categoryId: ca.category.id, // récupéré via la jointure
       attributeId: ca.attribute.id,
       attribute: {
         id: ca.attribute.id,
@@ -428,13 +429,15 @@ export class CategoryService {
         label: ca.attribute.label,
         type: ca.attribute.type,
         options: ca.attribute.options,
+        status: ca.attribute.status,
+        deleted: ca.attribute.deleted,
       },
       createdAt: ca.createdAt,
       updatedAt: ca.updatedAt,
     }));
 
     return {
-      message: `Attributs récupérés avec succès`,
+      message: `Attributs récupérés avec succès pour la catégorie "${category.name}"`,
       data,
       count: data.length,
     };
