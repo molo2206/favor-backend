@@ -1179,10 +1179,28 @@ export class ProductService {
       throw new BadRequestException('productId est obligatoire');
     }
 
-    const product = await this.productRepo.findOne({ where: { id: dto.productId } });
+    const product = await this.productRepo.findOne({
+      where: { id: dto.productId },
+      relations: [
+        'images',
+        'category',
+        'measure',
+        'company',
+        'company.tauxCompanies',
+        'company.country',
+        'company.city',
+        'specificationValues',
+        'specificationValues.specification',
+        'attributes',
+        'skus',
+        'rentalContracts',
+        'saleTransactions',
+      ],
+    });
+
     if (!product) throw new NotFoundException('Produit introuvable');
 
-    // Si déjà existant, supprimer pour recréer
+    // Supprimer l'éventuel existant
     const existing = await this.wishlistRepo.findOne({
       where: { user: { id: user.id }, product: { id: product.id } },
     });
@@ -1191,7 +1209,7 @@ export class ProductService {
       await this.wishlistRepo.remove(existing);
     }
 
-    // Créer le nouvel item
+    // Créer et sauvegarder l'item
     const wishlistItem = this.wishlistRepo.create({
       user,
       product,
@@ -1200,14 +1218,12 @@ export class ProductService {
       shopType: dto.shopType,
     });
 
-    const savedItem = await this.wishlistRepo.save(wishlistItem);
+    await this.wishlistRepo.save(wishlistItem);
 
-    // Supprimer la propriété user pour le retour
-    const { user: _, ...itemWithoutUser } = savedItem;
-
+    // Retourner directement le produit
     return {
       message: 'Produit ajouté à la wishlist avec succès',
-      data: itemWithoutUser, // ← objet principal sans user
+      data: product, // ← objet Product complet
     };
   }
 
