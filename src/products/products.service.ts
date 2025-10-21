@@ -1200,13 +1200,19 @@ export class ProductService {
 
     if (!product) throw new NotFoundException('Produit introuvable');
 
-    // Supprimer l'éventuel existant
+    // Vérifier si le produit est déjà dans la wishlist
     const existing = await this.wishlistRepo.findOne({
       where: { user: { id: user.id }, product: { id: product.id } },
     });
 
     if (existing) {
+      // Supprimer si déjà présent
       await this.wishlistRepo.remove(existing);
+
+      return {
+        message: 'Produit retiré de la wishlist (existait déjà)',
+        data: null, // ← data devient null
+      };
     }
 
     // Créer et sauvegarder l'item
