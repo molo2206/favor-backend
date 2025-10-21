@@ -1224,8 +1224,8 @@ export class ProductService {
   }
 
   async getUserWishlist(user: UserEntity) {
-    if (!user || !user.id) {
-      throw new BadRequestException('Utilisateur non trouvé ou non connecté');
+    if (!user?.id) {
+      throw new BadRequestException('Utilisateur non trouvé ou non connecté.');
     }
 
     const wishlistItems = await this.wishlistRepo.find({
@@ -1235,7 +1235,11 @@ export class ProductService {
         status: true,
       },
       relations: [
+        // 🔹 Relations directes
+        'user',
         'product',
+
+        // 🔹 Relations du produit
         'product.images',
         'product.category',
         'product.measure',
@@ -1243,8 +1247,14 @@ export class ProductService {
         'product.company.tauxCompanies',
         'product.company.country',
         'product.company.city',
+
+        // 🔹 Spécifications & Attributs
         'product.specificationValues',
         'product.specificationValues.specification',
+        'product.attributes',
+        'product.skus',
+
+        // 🔹 Liens métiers
         'product.rentalContracts',
         'product.saleTransactions',
       ],
@@ -1253,7 +1263,15 @@ export class ProductService {
 
     return {
       message: 'Wishlist récupérée avec succès',
-      data: wishlistItems,
+      count: wishlistItems.length,
+      data: wishlistItems.map((item) => ({
+        id: item.id,
+        createdAt: item.createdAt,
+        shopType: item.shopType,
+        product: {
+          ...item.product
+        },
+      })),
     };
   }
 
