@@ -33,6 +33,6 @@ export class GlobalAttribute {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @Column({ type: 'enum', enum: AttributeType })
-  type: AttributeType;
+  @Column({ type: 'varchar', length: 20 }) // ou plus si tu veux
+  type: string;
 }

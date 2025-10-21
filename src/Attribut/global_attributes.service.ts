@@ -21,18 +21,21 @@ export class GlobalAttributeService {
   // 🔹 Créer un attribut global avec valeurs optionnelles
   async create(data: CreateGlobalAttributeDto) {
     return await this.dataSource.transaction(async (manager) => {
+      // Transformer la chaîne CSV en tableau
       let optionsArray: string[] | undefined = undefined;
       if (data.options) {
         optionsArray = data.options.split(',').map((opt) => opt.trim());
       }
 
+      // Créer l'entité avec type en string et options en tableau JSON
       const attribute = manager.create(GlobalAttribute, {
         key: data.key,
         label: data.label,
-        type: data.type,
-        options: optionsArray, // sauvegarde en JSON
+        type: data.type, // type comme string
+        options: optionsArray,
       });
 
+      // Sauvegarder dans la base
       const savedAttribute = await manager.save(attribute);
 
       return {
@@ -64,14 +67,18 @@ export class GlobalAttributeService {
   }
 
   async update(id: string, data: UpdateGlobalAttributeDto) {
-    const attribute = await this.globalAttrRepo.findOne({
-      where: { id },
-    });
+    const attribute = await this.globalAttrRepo.findOne({ where: { id } });
     if (!attribute) throw new NotFoundException(`GlobalAttribute avec l'id ${id} introuvable`);
 
+    // Mettre à jour les champs simples
     if (data.key) attribute.key = data.key;
     if (data.label) attribute.label = data.label;
-    if (data.options !== undefined) attribute.options = data.options;
+    if (data.type) attribute.type = data.type; // string simple
+
+    // Transformer options CSV en tableau si présent
+    if (data.options !== undefined) {
+      attribute.options = data.options ? data.options.split(',').map((opt) => opt.trim()) : [];
+    }
 
     await this.globalAttrRepo.save(attribute);
 
