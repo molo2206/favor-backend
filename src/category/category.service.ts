@@ -406,9 +406,9 @@ export class CategoryService {
 
     const categoryAttrs = await this.categoryAttributeRepo
       .createQueryBuilder('ca')
-      .leftJoinAndSelect('ca.attribute', 'attr') // jointure pour récupérer les détails de l'attribut
-      .where('ca.categoryId = :categoryId', { categoryId })
-      .orderBy('attr.label', 'ASC') // tu peux changer l'ordre selon ton besoin
+      .leftJoinAndSelect('ca.attribute', 'attr')
+      .where('ca.category_id = :categoryId', { categoryId }) // ← utiliser le nom exact de la colonne
+      .orderBy('attr.label', 'ASC')
       .getMany();
 
     if (!categoryAttrs.length) {
