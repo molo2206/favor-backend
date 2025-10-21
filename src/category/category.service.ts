@@ -138,13 +138,11 @@ export class CategoryService {
     const category = await this.categoryRepo.findOne({ where: { id } });
     if (!category) throw new NotFoundException('Catégorie introuvable');
 
-    const { name, parentId, type, color, specifications } = updateCategoryDto;
+    const { name, parentId, type, color, specifications, attributes } = updateCategoryDto;
 
     // ✅ Vérifier unicité nom + type
     if (name && type) {
-      const existingCategory = await this.categoryRepo.findOne({
-        where: { name, type },
-      });
+      const existingCategory = await this.categoryRepo.findOne({ where: { name, type } });
       if (existingCategory && existingCategory.id !== id) {
         throw new ConflictException('Une catégorie avec ce nom et ce type existe déjà');
       }
@@ -173,11 +171,10 @@ export class CategoryService {
     // ✅ Sauvegarder la catégorie
     const updatedCategory = await this.categoryRepo.save(category);
 
+    // 🔹 Gestion des specifications
     if (specifications && Array.isArray(specifications)) {
-      // Supprimer toutes les anciennes spécifications pour cette catégorie
       await this.categorySpecification.removeAllSpecificationsFromCategory(updatedCategory.id);
 
-      // Ajouter ou mettre à jour les nouvelles spécifications
       for (const spec of specifications) {
         if (!spec.specificationId) {
           throw new BadRequestException(
@@ -192,7 +189,29 @@ export class CategoryService {
       }
     }
 
-    // ✅ Charger les relations pour la réponse
+    // 🔹 Gestion des attributes
+    if (attributes && Array.isArray(attributes)) {
+      // Supprimer les anciennes relations si existantes
+      await this.categoryAttributeRepo.delete({ category: { id: updatedCategory.id } });
+
+      const relations: CategoryAttribute[] = [];
+      for (const attr of attributes) {
+        const attribute = await this.globalAttrRepo.findOne({
+          where: { id: attr.attribute_id },
+        });
+        if (!attribute)
+          throw new NotFoundException(`Attribut ${attr.attribute_id} introuvable`);
+
+        const relation = this.categoryAttributeRepo.create({
+          category: updatedCategory,
+          attribute,
+        });
+        relations.push(relation);
+      }
+      await this.categoryAttributeRepo.save(relations); // insertion réelle
+    }
+
+    // ✅ Charger toutes les relations pour la réponse
     const categoryWithRelations = await this.categoryRepo.findOne({
       where: { id: updatedCategory.id },
       relations: [

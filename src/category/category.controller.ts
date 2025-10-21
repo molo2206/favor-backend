@@ -110,9 +110,8 @@ export class CategoryController {
     @Body() body: any,
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<{ message: string; data: CategoryEntity }> {
+    // 🔹 Parse specifications
     let specifications;
-
-    // ✅ On parse seulement si `specifications` est fourni
     if (body.specifications) {
       try {
         specifications = JSON.parse(body.specifications);
@@ -124,12 +123,26 @@ export class CategoryController {
       }
     }
 
+    // 🔹 Parse attributes
+    let attributes;
+    if (body.attributes) {
+      try {
+        attributes = JSON.parse(body.attributes);
+        if (!Array.isArray(attributes)) {
+          throw new BadRequestException('Le champ attributes doit être un tableau JSON');
+        }
+      } catch (error) {
+        throw new BadRequestException('Le champ attributes doit être un JSON valide');
+      }
+    }
+
     const updateCategoryDto: UpdateCategoryDto = {
       name: body.name,
       parentId: body.parentId,
       type: body.type,
       color: body.color,
       specifications, // undefined si non fourni
+      attributes, // undefined si non fourni
     };
 
     return await this.categoryService.update(id, updateCategoryDto, file);
