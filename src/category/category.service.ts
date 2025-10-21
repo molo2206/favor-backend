@@ -319,7 +319,6 @@ export class CategoryService {
       .leftJoinAndSelect('product.attributes', 'attributes')
       .leftJoinAndSelect('product.skus', 'skus')
       .leftJoinAndSelect('product.wishlist', 'wishlist')
-      .leftJoinAndSelect('product.company', 'company');
 
     if (type) {
       queryBuilder.andWhere('category.type = :type', { type });
