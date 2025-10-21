@@ -41,7 +41,7 @@ export class ProductController {
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(FilesInterceptor('images', 4))
+  @UseInterceptors(FilesInterceptor('images', 1))
   async create(
     @UploadedFiles() files: Express.Multer.File[],
     @Body() body: any,
