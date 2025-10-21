@@ -298,37 +298,34 @@ export class CategoryService {
     };
   }
 
-  async findAllWithProducts(companyId?: string, type?: string) {
+  async findAllWithProducts(companyId: string, type?: string) {
     const queryBuilder = this.categoryRepo
       .createQueryBuilder('category')
       .leftJoinAndSelect('category.parent', 'parent')
       .leftJoinAndSelect('category.children', 'children')
       .leftJoinAndSelect('category.specifications', 'categorySpec')
       .leftJoinAndSelect('categorySpec.specification', 'specification')
-      .innerJoin('category.products', 'product') // seulement catégories avec produits
-      .leftJoinAndSelect('product.images', 'images')
-      .leftJoinAndSelect('product.company', 'company'); // join sur la company du produit
+      .leftJoinAndSelect('category.products', 'product', 'product.companyId = :companyId', {
+        companyId,
+      }) // join avec filtre companyId
+      .leftJoinAndSelect('product.images', 'images');
 
-    // Filtrer par type de catégorie si fourni
     if (type) {
       queryBuilder.andWhere('category.type = :type', { type });
     }
 
-    // Filtrer par companyId si fourni
-    if (companyId) {
-      queryBuilder.andWhere('company.id = :companyId', { companyId });
-    }
-
-    // Tri sur un champ existant
     queryBuilder.orderBy('category.name', 'ASC');
 
     const categories = await queryBuilder.getMany();
 
+    // Supprimer les catégories sans produit
+    const categoriesWithProducts = categories.filter((c) => c.products?.length);
+
     return {
-      message: categories.length
-        ? 'Catégories récupérées avec succès.'
-        : 'Aucune catégorie avec produit trouvée pour cette entreprise.',
-      data: categories,
+      message: categoriesWithProducts.length
+        ? 'Catégories avec produits récupérées avec succès.'
+        : 'Aucune catégorie avec produit trouvé.',
+      data: categoriesWithProducts,
     };
   }
 }

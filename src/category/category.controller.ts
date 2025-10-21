@@ -68,8 +68,8 @@ export class CategoryController {
 
   @Get('with-products')
   async findAllWithProducts(
+    @Query('companyId') companyId: string,
     @Query('type') type?: string,
-    @Query('companyId') companyId?: string,
   ) {
     return this.categoryService.findAllWithProducts(companyId, type);
   }
