@@ -45,4 +45,5 @@ export class CategoryEntity {
 
   @OneToMany(() => CategorySpecification, (cs) => cs.category, { cascade: true })
   specifications: CategorySpecification[];
+  
 }

@@ -9,8 +9,6 @@ import {
 import { SpecFieldType } from '../enum/SpecFieldType';
 import { CategorySpecification } from './CategorySpecification.entity';
 import { ProductSpecificationValue } from './ProductSpecificationValue.entity';
-import { GlobalAttributesSpecification } from 'src/Attribut/entities/global_attributes_specification.entity';
-
 @Entity()
 export class Specification {
   @PrimaryGeneratedColumn('uuid')
@@ -48,7 +46,4 @@ export class Specification {
 
   @OneToMany(() => ProductSpecificationValue, (pv) => pv.specification)
   specificationValues: ProductSpecificationValue[];
-
-  @OneToMany(() => GlobalAttributesSpecification, (gas) => gas.specification)
-  globalAttributes: GlobalAttributesSpecification[];
 }

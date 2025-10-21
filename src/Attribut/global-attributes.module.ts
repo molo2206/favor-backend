@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GlobalAttribute } from './entities/global_attributes.entity';
 import { GlobalAttributeValue } from './entities/global_attribute_values.entity';
-import { GlobalAttributesSpecification } from './entities/global_attributes_specification.entity';
 import { Specification } from 'src/specification/entities/Specification.entity';
 import { GlobalAttributeService } from './global_attributes.service';
 import { GlobalAttributeController } from './global_attributes.controller';
@@ -12,7 +11,6 @@ import { GlobalAttributeController } from './global_attributes.controller';
     TypeOrmModule.forFeature([
       GlobalAttribute,
       GlobalAttributeValue,
-      GlobalAttributesSpecification,
       Specification, // permet de vérifier et lier les spécifications
     ]),
   ],

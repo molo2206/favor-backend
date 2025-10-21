@@ -21,4 +21,5 @@ export class CreateCategoryDto {
   @ValidateNested({ each: true })
   @Type(() => SpecificationsDto)
   specifications?: SpecificationsDto[];
+  
 }

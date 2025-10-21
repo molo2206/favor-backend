@@ -1,26 +1,41 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn } from 'typeorm';
-import { GlobalAttributeValue } from './global_attribute_values.entity';
-import { CategorySpecification } from 'src/specification/entities/CategorySpecification.entity';
-import { GlobalAttributesSpecification } from './global_attributes_specification.entity';
+import { SpecFieldType } from 'src/specification/enum/SpecFieldType';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('global_attributes')
 export class GlobalAttribute {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+  @Column({ unique: true })
+  key: string;
 
   @Column()
-  name: string;
+  label: string;
 
-  @OneToMany(() => GlobalAttributeValue, (val) => val.attribute, {
-    cascade: true,
-  })
-  values: GlobalAttributeValue[];
+  @Column({ type: 'enum', enum: SpecFieldType })
+  type: SpecFieldType;
 
-  @OneToMany(() => GlobalAttributesSpecification, (gas) => gas.globalAttribute, {
-    cascade: true,
-  })
-  specifications: GlobalAttributesSpecification[];
+  @Column({ nullable: true })
+  unit?: string;
+
+  @Column({ type: 'json', nullable: true })
+  options?: any;
+
+  @Column({ default: false })
+  deleted: boolean;
+
+  @Column({ default: true })
+  status: boolean;
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }
