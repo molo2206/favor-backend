@@ -44,33 +44,29 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Autoriser les requêtes cross-origin (ex: depuis localhost:5173)
   app.enableCors({
     origin: ['http://localhost:5173', 'https://favor-help.vercel.app'],
     credentials: true,
   });
-  
-  // Autorise les corps JSON et urlencodeds
+
   app.use(bodyParser.json({ limit: '10mb' }));
   app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-  // Gérer les fichiers statiques (uploads/images etc.)
   app.useStaticAssets(join(__dirname, '..', 'uploads/users'), {
     prefix: '/uploads/users/',
   });
 
-  // Préfixe global pour tes routes
   app.setGlobalPrefix('api/v1');
-  
-  // ✅ CORRECTION : Désactiver whitelist
+
+  // ✅ VALIDATION SIMPLIFIÉE
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
-      whitelist: false, // ← DÉSACTIVÉ
-      forbidNonWhitelisted: false, // ← DÉSACTIVÉ
+      whitelist: false,
+      forbidNonWhitelisted: false,
     }),
   );
-  
+
   await app.listen(3000);
 }
 bootstrap();

@@ -48,7 +48,22 @@ export class UsersService {
   }> {
     const { email, phone, otpCode, password } = createUserDto;
 
-    // ✅ Au moins un des deux doit être présent (déjà validé par le DTO)
+    // ✅ VALIDATION MANUELLE SIMPLE
+    const hasEmail = email && email !== '';
+    const hasPhone = phone && phone !== '';
+
+    if (!hasEmail && !hasPhone) {
+      throw new BadRequestException('Un email ou un numéro de téléphone est requis.');
+    }
+
+    if (hasEmail && !validator.isEmail(email)) {
+      throw new BadRequestException('Email must be a valid email address');
+    }
+
+    if (hasPhone && !validator.isMobilePhone(phone, 'any')) {
+      throw new BadRequestException('Phone must be a valid phone number');
+    }
+
     const destination = email || phone;
     if (!destination) {
       throw new BadRequestException('Un email ou un numéro de téléphone est requis.');
@@ -67,6 +82,7 @@ export class UsersService {
     if (!otpCode) {
       await this.sendOtp(destination);
 
+      // ✅ RETURN MANQUANT AJOUTÉ
       return {
         message: 'Un code OTP a été envoyé.',
         data: { ...(email ? { email } : {}), ...(phone ? { phone } : {}) },
@@ -118,6 +134,7 @@ export class UsersService {
     const access_token = await this.accessToken(savedUser);
     const refresh_token = await this.refreshToken(savedUser);
 
+    // ✅ RETURN FINAL
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: userWithoutPassword,
@@ -125,7 +142,6 @@ export class UsersService {
       refresh_token,
     };
   }
-
   async update(
     updateUserDto: Partial<UpdateUserDto>,
     currentUser: UserEntity,
