@@ -101,7 +101,7 @@ export class ProductService {
     } = createProductDto;
 
     // 🔹 Validation images
-    if (!files || files.length < 2 || files.length > 4) {
+    if (!files) {
       throw new BadRequestException('Vous devez fournir entre 2 et 4 images');
     }
 
