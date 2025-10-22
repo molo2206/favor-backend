@@ -230,7 +230,14 @@ export class OrderService {
       });
     }
     if (hasPhone) {
-      const message = `Votre commande ${finalOrder.invoiceNumber} a été créée avec succès. Total : ${finalOrder.grandTotal} ${finalOrder.currency}. Merci pour votre achat !`;
+      const message = `Votre commande ${finalOrder.invoiceNumber} a été créée avec succès sur FavorHelp !
+      Montant total : ${finalOrder.grandTotal} ${finalOrder.currency}.
+      Si votre adresse email est renseignée dans votre profil FavorHelp, vous pouvez consulter votre boîte mail pour télécharger votre facture complète au format PDF.
+      Pour le paiement, vous pouvez envoyer votre argent via Mobile Money sur l'un des numéros suivants :
+      - +243 973 760 641
+      - +243 811 824 573
+      Merci pour votre confiance et votre achat ! Votre commande sera traitée dès réception du paiement.`;
+
       await this.smsHelper.sendSms(user.phone, message);
     }
     return finalOrder;
@@ -289,32 +296,51 @@ export class OrderService {
 
     if (dto.status === OrderStatus.VALIDATED) {
       const paymentQrCode = await QRCode.toDataURL(order.invoiceNumber);
+      const hasEmail = order.user.email && order.user.email.trim() !== '';
+      const hasPhone = order.user.phone && order.user.phone.trim() !== '';
 
-      await this.mailService.sendHtmlEmail(
-        order.user.email,
-        'Votre code PIN pour la commande FavorHelp',
-        'sendPin.html',
-        {
-          pinCode: updatedOrder.pin,
-          invoiceNumber: updatedOrder.invoiceNumber,
-          user: order.user,
-          subOrders,
-          order: updatedOrder,
-          year: new Date().getFullYear(),
-        } as any,
-      );
+      if (!hasEmail && !hasPhone) {
+        throw new BadRequestException(
+          'Aucun moyen de contact disponible (ni email, ni numéro de téléphone).',
+        );
+      }
+      if (hasEmail) {
+        await this.mailService.sendHtmlEmail(
+          order.user.email,
+          'Votre code PIN pour la commande FavorHelp',
+          'sendPin.html',
+          {
+            pinCode: updatedOrder.pin,
+            invoiceNumber: updatedOrder.invoiceNumber,
+            user: order.user,
+            subOrders,
+            order: updatedOrder,
+            year: new Date().getFullYear(),
+          } as any,
+        );
+        await this.mailService.sendInvoicePaidWithPdf(
+          order.user.email,
+          'Veuillez trouver ci-joint votre facture PDF, déjà payée et validée - FavorHelp',
+          {
+            user: order.user,
+            order: updatedOrder,
+            subOrders,
+            paymentQrCode,
+          },
+        );
+      }
+      if (hasPhone) {
+        const message = `Votre commande ${updatedOrder.invoiceNumber} a été créée avec succès sur FavorHelp !
+      Montant total : ${updatedOrder.grandTotal} ${updatedOrder.currency}.
+      Un code PIN de livraison vous sera demandé à la réception : ${updatedOrder.pin}.
+      Si votre adresse email est renseignée dans votre profil FavorHelp, vous pouvez consulter votre boîte mail pour télécharger votre facture complète au format PDF.
+      Pour le paiement, vous pouvez envoyer votre argent via Mobile Money sur l'un des numéros suivants :
+      - +243 973 760 641
+      - +243 811 824 573
+      Merci pour votre confiance et votre achat ! Votre commande sera traitée dès réception du paiement.`;
 
-      // Envoi également de la facture PDF si nécessaire
-      await this.mailService.sendInvoicePaidWithPdf(
-        order.user.email,
-        'Veuillez trouver ci-joint votre facture PDF, déjà payée et validée - FavorHelp',
-        {
-          user: order.user,
-          order: updatedOrder,
-          subOrders,
-          paymentQrCode,
-        },
-      );
+        await this.smsHelper.sendSms(updatedOrder.user.phone, message);
+      }
 
       const createTransactionDto: CreateTransactionDto = {
         orderId: updatedOrder.id,
