@@ -28,7 +28,9 @@ export function AtLeastOneField(
       validator: {
         validate(_: any, args: ValidationArguments) {
           const obj = args.object as any;
-          return fields.some((field) => obj[field] && obj[field].trim() !== '');
+          return fields.some(
+            (field) => obj[field] && obj[field].toString().trim() !== '',
+          );
         },
         defaultMessage() {
           return `Un email ou un numéro de téléphone est requis.`;
@@ -43,17 +45,19 @@ export class CreateUserDto {
   @Transform(({ value }) => value?.trim())
   fullName: string;
 
-  @ValidateIf((o) => o.email)
+  // ✅ Ne valide l'email que si la valeur n'est pas vide
+  @ValidateIf((o) => o.email && o.email.trim() !== '')
   @IsString()
   @IsEmailOrPhone({ message: 'Doit être un email valide.' })
   email?: string;
 
-  @ValidateIf((o) => o.phone)
+  // ✅ Idem pour phone
+  @ValidateIf((o) => o.phone && o.phone.trim() !== '')
   @IsString()
   @IsEmailOrPhone({ message: 'Doit être un numéro de téléphone valide.' })
   phone?: string;
 
-  // ✅ Vérifie que l'un des deux est rempli
+  // ✅ Vérifie qu'au moins un des deux champs est rempli
   @AtLeastOneField(['email', 'phone'])
   dummyValidationField: string;
 
