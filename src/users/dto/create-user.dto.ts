@@ -7,27 +7,38 @@ import {
   ValidationOptions,
   ValidationArguments,
 } from 'class-validator';
-import { Transform } from 'class-transformer'; // ✅ Correct
+import { Transform } from 'class-transformer';
 import { UserRole } from '../enum/user-role-enum';
-import { IsEmailOrPhone } from '../utility/helpers/IsEmailOrPhone';
+import validator from 'validator';
 
 /**
- * Validateur pour au moins un champ requis
+ * Valide qu'au moins un des champs est présent et correct.
  */
-export function AtLeastOneField(fields: string[], validationOptions?: ValidationOptions) {
+export function EmailOrPhoneRequired(validationOptions?: ValidationOptions) {
   return function (object: Object, propertyName: string) {
     registerDecorator({
-      name: 'atLeastOneField',
+      name: 'emailOrPhoneRequired',
       target: object.constructor,
       propertyName,
       options: validationOptions,
       validator: {
         validate(_: any, args: ValidationArguments) {
           const obj = args.object as any;
-          return fields.some((field) => obj[field] && obj[field].toString().trim() !== '');
+          const email = obj.email?.trim();
+          const phone = obj.phone?.trim();
+
+          if (!email && !phone) return false; // aucun champ fourni
+
+          // si email présent, vérifier format
+          if (email && !validator.isEmail(email)) return false;
+
+          // si phone présent, vérifier format
+          if (phone && !validator.isMobilePhone(phone, 'any')) return false;
+
+          return true;
         },
         defaultMessage() {
-          return `Un email ou un numéro de téléphone est requis.`;
+          return `Un email valide ou un numéro de téléphone valide est requis.`;
         },
       },
     });
@@ -38,20 +49,14 @@ export class CreateUserDto {
   @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
   fullName: string;
 
-  // Transforme "" en undefined
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
-  @IsOptional()
-  @IsEmailOrPhone({ message: 'Doit être un email ou un numéro de téléphone valide.' })
   email?: string;
 
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
-  @IsOptional()
-  @IsEmailOrPhone({ message: 'Doit être un email ou un numéro de téléphone valide.' })
   phone?: string;
 
-  // Vérifie qu'au moins un est rempli
-  @AtLeastOneField(['email', 'phone'])
-  dummyValidationField: string;
+  @EmailOrPhoneRequired()
+  dummyValidationField: string; // champ virtuel pour validation
 
   @IsOptional()
   @IsString()
