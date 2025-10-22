@@ -14,20 +14,30 @@ export function EmailOrPhoneRequired(validationOptions?: ValidationOptions) {
       validator: {
         validate(_: any, args: ValidationArguments) {
           const obj = args.object as any;
-          const email = obj.email?.trim();
-          const phone = obj.phone?.trim();
+          const email = obj.email;
+          const phone = obj.phone;
 
-          // Si les deux champs sont vides ou undefined, c'est valide (car optionnels)
-          if (!email && !phone) return true;
+          // Debug: voir ce qui est reçu
+          console.log('Email:', email, 'Phone:', phone);
+
+          // Si les deux champs sont undefined/null, c'est valide
+          if (email === undefined && phone === undefined) return true;
           
-          // Si email est fourni mais invalide
-          if (email && !validator.isEmail(email)) return false;
+          // Si email est fourni mais vide ou invalide
+          if (email !== undefined && email !== null) {
+            if (email === '' || !validator.isEmail(email)) return false;
+          }
           
-          // Si phone est fourni mais invalide
-          if (phone && !validator.isMobilePhone(phone, 'any')) return false;
+          // Si phone est fourni mais vide ou invalide
+          if (phone !== undefined && phone !== null) {
+            if (phone === '' || !validator.isMobilePhone(phone, 'any')) return false;
+          }
           
-          // Au moins un des deux champs est valide
-          return true;
+          // Au moins un des deux champs est valide et non vide
+          const hasValidEmail = email && email !== '' && validator.isEmail(email);
+          const hasValidPhone = phone && phone !== '' && validator.isMobilePhone(phone, 'any');
+          
+          return hasValidEmail || hasValidPhone;
         },
         defaultMessage() {
           return 'Un email valide ou un numéro de téléphone valide est requis.';
@@ -42,11 +52,17 @@ export class CreateUserDto {
   fullName: string;
 
   @IsOptional()
-  @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
+  @Transform(({ value }) => {
+    if (value === '' || value === null) return undefined;
+    return value?.trim();
+  })
   email?: string;
 
   @IsOptional()
-  @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
+  @Transform(({ value }) => {
+    if (value === '' || value === null) return undefined;
+    return value?.trim();
+  })
   phone?: string;
 
   // ✅ Validation globale
