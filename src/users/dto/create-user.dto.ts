@@ -39,13 +39,14 @@ export class CreateUserDto {
   @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
   fullName: string;
 
+  @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
   @IsEmailOrPhone({ message: 'Doit être un email ou un numéro de téléphone valide.' })
   email?: string;
 
+  @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
   @IsEmailOrPhone({ message: 'Doit être un email ou un numéro de téléphone valide.' })
   phone?: string;
 
-  // ✅ Vérifie qu'au moins un est fourni
   @AtLeastOneField(['email', 'phone'])
   dummyValidationField: string;
 
