@@ -48,7 +48,7 @@ export class UsersService {
   }> {
     const { email, phone, otpCode, password } = createUserDto;
 
-    // ✅ Au moins un des deux doit être présent
+    // ✅ Au moins un des deux doit être présent (déjà validé par le DTO)
     const destination = email || phone;
     if (!destination) {
       throw new BadRequestException('Un email ou un numéro de téléphone est requis.');
@@ -104,8 +104,8 @@ export class UsersService {
 
     const { password: _pw, ...userWithoutPassword } = savedUser;
 
-    // 6️⃣ Envoyer email si c’est un email
-    if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    // 6️⃣ Envoyer email si c'est un email valide et non vide
+    if (email && email !== '' && validator.isEmail(email)) {
       await this.mailService.sendHtmlEmail(
         email,
         'Bienvenue dans FavorHelp',

@@ -1,4 +1,12 @@
-import { IsString, Matches, IsEnum, registerDecorator, ValidationOptions, ValidationArguments, IsOptional } from 'class-validator';
+import {
+  IsString,
+  Matches,
+  IsEnum,
+  registerDecorator,
+  ValidationOptions,
+  ValidationArguments,
+  IsOptional,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserRole } from '../enum/user-role-enum';
 import validator from 'validator';
@@ -17,27 +25,33 @@ export function EmailOrPhoneRequired(validationOptions?: ValidationOptions) {
           const email = obj.email;
           const phone = obj.phone;
 
-          // Debug: voir ce qui est reçu
-          console.log('Email:', email, 'Phone:', phone);
+          console.log('🔍 VALIDATION DEBUG - Email:', email, 'Phone:', phone);
 
-          // Si les deux champs sont undefined/null, c'est valide
-          if (email === undefined && phone === undefined) return true;
-          
-          // Si email est fourni mais vide ou invalide
-          if (email !== undefined && email !== null) {
-            if (email === '' || !validator.isEmail(email)) return false;
+          // Ignorer les chaînes vides
+          const hasEmail = email && email !== '';
+          const hasPhone = phone && phone !== '';
+
+          // Aucun champ fourni → valide
+          if (!hasEmail && !hasPhone) {
+            console.log('✅ Aucun champ requis fourni - VALIDE');
+            return true;
           }
-          
-          // Si phone est fourni mais vide ou invalide
-          if (phone !== undefined && phone !== null) {
-            if (phone === '' || !validator.isMobilePhone(phone, 'any')) return false;
+
+          // Email fourni → doit être valide
+          if (hasEmail && !validator.isEmail(email)) {
+            console.log('❌ Email invalide');
+            return false;
           }
-          
-          // Au moins un des deux champs est valide et non vide
-          const hasValidEmail = email && email !== '' && validator.isEmail(email);
-          const hasValidPhone = phone && phone !== '' && validator.isMobilePhone(phone, 'any');
-          
-          return hasValidEmail || hasValidPhone;
+
+          // Phone fourni → doit être valide
+          if (hasPhone && !validator.isMobilePhone(phone, 'any')) {
+            console.log('❌ Phone invalide');
+            return false;
+          }
+
+          // Au moins un champ valide
+          console.log('✅ Au moins un champ valide - VALIDE');
+          return true;
         },
         defaultMessage() {
           return 'Un email valide ou un numéro de téléphone valide est requis.';
@@ -67,7 +81,7 @@ export class CreateUserDto {
 
   // ✅ Validation globale
   @EmailOrPhoneRequired()
-  dummyValidationField?: string;
+  emailOrPhoneValidation?: string;
 
   @IsString()
   @Matches(/(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])/, {
