@@ -128,20 +128,21 @@
           </div>
 
           <!-- Message conditionnel -->
-          <% if (order.paymentStatus === 'PENDING') { %>
-            <div class="payment-info" style="font-size: 0.85rem; color: #111827; margin-top: 1rem; line-height: 1.4;">
-              Pour le paiement, vous pouvez envoyer votre argent via Mobile Money sur
-              <a href="tel:+243973760641">+243 973 760 641</a> ou 
-              <a href="tel:+243811824573">+243 811 824 573</a>.<br />
-              Merci pour votre confiance, votre commande sera traitée dès réception du paiement.
-            </div>
-          <% } %>
+          <% if (order.paymentStatus?.toUpperCase() === 'PENDING') { %>
+  <div class="payment-info" style="font-size: 0.85rem; color: #111827; margin-top: 1rem; line-height: 1.4;">
+    Pour le paiement, vous pouvez envoyer votre argent via Mobile Money sur
+    <a href="tel:+243973760641">+243 973 760 641</a> ou 
+    <a href="tel:+243811824573">+243 811 824 573</a>.<br />
+    Merci pour votre confiance, votre commande sera traitée dès réception du paiement.
+  </div>
+<% } %>
 
-          <% if (order.paymentStatus === 'PAID') { %>
-            <div class="pin-info" style="margin-top: 1rem; font-weight: bold; color: #dc2626;">
-              Pour récupérer votre commande ou colis, veuillez présenter ce code PIN au livreur : <%= order.pin %>
-            </div>
-          <% } %>
+<% if (order.paymentStatus?.toUpperCase() === 'PAID') { %>
+  <div class="pin-info" style="margin-top: 1rem; font-weight: bold; color: #dc2626;">
+    Pour récupérer votre commande ou colis, veuillez présenter ce code PIN au livreur : <%= order.pin %>
+  </div>
+<% } %>
+
         </div>
       </div>
 
