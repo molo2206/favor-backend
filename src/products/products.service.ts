@@ -186,61 +186,6 @@ export class ProductService {
         await this.productSpecificationValueService.create(specValueDto);
       }
     }
-
-    // 🔹 Création des attributs et valeurs produits
-    if (attributes && Array.isArray(attributes)) {
-      for (const attr of attributes as CreateProductAttributeDto[]) {
-        // Préparer les données à insérer
-        const productAttrData: Partial<ProductAttribute> = {
-          productId: product.id,
-          name: attr.name,
-        };
-
-        // Ajouter globalAttrId uniquement s'il existe
-        if (attr.globalAttrId && attr.globalAttrId.trim() !== '') {
-          productAttrData.globalAttrId = attr.globalAttrId;
-        }
-
-        // Créer et sauvegarder l'attribut
-        const productAttr = this.productAttributeRepo.create(productAttrData);
-        await this.productAttributeRepo.save(productAttr);
-
-        // Créer et sauvegarder les valeurs associées
-        if (attr.values && Array.isArray(attr.values)) {
-          for (const val of attr.values) {
-            if (val.value && val.value.trim() !== '') {
-              const attributeValue = this.attributeValueRepo.create({
-                attributeId: productAttr.id, // lier à l'attribut créé
-                value: val.value,
-              });
-              await this.attributeValueRepo.save(attributeValue);
-            }
-          }
-        }
-      }
-    }
-    function generateUniqueSku(base: string): string {
-      return `${base}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    }
-
-    // 🔹 Création des SKUs avec génération automatique pour éviter les doublons
-    if (skus && Array.isArray(skus)) {
-      for (const skuDto of skus as CreateSkuDto[]) {
-        const skuCode = skuDto.skuCode
-          ? generateUniqueSku(skuDto.skuCode)
-          : generateUniqueSku('SKU');
-        const sku = this.skuRepo.create({
-          productId: product.id,
-          skuCode,
-          price: skuDto.price,
-          stock: skuDto.stock,
-          attributesJson: skuDto.attributesJson ?? {},
-          imageUrl: skuDto.imageUrl ?? undefined, // 🔹 Remplace null par undefined
-        } as DeepPartial<Sku>);
-        await this.skuRepo.save(sku);
-      }
-    }
-
     // 🔹 Sérialisation finale
     const serializedProduct = plainToInstance(Product, product, {
       excludeExtraneousValues: true,
@@ -946,71 +891,6 @@ export class ProductService {
           specificationId: spec.specificationId,
           value: spec.value,
         });
-      }
-    }
-
-    // 🔹 Gestion des attributs
-    if (attributes && Array.isArray(attributes)) {
-      // Supprimer les anciens attributs et valeurs
-      if (product.attributes && product.attributes.length > 0) {
-        for (const attr of product.attributes) {
-          if (attr.values && attr.values.length > 0) {
-            await this.attributeValueRepo.remove(attr.values);
-          }
-        }
-        await this.productAttributeRepo.remove(product.attributes);
-      }
-
-      // Créer les nouveaux attributs et valeurs
-      for (const attr of attributes as CreateProductAttributeDto[]) {
-        const productAttrData: Partial<ProductAttribute> = {
-          productId: updatedProduct.id,
-          name: attr.name,
-          globalAttrId: attr.globalAttrId?.trim() || undefined,
-        };
-        const productAttr = this.productAttributeRepo.create(productAttrData);
-        await this.productAttributeRepo.save(productAttr);
-
-        if (attr.values && Array.isArray(attr.values)) {
-          for (const val of attr.values) {
-            const value = val.value?.trim();
-            if (value) {
-              const attributeValue = this.attributeValueRepo.create({
-                attributeId: productAttr.id,
-                value,
-              } as DeepPartial<AttributeValue>);
-              await this.attributeValueRepo.save(attributeValue);
-            }
-          }
-        }
-      }
-    }
-
-    // 🔹 Gestion des SKUs
-    if (skus && Array.isArray(skus)) {
-      // Supprimer les anciens SKUs
-      if (updatedProduct.skus && updatedProduct.skus.length > 0) {
-        await this.skuRepo.remove(updatedProduct.skus);
-      }
-
-      // Générer SKUs uniques
-      const generateUniqueSku = (base: string) =>
-        `${base}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-      for (const skuDto of skus as CreateSkuDto[]) {
-        const skuCode = skuDto.skuCode
-          ? generateUniqueSku(skuDto.skuCode)
-          : generateUniqueSku('SKU');
-
-        const sku = this.skuRepo.create({
-          productId: updatedProduct.id,
-          skuCode,
-          price: skuDto.price,
-          stock: skuDto.stock,
-          attributesJson: skuDto.attributesJson ?? {},
-          imageUrl: skuDto.imageUrl ?? undefined,
-        } as DeepPartial<Sku>);
-        await this.skuRepo.save(sku);
       }
     }
 
