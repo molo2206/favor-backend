@@ -42,52 +42,53 @@ export class UsersService {
   // users.service.ts
   async signup(createUserDto: CreateUserDto): Promise<{
     message: string;
-    data: Omit<UserEntity, 'password'> | { email: string };
+    data: Omit<UserEntity, 'password'> | { email?: string; phone?: string };
     access_token: string | null;
     refresh_token: string | null;
   }> {
-    const { email, otpCode, password } = createUserDto;
+    const { email, phone, otpCode, password } = createUserDto;
 
-    if (!email) {
+    // ✅ Au moins un des deux doit être présent
+    const destination = email || phone;
+    if (!destination) {
       throw new BadRequestException('Un email ou un numéro de téléphone est requis.');
     }
 
-    // Vérification doublons
+    // 1️⃣ Vérification doublons
     const userExists = await this.usersRepository.findOne({
-      where: [
-        { email: email },
-        { phone: email }, // si c’est un numéro, vérifie phone
-      ],
+      where: [{ email: email || undefined }, { phone: phone || undefined }],
     });
+
     if (userExists) {
       throw new BadRequestException('Un compte avec cet email ou numéro existe déjà.');
     }
 
-    // Envoi OTP si non fourni
+    // 2️⃣ Envoi OTP si non fourni
     if (!otpCode) {
-      await this.sendOtp(email);
+      await this.sendOtp(destination);
 
       return {
         message: 'Un code OTP a été envoyé.',
-        data: { email },
+        data: { ...(email ? { email } : {}), ...(phone ? { phone } : {}) },
         access_token: null,
         refresh_token: null,
       };
     }
 
-    // Vérification OTP
+    // 3️⃣ Vérification OTP
     const otpEntry = await this.otpRepository.findOne({
-      where: { email, otpCode, isUsed: false },
+      where: { email: destination, otpCode, isUsed: false },
     });
     if (!otpEntry || new Date() > otpEntry.expiresAt) {
       throw new BadRequestException('OTP invalide ou expiré.');
     }
 
-    // Création utilisateur
+    // 4️⃣ Création utilisateur
     const hashedPassword = password ? await bcrypt.hash(password, 10) : undefined;
     const newUser = this.usersRepository.create({
       ...createUserDto,
-      email,
+      email: email || undefined,
+      phone: phone || undefined,
       password: hashedPassword,
       role: UserRole.CUSTOMER,
       isActive: true,
@@ -96,15 +97,15 @@ export class UsersService {
 
     const savedUser = await this.usersRepository.save(newUser);
 
-    // Marquer OTP utilisé
+    // 5️⃣ Marquer OTP utilisé
     otpEntry.isUsed = true;
     otpEntry.user = savedUser;
     await this.otpRepository.save(otpEntry);
 
     const { password: _pw, ...userWithoutPassword } = savedUser;
 
-    // Envoyer email de bienvenue uniquement si c’est un email
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    // 6️⃣ Envoyer email si c’est un email
+    if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       await this.mailService.sendHtmlEmail(
         email,
         'Bienvenue dans FavorHelp',
@@ -113,7 +114,7 @@ export class UsersService {
       );
     }
 
-    // Générer tokens JWT
+    // 7️⃣ Générer tokens JWT
     const access_token = await this.accessToken(savedUser);
     const refresh_token = await this.refreshToken(savedUser);
 

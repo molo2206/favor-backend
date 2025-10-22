@@ -1,10 +1,4 @@
-import {
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  Matches,
-  IsEnum,
-} from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, Matches, IsEnum, ValidateIf } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserRole } from '../enum/user-role-enum';
 import { IsEmailOrPhone } from '../utility/helpers/IsEmailOrPhone';
@@ -14,14 +8,27 @@ export class CreateUserDto {
   @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
   fullName: string;
 
-  @IsNotEmpty({ message: 'Email ou numéro est requis.' })
+  // Email optionnel
+  @ValidateIf((o) => o.email)
+  @IsString()
   @IsEmailOrPhone({ message: 'Doit être un email ou un numéro de téléphone valide.' })
-  email: string; // ce champ devient “email ou phone”
+  email?: string;
+
+  // Phone optionnel
+  @ValidateIf((o) => o.phone)
+  @IsString()
+  @IsEmailOrPhone({ message: 'Doit être un email ou un numéro de téléphone valide.' })
+  phone?: string;
+
+  // Champ virtuel pour validation globale (au moins un requis)
+  @IsNotEmpty({ message: 'Un email ou un numéro de téléphone est requis.' })
+  validateEmailOrPhone?: string;
 
   @IsOptional()
   @IsString({ message: 'Le mot de passe doit être une chaîne de caractères.' })
   @Matches(/(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])/, {
-    message: 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.',
+    message:
+      'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.',
   })
   password?: string;
 
