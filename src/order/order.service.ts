@@ -327,9 +327,9 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
         );
       }
       if (hasPhone) {
-       const message = `Votre commande ${updatedOrder.invoiceNumber} a ete validee avec succes
+        const message = `Votre commande ${updatedOrder.invoiceNumber} a ete validee avec succes
 Pour recuperer votre commande ou colis veuillez presenter ce code PIN au livreur : ${updatedOrder.pin}
-Merci pour votre confiance votre commande sera traitee des reception du paiement`;
+Merci pour votre confiance.`;
         await this.smsHelper.sendSms(updatedOrder.user.phone, message);
       }
 
