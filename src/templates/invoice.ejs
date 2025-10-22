@@ -180,8 +180,11 @@
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="status-box">
+      <!-- Client -->
+      <div class="section">
+         <div class="status-box">
           <div class="status <%= order.paymentStatus?.toLowerCase() %>">
             <%= order.paymentStatus === 'PAID' ? '✅ Payée' : order.paymentStatus === 'PENDING' ? '⏳ En attente' : '❌ Annulée' %>
           </div>
@@ -204,10 +207,6 @@
             <%= order.type %> / <%= order.shopType %>
           </div>
         </div>
-      </div>
-
-      <!-- Client -->
-      <div class="section">
         <div class="section-title">Client</div>
         <div class="section-content">
           <div>
