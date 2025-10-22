@@ -16,7 +16,6 @@ export class CreateUserDto {
   fullName: string;
 
   @Transform(({ value }) => value.toLowerCase())
-  @IsNotEmpty({ message: "L'email est requis." })
   @IsEmail({}, { message: 'Email invalide.' })
   email: string;
 
