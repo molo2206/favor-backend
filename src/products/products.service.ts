@@ -101,8 +101,8 @@ export class ProductService {
     } = createProductDto;
 
     // 🔹 Validation images
-    if (!files) {
-      throw new BadRequestException('Vous devez fournir une image');
+    if (!files || files.length < 1 || files.length > 5) {
+      throw new BadRequestException('Vous devez fournir entre 1 et 4 images');
     }
 
     if (!user.activeCompanyId) {
