@@ -39,7 +39,6 @@ export class UsersService {
     private readonly smsHelper: SmsHelper,
   ) {}
 
-  // users.service.ts
   async signup(createUserDto: CreateUserDto): Promise<{
     message: string;
     data: Omit<UserEntity, 'password'> | { email?: string; phone?: string };
@@ -78,13 +77,39 @@ export class UsersService {
       throw new BadRequestException('Un compte avec cet email ou numéro existe déjà.');
     }
 
-    // 2️⃣ Envoi OTP si non fourni
+    // 2️⃣ Envoi OTP si non fourni - AVEC LOGIQUE AMÉLIORÉE
     if (!otpCode) {
-      await this.sendOtp(destination);
+      // ✅ APPLIQUER LA LOGIQUE DE sendResetPasswordOtp
+      const generatedOtpCode = Math.floor(1000 + Math.random() * 9000).toString();
+      const otp = this.otpRepository.create({
+        email: destination, // On utilise destination (email ou phone) comme identifiant
+        otpCode: generatedOtpCode,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      });
+      await this.otpRepository.save(otp);
 
-      // ✅ RETURN MANQUANT AJOUTÉ
+      // ✅ ENVOI AUTOMATIQUE SELON LE TYPE (Email ou SMS)
+      if (validator.isEmail(destination)) {
+        // Envoi par EMAIL
+        await this.mailService.sendHtmlEmail(
+          destination,
+          'Code de vérification - FavorHelp',
+          'sendOtp.html',
+          { otpCode: generatedOtpCode, year: new Date().getFullYear() },
+        );
+      } else if (validator.isMobilePhone(destination, 'any')) {
+        // Envoi par SMS
+        const message = `Votre code de vérification FavorHelp est : ${generatedOtpCode}`;
+        const sent = await this.smsHelper.sendSms(destination, message);
+        if (!sent) {
+          throw new BadRequestException("Impossible d'envoyer le SMS de vérification.");
+        }
+      }
+
       return {
-        message: 'Un code OTP a été envoyé.',
+        message: validator.isEmail(destination)
+          ? 'Un code OTP a été envoyé à votre email.'
+          : 'Un code OTP a été envoyé par SMS.',
         data: { ...(email ? { email } : {}), ...(phone ? { phone } : {}) },
         access_token: null,
         refresh_token: null,
@@ -120,7 +145,7 @@ export class UsersService {
 
     const { password: _pw, ...userWithoutPassword } = savedUser;
 
-    // 6️⃣ Envoyer email si c'est un email valide et non vide
+    // 6️⃣ Envoyer email de bienvenue si c'est un email
     if (email && email !== '' && validator.isEmail(email)) {
       await this.mailService.sendHtmlEmail(
         email,
@@ -134,7 +159,6 @@ export class UsersService {
     const access_token = await this.accessToken(savedUser);
     const refresh_token = await this.refreshToken(savedUser);
 
-    // ✅ RETURN FINAL
     return {
       message: 'Inscription réussie. Bienvenue !',
       data: userWithoutPassword,
