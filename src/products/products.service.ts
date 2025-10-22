@@ -102,7 +102,7 @@ export class ProductService {
 
     // 🔹 Validation images
     if (!files) {
-      throw new BadRequestException('Vous devez fournir entre 2 et 4 images');
+      throw new BadRequestException('Vous devez fournir une image');
     }
 
     if (!user.activeCompanyId) {
