@@ -10,7 +10,7 @@ export function IsEmailOrPhone(validationOptions?: ValidationOptions) {
       options: validationOptions,
       validator: {
         validate(value: any, args: ValidationArguments) {
-          if (!value) return false; // obligatoire
+          if (!value || value.toString().trim() === '') return true; // ✅ ignore les chaînes vides
           return validator.isEmail(value) || validator.isMobilePhone(value, 'any');
         },
         defaultMessage(args: ValidationArguments) {
