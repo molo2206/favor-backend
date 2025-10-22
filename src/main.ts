@@ -13,6 +13,7 @@ async function bootstrap() {
     origin: ['http://localhost:5173', 'https://favor-help.vercel.app'],
     credentials: true,
   });
+  
   // Autorise les corps JSON et urlencodeds
   app.use(bodyParser.json({ limit: '10mb' }));
   app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
@@ -24,13 +25,16 @@ async function bootstrap() {
 
   // Préfixe global pour tes routes
   app.setGlobalPrefix('api/v1');
+  
+  // ✅ CORRECTION : Désactiver whitelist
   app.useGlobalPipes(
     new ValidationPipe({
-      transform: true, // Permet la conversion automatique des types
-      whitelist: true, // Ignore les propriétés non définies dans le DTO
-      forbidNonWhitelisted: true, // Lève une erreur si des propriétés non attendues sont envoyées
+      transform: true,
+      whitelist: false, // ← DÉSACTIVÉ
+      forbidNonWhitelisted: false, // ← DÉSACTIVÉ
     }),
   );
+  
   await app.listen(3000);
 }
 bootstrap();
