@@ -1,11 +1,4 @@
-import {
-  IsString,
-  Matches,
-  IsEnum,
-  registerDecorator,
-  ValidationOptions,
-  ValidationArguments,
-} from 'class-validator';
+import { IsString, Matches, IsEnum, registerDecorator, ValidationOptions, ValidationArguments, Allow } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserRole } from '../enum/user-role-enum';
 import validator from 'validator';
@@ -26,13 +19,13 @@ export function EmailOrPhoneRequired(validationOptions?: ValidationOptions) {
 
           // Si les deux champs sont vides ou undefined, c'est valide (car optionnels)
           if (!email && !phone) return true;
-
+          
           // Si email est fourni mais invalide
           if (email && !validator.isEmail(email)) return false;
-
+          
           // Si phone est fourni mais invalide
           if (phone && !validator.isMobilePhone(phone, 'any')) return false;
-
+          
           // Au moins un des deux champs est valide
           return true;
         },
@@ -48,9 +41,11 @@ export class CreateUserDto {
   @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
   fullName: string;
 
+  @Allow()
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
   email?: string;
 
+  @Allow()
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
   phone?: string;
 
@@ -60,29 +55,34 @@ export class CreateUserDto {
 
   @IsString()
   @Matches(/(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])/, {
-    message:
-      'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.',
+    message: 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.',
   })
   password?: string;
 
+  @Allow()
   @IsString()
   otpCode?: string;
 
+  @Allow()
   @IsString()
   country?: string;
 
+  @Allow()
   @IsString()
   city?: string;
 
+  @Allow()
   @IsString()
   address?: string;
 
   @IsEnum(UserRole)
   roles?: UserRole = UserRole.CUSTOMER;
 
+  @Allow()
   @IsString()
   fcmToken?: string;
 
+  @Allow()
   @IsString()
   platform?: 'ios' | 'android' | 'web';
 }
