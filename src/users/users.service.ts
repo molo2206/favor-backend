@@ -68,6 +68,11 @@ export class UsersService {
     // 2️⃣ Envoi OTP si otpCode absent
     if (!otpCode) {
       const destination = email ?? phone; // on envoie OTP sur ce qui est disponible
+
+      if (!destination) {
+        throw new BadRequestException('Un email ou un numéro de téléphone est requis.');
+      }
+
       await this.sendOtp(destination);
 
       return {
