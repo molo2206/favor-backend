@@ -518,16 +518,11 @@ export class UsersService {
       ],
     });
 
-    if (!user) {
-      throw new NotFoundException('Utilisateur non trouvé.');
-    }
+    if (!user) throw new NotFoundException('Utilisateur non trouvé.');
+    if (!file) throw new BadRequestException('Image invalide.');
 
-    if (!file) {
-      throw new BadRequestException('Image invalide.');
-    }
-
-    // 🧹 Si une image existe déjà → extraire le public_id et la supprimer
-    if (user.image) {
+    // 🧹 Supprime l’ancienne image uniquement si elle est sur Cloudinary
+    if (user.image && user.image.includes('res.cloudinary.com')) {
       const publicId = this.extractPublicId(user.image);
       if (publicId) {
         await this.cloudinary.handleDeleteImage(publicId);
@@ -539,7 +534,6 @@ export class UsersService {
     user.image = imageUrl;
 
     const updatedUser = await this.usersRepository.save(user);
-
     const { password, ...userWithoutPassword } = updatedUser;
 
     const userHasCompany =
@@ -600,6 +594,7 @@ export class UsersService {
       userHasCompany,
       activeCompany: userWithoutPassword.activeCompany,
     };
+
     const sanitizedUser = instanceToPlain(responseUser);
 
     return {
