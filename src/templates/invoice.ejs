@@ -13,7 +13,6 @@
         padding: 2rem;
         margin: 0;
       }
-
       .card {
         background: #ffffff;
         max-width: 900px;
@@ -22,95 +21,58 @@
         padding: 2rem;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
       }
-
-      /* Header modernisé */
       .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: #ffffff;
-        padding: 1.5rem 2rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 1.5rem;
         margin-bottom: 2rem;
       }
-
       .logo-title {
         display: flex;
         align-items: center;
         gap: 1rem;
       }
-
       .logo-title img {
-        height: 80px;
+        height: 90px;
         width: auto;
         border-radius: 6px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
       }
-
       .logo-title h1 {
-        font-size: 1.8rem;
-        color: #111827;
+        font-size: 2rem;
+        color: #1d4ed8;
         margin: 0;
         font-weight: 700;
         letter-spacing: 1px;
       }
-
-      .invoice-number {
-        font-size: 0.85rem;
-        color: #6b7280;
-        margin-top: 0.25rem;
-      }
-
       .status-box {
         text-align: right;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 0.4rem;
-        max-width: 220px;
       }
-
-      .status {
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
+      .status-box .status {
+        padding: 6px 16px;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        font-weight: bold;
         display: inline-block;
-        white-space: nowrap;
+        margin-bottom: 4px;
       }
-
-      .status.paid { background-color: #dcfce7; color: #16a34a; }
-      .status.pending { background-color: #fef3c7; color: #f59e0b; }
-      .status.cancelled { background-color: #fee2e2; color: #dc2626; }
-
-      .payment-info, .pin-info {
-        background: #f3f4f6;
-        padding: 0.4rem 0.8rem;
-        border-radius: 6px;
-        font-size: 0.75rem;
-        color: #111827;
-        line-height: 1.3;
-        text-align: right;
-        max-width: 220px;
+      .status.paid {
+        background-color: #dcfce7;
+        color: #16a34a;
       }
-
-      .payment-info a {
-        color: #1d4ed8;
-        text-decoration: none;
-        font-weight: 500;
+      .status.pending {
+        background-color: #fef3c7;
+        color: #f59e0b;
       }
-
-      .pin-info strong {
+      .status.cancelled {
+        background-color: #fee2e2;
         color: #dc2626;
       }
-
-      .small-info {
-        font-size: 0.75rem;
-        color: #6b7280;
+      .section {
+        margin-top: 2rem;
       }
-
-      .section { margin-top: 2rem; }
       .section-title {
         font-weight: 600;
         background: #1d4ed8;
@@ -125,111 +87,126 @@
         padding: 1rem;
         border-radius: 0 0 6px 6px;
       }
-      .section-content div { width: 30%; }
-
-      table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-      th, td { border: 1px solid #e5e7eb; padding: 0.75rem; font-size: 0.95rem; }
-      th { background: #1d4ed8; color: white; text-align: left; }
-
-      .totals { margin-top: 1.5rem; text-align: right; }
-      .totals div { margin: 0.25rem 0; }
-
+      .section-content div {
+        width: 30%;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+      }
+      th,
+      td {
+        border: 1px solid #e5e7eb;
+        padding: 0.75rem;
+        font-size: 0.95rem;
+      }
+      th {
+        background: #1d4ed8;
+        color: white;
+        text-align: left;
+      }
+      .totals {
+        margin-top: 1.5rem;
+        text-align: right;
+      }
+      .totals div {
+        margin: 0.25rem 0;
+      }
       .footer {
         display: flex;
         justify-content: space-between;
         font-size: 0.9rem;
         color: #4b5563;
         border-top: 1px solid #e5e7eb;
-        padding-top: 1.5rem;
-        margin-top: 2rem;
+        padding-top: 1.5rem; /* espace entre la bordure et le contenu */
+        margin-top: 2rem;    /* espace entre le footer et le contenu précédent */
       }
+
       .footer div strong {
         display: block;
         margin-bottom: 0.5rem;
         color: #111827;
       }
-
-      .qr-code-container { margin-top: 2rem; text-align: center; }
+      .qr-code-container {
+        margin-top: 2rem;
+        text-align: center;
+      }
       .qr-code-container img {
         width: 150px;
         height: 150px;
         border: 1px solid #e5e7eb;
         border-radius: 12px;
       }
-
       @media (max-width: 768px) {
-        .section-content { flex-direction: column; }
-        .section-content div { width: 100%; margin-bottom: 1rem; }
-        .footer { flex-direction: column; gap: 1rem; }
-        .header { flex-direction: column; gap: 1rem; align-items: flex-start; }
-        .status-box { align-items: flex-start; }
+        .section-content {
+          flex-direction: column;
+        }
+        .section-content div {
+          width: 100%;
+          margin-bottom: 1rem;
+        }
+        .footer {
+          flex-direction: column;
+          gap: 1rem;
+        }
       }
     </style>
   </head>
-
   <body>
     <div class="card">
-      <!-- Header -->
       <div class="header">
         <div class="logo-title">
           <img src="https://cosamed.org/1%20Favor.png" alt="Logo" />
-          <div>
-            <h1>FACTURE</h1>
-            <div class="invoice-number">
-              #<%= order.invoiceNumber %> • <%= new Date(order.createdAt).toLocaleDateString('fr-FR') %>
-            </div>
-          </div>
+          <h1>FACTURE</h1>
         </div>
-
-       
-      </div>
-
-      <!-- Client -->
-      <div class="section">
-        <div class="section-title">Client</div>
-        
-        <div class="section-content">
-          <div>
-            <strong>Facturé à</strong><br />
-            <%= user.fullName %><br />
-            <%= user.email %>
-          </div>
-          <div>
-            <strong>N° Facture:</strong> #<%= order.invoiceNumber %><br />
-            <strong>Date:</strong> <%= new Date(order.createdAt).toLocaleDateString('fr-FR') %>
-          </div>
-          <div>
-            <strong>Adresse Livraison:</strong><br />
-            <%= order.addressUser?.address || 'Non spécifiée' %><br />
-            <%= order.addressUser?.city || '' %>, <%= order.addressUser?.country || '' %>
-          </div>
-           <div class="status-box">
+        <div class="status-box">
           <div class="status <%= order.paymentStatus?.toLowerCase() %>">
-            <%= order.paymentStatus === 'PAID' ? '✅ Payée' : order.paymentStatus === 'PENDING' ? '⏳ En attente' : '❌ Annulée' %>
+            <%= order.paymentStatus === 'PAID' ? '✅ Payée' : order.paymentStatus === 'PENDING' ? '⏳ En attente de validation.' : '❌ Annulée' %>
           </div>
-
-          <% if (order.paymentStatus?.toLowerCase().trim() === 'pending') { %>
-            <div class="payment-info">
-              Mobile Money : 
-              <a href="tel:+243973760641">+243 973 760 641</a> / 
-              <a href="tel:+243811824573">+243 811 824 573</a>
-            </div>
-          <% } %>
-
-          <% if (order.paymentStatus?.toLowerCase().trim() === 'paid') { %>
-            <div class="pin-info">
-              Code PIN : <strong><%= order.pin || '—' %></strong>
-            </div>
-          <% } %>
-
-          <div class="small-info">
+          <div style="font-size: 0.85rem; color: #4b5563;">
             <%= order.type %> / <%= order.shopType %>
           </div>
         </div>
-        </div>
       </div>
 
-      <!-- Détails de la facture -->
+<div class="section">
+  <div class="section-title">Client</div>
+  <div class="section-content">
+    <div>
+      <strong>Facturé à</strong><br />
+      <%= user.fullName %><br />
+      <%= user.email %><br />
+
+      <% if (order.paymentStatus?.toLowerCase().trim() === 'pending') { %> 
+        <div class="payment-info" style="margin-top:0.5rem; text-align:left;">
+          Mobile Money : 
+          <a href="tel:+243973760641">+243 973 760 641</a> / 
+          <a href="tel:+243811824573">+243 811 824 573</a>
+        </div>
+      <% } %>
+
+      <% if (order.paymentStatus?.toLowerCase().trim() === 'paid') { %>
+        <div class="pin-info" style="margin-top:0.5rem; text-align:left;">
+          Code PIN : <strong><%= order.pin || '—' %></strong>
+        </div>
+      <% } %>
+    </div>
+
+    <div>
+      <strong>N° Facture:</strong> #<%= order.invoiceNumber %><br />
+      <strong>Date:</strong> <%= new Date(order.createdAt).toLocaleDateString('fr-FR') %>
+    </div>
+
+    <div>
+      <strong>Adresse Livraison:</strong><br />
+      <%= order.addressUser?.address || 'Non spécifiée' %><br />
+      <%= order.addressUser?.city || '' %>, <%= order.addressUser?.country || '' %>
+    </div>
+  </div>
+</div>
+
+
       <div class="section">
         <div class="section-title">Détails de la facture / Invoice Details</div>
         <table>
@@ -261,20 +238,12 @@
           </tfoot>
         </table>
       </div>
-
-      <!-- Footer -->
       <div class="footer">
         <div>
           📞 +243 979 649 404<br />
-          ✉️ favorhelp@gmail.com
-        </div>
-        <div class="qr-code-container">
-          <% if(order.qrCode) { %>
-            <img src="<%= order.qrCode %>" alt="QR Code Paiement" />
-          <% } %>
+          ✉️ baenisam@gmail.com
         </div>
       </div>
-
     </div>
   </body>
 </html>
