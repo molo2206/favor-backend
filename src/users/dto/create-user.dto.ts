@@ -1,37 +1,33 @@
 import {
-  IsEmail,
-  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
-  IsPhoneNumber,
-  ValidateIf,
+  IsEnum,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserRole } from '../enum/user-role-enum';
+import { IsEmailOrPhone } from '../utility/helpers/IsEmailOrPhone';
 
 export class CreateUserDto {
   @IsNotEmpty({ message: 'Le nom complet est requis.' })
   @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
   fullName: string;
 
-  @ValidateIf((o) => o.email) // Valide email uniquement s’il est fourni
-  @Transform(({ value }) => value?.toLowerCase())
-  @IsString()
-  email?: string;
+  @IsNotEmpty({ message: 'Email ou numéro est requis.' })
+  @IsEmailOrPhone({ message: 'Doit être un email ou un numéro de téléphone valide.' })
+  email: string; // ce champ devient “email ou phone”
 
-  @ValidateIf((o) => o.phone) // Valide phone uniquement s’il est fourni
-  @IsPhoneNumber(undefined, { message: 'Le numéro de téléphone est invalide.' })
-  phone?: string;
-
-  @IsNotEmpty({ message: 'Le mot de passe est requis.' })
+  @IsOptional()
   @IsString({ message: 'Le mot de passe doit être une chaîne de caractères.' })
   @Matches(/(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])/, {
-    message:
-      'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.',
+    message: 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.',
   })
-  password: string;
+  password?: string;
+
+  @IsOptional()
+  @IsString()
+  otpCode?: string;
 
   @IsOptional()
   @IsString()
@@ -44,10 +40,6 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   address?: string;
-
-  @IsOptional()
-  @IsString()
-  otpCode?: string;
 
   @IsOptional()
   @IsEnum(UserRole)
