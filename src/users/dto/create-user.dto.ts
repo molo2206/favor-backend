@@ -3,6 +3,7 @@ import {
   IsString,
   Matches,
   IsEnum,
+  ValidateIf,
   registerDecorator,
   ValidationOptions,
   ValidationArguments,
@@ -11,9 +12,7 @@ import { Transform } from 'class-transformer';
 import { UserRole } from '../enum/user-role-enum';
 import validator from 'validator';
 
-/**
- * Valide qu'au moins un des champs email/phone est fourni et correct
- */
+/** Validateur global pour au moins un champ email/phone valide */
 export function EmailOrPhoneRequired(validationOptions?: ValidationOptions) {
   return function (object: Object, propertyName: string) {
     registerDecorator({
@@ -27,8 +26,7 @@ export function EmailOrPhoneRequired(validationOptions?: ValidationOptions) {
           const email = obj.email?.trim();
           const phone = obj.phone?.trim();
 
-          if (!email && !phone) return false; // aucun champ fourni
-
+          if (!email && !phone) return false;
           if (email && !validator.isEmail(email)) return false;
           if (phone && !validator.isMobilePhone(phone, 'any')) return false;
 
@@ -48,15 +46,17 @@ export class CreateUserDto {
 
   @IsOptional()
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
+  @ValidateIf((o) => o.email !== undefined) // ✅ ne valide que si présent
   email?: string;
 
   @IsOptional()
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
+  @ValidateIf((o) => o.phone !== undefined) // ✅ ne valide que si présent
   phone?: string;
 
   @IsOptional()
   @EmailOrPhoneRequired()
-  dummyValidationField?: string; // ✅ champ virtuel facultatif
+  dummyValidationField?: string;
 
   @IsOptional()
   @IsString()
