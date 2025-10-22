@@ -327,11 +327,9 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
         );
       }
       if (hasPhone) {
-        const message = `Votre commande ${updatedOrder.invoiceNumber} a ete creee avec succes sur FavorHelp
-Montant total ${updatedOrder.grandTotal} ${updatedOrder.currency}
-Code PIN livraison ${updatedOrder.pin}
-Merci pour votre confiance votre commande sera traitée des reception du paiement`;
-
+       const message = `Votre commande ${updatedOrder.invoiceNumber} a ete validee avec succes
+Pour recuperer votre commande ou colis veuillez presenter ce code PIN au livreur : ${updatedOrder.pin}
+Merci pour votre confiance votre commande sera traitee des reception du paiement`;
         await this.smsHelper.sendSms(updatedOrder.user.phone, message);
       }
 
