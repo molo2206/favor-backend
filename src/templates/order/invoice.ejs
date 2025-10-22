@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!DOCTYPE html>
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
@@ -9,190 +8,76 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link href="https://unpkg.com/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
     <script src="https://unpkg.com/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
     <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        background: #f1f5f9;
-        padding: 2rem;
-        margin: 0;
-      }
-      .card {
-        background: #ffffff;
-        max-width: 900px;
-        margin: auto;
-        border-radius: 12px;
-        padding: 2rem;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-      }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 2px solid #e2e8f0;
-        padding-bottom: 1.5rem;
-        margin-bottom: 2rem;
-      }
-      .logo-title {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-      }
-      .logo-title img {
-        height: 90px;
-        width: auto;
-        border-radius: 6px;
-        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-      }
-      .logo-title h1 {
-        font-size: 2rem;
-        color: #1d4ed8;
-        margin: 0;
-        font-weight: 700;
-        letter-spacing: 1px;
-      }
-      .status-box {
-        text-align: right;
-      }
-      .status-box .status {
-        padding: 6px 16px;
-        border-radius: 30px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: inline-block;
-        margin-bottom: 4px;
-      }
-      .status.paid {
-        background-color: #dcfce7;
-        color: #16a34a;
-      }
-      .status.pending {
-        background-color: #fef3c7;
-        color: #f59e0b;
-      }
-      .status.cancelled {
-        background-color: #fee2e2;
-        color: #dc2626;
-      }
-      .section {
-        margin-top: 2rem;
-      }
-      .section-title {
-        font-weight: 600;
-        background: #1d4ed8;
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 6px 6px 0 0;
-      }
-      .section-content {
-        display: flex;
-        justify-content: space-between;
-        background: #f8fafc;
-        padding: 1rem;
-        border-radius: 0 0 6px 6px;
-      }
-      .section-content div {
-        width: 30%;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 1rem;
-      }
-      th,
-      td {
-        border: 1px solid #e5e7eb;
-        padding: 0.75rem;
-        font-size: 0.95rem;
-      }
-      th {
-        background: #1d4ed8;
-        color: white;
-        text-align: left;
-      }
-      .totals {
-        margin-top: 1.5rem;
-        text-align: right;
-      }
-      .totals div {
-        margin: 0.25rem 0;
-      }
-      .footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 2rem;
-        font-size: 0.9rem;
-        border-top: 1px solid #e5e7eb;
-        padding-top: 1.5rem;
-        color: #4b5563;
-      }
-      .footer div strong {
-        display: block;
-        margin-bottom: 0.5rem;
-        color: #111827;
-      }
-      .footer .contact-info {
-        max-width: 50%;
-      }
-      .qr-code-container {
-        max-width: 50%;
-        text-align: right;
-        margin-top: 0; 
-      }
-      .qr-code-container img {
-        width: 100px;      
-        height: 100px;     
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-      }
+      body { font-family: 'Inter', sans-serif; background: #f1f5f9; padding: 2rem; margin: 0; }
+      .card { background: #ffffff; max-width: 900px; margin: auto; border-radius: 12px; padding: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+      .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 1.5rem; margin-bottom: 2rem; }
+      .logo-title { display: flex; align-items: center; gap: 1rem; }
+      .logo-title img { height: 90px; width: auto; border-radius: 6px; box-shadow: 0 3px 8px rgba(0,0,0,0.1); }
+      .logo-title h1 { font-size: 2rem; color: #1d4ed8; margin: 0; font-weight: 700; letter-spacing: 1px; }
+      .status-box { text-align: right; }
+      .status-box .status { padding: 6px 16px; border-radius: 30px; font-size: 0.9rem; font-weight: bold; display: inline-block; margin-bottom: 4px; }
+      .status.paid { background-color: #dcfce7; color: #16a34a; }
+      .status.pending { background-color: #fef3c7; color: #f59e0b; }
+      .status.cancelled { background-color: #fee2e2; color: #dc2626; }
+      .section { margin-top: 2rem; }
+      .section-title { font-weight: 600; background: #1d4ed8; color: white; padding: 0.5rem 1rem; border-radius: 6px 6px 0 0; }
+      .section-content { display: flex; justify-content: space-between; background: #f8fafc; padding: 1rem; border-radius: 0 0 6px 6px; }
+      .section-content div { width: 30%; }
+      table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+      th, td { border: 1px solid #e5e7eb; padding: 0.75rem; font-size: 0.95rem; }
+      th { background: #1d4ed8; color: white; text-align: left; }
+      .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; font-size: 0.9rem; border-top: 1px solid #e5e7eb; padding-top: 1.5rem; color: #4b5563; }
+      .footer div strong { display: block; margin-bottom: 0.5rem; color: #111827; }
       @media (max-width: 768px) {
-        .section-content {
-          flex-direction: column;
-        }
-        .section-content div {
-          width: 100%;
-          margin-bottom: 1rem;
-        }
-        .footer {
-          flex-direction: column;
-          gap: 1rem;
-          align-items: flex-start;
-        }
-        .qr-code-container {
-          text-align: left;
-          max-width: 100%;
-          margin-top: 1rem;
-        }
-        .footer .contact-info {
-          max-width: 100%;
-        }
+        .section-content { flex-direction: column; }
+        .section-content div { width: 100%; margin-bottom: 1rem; }
+        .footer { flex-direction: column; gap: 1rem; align-items: flex-start; }
       }
+      .payment-info { font-size: 0.85rem; color: #111827; margin-top: 1rem; line-height: 1.4; }
+      .pin-info { margin-top: 1rem; font-weight: bold; color: #dc2626; }
     </style>
   </head>
   <body>
     <div class="card">
+      <!-- Header -->
       <div class="header">
         <div class="logo-title">
           <img src="https://cosamed.org/1%20Favor.png" alt="Logo" />
           <h1>FACTURE</h1>
         </div>
-       <div class="status-box">
-         <div class="status">
-          <% if(order.paymentStatus === 'PAID') { %>
-            <i class="fas fa-check-circle" style="color: #16a34a;"></i> Payée
-          <% } else if(order.paymentStatus === 'PENDING') { %>
-            <i class="fas fa-hourglass-half" style="color: #f59e0b;"></i> En attente de validation.
-          <% } else { %>
-            <i class="fas fa-times-circle" style="color: #dc2626;"></i> Annulée
+        <div class="status-box">
+          <div class="status <%= order.paymentStatus?.toLowerCase() %>">
+            <% if(order.paymentStatus?.toUpperCase() === 'PAID') { %>
+              <i class="fas fa-check-circle" style="color: #16a34a;"></i> Payée
+            <% } else if(order.paymentStatus?.toUpperCase() === 'PENDING') { %>
+              <i class="fas fa-hourglass-half" style="color: #f59e0b;"></i> En attente de validation.
+            <% } else { %>
+              <i class="fas fa-times-circle" style="color: #dc2626;"></i> Annulée
+            <% } %>
+          </div>
+
+          <!-- Message Mobile Money si pending -->
+          <% if(order.paymentStatus?.toUpperCase() === 'PENDING') { %>
+            <div class="payment-info">
+              Pour le paiement, vous pouvez envoyer votre argent via Mobile Money sur
+              <a href="tel:+243973760641">+243 973 760 641</a> ou 
+              <a href="tel:+243811824573">+243 811 824 573</a>.<br />
+              Merci pour votre confiance, votre commande sera traitée dès réception du paiement.
+            </div>
+          <% } %>
+
+          <!-- PIN si paid -->
+          <% if(order.paymentStatus?.toUpperCase() === 'PAID') { %>
+            <div class="pin-info">
+              Pour récupérer votre commande ou colis, veuillez présenter ce code PIN au livreur : <%= order.pin || '—' %>
+            </div>
           <% } %>
         </div>
-
       </div>
 
-      </div>
-
+      <!-- Client -->
       <div class="section">
         <div class="section-title">Client</div>
         <div class="section-content">
@@ -212,6 +97,7 @@
         </div>
       </div>
 
+      <!-- Détails -->
       <div class="section">
         <div class="section-title">Détails de la facture / Invoice Details</div>
         <table>
@@ -243,11 +129,13 @@
           </tfoot>
         </table>
       </div>
+
+      <!-- Footer -->
       <div class="footer">
-       <div>
-        <i class="fas fa-phone"></i> +243 979 649 404<br />
-        <i class="fas fa-envelope"></i> baenisam@gmail.com
-      </div>
+        <div>
+          <i class="fas fa-phone"></i> +243 979 649 404<br />
+          <i class="fas fa-envelope"></i> baenisam@gmail.com
+        </div>
       </div>
     </div>
   </body>

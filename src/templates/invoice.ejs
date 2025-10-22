@@ -126,10 +126,8 @@
           <div style="font-size: 0.85rem; color: #4b5563; margin-top: 0.5rem;">
             <%= order.type %> / <%= order.shopType %>
           </div>
-
-          <!-- Message conditionnel -->
-          <% if (order.paymentStatus?.toUpperCase() === 'PENDING') { %>
-  <div class="payment-info" style="font-size: 0.85rem; color: #111827; margin-top: 1rem; line-height: 1.4;">
+<% if (order.paymentStatus?.toLowerCase().trim() === 'pending') { %>
+  <div class="payment-info">
     Pour le paiement, vous pouvez envoyer votre argent via Mobile Money sur
     <a href="tel:+243973760641">+243 973 760 641</a> ou 
     <a href="tel:+243811824573">+243 811 824 573</a>.<br />
@@ -137,13 +135,13 @@
   </div>
 <% } %>
 
-<% if (order.paymentStatus?.toUpperCase() === 'PAID') { %>
-  <div class="pin-info" style="margin-top: 1rem; font-weight: bold; color: #dc2626;">
-    Pour récupérer votre commande ou colis, veuillez présenter ce code PIN au livreur : <%= order.pin %>
+<% if (order.paymentStatus?.toLowerCase().trim() === 'paid') { %>
+  <div class="pin-info">
+    Pour récupérer votre commande ou colis, veuillez présenter ce code PIN au livreur : <%= order.pin || '—' %>
   </div>
 <% } %>
 
-        </div>
+         
       </div>
 
       <!-- Client -->
