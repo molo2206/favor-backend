@@ -14,6 +14,7 @@ import { MailModule } from 'src/email/email.module';
 import { PdfModule } from 'src/pdf/pdf.module';
 import { TransactionModule } from 'src/transaction/transaction.module';  // Assurez-vous que TransactionModule est bien importé
 import { InvoiceModule } from './invoice/invoice.module';
+import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { InvoiceModule } from './invoice/invoice.module';
     PdfModule,
     TransactionModule,  // Assurez-vous que TransactionModule est bien inclus ici
   ],
-  providers: [OrderService],
+  providers: [OrderService,SmsHelper],
   controllers: [OrderController],
 })
 export class OrderModule {}
