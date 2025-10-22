@@ -815,7 +815,12 @@ export class ProductService {
     return grouped;
   }
 
-  async update(id: string, dto: CreateProductDto, user: UserEntity) {
+  async update(
+    id: string,
+    dto: CreateProductDto,
+    user: UserEntity,
+    files?: Express.Multer.File[],
+  ) {
     const { categoryId, status, measureId, specifications, skus, attributes, ...data } = dto;
 
     const product = await this.productRepo.findOne({
@@ -833,8 +838,8 @@ export class ProductService {
         'specificationValues',
         'specificationValues.specification',
         'skus',
-        'attributes', // ajouter si tu as une relation product.attributes
-        'attributes.values', // pour récupérer les valeurs existantes
+        'attributes',
+        'attributes.values',
       ],
     });
     if (!product) throw new NotFoundException('Produit non trouvé');
@@ -842,13 +847,11 @@ export class ProductService {
     if (status) product.status = status;
     Object.assign(product, data);
 
-    // 🔹 Lien avec la société active
     const company = await this.companyRepo.findOne({ where: { id: user.activeCompanyId } });
     if (!company) throw new NotFoundException('Entreprise active non trouvée');
     product.company = company;
     product.type = company.typeCompany;
 
-    // 🔹 Lien avec la catégorie
     if (categoryId) {
       const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
       if (!category) throw new NotFoundException('Catégorie non trouvée');
@@ -857,7 +860,6 @@ export class ProductService {
       product.category = undefined;
     }
 
-    // 🔹 Lien avec la mesure
     if (measureId) {
       const measure = await this.measureRepo.findOne({ where: { id: measureId } });
       if (!measure) throw new NotFoundException('Mesure non trouvée');
@@ -866,9 +868,20 @@ export class ProductService {
       product.measure = undefined;
     }
 
+    // 🔹 AJOUT : Gestion des images si fournies
+    if (files && files.length > 0) {
+      const newImages: ImageProductEntity[] = [];
+      for (const file of files) {
+        const url = await this.cloudinary.handleUploadImage(file, 'product');
+        const img = this.imageRepository.create({ url, product });
+        newImages.push(await this.imageRepository.save(img));
+      }
+      // Ajoute aux images existantes
+      product.images = [...(product.images || []), ...newImages];
+    }
+
     const updatedProduct = await this.productRepo.save(product);
 
-    // 🔹 Gestion des valeurs de spécifications
     if (specifications && Array.isArray(specifications)) {
       for (const spec of specifications) {
         if (!spec.specificationId)
@@ -876,15 +889,11 @@ export class ProductService {
             'Chaque spécification doit contenir un specificationId',
           );
 
-        // Vérifier que la spécification existe dans la base
-        const specExists = await this.specRepo.findOne({
-          where: { id: spec.specificationId },
-        });
-        if (!specExists) {
+        const specExists = await this.specRepo.findOne({ where: { id: spec.specificationId } });
+        if (!specExists)
           throw new BadRequestException(
             `La spécification avec id ${spec.specificationId} n'existe pas`,
           );
-        }
 
         await this.productSpecificationValueService.create({
           productId: updatedProduct.id,

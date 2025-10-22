@@ -81,11 +81,13 @@ export class ProductController {
   async update(
     @Param('id') id: string,
     @Body() dto: CreateProductDto,
+    @UploadedFiles() files: Express.Multer.File[], // ✅ récupère les fichiers uploadés
     @CurrentUser() user: UserEntity,
   ) {
-    const result = await this.productService.update(id, dto, user);
+    const result = await this.productService.update(id, dto, user, files); // ✅ passe les fichiers au service
     return result;
   }
+
   @Patch(':id/status')
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
