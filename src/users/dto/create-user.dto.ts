@@ -1,4 +1,4 @@
-import { IsString, Matches, IsEnum, registerDecorator, ValidationOptions, ValidationArguments, Allow } from 'class-validator';
+import { IsString, Matches, IsEnum, registerDecorator, ValidationOptions, ValidationArguments, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserRole } from '../enum/user-role-enum';
 import validator from 'validator';
@@ -41,11 +41,11 @@ export class CreateUserDto {
   @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
   fullName: string;
 
-  @Allow()
+  @IsOptional()
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
   email?: string;
 
-  @Allow()
+  @IsOptional()
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
   phone?: string;
 
@@ -59,30 +59,30 @@ export class CreateUserDto {
   })
   password?: string;
 
-  @Allow()
+  @IsOptional()
   @IsString()
   otpCode?: string;
 
-  @Allow()
+  @IsOptional()
   @IsString()
   country?: string;
 
-  @Allow()
+  @IsOptional()
   @IsString()
   city?: string;
 
-  @Allow()
+  @IsOptional()
   @IsString()
   address?: string;
 
   @IsEnum(UserRole)
   roles?: UserRole = UserRole.CUSTOMER;
 
-  @Allow()
+  @IsOptional()
   @IsString()
   fcmToken?: string;
 
-  @Allow()
+  @IsOptional()
   @IsString()
   platform?: 'ios' | 'android' | 'web';
 }
