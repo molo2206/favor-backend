@@ -230,13 +230,10 @@ export class OrderService {
       });
     }
     if (hasPhone) {
-      const message = `Votre commande ${finalOrder.invoiceNumber} a été créée avec succès sur FavorHelp !
-      Montant total : ${finalOrder.grandTotal} ${finalOrder.currency}.
-      Si votre adresse email est renseignée dans votre profil FavorHelp, vous pouvez consulter votre boîte mail pour télécharger votre facture complète au format PDF.
-      Pour le paiement, vous pouvez envoyer votre argent via Mobile Money sur l'un des numéros suivants :
-      - +243 973 760 641
-      - +243 811 824 573
-      Merci pour votre confiance et votre achat ! Votre commande sera traitée dès réception du paiement.`;
+      const message = `Votre commande ${finalOrder.invoiceNumber} a ete creee avec succes sur FavorHelp
+Montant total ${finalOrder.grandTotal} ${finalOrder.currency}
+Pour le paiement vous pouvez envoyer votre argent via Mobile Money sur +243973760641 ou +243811824573
+Merci pour votre confiance votre commande sera traitee des reception du paiement`;
 
       await this.smsHelper.sendSms(user.phone, message);
     }
@@ -330,10 +327,10 @@ export class OrderService {
         );
       }
       if (hasPhone) {
-        const message = `Votre commande ${updatedOrder.invoiceNumber} a été créée avec succès sur FavorHelp !
-      Montant total : ${updatedOrder.grandTotal} ${updatedOrder.currency}.
-      Un code PIN de livraison vous sera demandé à la réception : ${updatedOrder.pin}.
-      Merci pour votre confiance et votre achat ! Votre commande sera traitée dès réception du paiement.`;
+        const message = `Votre commande ${updatedOrder.invoiceNumber} a ete creee avec succes sur FavorHelp
+Montant total ${updatedOrder.grandTotal} ${updatedOrder.currency}
+Code PIN livraison ${updatedOrder.pin}
+Merci pour votre confiance votre commande sera traitée des reception du paiement`;
 
         await this.smsHelper.sendSms(updatedOrder.user.phone, message);
       }
