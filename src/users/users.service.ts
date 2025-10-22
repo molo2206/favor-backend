@@ -22,6 +22,8 @@ import { UserRole } from './enum/user-role-enum';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
 import { MailService } from 'src/email/email.service';
 import { GoogleLoginDto } from './dto/googleLoginDto.dto';
+import { SmsHelper } from './utility/helpers/sms.helper';
+import validator from 'validator';
 @Injectable()
 export class UsersService {
   constructor(
@@ -34,41 +36,52 @@ export class UsersService {
     private readonly configService: ConfigService,
     private readonly cloudinary: CloudinaryService,
     private readonly mailService: MailService,
+    private readonly smsHelper: SmsHelper,
   ) {}
 
   // users.service.ts
   async signup(createUserDto: CreateUserDto): Promise<{
     message: string;
-    data: Omit<UserEntity, 'password'> | { email: string };
+    data: Omit<UserEntity, 'password'> | { email?: string; phone?: string };
     access_token: string | null;
     refresh_token: string | null;
   }> {
     const { email, phone, otpCode, password } = createUserDto;
+
+    // ✅ Vérification qu'au moins un des deux est fourni
+    if (!email && !phone) {
+      throw new BadRequestException('Un email ou un numéro de téléphone est requis.');
+    }
 
     // 1️⃣ Vérification doublons
     if (phone && (await this.usersRepository.findOne({ where: { phone } }))) {
       throw new BadRequestException('Un compte avec ce numéro de téléphone existe déjà.');
     }
 
-    const normalizedEmail = email.toLowerCase();
-    if (await this.usersRepository.findOne({ where: { email: normalizedEmail } })) {
-      throw new BadRequestException('Un compte avec cet email existe déjà.');
+    if (email) {
+      const normalizedEmail = email.toLowerCase();
+      if (await this.usersRepository.findOne({ where: { email: normalizedEmail } })) {
+        throw new BadRequestException('Un compte avec cet email existe déjà.');
+      }
     }
 
     // 2️⃣ Envoi OTP si otpCode absent
     if (!otpCode) {
-      await this.sendOtp(email);
+      const destination = email ?? phone; // on envoie OTP sur ce qui est disponible
+      await this.sendOtp(destination);
+
       return {
-        message: 'Un code OTP a été envoyé à votre adresse e-mail.',
-        data: { email },
+        message: 'Un code OTP a été envoyé.',
+        data: { ...(email ? { email } : {}), ...(phone ? { phone } : {}) },
         access_token: null,
         refresh_token: null,
       };
     }
 
     // 3️⃣ Vérification OTP
+    const destination = email ?? phone;
     const otpEntry = await this.otpRepository.findOne({
-      where: { email: normalizedEmail, otpCode, isUsed: false },
+      where: { email: destination, otpCode, isUsed: false },
     });
 
     if (!otpEntry || new Date() > otpEntry.expiresAt) {
@@ -79,8 +92,8 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = this.usersRepository.create({
       ...createUserDto,
-      email: normalizedEmail,
-      phone: phone || undefined,
+      email: email ?? undefined,
+      phone: phone ?? undefined,
       password: hashedPassword,
       role: UserRole.CUSTOMER,
       isActive: true,
@@ -97,13 +110,15 @@ export class UsersService {
     // 6️⃣ Préparer userWithoutPassword
     const { password: _pw, ...userWithoutPassword } = savedUser;
 
-    // 7️⃣ Envoyer email de bienvenue
-    await this.mailService.sendHtmlEmail(
-      email,
-      'Bienvenue dans FavorHelp',
-      'createCount.html',
-      { userWithoutPassword, year: new Date().getFullYear() },
-    );
+    // 7️⃣ Envoyer email de bienvenue uniquement si email présent
+    if (email) {
+      await this.mailService.sendHtmlEmail(
+        email,
+        'Bienvenue dans FavorHelp',
+        'createCount.html',
+        { userWithoutPassword, year: new Date().getFullYear() },
+      );
+    }
 
     // 8️⃣ Générer tokens JWT
     const access_token = await this.accessToken(savedUser);
@@ -277,11 +292,13 @@ export class UsersService {
       .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
       .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
       .leftJoinAndSelect('userPlatformRoles.role', 'role')
-      .where('users.email = :email', { email: userSignInDto.email })
+      .where('users.email = :login OR users.phone = :login', { login: userSignInDto.email })
       .getOne();
 
     if (!user) {
-      throw new BadRequestException("Cette adresse e-mail n'existe pas.");
+      throw new BadRequestException(
+        'Aucun utilisateur trouvé avec cet email ou numéro de téléphone.',
+      );
     }
 
     if (!user.password) {
@@ -555,7 +572,7 @@ export class UsersService {
   async sendOtp(email: string): Promise<any> {
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
 
-    // Validation DTO (pour s'assurer que l'email est correct)
+    // Validation DTO (pour s'assurer que c'est email ou phone valide)
     const dto = plainToInstance(VerifyOtpDto, { email, otpCode: '0000' });
     const errors = await validate(dto, {
       whitelist: true,
@@ -568,7 +585,7 @@ export class UsersService {
       throw new BadRequestException(errorMessages);
     }
 
-    // Supprimer l'ancien OTP actif pour ce mail
+    // Supprimer l'ancien OTP actif pour ce destinataire
     const existingOtp = await this.otpRepository.findOne({
       where: { email, isUsed: false },
     });
@@ -584,36 +601,64 @@ export class UsersService {
     });
     await this.otpRepository.save(otp);
 
-    // Envoyer l'email
-    await this.mailService.sendHtmlEmail(email, 'Votre OTP de connexion', 'sendOtp.html', {
-      otpCode,
-      year: new Date().getFullYear(),
-    });
+    // Vérifier si c'est un email ou un numéro de téléphone
+    if (validator.isEmail(email)) {
+      // Envoyer par email
+      await this.mailService.sendHtmlEmail(email, 'Votre OTP de connexion', 'sendOtp.html', {
+        otpCode,
+        year: new Date().getFullYear(),
+      });
+    } else if (validator.isMobilePhone(email, 'any')) {
+      // Envoyer par SMS
+      const message = `Votre code de validation est : ${otpCode}`;
+      const sent = await this.smsHelper.sendSms(email, message); // retourne le code si envoyé
+      if (!sent) {
+        throw new BadRequestException('Impossible d’envoyer le SMS de validation');
+      }
+    }
 
     return { message: 'OTP envoyé avec succès.', otpCode };
   }
 
   async sendResetPasswordOtp(email: string): Promise<any> {
-    const user = await this.usersRepository.findOne({ where: { email } });
+    // On garde le champ tel quel
+    const user = await this.usersRepository.findOne({
+      where: [
+        { email: email }, // Cherche par email
+        { phone: email }, // Cherche par téléphone
+      ],
+    });
     if (!user) {
-      throw new BadRequestException('Aucun utilisateur trouvé avec cet email.');
+      throw new BadRequestException('Aucun utilisateur trouvé avec cet email ou numéro.');
     }
 
+    // Générer l'OTP
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
     const otp = this.otpRepository.create({
       email,
       otpCode,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
     });
-
     await this.otpRepository.save(otp);
 
-    await this.mailService.sendHtmlEmail(
-      email,
-      'Réinitialisation de mot de passe',
-      'sendOtp.html',
-      { otpCode, year: new Date().getFullYear() }, // envoi otpCode + année
-    );
+    // Envoyer OTP
+    if (validator.isEmail(email)) {
+      // Envoi par email
+      await this.mailService.sendHtmlEmail(
+        email,
+        'Réinitialisation de mot de passe',
+        'sendOtp.html',
+        { otpCode, year: new Date().getFullYear() },
+      );
+    } else if (validator.isMobilePhone(email, 'any')) {
+      // Envoi par SMS
+      const message = `Votre code de réinitialisation est : ${otpCode}`;
+      const sent = await this.smsHelper.sendSms(email, message);
+      if (!sent) {
+        throw new BadRequestException('Impossible d’envoyer le SMS de réinitialisation.');
+      }
+    }
+
     return { message: 'OTP envoyé avec succès.' };
   }
 
@@ -629,7 +674,9 @@ export class UsersService {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await this.usersRepository.findOne({ where: { email } });
+    const user = await this.usersRepository.findOne({
+      where: [{ email: email }, { phone: email }],
+    });
     if (!user) {
       throw new BadRequestException('Utilisateur non trouvé.');
     }
@@ -644,11 +691,16 @@ export class UsersService {
   }
 
   async verifyOtp(email: string, otpCode: string): Promise<{ message: string }> {
-    // 1. Recherche d’un OTP valide (non utilisé et non expiré)
+    // Vérifie que l'email (ou téléphone) est fourni
+    if (!email) {
+      throw new BadRequestException('Un email ou un numéro de téléphone est requis.');
+    }
+
+    // Recherche d’un OTP valide correspondant à l’email ou téléphone
     const otpEntry = await this.otpRepository.findOne({
       where: {
-        email: email.toLowerCase(),
-        otpCode: otpCode,
+        email, // ce champ peut contenir un email ou un numéro de téléphone
+        otpCode,
         isUsed: false,
         expiresAt: MoreThan(new Date()),
       },
@@ -657,6 +709,11 @@ export class UsersService {
     if (!otpEntry) {
       throw new BadRequestException('Code OTP invalide ou expiré.');
     }
+
+    // Marquer l'OTP comme utilisé
+    otpEntry.isUsed = true;
+    await this.otpRepository.save(otpEntry);
+
     return { message: 'OTP validé avec succès.' };
   }
 

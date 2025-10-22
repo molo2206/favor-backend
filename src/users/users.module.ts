@@ -9,6 +9,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CloudinaryService } from './utility/helpers/cloudinary.service';
 import { MailModule } from 'src/email/email.module';
 import { TauxCompany } from 'src/taux-company/entities/taux-company.entity';
+import { SmsHelper } from './utility/helpers/sms.helper';
 
 @Module({
   imports: [
@@ -34,7 +35,7 @@ import { TauxCompany } from 'src/taux-company/entities/taux-company.entity';
     MailModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService, CloudinaryService],
+  providers: [UsersService, CloudinaryService,SmsHelper],
   exports: [
     UsersService,
     TypeOrmModule.forFeature([

@@ -45,7 +45,7 @@ export class UsersController {
   @Post('signup')
   async signup(@Body() createUserDto: CreateUserDto): Promise<{
     message: string;
-    data: Omit<UserEntity, 'password'> | { email: string };
+    data: Omit<UserEntity, 'password'> | { email?: string; phone?: string };
     access_token: string | null;
     refresh_token: string | null;
   }> {

@@ -45,6 +45,7 @@ import { CategorySpecificationModule } from './specification/category-specificat
 import { ProductSpecificationValueModule } from './specification/product-specification.module';
 import { GlobalAttributesModule } from './Attribut/global-attributes.module';
 import { AttributeValuesModule } from './Attribut/attribute-values.module';
+import { SmsHelper } from './users/utility/helpers/sms.helper';
 
 @Module({
   imports: [
@@ -120,7 +121,7 @@ import { AttributeValuesModule } from './Attribut/attribute-values.module';
     AttributeValuesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService,SmsHelper],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
