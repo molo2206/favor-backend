@@ -180,11 +180,30 @@
             </div>
           </div>
         </div>
+
+       
       </div>
 
       <!-- Client -->
       <div class="section">
-         <div class="status-box">
+        <div class="section-title">Client</div>
+        
+        <div class="section-content">
+          <div>
+            <strong>Facturé à</strong><br />
+            <%= user.fullName %><br />
+            <%= user.email %>
+          </div>
+          <div>
+            <strong>N° Facture:</strong> #<%= order.invoiceNumber %><br />
+            <strong>Date:</strong> <%= new Date(order.createdAt).toLocaleDateString('fr-FR') %>
+          </div>
+          <div>
+            <strong>Adresse Livraison:</strong><br />
+            <%= order.addressUser?.address || 'Non spécifiée' %><br />
+            <%= order.addressUser?.city || '' %>, <%= order.addressUser?.country || '' %>
+          </div>
+           <div class="status-box">
           <div class="status <%= order.paymentStatus?.toLowerCase() %>">
             <%= order.paymentStatus === 'PAID' ? '✅ Payée' : order.paymentStatus === 'PENDING' ? '⏳ En attente' : '❌ Annulée' %>
           </div>
@@ -207,22 +226,6 @@
             <%= order.type %> / <%= order.shopType %>
           </div>
         </div>
-        <div class="section-title">Client</div>
-        <div class="section-content">
-          <div>
-            <strong>Facturé à</strong><br />
-            <%= user.fullName %><br />
-            <%= user.email %>
-          </div>
-          <div>
-            <strong>N° Facture:</strong> #<%= order.invoiceNumber %><br />
-            <strong>Date:</strong> <%= new Date(order.createdAt).toLocaleDateString('fr-FR') %>
-          </div>
-          <div>
-            <strong>Adresse Livraison:</strong><br />
-            <%= order.addressUser?.address || 'Non spécifiée' %><br />
-            <%= order.addressUser?.city || '' %>, <%= order.addressUser?.country || '' %>
-          </div>
         </div>
       </div>
 
