@@ -1,28 +1,61 @@
-import { IsNotEmpty, IsOptional, IsString, Matches, IsEnum, ValidateIf } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  Matches,
+  IsEnum,
+  ValidateIf,
+  registerDecorator,
+  ValidationOptions,
+  ValidationArguments,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserRole } from '../enum/user-role-enum';
 import { IsEmailOrPhone } from '../utility/helpers/IsEmailOrPhone';
 
+/**
+ * ✅ Validateur personnalisé pour s'assurer qu'au moins un des deux champs est fourni.
+ */
+export function AtLeastOneField(
+  fields: string[],
+  validationOptions?: ValidationOptions,
+) {
+  return function (object: Object, propertyName: string) {
+    registerDecorator({
+      name: 'atLeastOneField',
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(_: any, args: ValidationArguments) {
+          const obj = args.object as any;
+          return fields.some((field) => obj[field] && obj[field].trim() !== '');
+        },
+        defaultMessage() {
+          return `Un email ou un numéro de téléphone est requis.`;
+        },
+      },
+    });
+  };
+}
+
 export class CreateUserDto {
-  @IsNotEmpty({ message: 'Le nom complet est requis.' })
   @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
+  @Transform(({ value }) => value?.trim())
   fullName: string;
 
-  // Email optionnel
   @ValidateIf((o) => o.email)
   @IsString()
-  @IsEmailOrPhone({ message: 'Doit être un email ou un numéro de téléphone valide.' })
+  @IsEmailOrPhone({ message: 'Doit être un email valide.' })
   email?: string;
 
-  // Phone optionnel
   @ValidateIf((o) => o.phone)
   @IsString()
-  @IsEmailOrPhone({ message: 'Doit être un email ou un numéro de téléphone valide.' })
+  @IsEmailOrPhone({ message: 'Doit être un numéro de téléphone valide.' })
   phone?: string;
 
-  // Champ virtuel pour validation globale (au moins un requis)
-  @IsNotEmpty({ message: 'Un email ou un numéro de téléphone est requis.' })
-  validateEmailOrPhone?: string;
+  // ✅ Vérifie que l'un des deux est rempli
+  @AtLeastOneField(['email', 'phone'])
+  dummyValidationField: string;
 
   @IsOptional()
   @IsString({ message: 'Le mot de passe doit être une chaîne de caractères.' })
