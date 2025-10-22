@@ -521,21 +521,35 @@ export class UsersService {
     if (!user) throw new NotFoundException('Utilisateur non trouvé.');
     if (!file) throw new BadRequestException('Image invalide.');
 
-    // 🧹 Supprime l’ancienne image uniquement si elle est sur Cloudinary
-    if (user.image && user.image.includes('res.cloudinary.com')) {
-      const publicId = this.extractPublicId(user.image);
-      if (publicId) {
-        await this.cloudinary.handleDeleteImage(publicId);
+    // 🧹 Gestion intelligente selon la source de l’image
+    if (user.image) {
+      if (user.image.includes('res.cloudinary.com')) {
+        // ✅ Image stockée sur Cloudinary → suppression
+        const publicId = this.extractPublicId(user.image);
+        if (publicId) {
+          try {
+            await this.cloudinary.handleDeleteImage(publicId);
+          } catch (err) {
+            console.warn('⚠️ Échec suppression Cloudinary :', err.message);
+          }
+        }
+      } else if (user.image.includes('googleusercontent.com')) {
+        // 🔵 Image Google (connexion Google) → on ne fait rien
+        console.log('🔵 Image Google détectée, aucune suppression nécessaire.');
+      } else {
+        // ⚪ Image locale ou inexistante
+        console.log('⚪ Aucune image Cloudinary à supprimer.');
       }
     }
 
-    // 📤 Upload de la nouvelle image
+    // 📤 Upload de la nouvelle image sur Cloudinary
     const imageUrl = await this.cloudinary.handleUploadImage(file, 'user');
     user.image = imageUrl;
 
     const updatedUser = await this.usersRepository.save(user);
     const { password, ...userWithoutPassword } = updatedUser;
 
+    // 🏢 Sérialisation et normalisation de l’objet user
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
         id: uhc.id,
@@ -603,13 +617,27 @@ export class UsersService {
     };
   }
 
+  /**
+   * 🔍 Extraction sécurisée du public_id depuis une URL Cloudinary
+   */
   private extractPublicId(url: string): string | null {
     try {
-      const parts = url.split('/');
-      const fileName = parts[parts.length - 1]; // abcxyz123.png
-      const folder = parts[parts.length - 2]; // user
-      const publicId = `${folder}/${fileName.split('.')[0]}`;
-      return publicId;
+      if (!url.includes('res.cloudinary.com')) return null;
+
+      const uploadIndex = url.indexOf('/upload/');
+      if (uploadIndex === -1) return null;
+
+      // Extrait la partie après /upload/
+      let publicIdPart = url.substring(uploadIndex + '/upload/'.length);
+
+      // Supprime les transformations et versions Cloudinary
+      publicIdPart = publicIdPart.replace(/^v\d+\//, '');
+      publicIdPart = publicIdPart.replace(/v\d+\//g, '');
+
+      // Supprime l’extension du fichier
+      publicIdPart = publicIdPart.replace(/\.[^/.]+$/, '');
+
+      return publicIdPart;
     } catch (error) {
       console.error('Erreur extraction public_id:', error);
       return null;
