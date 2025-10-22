@@ -41,7 +41,7 @@ export class ProductController {
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(FilesInterceptor('images', 1))
+  @UseInterceptors(FilesInterceptor('images', 5))
   async create(
     @UploadedFiles() files: Express.Multer.File[],
     @Body() body: any,
@@ -77,14 +77,14 @@ export class ProductController {
   @Patch(':id')
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(FilesInterceptor('images', 5)) // ✅ On attend le champ "images" (max 5 fichiers)
   async update(
     @Param('id') id: string,
+    @UploadedFiles() files: Express.Multer.File[], // ✅ Récupère les fichiers
     @Body() dto: CreateProductDto,
-    @UploadedFiles() files: Express.Multer.File[], // ✅ récupère les fichiers uploadés
     @CurrentUser() user: UserEntity,
   ) {
-    const result = await this.productService.update(id, dto, user, files); // ✅ passe les fichiers au service
+    const result = await this.productService.update(id, dto, user, files);
     return result;
   }
 

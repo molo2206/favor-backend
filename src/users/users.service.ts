@@ -471,7 +471,7 @@ export class UsersService {
         password: '',
         isActive: true,
         image: image || undefined,
-        phone: '', // ✅ valeur par défaut
+        phone: '', //  valeur par défaut
       });
 
       user = await this.usersRepository.save(user);
@@ -526,10 +526,15 @@ export class UsersService {
       throw new BadRequestException('Image invalide.');
     }
 
+    // 🧹 Si une image existe déjà → extraire le public_id et la supprimer
     if (user.image) {
-      await this.cloudinary.handleDeleteImage(user.image);
+      const publicId = this.extractPublicId(user.image);
+      if (publicId) {
+        await this.cloudinary.handleDeleteImage(publicId);
+      }
     }
 
+    // 📤 Upload de la nouvelle image
     const imageUrl = await this.cloudinary.handleUploadImage(file, 'user');
     user.image = imageUrl;
 
@@ -601,6 +606,19 @@ export class UsersService {
       message: 'Image de profil mise à jour avec succès.',
       data: sanitizedUser,
     };
+  }
+
+  private extractPublicId(url: string): string | null {
+    try {
+      const parts = url.split('/');
+      const fileName = parts[parts.length - 1]; // abcxyz123.png
+      const folder = parts[parts.length - 2]; // user
+      const publicId = `${folder}/${fileName.split('.')[0]}`;
+      return publicId;
+    } catch (error) {
+      console.error('Erreur extraction public_id:', error);
+      return null;
+    }
   }
 
   async sendOtp(email: string): Promise<any> {
