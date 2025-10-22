@@ -3,17 +3,16 @@ import {
   IsString,
   Matches,
   IsEnum,
-  ValidateIf,
   registerDecorator,
   ValidationOptions,
   ValidationArguments,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform } from 'class-transformer'; // ✅ Correct
 import { UserRole } from '../enum/user-role-enum';
 import { IsEmailOrPhone } from '../utility/helpers/IsEmailOrPhone';
 
 /**
- * ✅ Validateur personnalisé pour s'assurer qu'au moins un des deux champs est fourni.
+ * Validateur pour au moins un champ requis
  */
 export function AtLeastOneField(fields: string[], validationOptions?: ValidationOptions) {
   return function (object: Object, propertyName: string) {
@@ -39,14 +38,18 @@ export class CreateUserDto {
   @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
   fullName: string;
 
+  // Transforme "" en undefined
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
+  @IsOptional()
   @IsEmailOrPhone({ message: 'Doit être un email ou un numéro de téléphone valide.' })
   email?: string;
 
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
+  @IsOptional()
   @IsEmailOrPhone({ message: 'Doit être un email ou un numéro de téléphone valide.' })
   phone?: string;
 
+  // Vérifie qu'au moins un est rempli
   @AtLeastOneField(['email', 'phone'])
   dummyValidationField: string;
 
@@ -76,7 +79,6 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsEnum(UserRole)
-  @Transform(({ value }) => (value ? value : UserRole.CUSTOMER))
   roles?: UserRole = UserRole.CUSTOMER;
 
   @IsOptional()
