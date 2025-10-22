@@ -23,6 +23,7 @@ import { TransactionType } from 'src/transaction/transaction.enum';
 import { InvoiceService } from './invoice/invoice.util';
 import * as QRCode from 'qrcode';
 import { In } from 'typeorm';
+import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -64,6 +65,8 @@ export class OrderService {
 
     @InjectRepository(TransactionEntity)
     private readonly transactionRepository: Repository<TransactionEntity>,
+
+    private readonly smsHelper: SmsHelper,
   ) {}
   private generatePin(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -203,21 +206,33 @@ export class OrderService {
     });
 
     const paymentQrCode = await QRCode.toDataURL(finalOrder.invoiceNumber);
+    const hasEmail = user.email && user.email.trim() !== '';
+    const hasPhone = user.phone && user.phone.trim() !== '';
 
-    await this.mailService.sendInvoiceWithPdf(user.email, 'Votre facture PDF - FavorHelp', {
-      user,
-      order: {
-        id: finalOrder.id,
-        totalAmount: finalOrder.totalAmount,
-        currency: finalOrder.currency,
-        invoiceNumber: finalOrder.invoiceNumber,
-        address: finalOrder.addressUser.address,
-        paymentStatus: order.paymentStatus,
-      },
-      subOrders,
-      paymentQrCode,
-    });
-
+    if (!hasEmail && !hasPhone) {
+      throw new BadRequestException(
+        'Aucun moyen de contact disponible (ni email, ni numéro de téléphone).',
+      );
+    }
+    if (hasEmail) {
+      await this.mailService.sendInvoiceWithPdf(user.email, 'Votre facture PDF - FavorHelp', {
+        user,
+        order: {
+          id: finalOrder.id,
+          totalAmount: finalOrder.totalAmount,
+          currency: finalOrder.currency,
+          invoiceNumber: finalOrder.invoiceNumber,
+          address: finalOrder.addressUser.address,
+          paymentStatus: order.paymentStatus,
+        },
+        subOrders,
+        paymentQrCode,
+      });
+    }
+    if (hasPhone) {
+      const message = `Votre commande ${finalOrder.invoiceNumber} a été créée avec succès. Total : ${finalOrder.grandTotal} ${finalOrder.currency}. Merci pour votre achat !`;
+      await this.smsHelper.sendSms(user.phone, message);
+    }
     return finalOrder;
   }
 
