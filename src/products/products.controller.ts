@@ -47,7 +47,7 @@ export class ProductController {
     @Body() body: any,
     @CurrentUser() user: UserEntity,
   ) {
-    if (!files || files.length < 2 || files.length > 4) {
+    if (!files) {
       throw new BadRequestException("Le nombre d'images doit être compris entre 2 et 4");
     }
 
