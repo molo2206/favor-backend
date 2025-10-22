@@ -27,9 +27,9 @@ export class OrderEntity {
   @Column('decimal', { precision: 10, scale: 2 })
   totalAmount: number;
 
-  @Column('decimal', { precision: 10, scale: 2 })
-  shippingCost: number;
-  
+  @Column('decimal', { precision: 10, scale: 2, nullable: true, default: 0 })
+  shippingCost?: number;
+
   @Column({ type: 'enum', enum: CompanyType })
   type: CompanyType;
 

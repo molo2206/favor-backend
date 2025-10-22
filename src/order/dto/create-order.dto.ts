@@ -18,11 +18,6 @@ export class CreateOrderDto {
   @IsNotEmpty()
   totalAmount: number;
 
-  @Type(() => Number)
-  @IsNumber()
-  @IsNotEmpty()
-  shippingCost: number;
-
   @IsNotEmpty()
   addressUserId: string;
 

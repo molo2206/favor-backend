@@ -73,7 +73,7 @@ export class OrderService {
   }
 
   async createOrder(createOrderDto: CreateOrderDto, user: UserEntity): Promise<OrderEntity> {
-    const { totalAmount, shippingCost, currency, orderItems, addressUserId, type, shopType } =
+    const { totalAmount, currency, orderItems, addressUserId, type, shopType } =
       createOrderDto;
 
     const addressUser = await this.addressUserRepo.findOne({ where: { id: addressUserId } });
@@ -103,13 +103,12 @@ export class OrderService {
       }
     }
 
-    const grandTotal = Number(totalAmount) + Number(shippingCost);
+    const grandTotal = Number(totalAmount);
     const invoiceNumb = this.invoiceService.generateInvoiceNumber();
 
     const order = this.orderRepo.create({
       user,
       totalAmount,
-      shippingCost,
       currency,
       grandTotal,
       addressUser,
@@ -273,6 +272,8 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
 
     // Application des changements
     order.status = dto.status;
+    order.shippingCost = dto.shippingCost;
+    order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost);
 
     // Si la commande est validée
     if (dto.status === OrderStatus.VALIDATED) {
