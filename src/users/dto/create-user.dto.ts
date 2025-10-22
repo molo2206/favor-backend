@@ -12,7 +12,7 @@ import { UserRole } from '../enum/user-role-enum';
 import validator from 'validator';
 
 /**
- * Valide qu'au moins un des champs est présent et correct.
+ * Valide qu'au moins un des champs email/phone est fourni et correct
  */
 export function EmailOrPhoneRequired(validationOptions?: ValidationOptions) {
   return function (object: Object, propertyName: string) {
@@ -29,10 +29,7 @@ export function EmailOrPhoneRequired(validationOptions?: ValidationOptions) {
 
           if (!email && !phone) return false; // aucun champ fourni
 
-          // si email présent, vérifier format
           if (email && !validator.isEmail(email)) return false;
-
-          // si phone présent, vérifier format
           if (phone && !validator.isMobilePhone(phone, 'any')) return false;
 
           return true;
@@ -49,14 +46,17 @@ export class CreateUserDto {
   @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
   fullName: string;
 
+  @IsOptional()
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
   email?: string;
 
+  @IsOptional()
   @Transform(({ value }) => (value?.trim() === '' ? undefined : value))
   phone?: string;
 
+  @IsOptional()
   @EmailOrPhoneRequired()
-  dummyValidationField: string; // champ virtuel pour validation
+  dummyValidationField?: string; // ✅ champ virtuel facultatif
 
   @IsOptional()
   @IsString()
