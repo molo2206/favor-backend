@@ -6,6 +6,7 @@ import {
   IsString,
   Matches,
   IsPhoneNumber,
+  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserRole } from '../enum/user-role-enum';
@@ -15,11 +16,12 @@ export class CreateUserDto {
   @IsString({ message: 'Le nom complet doit être une chaîne de caractères.' })
   fullName: string;
 
-  @Transform(({ value }) => value.toLowerCase())
-  @IsEmail({}, { message: 'Email invalide.' })
-  email: string;
+  @ValidateIf((o) => o.email) // Valide email uniquement s’il est fourni
+  @Transform(({ value }) => value?.toLowerCase())
+  @IsString()
+  email?: string;
 
-  @IsOptional()
+  @ValidateIf((o) => o.phone) // Valide phone uniquement s’il est fourni
   @IsPhoneNumber(undefined, { message: 'Le numéro de téléphone est invalide.' })
   phone?: string;
 
