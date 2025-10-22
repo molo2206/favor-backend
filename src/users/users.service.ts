@@ -745,7 +745,7 @@ export class UsersService {
     }
 
     // Marquer l'OTP comme utilisé
-    otpEntry.isUsed = true;
+   
     await this.otpRepository.save(otpEntry);
 
     return { message: 'OTP validé avec succès.' };
