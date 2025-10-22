@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsNotEmpty, IsNumber } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, ValidateIf } from 'class-validator';
 import { OrderStatus } from 'src/order/enum/order.status.enum';
 
 export class UpdateOrderStatusDto {
@@ -8,6 +8,7 @@ export class UpdateOrderStatusDto {
 
   @Type(() => Number)
   @IsNumber()
-  @IsNotEmpty()
-  shippingCost: number;
+  @ValidateIf(o => o.status === OrderStatus.VALIDATED)
+  @IsNotEmpty({ message: 'Le champ shippingCost est obligatoire lorsque le statut est VALIDATED' })
+  shippingCost?: number;
 }
