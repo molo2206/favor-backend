@@ -43,15 +43,18 @@ export class UsersController {
 
   // users.controller.ts
   @Post('signup')
-  async signup(@Body() createUserDto: CreateUserDto): Promise<{
+  async signup(@Body() body: any): Promise<{
     message: string;
     data: Omit<UserEntity, 'password'> | { email?: string; phone?: string };
     access_token: string | null;
     refresh_token: string | null;
   }> {
-    return this.usersService.signup(createUserDto);
-  }
+    // ✅ VERSION ULTRA-SIMPLE
+    if (body.email === '') body.email = undefined;
+    if (body.phone === '') body.phone = undefined;
 
+    return this.usersService.signup(body);
+  }
   @Post('signin')
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   async signin(@Body() loginUserDto: LoginUserDto): Promise<{ data: string }> {
