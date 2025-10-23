@@ -599,4 +599,34 @@ export class ServiceService {
       data: prestataires,
     };
   }
+
+  async findPrestatairesByCompanyPublished(user: UserEntity) {
+    const companyId = user.activeCompanyId;
+    if (!companyId) {
+      throw new BadRequestException("L'utilisateur n'a pas de société active");
+    }
+
+    const company = await this.compRepo.findOne({ where: { id: companyId } });
+    if (!company) {
+      throw new NotFoundException('Entreprise introuvable');
+    }
+
+    // ✅ Requête avec uniquement les relations nécessaires
+    const prestataires = await this.prestataireRepo
+      .createQueryBuilder('prestataire')
+      .leftJoinAndSelect('prestataire.services', 'serviceLink')
+      .leftJoinAndSelect('serviceLink.service', 'service')
+      .leftJoinAndSelect('service.company', 'company')
+      .leftJoinAndSelect('service.category', 'category')
+      .where('company.id = :companyId', { companyId })
+      .andWhere('service.status = :status', { status: 'PUBLISHED' })
+      .orderBy('prestataire.createdAt', 'DESC')
+      .getMany();
+
+    return {
+      message: 'Prestataires publiés récupérés avec succès',
+      count: prestataires.length,
+      data: prestataires,
+    };
+  }
 }

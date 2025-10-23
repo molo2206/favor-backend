@@ -209,4 +209,10 @@ export class ServiceController {
   async getPrestatairesByCompany(@CurrentUser() user: UserEntity) {
     return this.serviceService.findPrestatairesByCompany(user);
   }
+
+  @Get('prestataire/service_published/company')
+  @UseGuards(AuthentificationGuard)
+  async findPrestatairesByCompanyPublished(@CurrentUser() user: UserEntity) {
+    return this.serviceService.findPrestatairesByCompanyPublished(user);
+  }
 }
