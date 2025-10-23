@@ -622,10 +622,9 @@ export class ServiceService {
       .andWhere('service.status = :status', { status: 'PUBLISHED' })
       .orderBy('prestataire.createdAt', 'DESC')
       .getMany();
-
     return {
       message: 'Prestataires publiés récupérés avec succès',
-      count: prestataires.length,
+      providerCount: prestataires.length,
       data: prestataires,
     };
   }
