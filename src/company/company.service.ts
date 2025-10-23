@@ -165,22 +165,25 @@ export class CompanyService {
         `Aucun moyen de contact disponible pour l'entreprise ${savedCompany.companyName}`,
       );
     }
-
+    const message = `Bonjour ${user.fullName}, votre entreprise "${savedCompany.companyName}" a été créée avec succès sur FavorHelp. Elle est en attente de vérification.`;
     if (hasEmail) {
       await this.mailService.sendHtmlEmail(
         savedCompany.email,
         'Bienvenue chez FavorHelp',
-        'welcomeCompany.html',
+        'company-status-update.html',
         {
-          company: savedCompany,
-          user,
+          user:
+            savedCompany.userHasCompany?.find((uhc) => uhc.isOwner)?.user.fullName ||
+            'Utilisateur',
+          companyName: company.companyName,
+          status: company.status,
+          message: message,
           year: new Date().getFullYear(),
         },
       );
     }
 
     if (hasPhone) {
-      const message = `Bonjour ${user.fullName}, votre entreprise "${savedCompany.companyName}" a été créée avec succès sur FavorHelp. Elle est en attente de vérification.`;
       await this.smsHelper.sendSms(savedCompany.phone, message);
     }
 
@@ -361,37 +364,55 @@ export class CompanyService {
       throw new NotFoundException('Entreprise non trouvée.');
     }
 
-    // Mettre à jour le statut
+    // 🔄 Mettre à jour le statut
     company.status = dto.status;
     const updatedCompany = await this.companyRepository.save(company);
 
-    // Récupérer l'utilisateur lié (propriétaire ou lié à cette entreprise)
+    // Récupérer l'utilisateur lié (propriétaire ou associé)
     const userHasCompany = await this.userHasCompanyRepository.findOne({
       where: { company: { id: company.id } },
       relations: ['user'],
     });
 
-    if (userHasCompany && userHasCompany.user?.email) {
+    if (userHasCompany) {
       const user = userHasCompany.user;
 
-      // Supprimer le mot de passe pour ne pas l’envoyer dans l’email
+      // Supprimer le mot de passe pour sécurité
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password, ...userWithoutPassword } = user;
 
-      await this.mailService.sendHtmlEmail(
-        user.email,
-        'Mise à jour du statut de votre entreprise sur FavorHelp',
-        'company-status-update.html', // Ton template d’email HTML
-        {
-          user: userWithoutPassword,
-          companyName: company.companyName,
-          status: company.status,
-          year: new Date().getFullYear(),
-        },
-      );
+      const hasEmail = user.email?.trim() !== '';
+      const hasPhone = user.phone?.trim() !== '';
+
+      const statusMessage = `Le statut de votre entreprise "${company.companyName}" a été mis à jour sur FavorHelp et est maintenant : ${company.status}.`;
+
+      // ✉️ Email
+      if (hasEmail) {
+        await this.mailService.sendHtmlEmail(
+          user.email,
+          'Mise à jour du statut de votre entreprise sur FavorHelp',
+          'company-status-update.html', // template HTML
+          {
+            user: userWithoutPassword,
+            companyName: company.companyName,
+            status: company.status,
+            message: statusMessage,
+            year: new Date().getFullYear(),
+          },
+        );
+      }
+
+      // 📱 SMS
+      if (hasPhone) {
+        const smsMessage = `Bonjour ${user.fullName}, ${statusMessage}`;
+        await this.smsHelper.sendSms(user.phone, smsMessage);
+      }
     }
 
-    return { message: 'Mise à jour du statut avec succès', data: updatedCompany };
+    return {
+      message: `Le statut de l'entreprise "${company.companyName}" a été mis à jour avec succès.`,
+      data: updatedCompany,
+    };
   }
 
   async findByType(type?: string): Promise<{ message: string; data: CompanyEntity[] }> {
