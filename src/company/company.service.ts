@@ -166,23 +166,7 @@ export class CompanyService {
       );
     }
     const message = `Bonjour ${user.fullName}, votre entreprise "${savedCompany.companyName}" a été créée avec succès sur FavorHelp. Elle est en attente de vérification.`;
-    if (hasEmail) {
-      await this.mailService.sendHtmlEmail(
-        user.email,
-        'Bienvenue chez FavorHelp',
-        'company-status-update.html',
-        {
-          user:
-            savedCompany.userHasCompany?.find((uhc) => uhc.isOwner)?.user.fullName ||
-            'Utilisateur',
-          companyName: company.companyName,
-          status: company.status,
-          message: message,
-          year: new Date().getFullYear(),
-        },
-      );
-    }
-
+  
     if (hasPhone) {
       await this.smsHelper.sendSms(savedCompany.phone, message);
     }
