@@ -18,6 +18,7 @@ import { Service } from 'src/service/entities/service.entity';
 import { OrderEntity } from 'src/order/entities/order.entity';
 import { Country } from './entities/country.entity';
 import { City } from './entities/city.entity';
+import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 
 @Module({
   imports: [
@@ -40,6 +41,6 @@ import { City } from './entities/city.entity';
     MailModule, // 👈 ajoute MailModule ici
   ],
   controllers: [CompanyController],
-  providers: [CompanyService],
+  providers: [CompanyService,SmsHelper],
 })
 export class CompanyModule {}

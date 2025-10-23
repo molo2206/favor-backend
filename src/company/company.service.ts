@@ -30,6 +30,7 @@ import { Country } from './entities/country.entity';
 import { City } from './entities/city.entity';
 import { CreateCountryDto } from './dto/create-country.dto';
 import { CreateCityDto } from './dto/create-city.dto';
+import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 
 @Injectable()
 export class CompanyService {
@@ -68,6 +69,7 @@ export class CompanyService {
 
     private readonly cloudinary: CloudinaryService,
     private readonly mailService: MailService,
+    private readonly smsHelper: SmsHelper,
   ) {}
 
   // services/company.service.ts
@@ -115,7 +117,6 @@ export class CompanyService {
       address: dto.address,
       taux: dto.taux || 0,
       localCurrency: dto.localCurrency,
-      // Relations ManyToOne
       country: dto.countryId ? ({ id: dto.countryId } as any) : null,
       city: dto.cityId ? ({ id: dto.cityId } as any) : null,
     });
@@ -154,6 +155,34 @@ export class CompanyService {
       company: savedCompany,
     });
     await this.tauxCompanyRepository.save(defaultTaux);
+
+    // ✅ Envoi de notification selon contact disponible
+    const hasEmail = savedCompany.email?.trim() !== '';
+    const hasPhone = savedCompany.phone?.trim() !== '';
+
+    if (!hasEmail && !hasPhone) {
+      console.warn(
+        `Aucun moyen de contact disponible pour l'entreprise ${savedCompany.companyName}`,
+      );
+    }
+
+    if (hasEmail) {
+      await this.mailService.sendHtmlEmail(
+        savedCompany.email,
+        'Bienvenue chez FavorHelp',
+        'welcomeCompany.html',
+        {
+          company: savedCompany,
+          user,
+          year: new Date().getFullYear(),
+        },
+      );
+    }
+
+    if (hasPhone) {
+      const message = `Bonjour ${user.fullName}, votre entreprise "${savedCompany.companyName}" a été créée avec succès sur FavorHelp. Elle est en attente de vérification.`;
+      await this.smsHelper.sendSms(savedCompany.phone, message);
+    }
 
     return {
       message: 'Entreprise créée avec succès.',
