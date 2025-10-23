@@ -565,33 +565,18 @@ export class ServiceService {
   }
 
   async findPrestatairesByCompany(user: UserEntity) {
-    // Vérifier que la société existe
     const companyId = user.activeCompanyId;
-    if (!companyId) {
-      throw new BadRequestException("L'utilisateur n'a pas de société active");
-    }
-    const company = await this.compRepo.findOne({ where: { id: companyId } });
-    if (!company) {
-      throw new NotFoundException('Entreprise introuvable');
-    }
+    if (!companyId) throw new BadRequestException("L'utilisateur n'a pas de société active");
 
-    // Récupérer les prestataires associés à cette entreprise via les services
-    const prestataires = await this.prestataireRepo.find({
-      where: {
-        services: {
-          service: {
-            company: { id: companyId },
-          },
-        },
-      },
-      relations: [
-        'services',
-        'services.service',
-        'services.service.company',
-        'services.service.category',
-      ],
-      order: { createdAt: 'DESC' },
-    });
+    const prestataires = await this.prestataireRepo
+      .createQueryBuilder('prestataire')
+      .leftJoinAndSelect('prestataire.services', 'serviceLink')
+      .leftJoinAndSelect('serviceLink.service', 'service')
+      .leftJoinAndSelect('service.company', 'company')
+      .leftJoinAndSelect('service.category', 'category')
+      .where('company.id = :companyId', { companyId })
+      .orderBy('prestataire.createdAt', 'DESC')
+      .getMany();
 
     return {
       message: 'Prestataires récupérés avec succès',
@@ -602,16 +587,8 @@ export class ServiceService {
 
   async findPrestatairesByCompanyPublished(user: UserEntity) {
     const companyId = user.activeCompanyId;
-    if (!companyId) {
-      throw new BadRequestException("L'utilisateur n'a pas de société active");
-    }
+    if (!companyId) throw new BadRequestException("L'utilisateur n'a pas de société active");
 
-    const company = await this.compRepo.findOne({ where: { id: companyId } });
-    if (!company) {
-      throw new NotFoundException('Entreprise introuvable');
-    }
-
-    // ✅ Requête avec uniquement les relations nécessaires
     const prestataires = await this.prestataireRepo
       .createQueryBuilder('prestataire')
       .leftJoinAndSelect('prestataire.services', 'serviceLink')
@@ -622,6 +599,7 @@ export class ServiceService {
       .andWhere('service.status = :status', { status: 'PUBLISHED' })
       .orderBy('prestataire.createdAt', 'DESC')
       .getMany();
+
     return {
       message: 'Prestataires publiés récupérés avec succès',
       providerCount: prestataires.length,
