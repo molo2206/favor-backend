@@ -1,4 +1,9 @@
-import { IsOptional, IsString, IsArray, ValidateNested } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsArray,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { SpecificationsDto } from './specification.dto';
 
@@ -12,6 +17,7 @@ export class CreateCategoryDto {
   name: string;
 
   @IsOptional()
+  @IsString()
   parentId?: string;
 
   @IsOptional()

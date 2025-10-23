@@ -14,31 +14,35 @@ import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
 import { ProductSpecificationValueModule } from 'src/specification/product-specification.module';
 import { Wishlist } from './entities/wishlists.entity';
 import { Service } from 'src/service/entities/service.entity';
-import { AttributeValue } from 'src/Attribut/entities/attribute_values.entity';
-import { Sku } from 'src/Attribut/entities/skus.entity';
-import { ProductAttribute } from 'src/Attribut/entities/product_attributes.entity';
 import { Specification } from 'src/specification/entities/Specification.entity';
+import { Attribute } from 'src/AttributGlobal/entities/attributes.entity';
+import { ProductAttribute } from 'src/AttributGlobal/entities/product_attributes.entity';
+import { ProductVariation } from 'src/AttributGlobal/entities/product_variations.entity';
+import { VariationAttributeValue } from 'src/AttributGlobal/entities/variation_attribute_values.entity';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      Product, // 👈 Requis pour @InjectRepository(Product)
-      CompanyEntity, // 👈 Requis pour @InjectRepository(CompanyEntity)
-      CategoryEntity, // 👈 Requis pour @InjectRepository(CategoryEntity)
-      ImageProductEntity,
-      MeasureEntity,
-      TauxCompany,
-      OrderItemEntity,
-      Wishlist,
-      Service,
-      ProductAttribute, // <-- ajoute ici
-      AttributeValue,
-      Sku,
-      Specification
+      Product, // ✅ ProductRepository
+      CompanyEntity, // ✅ CompanyEntityRepository  
+      CategoryEntity, // ✅ CategoryEntityRepository
+      ImageProductEntity, // ✅ ImageProductEntityRepository
+      Service, // ✅ ServiceRepository
+      MeasureEntity, // ✅ MeasureEntityRepository
+      OrderItemEntity, // ✅ OrderItemEntityRepository
+      Wishlist, // ✅ WishlistRepository
+      Specification, // ✅ SpecificationRepository
+      Attribute, // ✅ AttributeRepository
+      ProductAttribute, // ✅ ProductAttributeRepository
+      ProductVariation, // ✅ ProductVariationRepository
+      VariationAttributeValue, // ✅ VariationAttributeValueRepository
+      TauxCompany, // ✅ Pour les relations
     ]),
     ProductSpecificationValueModule,
     CloudinaryModule,
   ],
   controllers: [ProductController],
   providers: [ProductService, MeasureService],
+  exports: [ProductService], // ✅ Ajouter l'export si utilisé ailleurs
 })
 export class ProductModule {}

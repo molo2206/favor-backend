@@ -1,4 +1,4 @@
-import { CategoryAttribute } from 'src/Attribut/entities/category_attributes.entity';
+import { CategoryAttribute } from 'src/AttributGlobal/entities/category_attributes.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { Service } from 'src/service/entities/service.entity';
 import { CategorySpecification } from 'src/specification/entities/CategorySpecification.entity';
@@ -33,9 +33,18 @@ export class CategoryEntity {
   @Column({ nullable: true })
   color?: string;
 
-  @ManyToOne(() => CategoryEntity, (category) => category.children)
+  @Column({ default: true })
+  status: boolean;
+
+  @Column({ default: false })
+  deleted: boolean;
+
+  @ManyToOne(() => CategoryEntity, (category) => category.children, {
+    nullable: true,
+    onDelete: 'SET NULL', // Optionnel : définir le comportement en cas de suppression
+  })
   @JoinColumn({ name: 'parent_id' })
-  parent: CategoryEntity;
+  parent: CategoryEntity | null;
 
   @OneToMany(() => CategoryEntity, (category) => category.parent)
   children: CategoryEntity[];

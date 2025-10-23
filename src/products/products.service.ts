@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -24,7 +25,7 @@ import { Type_rental_both_sale_car } from './enum/type_rental_both_sale_car';
 import { CompanyStatus } from 'src/company/enum/company-status.enum';
 import { UserWithCompanyStatus } from 'src/users/interfaces/user-with-company-status.interface';
 import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
-import { In } from 'typeorm';
+import { In, DataSource } from 'typeorm';
 import { CompanyType } from 'src/company/enum/type.company.enum';
 import { ProductSpecificationValueService } from 'src/specification/product-specification.service';
 import { CreateProductSpecificationValueDto } from 'src/specification/dto/create-product-specification-value.dto';
@@ -32,12 +33,12 @@ import { plainToInstance } from 'class-transformer';
 import { Wishlist } from './entities/wishlists.entity';
 import { CreateWishlistDto } from './dto/create-wishlist.dto';
 import { Service } from 'src/service/entities/service.entity';
-import { ProductAttribute } from 'src/Attribut/entities/product_attributes.entity';
-import { AttributeValue } from 'src/Attribut/entities/attribute_values.entity';
-import { Sku } from 'src/Attribut/entities/skus.entity';
-import { CreateSkuDto } from 'src/Attribut/dto/create-sku.dto';
-import { CreateProductAttributeDto } from 'src/Attribut/dto/create-product-attribute.dto';
 import { Specification } from 'src/specification/entities/Specification.entity';
+import { ProductAttribute } from 'src/AttributGlobal/entities/product_attributes.entity';
+import { Attribute } from 'src/AttributGlobal/entities/attributes.entity';
+import { ProductSpecificationValue } from 'src/specification/entities/ProductSpecificationValue.entity';
+import { ProductVariation } from 'src/AttributGlobal/entities/product_variations.entity';
+import { VariationAttributeValue } from 'src/AttributGlobal/entities/variation_attribute_values.entity';
 
 @Injectable()
 export class ProductService {
@@ -70,20 +71,21 @@ export class ProductService {
     @InjectRepository(Wishlist)
     private readonly wishlistRepo: Repository<Wishlist>,
 
-    // 🔹 Injection pour ProductAttribute et AttributeValue
+    @InjectRepository(Attribute)
+    private readonly attributeRepo: Repository<Attribute>,
+
     @InjectRepository(ProductAttribute)
     private readonly productAttributeRepo: Repository<ProductAttribute>,
 
-    @InjectRepository(AttributeValue)
-    private readonly attributeValueRepo: Repository<AttributeValue>,
+    private readonly dataSource: DataSource,
 
-    @InjectRepository(Sku)
-    private skuRepo: Repository<Sku>,
+    // 🔹 Injection pour ProductAttribute et AttributeValue
 
     @InjectRepository(Specification)
     private specRepo: Repository<Specification>,
   ) {}
 
+  private readonly logger = new Logger(ProductService.name);
   async create(
     createProductDto: CreateProductDto,
     files: Express.Multer.File[],
@@ -96,7 +98,7 @@ export class ProductService {
       min_quantity,
       specifications,
       attributes,
-      skus,
+      variations, // ✅ Ajouter les variations depuis le DTO
       ...data
     } = createProductDto;
 
@@ -141,60 +143,484 @@ export class ProductService {
       );
     }
 
-    // 🔹 Création du produit
-    const product = this.productRepo.create({
-      ...data,
-      min_quantity: min_quantity ?? 0,
-      company,
-      category,
-      measure,
-      image: mainImage,
-      type: company.typeCompany,
-      status: productStatus,
-      companyActivity: company.companyActivity,
-    } as DeepPartial<Product>);
-    await this.productRepo.save(product);
+    // 🔹 Utilisation d'une transaction pour garantir l'intégrité des données
+    return await this.dataSource.transaction(async (manager) => {
+      // 🔹 Création du produit
+      const product = manager.create(Product, {
+        ...data,
+        min_quantity: min_quantity ?? 0,
+        company,
+        category,
+        measure,
+        image: mainImage,
+        type: company.typeCompany,
+        status: productStatus,
+        companyActivity: company.companyActivity,
+      } as DeepPartial<Product>);
 
-    // 🔹 Upload des images secondaires
-    const secondaryImages: ImageProductEntity[] = [];
-    for (const file of files) {
-      const uploaded = await this.cloudinary.handleUploadImage(file, 'product');
-      const imageEntity = this.imageRepository.create({ url: uploaded, product });
-      secondaryImages.push(await this.imageRepository.save(imageEntity));
-    }
-    product.images = secondaryImages;
+      const savedProduct = await manager.save(product);
 
-    // 🔹 Création des spécifications
-    if (specifications && Array.isArray(specifications)) {
-      for (const spec of specifications) {
-        const specification = await this.specRepo.findOne({
-          where: { id: spec.specificationId },
+      // 🔹 Upload des images secondaires
+      const secondaryImages: ImageProductEntity[] = [];
+      for (const file of files) {
+        const uploaded = await this.cloudinary.handleUploadImage(file, 'product');
+        const imageEntity = manager.create(ImageProductEntity, {
+          url: uploaded,
+          product: savedProduct,
         });
-
-        if (!specification) {
-          // 🚨 La spécification n'existe pas, on renvoie une erreur
-          throw new BadRequestException(
-            `La spécification avec l'ID ${spec.specificationId} n'existe pas.`,
-          );
-        }
-
-        const specValueDto: CreateProductSpecificationValueDto = {
-          productId: product.id,
-          specificationId: specification.id,
-          value: spec.value ?? undefined,
-        };
-        await this.productSpecificationValueService.create(specValueDto);
+        const savedImage = await manager.save(imageEntity);
+        secondaryImages.push(savedImage);
       }
-    }
-    // 🔹 Sérialisation finale
-    const serializedProduct = plainToInstance(Product, product, {
-      excludeExtraneousValues: true,
+      savedProduct.images = secondaryImages;
+
+      // 🔹 Création des spécifications
+      if (specifications && Array.isArray(specifications)) {
+        for (const spec of specifications) {
+          const specification = await manager.findOne(Specification, {
+            where: { id: spec.specificationId },
+          });
+
+          if (!specification) {
+            throw new BadRequestException(
+              `La spécification avec l'ID ${spec.specificationId} n'existe pas.`,
+            );
+          }
+
+          const specValue = manager.create(ProductSpecificationValue, {
+            product: savedProduct,
+            specification,
+            value: spec.value ?? undefined,
+          });
+          await manager.save(specValue);
+        }
+      }
+
+      // 🔹 Création des attributs
+      if (attributes && Array.isArray(attributes)) {
+        for (const attributeId of attributes) {
+          const attribute = await manager.findOne(Attribute, {
+            where: { id: attributeId },
+          });
+          if (!attribute) {
+            throw new BadRequestException(`L'attribut avec l'ID ${attributeId} n'existe pas.`);
+          }
+
+          const productAttribute = manager.create(ProductAttribute, {
+            product: savedProduct,
+            attribute,
+          });
+          await manager.save(productAttribute);
+        }
+      }
+
+      // 🔹 Création des variations de produit
+      if (variations && Array.isArray(variations)) {
+        for (const variationDto of variations) {
+          const {
+            imageId,
+            sku,
+            wholesalePrice,
+            retailPrice,
+            stock,
+            weight,
+            length,
+            width,
+            height,
+            barcode,
+            attributeValues,
+          } = variationDto;
+
+          // Vérifier l'unicité du SKU
+          const existingVariation = await manager.findOne(ProductVariation, {
+            where: { sku },
+          });
+          if (existingVariation) {
+            throw new ConflictException(`Une variation avec le SKU ${sku} existe déjà`);
+          }
+
+          // Vérifier que l'image existe si fournie
+          let variationImage: ImageProductEntity | undefined = undefined;
+          if (imageId) {
+            // ✅ Convertir en number si l'ID de ImageProductEntity est un number
+            const imageIdNumber = parseInt(imageId, 10);
+            if (isNaN(imageIdNumber)) {
+              throw new BadRequestException(`ID d'image invalide: ${imageId}`);
+            }
+
+            const foundImage = await manager.findOne(ImageProductEntity, {
+              where: { id: imageIdNumber },
+            });
+            if (!foundImage) {
+              throw new NotFoundException(`Image avec l'ID ${imageId} non trouvée`);
+            }
+            variationImage = foundImage;
+          }
+
+          // Créer la variation
+          const variation = manager.create(ProductVariation, {
+            sku,
+            wholesalePrice,
+            retailPrice,
+            stock,
+            weight,
+            length,
+            width,
+            height,
+            barcode,
+            product: savedProduct,
+            image: variationImage,
+          });
+
+          const savedVariation = await manager.save(variation);
+
+          // Créer les valeurs d'attributs si fournies
+          if (Array.isArray(attributeValues) && attributeValues.length > 0) {
+            const attributeValueEntities = attributeValues.map((attrValue) =>
+              manager.create(VariationAttributeValue, {
+                value: attrValue.value,
+                attribute: { id: attrValue.attributeId },
+                variation: savedVariation,
+              }),
+            );
+            await manager.save(attributeValueEntities);
+          }
+        }
+      }
+
+      // 🔹 Recharger le produit avec toutes ses relations
+      const productWithRelations = await manager.findOne(Product, {
+        where: { id: savedProduct.id },
+        relations: [
+          'company',
+          'category',
+          'measure',
+          'images',
+          'specifications',
+          'specifications.specification',
+          'attributes',
+          'attributes.attribute',
+          'variations',
+          'variations.image',
+          'variations.attributeValues',
+          'variations.attributeValues.attribute',
+        ],
+      });
+
+      // 🔹 Sérialisation finale
+      const serializedProduct = plainToInstance(Product, productWithRelations, {
+        excludeExtraneousValues: true,
+      });
+
+      this.logger.log(
+        ` Produit "${savedProduct.name}" créé avec succès avec ${variations?.length || 0} variations`,
+      );
+
+      return {
+        message: 'Produit créé avec succès',
+        data: serializedProduct!,
+      };
+    });
+  }
+
+  async update(
+    id: string,
+    dto: CreateProductDto,
+    user: UserEntity,
+    files?: Express.Multer.File[],
+  ): Promise<{ message: string; data: Product }> {
+    const {
+      categoryId,
+      status,
+      measureId,
+      specifications,
+      attributes,
+      variations, // ✅ Ajouter variations depuis le DTO
+      ...data
+    } = dto;
+
+    this.logger.log(`🔄 Début mise à jour produit ID: ${id}`);
+
+    // 🔹 Recherche du produit avec toutes ses relations
+    const product = await this.productRepo.findOne({
+      where: { id },
+      relations: [
+        'category',
+        'category.parent',
+        'category.children',
+        'images',
+        'measure',
+        'company',
+        'company.tauxCompanies',
+        'company.country',
+        'company.city',
+        'specificationValues',
+        'specificationValues.specification',
+        'skus',
+        'attributes',
+        'attributes.attribute',
+        'variations', // ✅ Ajouter les variations
+        'variations.image',
+        'variations.attributeValues',
+        'variations.attributeValues.attribute',
+      ],
     });
 
-    return {
-      message: 'Produit créé avec succès',
-      data: serializedProduct,
-    };
+    if (!product) {
+      this.logger.error(`❌ Produit non trouvé: ${id}`);
+      throw new NotFoundException('Produit non trouvé');
+    }
+
+    // 🔹 Utilisation d'une transaction pour garantir l'intégrité
+    return await this.dataSource.transaction(async (manager) => {
+      try {
+        this.logger.log(`📝 Mise à jour des données du produit: ${product.name}`);
+
+        // 🔹 Mise à jour des champs de base
+        if (status) product.status = status;
+        Object.assign(product, data);
+
+        // 🔹 Gestion de la catégorie
+        if (categoryId) {
+          const category = await manager.findOne(CategoryEntity, { where: { id: categoryId } });
+          if (!category) {
+            this.logger.warn(`❌ Catégorie non trouvée: ${categoryId}`);
+            throw new NotFoundException('Catégorie non trouvée');
+          }
+          product.category = category;
+          this.logger.log(`✅ Catégorie mise à jour: ${category.name}`);
+        } else {
+          product.category = undefined;
+          this.logger.log('🗑️ Catégorie supprimée du produit');
+        }
+
+        // 🔹 Gestion de la mesure
+        if (measureId) {
+          const measure = await manager.findOne(MeasureEntity, { where: { id: measureId } });
+          if (!measure) {
+            this.logger.warn(`❌ Mesure non trouvée: ${measureId}`);
+            throw new NotFoundException('Mesure non trouvée');
+          }
+          product.measure = measure;
+          this.logger.log(`✅ Mesure mise à jour: ${measure.name}`);
+        } else {
+          product.measure = undefined;
+          this.logger.log('🗑️ Mesure supprimée du produit');
+        }
+
+        // 🔹 Gestion des images si fournies
+        if (files && files.length > 0) {
+          this.logger.log(`📸 Upload de ${files.length} nouvelles images`);
+          const newImages: ImageProductEntity[] = [];
+          for (const file of files) {
+            const url = await this.cloudinary.handleUploadImage(file, 'product');
+            const img = manager.create(ImageProductEntity, { url, product });
+            const savedImg = await manager.save(img);
+            newImages.push(savedImg);
+          }
+          product.images = [...(product.images || []), ...newImages];
+          this.logger.log(`✅ ${newImages.length} nouvelles images ajoutées`);
+        }
+
+        // 🔹 Sauvegarde du produit mis à jour
+        const updatedProduct = await manager.save(product);
+        this.logger.log(`✅ Produit sauvegardé: ${updatedProduct.name}`);
+
+        // 🔹 Gestion des spécifications
+        if (specifications && Array.isArray(specifications)) {
+          this.logger.log(`⚙️ Mise à jour de ${specifications.length} spécifications`);
+
+          // Supprimer les anciennes spécifications
+          if (product.specificationValues && product.specificationValues.length > 0) {
+            const oldSpecIds = product.specificationValues.map((sv) => sv.id);
+            await manager.delete(ProductSpecificationValue, oldSpecIds);
+            this.logger.log(`🗑️ ${oldSpecIds.length} anciennes spécifications supprimées`);
+          }
+
+          // Créer les nouvelles spécifications
+          for (const spec of specifications) {
+            if (!spec.specificationId) {
+              throw new BadRequestException(
+                'Chaque spécification doit contenir un specificationId',
+              );
+            }
+
+            const specExists = await manager.findOne(Specification, {
+              where: { id: spec.specificationId },
+            });
+            if (!specExists) {
+              throw new BadRequestException(
+                `La spécification avec id ${spec.specificationId} n'existe pas`,
+              );
+            }
+
+            const specValue = manager.create(ProductSpecificationValue, {
+              product: updatedProduct,
+              specification: specExists,
+              value: spec.value,
+            });
+            await manager.save(specValue);
+          }
+          this.logger.log('✅ Spécifications mises à jour');
+        }
+
+        // 🔹 Gestion des attributs
+        if (attributes && Array.isArray(attributes)) {
+          this.logger.log(`🏷️ Mise à jour de ${attributes.length} attributs`);
+
+          // Supprimer les anciens attributs
+          if (product.attributes && product.attributes.length > 0) {
+            const oldAttrIds = product.attributes.map((pa) => pa.id);
+            await manager.delete(ProductAttribute, oldAttrIds);
+            this.logger.log(`🗑️ ${oldAttrIds.length} anciens attributs supprimés`);
+          }
+
+          // Créer les nouveaux attributs
+          for (const attributeId of attributes) {
+            const attribute = await manager.findOne(Attribute, {
+              where: { id: attributeId },
+            });
+            if (!attribute) {
+              throw new BadRequestException(
+                `L'attribut avec l'ID ${attributeId} n'existe pas.`,
+              );
+            }
+
+            const productAttribute = manager.create(ProductAttribute, {
+              product: updatedProduct,
+              attribute,
+            });
+            await manager.save(productAttribute);
+          }
+          this.logger.log('✅ Attributs mis à jour');
+        }
+
+        // 🔹 Gestion des variations de produit
+        if (variations && Array.isArray(variations)) {
+          this.logger.log(`🔄 Mise à jour de ${variations.length} variations`);
+
+          // Supprimer les anciennes variations et leurs attributs
+          if (product.variations && product.variations.length > 0) {
+            for (const variation of product.variations) {
+              // Supprimer d'abord les valeurs d'attributs
+              if (variation.attributeValues && variation.attributeValues.length > 0) {
+                const attrValueIds = variation.attributeValues.map((av) => av.id);
+                await manager.delete(VariationAttributeValue, attrValueIds);
+              }
+              // Puis supprimer la variation
+              await manager.delete(ProductVariation, variation.id);
+            }
+            this.logger.log(`🗑️ ${product.variations.length} anciennes variations supprimées`);
+          }
+
+          // Créer les nouvelles variations
+          for (const variationDto of variations) {
+            const {
+              imageId,
+              sku,
+              wholesalePrice,
+              retailPrice,
+              stock,
+              weight,
+              length,
+              width,
+              height,
+              barcode,
+              attributeValues,
+            } = variationDto;
+
+            // Vérifier l'unicité du SKU
+            const existingVariation = await manager.findOne(ProductVariation, {
+              where: { sku },
+            });
+            if (existingVariation) {
+              throw new ConflictException(`Une variation avec le SKU ${sku} existe déjà`);
+            }
+
+            // Gérer l'image de la variation
+            let variationImage: ImageProductEntity | undefined = undefined;
+            if (imageId) {
+              const imageIdNumber = parseInt(imageId, 10);
+              if (isNaN(imageIdNumber)) {
+                throw new BadRequestException(`ID d'image invalide: ${imageId}`);
+              }
+
+              const foundImage = await manager.findOne(ImageProductEntity, {
+                where: { id: imageIdNumber },
+              });
+              if (!foundImage) {
+                throw new NotFoundException(`Image avec l'ID ${imageId} non trouvée`);
+              }
+              variationImage = foundImage;
+            }
+
+            // Créer la variation
+            const variation = manager.create(ProductVariation, {
+              sku,
+              wholesalePrice,
+              retailPrice,
+              stock,
+              weight,
+              length,
+              width,
+              height,
+              barcode,
+              product: updatedProduct,
+              image: variationImage,
+            });
+
+            const savedVariation = await manager.save(variation);
+
+            // Créer les valeurs d'attributs si fournies
+            if (Array.isArray(attributeValues) && attributeValues.length > 0) {
+              const attributeValueEntities = attributeValues.map((attrValue) =>
+                manager.create(VariationAttributeValue, {
+                  value: attrValue.value,
+                  attribute: { id: attrValue.attributeId },
+                  variation: savedVariation,
+                }),
+              );
+              await manager.save(attributeValueEntities);
+            }
+
+            this.logger.log(`✅ Variation créée: ${savedVariation.sku}`);
+          }
+          this.logger.log('✅ Toutes les variations mises à jour');
+        }
+
+        // 🔹 Recharger le produit avec toutes ses relations
+        this.logger.log('🔄 Rechargement du produit mis à jour...');
+        const productWithRelations = await manager.findOne(Product, {
+          where: { id: updatedProduct.id },
+          relations: [
+            'category',
+            'images',
+            'measure',
+            'company',
+            'specificationValues',
+            'specificationValues.specification',
+            'attributes',
+            'attributes.attribute',
+            'variations',
+            'variations.image',
+            'variations.attributeValues',
+            'variations.attributeValues.attribute',
+          ],
+        });
+
+        this.logger.log(`🎉 Produit "${product.name}" mis à jour avec succès`);
+
+        return {
+          message: 'Produit mis à jour avec succès',
+          data: productWithRelations!,
+        };
+      } catch (error) {
+        this.logger.error(
+          `💥 Erreur lors de la mise à jour du produit: ${error.message}`,
+          error.stack,
+        );
+        throw error;
+      }
+    });
   }
 
   async findOne(id: string): Promise<{ message: string; data: Product }> {
@@ -813,104 +1239,6 @@ export class ProductService {
     }
 
     return grouped;
-  }
-
-  async update(
-    id: string,
-    dto: CreateProductDto,
-    user: UserEntity,
-    files?: Express.Multer.File[],
-  ) {
-    const { categoryId, status, measureId, specifications, skus, attributes, ...data } = dto;
-
-    const product = await this.productRepo.findOne({
-      where: { id },
-      relations: [
-        'category',
-        'category.parent',
-        'category.children',
-        'images',
-        'measure',
-        'company',
-        'company.tauxCompanies',
-        'company.country',
-        'company.city',
-        'specificationValues',
-        'specificationValues.specification',
-        'skus',
-        'attributes',
-        'attributes.values',
-      ],
-    });
-    if (!product) throw new NotFoundException('Produit non trouvé');
-
-    if (status) product.status = status;
-    Object.assign(product, data);
-
-    const company = await this.companyRepo.findOne({ where: { id: user.activeCompanyId } });
-    if (!company) throw new NotFoundException('Entreprise active non trouvée');
-    product.company = company;
-    product.type = company.typeCompany;
-
-    if (categoryId) {
-      const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
-      if (!category) throw new NotFoundException('Catégorie non trouvée');
-      product.category = category;
-    } else {
-      product.category = undefined;
-    }
-
-    if (measureId) {
-      const measure = await this.measureRepo.findOne({ where: { id: measureId } });
-      if (!measure) throw new NotFoundException('Mesure non trouvée');
-      product.measure = measure;
-    } else {
-      product.measure = undefined;
-    }
-
-    // 🔹 AJOUT : Gestion des images si fournies
-    if (files && files.length > 0) {
-      const newImages: ImageProductEntity[] = [];
-      for (const file of files) {
-        const url = await this.cloudinary.handleUploadImage(file, 'product');
-        const img = this.imageRepository.create({ url, product });
-        newImages.push(await this.imageRepository.save(img));
-      }
-      // Ajoute aux images existantes
-      product.images = [...(product.images || []), ...newImages];
-    }
-
-    const updatedProduct = await this.productRepo.save(product);
-
-    if (specifications && Array.isArray(specifications)) {
-      for (const spec of specifications) {
-        if (!spec.specificationId)
-          throw new BadRequestException(
-            'Chaque spécification doit contenir un specificationId',
-          );
-
-        const specExists = await this.specRepo.findOne({ where: { id: spec.specificationId } });
-        if (!specExists)
-          throw new BadRequestException(
-            `La spécification avec id ${spec.specificationId} n'existe pas`,
-          );
-
-        await this.productSpecificationValueService.create({
-          productId: updatedProduct.id,
-          specificationId: spec.specificationId,
-          value: spec.value,
-        });
-      }
-    }
-
-    const serializedProduct = plainToInstance(Product, updatedProduct, {
-      excludeExtraneousValues: true,
-    });
-
-    return {
-      message: 'Produit mis à jour avec succès',
-      data: serializedProduct,
-    };
   }
 
   async searchProducts(search: string): Promise<{ message: string; data: Product[] }> {

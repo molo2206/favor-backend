@@ -48,7 +48,7 @@ export class ProductController {
     @CurrentUser() user: UserEntity,
   ) {
     if (!files || files.length < 1 || files.length > 5) {
-      throw new BadRequestException("Le nombre d'images doit être compris entre 2 et 4");
+      throw new BadRequestException("Le nombre d'images doit être compris entre 1 et 5");
     }
 
     if (!user.activeCompanyId) {
@@ -65,9 +65,31 @@ export class ProductController {
       }
     }
 
+    // 🔹 Parse attributes si fournies
+    let attributes;
+    if (body.attributes) {
+      try {
+        attributes = JSON.parse(body.attributes);
+      } catch (error) {
+        throw new BadRequestException('Le champ attributes doit être un JSON valide');
+      }
+    }
+
+    // 🔹 Parse variations si fournies - NOUVEAU
+    let variations;
+    if (body.variations) {
+      try {
+        variations = JSON.parse(body.variations);
+      } catch (error) {
+        throw new BadRequestException('Le champ variations doit être un JSON valide');
+      }
+    }
+
     const dto: CreateProductDto = {
       ...body,
       specifications,
+      attributes,
+      variations, // ✅ Ajouter les variations au DTO
     };
 
     const result = await this.productService.create(dto, files, user);
@@ -77,15 +99,52 @@ export class ProductController {
   @Patch(':id')
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
-  @UseInterceptors(FilesInterceptor('images', 5)) // ✅ On attend le champ "images" (max 5 fichiers)
+  @UseInterceptors(FilesInterceptor('images', 5))
   async update(
     @Param('id') id: string,
-    @UploadedFiles() files: Express.Multer.File[], // ✅ Récupère les fichiers
-    @Body() dto: CreateProductDto,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() body: any,
     @CurrentUser() user: UserEntity,
   ) {
+    // 🔹 Parse specifications si fournies
+    let specifications;
+    if (body.specifications) {
+      try {
+        specifications = JSON.parse(body.specifications);
+      } catch (error) {
+        throw new BadRequestException('Le champ specifications doit être un JSON valide');
+      }
+    }
+
+    // 🔹 Parse attributes si fournies
+    let attributes;
+    if (body.attributes) {
+      try {
+        attributes = JSON.parse(body.attributes);
+      } catch (error) {
+        throw new BadRequestException('Le champ attributes doit être un JSON valide');
+      }
+    }
+
+    // 🔹 Parse variations si fournies - NOUVEAU
+    let variations;
+    if (body.variations) {
+      try {
+        variations = JSON.parse(body.variations);
+      } catch (error) {
+        throw new BadRequestException('Le champ variations doit être un JSON valide');
+      }
+    }
+
+    const dto: CreateProductDto = {
+      ...body,
+      specifications,
+      attributes,
+      variations, // ✅ Ajouter les variations au DTO
+    };
+
     const result = await this.productService.update(id, dto, user, files);
-    return result;
+    return { message: result.message, data: result.data };
   }
 
   @Patch(':id/status')

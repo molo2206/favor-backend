@@ -14,8 +14,8 @@ import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service'
 import { In } from 'typeorm';
 import { CategorySpecification } from 'src/specification/entities/CategorySpecification.entity';
 import { CategorySpecificationService } from 'src/specification/category-specification.service';
-import { CategoryAttribute } from 'src/Attribut/entities/category_attributes.entity';
-import { GlobalAttribute } from 'src/Attribut/entities/global_attributes.entity';
+import { CategoryAttribute } from 'src/AttributGlobal/entities/category_attributes.entity';
+import { Attribute } from 'src/AttributGlobal/entities/attributes.entity';
 
 @Injectable()
 export class CategoryService {
@@ -29,8 +29,8 @@ export class CategoryService {
     @InjectRepository(CategoryAttribute)
     private readonly categoryAttributeRepo: Repository<CategoryAttribute>,
 
-    @InjectRepository(GlobalAttribute)
-    private readonly globalAttrRepo: Repository<GlobalAttribute>,
+    @InjectRepository(Attribute)
+    private readonly globalAttrRepo: Repository<Attribute>,
 
     private readonly categorySpecification: CategorySpecificationService,
 
@@ -408,7 +408,7 @@ export class CategoryService {
       .leftJoinAndSelect('ca.attribute', 'attr') // jointure pour les attributs
       .leftJoinAndSelect('ca.category', 'category') // jointure pour la catégorie
       .where('ca.category_id = :categoryId', { categoryId }) // utilise le nom correct de la colonne
-      .orderBy('attr.label', 'ASC')
+      .orderBy('attr.name', 'ASC') // ✅ Utiliser 'name' au lieu de 'label'
       .getMany();
 
     if (!categoryAttrs.length) {
@@ -418,22 +418,21 @@ export class CategoryService {
       };
     }
 
-    // Transforme les résultats pour la réponse
+    // Transforme les résultats pour la réponse - CORRIGÉ selon l'entité Attribute
     const data = categoryAttrs.map((ca) => ({
       categoryAttributeId: ca.id,
       categoryId: ca.category.id, // récupéré via la jointure
       attributeId: ca.attribute.id,
       attribute: {
         id: ca.attribute.id,
-        key: ca.attribute.key,
-        label: ca.attribute.label,
-        type: ca.attribute.type,
-        options: ca.attribute.options,
-        status: ca.attribute.status,
-        deleted: ca.attribute.deleted,
+        name: ca.attribute.name, // ✅ Utiliser 'name' au lieu de 'key' et 'label'
+        slug: ca.attribute.slug, // ✅ Propriété existante
+        type: ca.attribute.type, // ✅ Propriété existante
+        description: ca.attribute.description, // ✅ Propriété existante
+        isRequired: ca.attribute.isRequired, // ✅ Propriété existante
+        isFilterable: ca.attribute.isFilterable, // ✅ Propriété existante
       },
       createdAt: ca.createdAt,
-      updatedAt: ca.updatedAt,
     }));
 
     return {
@@ -464,7 +463,6 @@ export class CategoryService {
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
       .leftJoinAndSelect('specificationValues.specification', 'specificationDetail') // si tu veux le détail
       .leftJoinAndSelect('product.attributes', 'attributes')
-      .leftJoinAndSelect('product.skus', 'skus')
       .leftJoinAndSelect('product.wishlist', 'wishlist')
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('company.country', 'country')

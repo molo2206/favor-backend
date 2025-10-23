@@ -8,6 +8,7 @@ import {
   IsArray,
   ValidateNested,
   IsInt,
+  Min,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
@@ -15,8 +16,67 @@ import { Type_rental_both_sale_car } from '../enum/type_rental_both_sale_car';
 import { FuelType } from '../enum/fuelType_enum';
 import { Transmission } from '../enum/transmission.enum';
 import { ProductSpecificationDto } from './create-product-specification.dto';
-import { CreateSkuDto } from 'src/Attribut/dto/create-sku.dto';
-import { CreateProductAttributeDto } from 'src/Attribut/dto/create-product-attribute.dto';
+
+// DTO pour les valeurs d'attributs des variations
+export class VariationAttributeValueDto {
+  @IsString()
+  value: string;
+
+  @IsString()
+  attributeId: string;
+}
+
+// DTO pour les variations de produit
+export class CreateProductVariationDto {
+  @IsOptional()
+  @IsString()
+  imageId?: string;
+
+  @IsString()
+  sku: string;
+
+  @IsNumber()
+  @Min(0)
+  wholesalePrice: number;
+
+  @IsNumber()
+  @Min(0)
+  retailPrice: number;
+
+  @IsNumber()
+  @Min(0)
+  stock: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  weight?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  length?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  width?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  height?: number;
+
+  @IsOptional()
+  @IsString()
+  barcode?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => VariationAttributeValueDto)
+  attributeValues?: VariationAttributeValueDto[];
+}
 
 export class CreateProductDto {
   // Obligatoire
@@ -149,20 +209,38 @@ export class CreateProductDto {
   specifications?: ProductSpecificationDto[];
 
   @IsOptional()
+  @IsArray()
+  @IsUUID('all', { each: true })
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value;
+      }
+    }
+    return value;
+  })
+  attributes?: string[];
+
+  // ✅ NOUVEAU: Variations du produit
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateProductVariationDto)
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value;
+      }
+    }
+    return value;
+  })
+  variations?: CreateProductVariationDto[];
+
+  @IsOptional()
   @IsString()
   type?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateProductAttributeDto)
-  @Transform(({ value }) => (typeof value === 'string' ? JSON.parse(value) : value))
-  attributes?: CreateProductAttributeDto[];
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateSkuDto)
-  @Transform(({ value }) => (typeof value === 'string' ? JSON.parse(value) : value))
-  skus?: CreateSkuDto[];
 }

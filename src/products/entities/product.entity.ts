@@ -20,10 +20,10 @@ import { FuelType } from 'src/products/enum/fuelType_enum';
 import { Transmission } from '../enum/transmission.enum';
 import { RentalContract } from 'src/rental-contract/entities/rental-contract.entity';
 import { SaleTransaction } from 'src/sale-transaction/entities/sale-transaction.entity';
-import { ProductSpecificationValue } from 'src/specification/entities/ProductSpecificationValue.entity';
-import { Sku } from 'src/Attribut/entities/skus.entity';
-import { ProductAttribute } from 'src/Attribut/entities/product_attributes.entity';
+import { ProductVariation } from 'src/AttributGlobal/entities/product_variations.entity';
+import { ProductAttribute } from 'src/AttributGlobal/entities/product_attributes.entity';
 import { Wishlist } from './wishlists.entity';
+import { ProductSpecificationValue } from 'src/specification/entities/ProductSpecificationValue.entity';
 
 @Entity('products')
 export class Product {
@@ -154,11 +154,14 @@ export class Product {
   @OneToMany(() => ProductSpecificationValue, (pv) => pv.product, { cascade: true })
   specificationValues: ProductSpecificationValue[];
 
-  @OneToMany(() => ProductAttribute, (attr) => attr.product, { cascade: true })
-  attributes: ProductAttribute[];
+  @OneToMany(() => ProductAttribute, (pa) => pa.product, { cascade: true })
+  productAttributes: ProductAttribute[];
 
-  @OneToMany(() => Sku, (sku) => sku.product, { cascade: true })
-  skus: Sku[];
+  @OneToMany(() => ProductVariation, (pv) => pv.product)
+  variations: ProductVariation[];
+
+  @OneToMany(() => ProductAttribute, (pa) => pa.product)
+  attributes: ProductAttribute[];
 
   @OneToMany(() => Wishlist, (wishlist) => wishlist.product)
   wishlist: Wishlist[];

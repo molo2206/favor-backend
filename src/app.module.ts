@@ -43,9 +43,8 @@ import { UserPlatformRoleModule } from './users/user-platform-role.module';
 import { SpecificationModule } from './specification/specification.module';
 import { CategorySpecificationModule } from './specification/category-specification.module';
 import { ProductSpecificationValueModule } from './specification/product-specification.module';
-import { GlobalAttributesModule } from './Attribut/global-attributes.module';
-import { AttributeValuesModule } from './Attribut/attribute-values.module';
 import { SmsHelper } from './users/utility/helpers/sms.helper';
+import { AttributeModule } from './AttributGlobal/attribute.module';
 
 @Module({
   imports: [
@@ -117,8 +116,7 @@ import { SmsHelper } from './users/utility/helpers/sms.helper';
     SpecificationModule,
     CategorySpecificationModule,
     ProductSpecificationValueModule,
-    GlobalAttributesModule,
-    AttributeValuesModule,
+    AttributeModule,
   ],
   controllers: [AppController],
   providers: [AppService,SmsHelper],
