@@ -29,34 +29,13 @@ export class PrestataireEntity {
   @Column({ nullable: true })
   photo?: string;
 
-  @Column({
-    type: 'longtext',
-    nullable: true,
-    transformer: {
-      to: (value: any) => (value ? JSON.stringify(value) : null),
-      from: (value: string) => (value ? JSON.parse(value) : null),
-    },
-  })
+  @Column({ type: 'json', nullable: true })
   experience?: any;
 
-  @Column({
-    type: 'longtext',
-    nullable: true,
-    transformer: {
-      to: (value: any) => (value ? JSON.stringify(value) : null),
-      from: (value: string) => (value ? JSON.parse(value) : null),
-    },
-  })
+  @Column({ type: 'json', nullable: true })
   specialite?: any;
 
-  @Column({
-    type: 'longtext',
-    nullable: true,
-    transformer: {
-      to: (value: any) => (value ? JSON.stringify(value) : null),
-      from: (value: string) => (value ? JSON.parse(value) : null),
-    },
-  })
+  @Column({ type: 'json', nullable: true })
   competence?: any;
 
   // 🔗 Relation vers la table pivot
