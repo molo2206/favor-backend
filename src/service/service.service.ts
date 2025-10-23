@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DeepPartial, Repository } from 'typeorm';
 
 import { Service } from './entities/service.entity';
 import { CategoryEntity } from 'src/category/entities/category.entity';
@@ -360,15 +360,15 @@ export class ServiceService {
 
     // Créer le prestataire
     const prestataire = this.prestataireRepo.create({
-      full_name: dto.full_name,
+      full_name: dto.full_name, // correspond exactement à ton entité
       email: dto.email,
       phone: dto.phone,
       description: dto.description,
       photo,
-      experience: dto.experience || null, // texte simple
-      competence: dto.competence || null, // texte simple
-      specialite: dto.specialite || null, // texte simple
-    });
+      experience: dto.experience || null,
+      competence: dto.competence || null,
+      specialite: dto.specialite || null,
+    } as DeepPartial<PrestataireEntity>); // ⚡ cast pour TypeScript
 
     await this.prestataireRepo.save(prestataire);
 
@@ -395,7 +395,6 @@ export class ServiceService {
     return { message: 'Prestataire créé avec succès', data: savedPrestataire };
   }
 
-  // UPDATE
   async updatePrestataire(
     id: string,
     dto: Partial<CreatePrestataireDto> & { serviceIds?: string[] },
@@ -428,7 +427,7 @@ export class ServiceService {
       }
     });
 
-    // Assurer que chaque champ JSON reste une seule ligne de texte
+    // Assurer que chaque champ reste texte simple
     if (dto.experience !== undefined) prestataire.experience = dto.experience;
     if (dto.competence !== undefined) prestataire.competence = dto.competence;
     if (dto.specialite !== undefined) prestataire.specialite = dto.specialite;

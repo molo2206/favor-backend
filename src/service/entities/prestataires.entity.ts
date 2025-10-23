@@ -29,14 +29,14 @@ export class PrestataireEntity {
   @Column({ nullable: true })
   photo?: string;
 
-  @Column({ type: 'json', nullable: true })
-  experience?: any;
+  @Column({ type: 'text', nullable: true })
+  experience?: string;
 
-  @Column({ type: 'json', nullable: true })
-  specialite?: any;
+  @Column({ type: 'text', nullable: true })
+  competence?: string;
 
-  @Column({ type: 'json', nullable: true })
-  competence?: any;
+  @Column({ type: 'text', nullable: true })
+  specialite?: string;
 
   // 🔗 Relation vers la table pivot
   @OneToMany(() => ServiceHasPrestataire, (shp) => shp.prestataire)
