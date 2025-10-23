@@ -292,6 +292,9 @@ export class ProductService {
         where: { id: savedProduct.id },
         relations: [
           'company',
+          'company.tauxCompanies',
+          'company.country',
+          'company.city',
           'category',
           'measure',
           'images',
@@ -595,6 +598,9 @@ export class ProductService {
             'images',
             'measure',
             'company',
+            'company.tauxCompanies',
+            'company.country',
+            'company.city',
             'specificationValues',
             'specificationValues.specification',
             'attributes',
@@ -627,6 +633,9 @@ export class ProductService {
       where: { id },
       relations: [
         'company',
+        'company.tauxCompanies',
+        'company.country',
+        'company.city',
         'category',
         'category.parent',
         'category.children',
@@ -637,6 +646,12 @@ export class ProductService {
         'company.city',
         'specificationValues',
         'specificationValues.specification',
+        'attributes',
+        'attributes.attribute',
+        'variations',
+        'variations.image',
+        'variations.attributeValues',
+        'variations.attributeValues.attribute',
       ],
     });
     if (!product) {
@@ -662,7 +677,13 @@ export class ProductService {
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
-      .leftJoinAndSelect('specificationValues.specification', 'specification');
+      .leftJoinAndSelect('specificationValues.specification', 'specification')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('attributes.attribute', 'attribute')
+      .leftJoinAndSelect('product.variations', 'variations')
+      .leftJoinAndSelect('variations.image', 'variationImage')
+      .leftJoinAndSelect('variations.attributeValues', 'variationAttributeValues')
+      .leftJoinAndSelect('variationAttributeValues.attribute', 'variationAttribute');
 
     if (type) {
       queryBuilder.where('product.type = :type', { type });
@@ -692,6 +713,13 @@ export class ProductService {
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
       .leftJoinAndSelect('specificationValues.specification', 'specification')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('attributes.attribute', 'attribute')
+      .leftJoinAndSelect('product.variations', 'variations')
+      .leftJoinAndSelect('variations.image', 'variationImage')
+      .leftJoinAndSelect('variations.attributeValues', 'variationAttributeValues')
+      .leftJoinAndSelect('variationAttributeValues.attribute', 'variationAttribute')
+
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     if (type) {
@@ -741,6 +769,13 @@ export class ProductService {
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('attributes.attribute', 'attribute')
+      .leftJoinAndSelect('product.variations', 'variations')
+      .leftJoinAndSelect('variations.image', 'variationImage')
+      .leftJoinAndSelect('variations.attributeValues', 'variationAttributeValues')
+      .leftJoinAndSelect('variationAttributeValues.attribute', 'variationAttribute')
+
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     if (type) {
@@ -953,6 +988,13 @@ export class ProductService {
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('attributes.attribute', 'attribute')
+      .leftJoinAndSelect('product.variations', 'variations')
+      .leftJoinAndSelect('variations.image', 'variationImage')
+      .leftJoinAndSelect('variations.attributeValues', 'variationAttributeValues')
+      .leftJoinAndSelect('variationAttributeValues.attribute', 'variationAttribute')
+
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     // 🔸 Filtre companyId
@@ -1114,6 +1156,12 @@ export class ProductService {
         'company.city',
         'specificationValues',
         'specificationValues.specification',
+        'attributes',
+        'attributes.attribute',
+        'variations',
+        'variations.image',
+        'variations.attributeValues',
+        'variations.attributeValues.attribute',
       ],
       skip,
       take: limit,
@@ -1145,6 +1193,12 @@ export class ProductService {
         'company.city',
         'specificationValues',
         'specificationValues.specification',
+        'attributes',
+        'attributes.attribute',
+        'variations',
+        'variations.image',
+        'variations.attributeValues',
+        'variations.attributeValues.attribute',
       ],
     });
 
@@ -1182,6 +1236,12 @@ export class ProductService {
         'company.city',
         'specificationValues',
         'specificationValues.specification',
+        'attributes',
+        'attributes.attribute',
+        'variations',
+        'variations.image',
+        'variations.attributeValues',
+        'variations.attributeValues.attribute',
       ],
     });
 
@@ -1225,6 +1285,12 @@ export class ProductService {
         'company.city',
         'specificationValues',
         'specificationValues.specification',
+        'attributes',
+        'attributes.attribute',
+        'variations',
+        'variations.image',
+        'variations.attributeValues',
+        'variations.attributeValues.attribute',
       ],
       order: { createdAt: 'ASC' }, // pour s'assurer que le "premier" est bien le plus ancien
     });
@@ -1250,7 +1316,13 @@ export class ProductService {
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('product.category', 'category')
-      .leftJoinAndSelect('product.images', 'images');
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('attributes.attribute', 'attribute')
+      .leftJoinAndSelect('product.variations', 'variations')
+      .leftJoinAndSelect('variations.image', 'variationImage')
+      .leftJoinAndSelect('variations.attributeValues', 'variationAttributeValues')
+      .leftJoinAndSelect('variationAttributeValues.attribute', 'variationAttribute');
 
     if (search) {
       qb.where('product.name LIKE :search', { search: `%${search}%` })
@@ -1307,6 +1379,12 @@ export class ProductService {
         'measure',
         'specificationValues',
         'specificationValues.specification',
+        'attributes',
+        'attributes.attribute',
+        'variations',
+        'variations.image',
+        'variations.attributeValues',
+        'variations.attributeValues.attribute',
       ],
     });
     if (!updated) {
@@ -1365,6 +1443,12 @@ export class ProductService {
         'company.city',
         'specificationValues',
         'specificationValues.specification',
+        'attributes',
+        'attributes.attribute',
+        'variations',
+        'variations.image',
+        'variations.attributeValues',
+        'variations.attributeValues.attribute',
       ],
     });
 
@@ -1398,19 +1482,21 @@ export class ProductService {
     const product = await this.productRepo.findOne({
       where: { id: dto.productId },
       relations: [
-        'images',
+        'company',
         'category',
         'measure',
-        'company',
+        'images',
         'company.tauxCompanies',
         'company.country',
         'company.city',
         'specificationValues',
         'specificationValues.specification',
         'attributes',
-        'skus',
-        'rentalContracts',
-        'saleTransactions',
+        'attributes.attribute',
+        'variations',
+        'variations.image',
+        'variations.attributeValues',
+        'variations.attributeValues.attribute',
       ],
     });
 
@@ -1477,8 +1563,13 @@ export class ProductService {
         // 🔹 Spécifications & Attributs
         'product.specificationValues',
         'product.specificationValues.specification',
+
         'product.attributes',
-        'product.skus',
+        'product.attributes.attribute', // 🔹 Ajouté
+        'product.variations', // 🔹 Ajouté
+        'product.variations.image',
+        'product.variations.attributeValues',
+        'product.variations.attributeValues.attribute',
 
         // 🔹 Liens métiers
         'product.rentalContracts',
@@ -1562,6 +1653,12 @@ export class ProductService {
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
       .leftJoinAndSelect('specificationValues.specification', 'specification')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('attributes.attribute', 'attribute')
+      .leftJoinAndSelect('product.variations', 'variations')
+      .leftJoinAndSelect('variations.image', 'variationImage')
+      .leftJoinAndSelect('variations.attributeValues', 'variationAttributeValues')
+      .leftJoinAndSelect('variationAttributeValues.attribute', 'variationAttribute')
       .where(
         `
     (product.name LIKE :searchKey
