@@ -203,4 +203,10 @@ export class ServiceController {
   ) {
     return this.serviceService.findPublishedByCompany(companyId, page, limit);
   }
+
+  @Get('prestataire/company')
+  @UseGuards(AuthentificationGuard)
+  async getPrestatairesByCompany(@CurrentUser() user: UserEntity) {
+    return this.serviceService.findPrestatairesByCompany(user);
+  }
 }

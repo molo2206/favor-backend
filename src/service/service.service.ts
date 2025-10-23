@@ -563,4 +563,40 @@ export class ServiceService {
       },
     };
   }
+
+  async findPrestatairesByCompany(user: UserEntity) {
+    // Vérifier que la société existe
+    const companyId = user.activeCompanyId;
+    if (!companyId) {
+      throw new BadRequestException("L'utilisateur n'a pas de société active");
+    }
+    const company = await this.compRepo.findOne({ where: { id: companyId } });
+    if (!company) {
+      throw new NotFoundException('Entreprise introuvable');
+    }
+
+    // Récupérer les prestataires associés à cette entreprise via les services
+    const prestataires = await this.prestataireRepo.find({
+      where: {
+        services: {
+          service: {
+            company: { id: companyId },
+          },
+        },
+      },
+      relations: [
+        'services',
+        'services.service',
+        'services.service.company',
+        'services.service.category',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      message: 'Prestataires récupérés avec succès',
+      count: prestataires.length,
+      data: prestataires,
+    };
+  }
 }
