@@ -14,6 +14,7 @@ export class CreateAttributeDto {
   @IsString()
   name: string;
 
+  @IsOptional()
   @IsString()
   slug: string;
 
