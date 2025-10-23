@@ -269,6 +269,15 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
       );
     }
 
+    if (
+      order.status === OrderStatus.VALIDATED &&
+      dto.status !== OrderStatus.VALIDATED &&
+      order.shippingCost !== 0
+    ) {
+      throw new BadRequestException(
+        'Impossible de changer le statut de la commande depuis "VALIDATED" vers un autre statut car un coût de livraison (shippingCost) a déjà été défini. Pour modifier le statut, veuillez d’abord ajuster ou supprimer le shippingCost.',
+      );
+    }
     // ✅ Empêche la modification du shippingCost pour certains statuts
     if (
       [OrderStatus.PROCESSING, OrderStatus.COMPLETED, OrderStatus.DELIVERED].includes(
