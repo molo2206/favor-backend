@@ -336,35 +336,27 @@ export class ServiceService {
   }
 
   // Service
+  // CREATE
   async createPrestataire(
     dto: CreatePrestataireDto & { serviceIds?: string[] },
-    file?: Express.Multer.File, // un seul fichier
+    file?: Express.Multer.File,
   ): Promise<{ message: string; data: PrestataireEntity }> {
-    // Vérifier doublon email
+    // Vérifier doublons email et téléphone
     if (dto.email) {
       const existingEmail = await this.prestataireRepo.findOne({ where: { email: dto.email } });
       if (existingEmail)
         throw new BadRequestException('Un prestataire avec cet email existe déjà');
     }
-
-    // Vérifier doublon téléphone
     if (dto.phone) {
       const existingPhone = await this.prestataireRepo.findOne({ where: { phone: dto.phone } });
       if (existingPhone)
         throw new BadRequestException('Un prestataire avec ce téléphone existe déjà');
     }
 
-    // Upload d'une seule photo
+    // Upload photo
     const photo = file
       ? await this.cloudinary.handleUploadImage(file, 'prestataires')
       : undefined;
-
-    // Préparer les données JSON
-    const profileData = {
-      experience: dto.experience || null,
-      competence: dto.competence || null,
-      specialite: dto.specialite || null,
-    };
 
     // Créer le prestataire
     const prestataire = this.prestataireRepo.create({
@@ -373,17 +365,16 @@ export class ServiceService {
       phone: dto.phone,
       description: dto.description,
       photo,
-      experience: profileData, // JSON
-      competence: profileData, // JSON
-      specialite: profileData, // JSON
+      experience: dto.experience || null, // texte simple
+      competence: dto.competence || null, // texte simple
+      specialite: dto.specialite || null, // texte simple
     });
 
     await this.prestataireRepo.save(prestataire);
 
-    // Gestion des services liés
+    // Gestion des services
     if (dto.serviceIds) {
       if (typeof dto.serviceIds === 'string') dto.serviceIds = JSON.parse(dto.serviceIds);
-
       if (Array.isArray(dto.serviceIds) && dto.serviceIds.length > 0) {
         const validServices = await this.serviceRepo.findByIds(dto.serviceIds);
         const serviceLinks = validServices.map((s) =>
@@ -393,73 +384,66 @@ export class ServiceService {
       }
     }
 
-    // Recharger le prestataire avec les relations
+    // Recharger avec relations
     const savedPrestataire = await this.prestataireRepo.findOne({
       where: { id: prestataire.id },
       relations: ['services', 'services.service'],
     });
 
-    if (!savedPrestataire)
-      throw new NotFoundException('Prestataire créé introuvable après sauvegarde');
+    if (!savedPrestataire) throw new NotFoundException('Prestataire créé introuvable');
 
     return { message: 'Prestataire créé avec succès', data: savedPrestataire };
   }
 
+  // UPDATE
   async updatePrestataire(
     id: string,
     dto: Partial<CreatePrestataireDto> & { serviceIds?: string[] },
-    file?: Express.Multer.File, // un seul fichier
+    file?: Express.Multer.File,
   ): Promise<{ message: string; data: PrestataireEntity }> {
     const prestataire = await this.prestataireRepo.findOne({ where: { id } });
     if (!prestataire) throw new NotFoundException('Prestataire introuvable');
 
-    // Vérifier doublon email sur les autres prestataires
+    // Vérifier doublons
     if (dto.email && dto.email !== prestataire.email) {
       const existingEmail = await this.prestataireRepo.findOne({ where: { email: dto.email } });
       if (existingEmail)
         throw new BadRequestException('Un prestataire avec cet email existe déjà');
     }
-
-    // Vérifier doublon téléphone sur les autres prestataires
     if (dto.phone && dto.phone !== prestataire.phone) {
       const existingPhone = await this.prestataireRepo.findOne({ where: { phone: dto.phone } });
       if (existingPhone)
         throw new BadRequestException('Un prestataire avec ce téléphone existe déjà');
     }
 
-    // Mettre à jour la photo si fourni
+    // Mettre à jour la photo
     if (file) {
       prestataire.photo = await this.cloudinary.handleUploadImage(file, 'prestataires');
     }
 
-    // Mettre à jour les autres champs
+    // Mettre à jour les champs simples
     Object.entries(dto).forEach(([key, value]) => {
       if (value !== undefined && key !== 'photo' && key !== 'serviceIds') {
         (prestataire as any)[key] = value;
       }
     });
 
-    // Transformer les champs experience, competence et specialite en JSON unique
-    prestataire.experience = {
-      experience: dto.experience || (prestataire.experience?.experience ?? ''),
-      competence: dto.competence || (prestataire.experience?.competence ?? ''),
-      specialite: dto.specialite || (prestataire.experience?.specialite ?? ''),
-    };
+    // Assurer que chaque champ JSON reste une seule ligne de texte
+    if (dto.experience !== undefined) prestataire.experience = dto.experience;
+    if (dto.competence !== undefined) prestataire.competence = dto.competence;
+    if (dto.specialite !== undefined) prestataire.specialite = dto.specialite;
 
     await this.prestataireRepo.save(prestataire);
 
     // Mettre à jour les services
     if (dto.serviceIds) {
       if (typeof dto.serviceIds === 'string') dto.serviceIds = JSON.parse(dto.serviceIds);
-
       if (Array.isArray(dto.serviceIds)) {
         await this.shpRepo.delete({ prestataireId: prestataire.id });
-
         const validServices = await this.serviceRepo.findByIds(dto.serviceIds);
         const serviceLinks = validServices.map((s) =>
           this.shpRepo.create({ prestataireId: prestataire.id, serviceId: s.id, actif: true }),
         );
-
         if (serviceLinks.length > 0) await this.shpRepo.save(serviceLinks);
       }
     }
