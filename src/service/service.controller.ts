@@ -161,6 +161,7 @@ export class ServiceController {
   async getServicesByPrestataire(@Param('prestataireId') prestataireId: string) {
     return this.serviceService.getServicesByPrestataire(prestataireId);
   }
+  // Créer un prestataire
   @Post('prestataire')
   @UseGuards(AuthentificationGuard)
   @UseInterceptors(FileInterceptor('image')) // un seul fichier
@@ -171,17 +172,18 @@ export class ServiceController {
     return this.serviceService.createPrestataire(dto, image);
   }
 
-  // Mettre à jour un prestataire avec option d'assigner des services
+  // Mettre à jour un prestataire
   @Patch('/prestataire/:id')
   @UseGuards(AuthentificationGuard)
-  @UseInterceptors(FilesInterceptor('image', 1)) // une seule photo
+  @UseInterceptors(FileInterceptor('image')) // un seul fichier
   async updatePrestataire(
     @Param('id') id: string,
     @Body() dto: UpdatePrestataireDto & { serviceIds?: string[] },
-    @UploadedFiles() files?: Express.Multer.File[],
+    @UploadedFile() image?: Express.Multer.File, // singular
   ) {
-    return this.serviceService.updatePrestataire(id, dto, files);
+    return this.serviceService.updatePrestataire(id, dto, image);
   }
+
   @Get('published/public')
   @Public()
   async getPublishedService(

@@ -29,6 +29,36 @@ export class PrestataireEntity {
   @Column({ nullable: true })
   photo?: string;
 
+  @Column({
+    type: 'longtext',
+    nullable: true,
+    transformer: {
+      to: (value: any) => (value ? JSON.stringify(value) : null),
+      from: (value: string) => (value ? JSON.parse(value) : null),
+    },
+  })
+  experience?: any;
+
+  @Column({
+    type: 'longtext',
+    nullable: true,
+    transformer: {
+      to: (value: any) => (value ? JSON.stringify(value) : null),
+      from: (value: string) => (value ? JSON.parse(value) : null),
+    },
+  })
+  specialite?: any;
+
+  @Column({
+    type: 'longtext',
+    nullable: true,
+    transformer: {
+      to: (value: any) => (value ? JSON.stringify(value) : null),
+      from: (value: string) => (value ? JSON.parse(value) : null),
+    },
+  })
+  competence?: any;
+
   // 🔗 Relation vers la table pivot
   @OneToMany(() => ServiceHasPrestataire, (shp) => shp.prestataire)
   services: ServiceHasPrestataire[];

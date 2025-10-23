@@ -338,7 +338,7 @@ export class ServiceService {
   // Service
   async createPrestataire(
     dto: CreatePrestataireDto & { serviceIds?: string[] },
-    file?: Express.Multer.File, // singular
+    file?: Express.Multer.File, // un seul fichier
   ): Promise<{ message: string; data: PrestataireEntity }> {
     // Vérifier doublon email
     if (dto.email) {
@@ -359,6 +359,13 @@ export class ServiceService {
       ? await this.cloudinary.handleUploadImage(file, 'prestataires')
       : undefined;
 
+    // Préparer les données JSON
+    const profileData = {
+      experience: dto.experience || null,
+      competence: dto.competence || null,
+      specialite: dto.specialite || null,
+    };
+
     // Créer le prestataire
     const prestataire = this.prestataireRepo.create({
       full_name: dto.full_name,
@@ -366,6 +373,9 @@ export class ServiceService {
       phone: dto.phone,
       description: dto.description,
       photo,
+      experience: profileData, // JSON
+      competence: profileData, // JSON
+      specialite: profileData, // JSON
     });
 
     await this.prestataireRepo.save(prestataire);
@@ -398,7 +408,7 @@ export class ServiceService {
   async updatePrestataire(
     id: string,
     dto: Partial<CreatePrestataireDto> & { serviceIds?: string[] },
-    files?: Express.Multer.File[],
+    file?: Express.Multer.File, // un seul fichier
   ): Promise<{ message: string; data: PrestataireEntity }> {
     const prestataire = await this.prestataireRepo.findOne({ where: { id } });
     if (!prestataire) throw new NotFoundException('Prestataire introuvable');
@@ -418,8 +428,8 @@ export class ServiceService {
     }
 
     // Mettre à jour la photo si fourni
-    if (files && files.length > 0) {
-      prestataire.photo = await this.cloudinary.handleUploadImage(files[0], 'prestataires');
+    if (file) {
+      prestataire.photo = await this.cloudinary.handleUploadImage(file, 'prestataires');
     }
 
     // Mettre à jour les autres champs
@@ -428,6 +438,13 @@ export class ServiceService {
         (prestataire as any)[key] = value;
       }
     });
+
+    // Transformer les champs experience, competence et specialite en JSON unique
+    prestataire.experience = {
+      experience: dto.experience || (prestataire.experience?.experience ?? ''),
+      competence: dto.competence || (prestataire.experience?.competence ?? ''),
+      specialite: dto.specialite || (prestataire.experience?.specialite ?? ''),
+    };
 
     await this.prestataireRepo.save(prestataire);
 

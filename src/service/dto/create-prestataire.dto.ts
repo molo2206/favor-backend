@@ -18,4 +18,16 @@ export class CreatePrestataireDto {
   @IsOptional()
   @IsString({ each: true })
   photo?: string;
+
+  @IsOptional()
+  @IsString()
+  experience?: string; // ex: "2 ans"
+
+  @IsOptional()
+  @IsString()
+  competence?: string; // ex: "réparation fuites, installation sanitaire"
+
+  @IsOptional()
+  @IsString()
+  specialite?: string; // ex: "Informaticien, Médecin"
 }
