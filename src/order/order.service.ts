@@ -73,8 +73,7 @@ export class OrderService {
   }
 
   async createOrder(createOrderDto: CreateOrderDto, user: UserEntity): Promise<OrderEntity> {
-    const { totalAmount, currency, orderItems, addressUserId, type, shopType } =
-      createOrderDto;
+    const { totalAmount, currency, orderItems, addressUserId, type, shopType } = createOrderDto;
 
     const addressUser = await this.addressUserRepo.findOne({ where: { id: addressUserId } });
     if (!addressUser) throw new NotFoundException('Adresse introuvable');
@@ -263,25 +262,54 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
       throw new NotFoundException('Commande introuvable');
     }
 
-    // Vérification de la transition
+    // ✅ Vérifie la validité de la transition de statut
     if (!isValidStatusTransition(order.status, dto.status)) {
       throw new BadRequestException(
         `Transition invalide de "${order.status}" vers "${dto.status}".`,
       );
     }
 
-    // Application des changements
-    order.status = dto.status;
-    order.shippingCost = dto.shippingCost;
-    order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost);
+    // ✅ Empêche la modification du shippingCost pour certains statuts
+    if (
+      [OrderStatus.PROCESSING, OrderStatus.COMPLETED, OrderStatus.DELIVERED].includes(
+        dto.status,
+      )
+    ) {
+      dto.shippingCost = order.shippingCost; // ignore la valeur fournie
+    }
 
-    // Si la commande est validée
+    // ✅ Si le statut est VALIDATED, shippingCost est requis
     if (dto.status === OrderStatus.VALIDATED) {
-      // Marquer comme payée
+      if (dto.shippingCost === undefined || dto.shippingCost === null) {
+        throw new BadRequestException(
+          'Le coût de livraison (shippingCost) est obligatoire lorsque le statut est VALIDATED.',
+        );
+      }
+      order.shippingCost = dto.shippingCost;
+      order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost);
+    }
+
+    // ✅ Sinon, on garde le shippingCost existant s’il ne doit pas être modifié
+    if (dto.status !== OrderStatus.VALIDATED) {
+      if (
+        ![OrderStatus.PROCESSING, OrderStatus.COMPLETED, OrderStatus.DELIVERED].includes(
+          dto.status,
+        )
+      ) {
+        if (dto.shippingCost !== undefined) {
+          order.shippingCost = dto.shippingCost;
+          order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost);
+        }
+      }
+    }
+
+    // ✅ Application du nouveau statut
+    order.status = dto.status;
+
+    // ✅ Si la commande devient VALIDATED
+    if (dto.status === OrderStatus.VALIDATED) {
       order.paymentStatus = PaymentStatus.PAID;
       order.paid = true;
-
-      // Générer un PIN
       order.pin = this.generatePin();
     }
 
@@ -292,6 +320,7 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
       relations: ['company', 'items', 'items.product', 'order'],
     });
 
+    // ✅ Si la commande est validée → envoi du mail, SMS, PDF, transaction
     if (dto.status === OrderStatus.VALIDATED) {
       const paymentQrCode = await QRCode.toDataURL(order.invoiceNumber);
       const hasEmail = order.user.email && order.user.email.trim() !== '';
@@ -302,6 +331,7 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
           'Aucun moyen de contact disponible (ni email, ni numéro de téléphone).',
         );
       }
+
       if (hasEmail) {
         await this.mailService.sendHtmlEmail(
           order.user.email,
@@ -316,6 +346,7 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
             year: new Date().getFullYear(),
           } as any,
         );
+
         await this.mailService.sendInvoicePaidWithPdf(
           order.user.email,
           'Veuillez trouver ci-joint votre facture PDF, déjà payée et validée - FavorHelp',
@@ -327,9 +358,10 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
           },
         );
       }
+
       if (hasPhone) {
-        const message = `Votre commande ${updatedOrder.invoiceNumber} a ete validee avec succes
-Pour recuperer votre commande ou colis veuillez presenter ce code PIN au livreur : ${updatedOrder.pin}
+        const message = `Votre commande ${updatedOrder.invoiceNumber} a été validée avec succès.
+Pour récupérer votre commande ou colis, veuillez présenter ce code PIN au livreur : ${updatedOrder.pin}
 Merci pour votre confiance.`;
         await this.smsHelper.sendSms(updatedOrder.user.phone, message);
       }
