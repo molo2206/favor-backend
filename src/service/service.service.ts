@@ -338,7 +338,7 @@ export class ServiceService {
   // Service
   async createPrestataire(
     dto: CreatePrestataireDto & { serviceIds?: string[] },
-    files?: Express.Multer.File[],
+    file?: Express.Multer.File, // singular
   ): Promise<{ message: string; data: PrestataireEntity }> {
     // Vérifier doublon email
     if (dto.email) {
@@ -354,11 +354,10 @@ export class ServiceService {
         throw new BadRequestException('Un prestataire avec ce téléphone existe déjà');
     }
 
-    // Upload photo si fourni
-    let photo: string | undefined;
-    if (files && files.length > 0) {
-      photo = await this.cloudinary.handleUploadImage(files[0], 'prestataires');
-    }
+    // Upload d'une seule photo
+    const photo = file
+      ? await this.cloudinary.handleUploadImage(file, 'prestataires')
+      : undefined;
 
     // Créer le prestataire
     const prestataire = this.prestataireRepo.create({
@@ -371,7 +370,7 @@ export class ServiceService {
 
     await this.prestataireRepo.save(prestataire);
 
-    // Gestion des services
+    // Gestion des services liés
     if (dto.serviceIds) {
       if (typeof dto.serviceIds === 'string') dto.serviceIds = JSON.parse(dto.serviceIds);
 
@@ -384,6 +383,7 @@ export class ServiceService {
       }
     }
 
+    // Recharger le prestataire avec les relations
     const savedPrestataire = await this.prestataireRepo.findOne({
       where: { id: prestataire.id },
       relations: ['services', 'services.service'],
@@ -525,7 +525,7 @@ export class ServiceService {
   }
 
   async findPublishedByCompany(
-    companyId: string, 
+    companyId: string,
     page = 1,
     limit = 10,
   ): Promise<{

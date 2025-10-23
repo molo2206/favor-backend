@@ -16,8 +16,9 @@ import {
   BadRequestException,
   DefaultValuePipe,
   ParseIntPipe,
+  UploadedFile,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ServiceService } from './service.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
@@ -151,7 +152,7 @@ export class ServiceController {
     return this.serviceService.removePrestataireFromService(serviceId, prestataireId);
   }
 
-  @Get(':serviceId/prestataires')
+  @Get(':serviceId/by-service/prestataires')
   async getPrestataires(@Param('serviceId') serviceId: string) {
     return this.serviceService.getPrestatairesByService(serviceId);
   }
@@ -162,18 +163,18 @@ export class ServiceController {
   }
   @Post('prestataire')
   @UseGuards(AuthentificationGuard)
-  @UseInterceptors(FilesInterceptor('file', 1))
+  @UseInterceptors(FileInterceptor('image')) // un seul fichier
   async createPrestataire(
     @Body() dto: CreatePrestataireDto & { serviceIds?: string[] },
-    @UploadedFiles() files?: Express.Multer.File[],
+    @UploadedFile() image?: Express.Multer.File, // singular
   ) {
-    return this.serviceService.createPrestataire(dto, files);
+    return this.serviceService.createPrestataire(dto, image);
   }
 
   // Mettre à jour un prestataire avec option d'assigner des services
   @Patch('/prestataire/:id')
   @UseGuards(AuthentificationGuard)
-  @UseInterceptors(FilesInterceptor('files', 1)) // une seule photo
+  @UseInterceptors(FilesInterceptor('image', 1)) // une seule photo
   async updatePrestataire(
     @Param('id') id: string,
     @Body() dto: UpdatePrestataireDto & { serviceIds?: string[] },
