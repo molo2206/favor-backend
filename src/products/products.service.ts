@@ -355,7 +355,6 @@ export class ProductService {
         'company.city',
         'specificationValues',
         'specificationValues.specification',
-        'skus',
         'attributes',
         'attributes.attribute',
         'variations', // ✅ Ajouter les variations
