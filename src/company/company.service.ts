@@ -168,7 +168,7 @@ export class CompanyService {
     const message = `Bonjour ${user.fullName}, votre entreprise "${savedCompany.companyName}" a été créée avec succès sur FavorHelp. Elle est en attente de vérification.`;
     if (hasEmail) {
       await this.mailService.sendHtmlEmail(
-        savedCompany.userHasCompany?.find((uhc) => uhc.isOwner)?.user.email!,
+        user.email,
         'Bienvenue chez FavorHelp',
         'company-status-update.html',
         {
