@@ -356,12 +356,6 @@ Pour récupérer votre commande ou colis, veuillez présenter ce code PIN au liv
 Merci pour votre confiance.`;
         await this.smsHelper.sendSms(order.user.phone, message);
       }
-
-      if (hasPhone) {
-        const message = `Votre commande ${order.invoiceNumber} a été validée. Code PIN: ${order.pin}`;
-        await this.smsHelper.sendSms(order.user.phone, message);
-      }
-
       // Créer la transaction
       const transaction = this.transactionRepository.create({
         orderId: order.id,
