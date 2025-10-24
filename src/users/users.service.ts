@@ -795,12 +795,12 @@ export class UsersService {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
       relations: [
-        'activeCompany.',
+        'activeCompany',
         'activeCompany.country',
         'activeCompany.city',
         'userHasCompany',
         'userHasCompany.company',
-        'userHasCompany.company.tauxCompanies', // chemin correct
+        'userHasCompany.company.tauxCompanies',
         'userHasCompany.permissions',
         'userHasCompany.permissions.permission',
         'userHasCompany.company.country',
@@ -841,8 +841,8 @@ export class UsersService {
               longitude: uhc.company.longitude,
               address: uhc.company.address,
               tauxCompanies: uhc.company.tauxCompanies || [],
-              country: uhc.company.country,
-              city: uhc.company.city,
+              country: uhc.company.country || null,
+              city: uhc.company.city || null,
               localCurrency: uhc.company.localCurrency,
               taux: uhc.company.taux,
             }
@@ -870,7 +870,13 @@ export class UsersService {
     return {
       ...userWithoutPassword,
       userHasCompany,
-      activeCompany: userWithoutPassword.activeCompany,
+      activeCompany: userWithoutPassword.activeCompany
+        ? {
+            ...userWithoutPassword.activeCompany,
+            country: userWithoutPassword.activeCompany.country || null,
+            city: userWithoutPassword.activeCompany.city || null,
+          }
+        : null,
     };
   }
 
