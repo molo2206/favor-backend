@@ -608,50 +608,68 @@ export class ServiceService {
     // 🔹 Récupération des services avec prestataires
     const [services] = await this.serviceRepo.findAndCount({
       where: { company: { id: user.activeCompanyId } },
-      relations: ['prestataires', 'prestataires.prestataire'],
+      relations: ['prestataires', 'prestataires.prestataire', 'category', 'measure'],
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
     });
 
-    // 🔹 Extraction des prestataires uniques avec info société, country et city
-    const prestataires = services.flatMap((service) =>
+    // 🔹 Map pour regrouper services par prestataire
+    const prestatairesMap = new Map<string, any>();
+
+    services.forEach((service) => {
       service.prestataires
         .filter((sp) => sp.prestataire)
-        .map((sp) => ({
-          id: sp.prestataire.id,
-          full_name: sp.prestataire.full_name,
-          email: sp.prestataire.email,
-          phone: sp.prestataire.phone,
-          description: sp.prestataire.description,
-          photo: sp.prestataire.photo,
-          experience: sp.prestataire.experience,
-          competence: sp.prestataire.competence,
-          specialite: sp.prestataire.specialite,
-          status: sp.prestataire.status,
-          createdAt: sp.prestataire.createdAt,
-          updatedAt: sp.prestataire.updatedAt,
+        .forEach((sp) => {
+          const id = sp.prestataire.id;
+          if (!prestatairesMap.has(id)) {
+            prestatairesMap.set(id, {
+              id: sp.prestataire.id,
+              full_name: sp.prestataire.full_name,
+              email: sp.prestataire.email,
+              phone: sp.prestataire.phone,
+              description: sp.prestataire.description,
+              photo: sp.prestataire.photo,
+              experience: sp.prestataire.experience,
+              competence: sp.prestataire.competence,
+              specialite: sp.prestataire.specialite,
+              status: sp.prestataire.status,
+              createdAt: sp.prestataire.createdAt,
+              updatedAt: sp.prestataire.updatedAt,
+              company: {
+                id: company.id,
+                name: company.companyName,
+                email: company.email,
+                phone: company.phone,
+                logo: company.logo,
+                country: company.country
+                  ? {
+                      id: company.country.id,
+                      name: company.country.name,
+                      code: company.country.code,
+                    }
+                  : null,
+                city: company.city ? { id: company.city.id, name: company.city.name } : null,
+              },
+              services: [],
+            });
+          }
 
-          company: {
-            id: company.id,
-            name: company.companyName,
-            email: company.email,
-            phone: company.phone,
-            logo: company.logo,
-            country: company.country
-              ? {
-                  id: company.country.id,
-                  name: company.country.name,
-                  code: company.country.code,
-                }
-              : null,
-            city: company.city ? { id: company.city.id, name: company.city.name } : null,
-          },
-        })),
-    );
+          // 🔹 Ajouter le service dans le tableau services du prestataire
+          prestatairesMap.get(id).services.push({
+            id: service.id,
+            name: service.name,
+            description: service.description,
+            category: service.category || null,
+            measure: service.measure || null,
+            status: service.status,
+            createdAt: service.createdAt,
+            updatedAt: service.updatedAt,
+          });
+        });
+    });
 
-    // 🔹 Supprimer les doublons de prestataires
-    const uniquePrestataires = Array.from(new Map(prestataires.map((p) => [p.id, p])).values());
+    const uniquePrestataires = Array.from(prestatairesMap.values());
 
     return {
       message: 'Prestataires de la société récupérés avec succès.',
@@ -666,14 +684,10 @@ export class ServiceService {
 
   async findPrestatairesByCompanyPublished(
     user: UserEntity,
-    page = 1,
-    limit = 10,
   ): Promise<{ message: string; data: any }> {
     if (!user.activeCompanyId) {
       throw new BadRequestException("L'utilisateur n'a pas de société active");
     }
-
-    const skip = (page - 1) * limit;
 
     // Charger la société avec country et city
     const company = await this.compRepo.findOne({
@@ -682,13 +696,11 @@ export class ServiceService {
     });
     if (!company) throw new NotFoundException('Entreprise introuvable');
 
-    // Récupération des services avec prestataires
-    const [services, totalServices] = await this.serviceRepo.findAndCount({
+    // Récupération de tous les services publiés avec prestataires
+    const services = await this.serviceRepo.find({
       where: { company: { id: user.activeCompanyId }, status: ProductStatus.PUBLISHED },
       relations: ['prestataires', 'prestataires.prestataire', 'category', 'measure'],
       order: { createdAt: 'DESC' },
-      skip,
-      take: limit,
     });
 
     // Map pour regrouper services par prestataire
@@ -753,8 +765,6 @@ export class ServiceService {
       data: {
         data: prestataires,
         total: prestataires.length, // nombre de prestataires uniques
-        page,
-        limit,
       },
     };
   }
