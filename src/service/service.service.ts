@@ -632,8 +632,7 @@ export class ServiceService {
   }
   async findPrestatairesByCompanyPublished(user: UserEntity): Promise<{
     message: string;
-    providerCount: number;
-    data: PrestataireEntity[];
+    data: any[];
   }> {
     const companyId = user.activeCompanyId;
     if (!companyId) {
@@ -645,27 +644,41 @@ export class ServiceService {
       throw new NotFoundException('Entreprise introuvable');
     }
 
-    // ✅ Charger uniquement les services publiés avec leurs prestataires
+    // 🔍 Récupération des services publiés avec leurs prestataires
     const services = await this.serviceRepo.find({
       where: {
         company: { id: companyId },
         status: ProductStatus.PUBLISHED,
       },
       relations: ['prestataires', 'prestataires.prestataire'],
+      order: { createdAt: 'DESC' },
     });
 
-    // ✅ Extraire tous les prestataires (éliminer les doublons)
-    const allPrestataires = services.flatMap(
-      (s) => s.prestataires?.map((p) => p.prestataire) || [],
+    // 🧩 Extraction des prestataires uniques
+    const prestataires = services.flatMap((service) =>
+      service.prestataires
+        .filter((sp) => sp.prestataire) // filtre sécurité
+        .map((sp) => ({
+          id: sp.prestataire.id,
+          full_name: sp.prestataire.full_name,
+          email: sp.prestataire.email,
+          phone: sp.prestataire.phone,
+          description: sp.prestataire.description,
+          photo: sp.prestataire.photo,
+          experience: sp.prestataire.experience,
+          competence: sp.prestataire.competence,
+          specialite: sp.prestataire.specialite,
+          status: sp.prestataire.status,
+          createdAt: sp.prestataire.createdAt,
+          updatedAt: sp.prestataire.updatedAt,
+        })),
     );
 
-    const uniquePrestataires = Array.from(
-      new Map(allPrestataires.map((p) => [p.id, p])).values(),
-    );
+    // 🧹 Supprime les doublons si un prestataire apparaît dans plusieurs services
+    const uniquePrestataires = Array.from(new Map(prestataires.map((p) => [p.id, p])).values());
 
     return {
       message: 'Prestataires publiés de la société récupérés avec succès.',
-      providerCount: uniquePrestataires.length,
       data: uniquePrestataires,
     };
   }
