@@ -53,12 +53,14 @@ export class AppSettingService {
   }
 
   /** 🔹 Créer ou mettre à jour la configuration globale */
+  /** 🔹 Créer ou mettre à jour la configuration globale */
   async createOrUpdate(
     config: DeepPartial<AppSettingEntity>,
   ): Promise<{ data: any; message: string }> {
+    // Récupère la configuration existante (il ne doit y en avoir qu’une)
     let setting = await this.appSettingRepo.findOne({ where: {} });
 
-    // Conversion des champs numériques
+    // 🔸 Conversion des champs numériques
     const numericFields = [
       'exchangeRate',
       'ecommerceDeliveryFee',
@@ -73,17 +75,29 @@ export class AppSettingService {
       }
     });
 
+    // 🔸 Normalisation des intégrations (booléens)
     if (config.config?.integrations) {
       const normalizedIntegrations: Record<string, boolean> = {};
       Object.entries(config.config.integrations).forEach(([key, value]) => {
-        normalizedIntegrations[key] = !!value; // force boolean
+        normalizedIntegrations[key] = !!value;
       });
       config.config.integrations = normalizedIntegrations;
     }
 
-    setting = this.appSettingRepo.create(config);
-    const saved = await this.appSettingRepo.save(setting);
-    return { data: this.formatSetting(saved), message: 'Configuration créée avec succès' };
+    if (setting) {
+      // ✅ Mise à jour si déjà existant
+      Object.assign(setting, config);
+      const updated = await this.appSettingRepo.save(setting);
+      return {
+        data: this.formatSetting(updated),
+        message: 'Configuration mise à jour avec succès',
+      };
+    } else {
+      // ✅ Création si aucune configuration
+      const newSetting = this.appSettingRepo.create(config);
+      const saved = await this.appSettingRepo.save(newSetting);
+      return { data: this.formatSetting(saved), message: 'Configuration créée avec succès' };
+    }
   }
 
   /** 🔹 Récupérer toute la configuration globale */
