@@ -340,9 +340,21 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
 
         await this.mailService.sendInvoicePaidWithPdf(
           order.user.email,
-          'Facture payée et validée - FavorHelp',
-          { user: order.user, order, subOrders, paymentQrCode },
+          'Veuillez trouver ci-joint votre facture PDF, déjà payée et validée - FavorHelp',
+          {
+            user: order.user,
+            order: order,
+            subOrders,
+            paymentQrCode,
+          },
         );
+      }
+
+      if (hasPhone) {
+        const message = `Votre commande ${order.invoiceNumber} a été validée avec succès.
+Pour récupérer votre commande ou colis, veuillez présenter ce code PIN au livreur : ${order.pin}
+Merci pour votre confiance.`;
+        await this.smsHelper.sendSms(order.user.phone, message);
       }
 
       if (hasPhone) {
