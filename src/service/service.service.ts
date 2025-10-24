@@ -631,7 +631,7 @@ export class ServiceService {
     }
   }
   async findPrestatairesByCompanyPublished(user: UserEntity) {
-    const companyId = user.activeCompanyId;
+    const companyId = 'dbb8a37d-a50f-4065-906b-66378e4c5974';
     if (!companyId) throw new BadRequestException("L'utilisateur n'a pas de société active");
 
     try {
