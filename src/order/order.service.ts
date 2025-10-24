@@ -351,9 +351,8 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
       }
 
       if (hasPhone) {
-        const message = `Votre commande ${order.invoiceNumber} a été validée avec succès.
-Pour récupérer votre commande ou colis, veuillez présenter ce code PIN au livreur : ${order.pin}
-Merci pour votre confiance.`;
+        const message = `Votre commande/colis ${order.invoiceNumber} a été validé avec succès. Livraison: ${order.shippingCost} ${order.currency}. Présentez votre code PIN au livreur: ${order.pin}. Merci pour votre confiance - FavorHelp`;
+
         await this.smsHelper.sendSms(order.user.phone, message);
       }
       // Créer la transaction
