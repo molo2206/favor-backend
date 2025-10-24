@@ -524,59 +524,43 @@ export class ServiceService {
     };
   }
 
-  async findPublishedByCompany(
-    companyId: string,
-    page = 1,
-    limit = 10,
-  ): Promise<{
-    message: string;
-    data: { data: any[]; total: number; page: number; limit: number };
-  }> {
-    if (!companyId) {
-      throw new BadRequestException('L’ID de la société est requis');
-    }
-
-    const skip = (page - 1) * limit;
-
-    const query = this.serviceRepo
-      .createQueryBuilder('service')
-      .leftJoinAndSelect('service.company', 'company')
-      .leftJoinAndSelect('company.country', 'country')
-      .leftJoinAndSelect('company.city', 'city')
-      .leftJoinAndSelect('service.category', 'category')
-      .leftJoinAndSelect('service.prestataires', 'shp')
-      .leftJoinAndSelect('service.measure', 'measure')
-      .leftJoinAndSelect('shp.prestataire', 'prestataire')
-      .where('service.status = :status', { status: ProductStatus.PUBLISHED })
-      .andWhere('company.id = :companyId', { companyId })
-      .orderBy('service.createdAt', 'DESC');
-
-    const [services, total] = await query.skip(skip).take(limit).getManyAndCount();
-
-    return {
-      message: 'Liste des services publiés de la société récupérée avec succès',
-      data: {
-        data: services,
-        total,
-        page,
-        limit,
-      },
-    };
-  }
-
   async findPrestatairesByCompany(user: UserEntity) {
     const companyId = user.activeCompanyId;
     if (!companyId) throw new BadRequestException("L'utilisateur n'a pas de société active");
 
-    const prestataires = await this.prestataireRepo
-      .createQueryBuilder('prestataire')
-      .leftJoinAndSelect('prestataire.services', 'serviceLink')
-      .leftJoinAndSelect('serviceLink.service', 'service')
-      .leftJoinAndSelect('service.company', 'company')
-      .leftJoinAndSelect('service.category', 'category')
-      .where('company.id = :companyId', { companyId })
-      .orderBy('prestataire.createdAt', 'DESC')
-      .getMany();
+    // 🔹 Trouver d'abord les services de la company
+    const services = await this.serviceRepo.find({
+      where: { company: { id: companyId } },
+      relations: ['prestataires', 'prestataires.prestataire', 'category'],
+    });
+
+    // 🔹 Extraire tous les prestataires uniques
+    const prestatairesMap = new Map();
+
+    services.forEach((service) => {
+      service.prestataires.forEach((ps) => {
+        if (ps.prestataire && !prestatairesMap.has(ps.prestataire.id)) {
+          prestatairesMap.set(ps.prestataire.id, {
+            ...ps.prestataire,
+            services: [], // Initialiser le tableau des services
+          });
+        }
+
+        // Ajouter le service au prestataire
+        if (ps.prestataire) {
+          const prestataire = prestatairesMap.get(ps.prestataire.id);
+          prestataire.services.push({
+            service: {
+              id: service.id,
+              name: service.name,
+              category: service.category,
+            },
+          });
+        }
+      });
+    });
+
+    const prestataires = Array.from(prestatairesMap.values());
 
     return {
       message: 'Prestataires récupérés avec succès',
@@ -585,25 +569,47 @@ export class ServiceService {
     };
   }
 
-  async findPrestatairesByCompanyPublished(user: UserEntity) {
+  async findServicesByCompanyPublished(user: UserEntity) {
     const companyId = user.activeCompanyId;
     if (!companyId) throw new BadRequestException("L'utilisateur n'a pas de société active");
 
-    const prestataires = await this.prestataireRepo
-      .createQueryBuilder('prestataire')
-      .leftJoinAndSelect('prestataire.services', 'serviceLink')
-      .leftJoinAndSelect('serviceLink.service', 'service')
-      .leftJoinAndSelect('service.company', 'company')
-      .leftJoinAndSelect('service.category', 'category')
-      .where('company.id = :companyId', { companyId })
-      .andWhere('service.status = :status', { status: 'PUBLISHED' })
-      .orderBy('prestataire.createdAt', 'DESC')
-      .getMany();
+    console.log('🔍 DEBUG findServicesByCompanyPublished');
+    console.log('Company ID:', companyId);
 
-    return {
-      message: 'Prestataires publiés récupérés avec succès',
-      providerCount: prestataires.length,
-      data: prestataires,
-    };
+    try {
+      // 🔹 REQUÊTE DIRECTE POUR LES SERVICES PUBLIÉS
+      const services = await this.serviceRepo
+        .createQueryBuilder('service')
+        .leftJoinAndSelect('service.company', 'company')
+        .leftJoinAndSelect('service.category', 'category')
+        .leftJoinAndSelect('service.prestataires', 'serviceLink') // Relation avec prestataires
+        .leftJoinAndSelect('serviceLink.prestataire', 'prestataire') // Les prestataires liés
+        .where('company.id = :companyId', { companyId })
+        .andWhere('service.status = :status', { status: ProductStatus.PUBLISHED })
+        .orderBy('service.createdAt', 'DESC')
+        .getMany();
+
+      console.log('Services publiés trouvés:', services.length);
+
+      // 🔹 Vérifier le contenu
+      if (services.length > 0) {
+        services.forEach((service, index) => {
+          console.log(
+            `Service ${index + 1}:`,
+            service.name,
+            `(Prestataires: ${service.prestataires?.length || 0})`,
+          );
+        });
+      }
+
+      return {
+        message: 'Services publiés de la société récupérés avec succès',
+        serviceCount: services.length,
+        data: services,
+      };
+    } catch (error) {
+      console.error('💥 Erreur:', error);
+      throw error;
+    }
   }
 }
