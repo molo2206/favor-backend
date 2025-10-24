@@ -402,18 +402,6 @@ export class ServiceService {
     dto: CreatePrestataireDto & { serviceIds?: string[] },
     file?: Express.Multer.File,
   ): Promise<{ message: string; data: PrestataireEntity }> {
-    // Vérifier doublons email et téléphone
-    if (dto.email) {
-      const existingEmail = await this.prestataireRepo.findOne({ where: { email: dto.email } });
-      if (existingEmail)
-        throw new BadRequestException('Un prestataire avec cet email existe déjà');
-    }
-    if (dto.phone) {
-      const existingPhone = await this.prestataireRepo.findOne({ where: { phone: dto.phone } });
-      if (existingPhone)
-        throw new BadRequestException('Un prestataire avec ce téléphone existe déjà');
-    }
-
     // Upload photo
     const image = file
       ? await this.cloudinary.handleUploadImage(file, 'prestataires')
@@ -463,19 +451,6 @@ export class ServiceService {
   ): Promise<{ message: string; data: PrestataireEntity }> {
     const prestataire = await this.prestataireRepo.findOne({ where: { id } });
     if (!prestataire) throw new NotFoundException('Prestataire introuvable');
-
-    // Vérifier doublons
-    if (dto.email && dto.email !== prestataire.email) {
-      const existingEmail = await this.prestataireRepo.findOne({ where: { email: dto.email } });
-      if (existingEmail)
-        throw new BadRequestException('Un prestataire avec cet email existe déjà');
-    }
-    if (dto.phone && dto.phone !== prestataire.phone) {
-      const existingPhone = await this.prestataireRepo.findOne({ where: { phone: dto.phone } });
-      if (existingPhone)
-        throw new BadRequestException('Un prestataire avec ce téléphone existe déjà');
-    }
-
     // Mettre à jour la photo
     if (file) {
       prestataire.image = await this.cloudinary.handleUploadImage(file, 'prestataires');

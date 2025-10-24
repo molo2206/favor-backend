@@ -4,8 +4,9 @@ export class CreatePrestataireDto {
   @IsString()
   full_name: string;
 
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
   @IsOptional()
   @IsString()

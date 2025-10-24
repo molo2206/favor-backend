@@ -17,7 +17,7 @@ export class PrestataireEntity {
   @Column()
   full_name: string;
 
-  @Column({ unique: true })
+  @Column({ nullable: true })
   email: string;
 
   @Column({ nullable: true })
