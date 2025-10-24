@@ -630,38 +630,33 @@ export class ServiceService {
       throw error;
     }
   }
-  async findPrestatairesByCompanyPublished(user: UserEntity) {
-    const companyId = 'dbb8a37d-a50f-4065-906b-66378e4c5974';
-    if (!companyId) throw new BadRequestException("L'utilisateur n'a pas de société active");
-
-    try {
-      // 🔹 Requête simplifiée pour récupérer uniquement les prestataires liés à des services publiés
-      const services = await this.serviceRepo
-        .createQueryBuilder('service')
-        .leftJoin('service.company', 'company')
-        .leftJoinAndSelect('service.prestataires', 'serviceLink')
-        .leftJoinAndSelect('serviceLink.prestataire', 'prestataire')
-        .where('company.id = :companyId', { companyId })
-        .andWhere('service.status = :status', { status: ProductStatus.PUBLISHED })
-        .orderBy('service.createdAt', 'DESC')
-        .getMany();
-
-      // 🔹 Extraire les prestataires uniques
-      const prestataires = services.flatMap(
-        (s) => s.prestataires?.map((p) => p.prestataire) || [],
-      );
-      const uniquePrestataires = Array.from(
-        new Map(prestataires.map((p) => [p.id, p])).values(),
-      );
-
-      return {
-        message: 'Prestataires publiés récupérés avec succès',
-        providerCount: uniquePrestataires.length,
-        data: uniquePrestataires,
-      };
-    } catch (error) {
-      console.error('💥 Erreur findPrestatairesByCompanyPublished:', error);
-      throw error;
+  async findPrestatairesByCompanyPublished(user: UserEntity): Promise<{
+    message: string;
+    data: Service[];
+  }> {
+    const companyId = user.activeCompanyId;
+    if (!companyId) {
+      throw new BadRequestException("L'utilisateur n'a pas de société active");
     }
+
+    const company = await this.compRepo.findOne({ where: { id: companyId } });
+    if (!company) {
+      throw new NotFoundException('Entreprise introuvable');
+    }
+
+    // ✅ Recherche directe avec relations
+    const services = await this.serviceRepo.find({
+      where: {
+        company: { id: companyId },
+        status: ProductStatus.PUBLISHED,
+      },
+      relations: ['company', 'category', 'prestataires', 'prestataires.prestataire', 'measure'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      message: 'Services publiés de la société récupérés avec succès.',
+      data: services,
+    };
   }
 }
