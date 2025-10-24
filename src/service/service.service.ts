@@ -634,42 +634,33 @@ export class ServiceService {
     const companyId = user.activeCompanyId;
     if (!companyId) throw new BadRequestException("L'utilisateur n'a pas de société active");
 
-    console.log('🔍 DEBUG findServicesByCompanyPublished');
-    console.log('Company ID:', companyId);
-
     try {
-      // 🔹 REQUÊTE DIRECTE POUR LES SERVICES PUBLIÉS
+      // 🔹 Requête simplifiée pour récupérer uniquement les prestataires liés à des services publiés
       const services = await this.serviceRepo
         .createQueryBuilder('service')
-        .leftJoinAndSelect('service.company', 'company')
-        .leftJoinAndSelect('service.category', 'category')
-        .leftJoinAndSelect('service.prestataires', 'serviceLink') // Relation avec prestataires
-        .leftJoinAndSelect('serviceLink.prestataire', 'prestataire') // Les prestataires liés
+        .leftJoin('service.company', 'company')
+        .leftJoinAndSelect('service.prestataires', 'serviceLink')
+        .leftJoinAndSelect('serviceLink.prestataire', 'prestataire')
         .where('company.id = :companyId', { companyId })
         .andWhere('service.status = :status', { status: ProductStatus.PUBLISHED })
         .orderBy('service.createdAt', 'DESC')
         .getMany();
 
-      console.log('Services publiés trouvés:', services.length);
-
-      // 🔹 Vérifier le contenu
-      if (services.length > 0) {
-        services.forEach((service, index) => {
-          console.log(
-            `Service ${index + 1}:`,
-            service.name,
-            `(Prestataires: ${service.prestataires?.length || 0})`,
-          );
-        });
-      }
+      // 🔹 Extraire les prestataires uniques
+      const prestataires = services.flatMap(
+        (s) => s.prestataires?.map((p) => p.prestataire) || [],
+      );
+      const uniquePrestataires = Array.from(
+        new Map(prestataires.map((p) => [p.id, p])).values(),
+      );
 
       return {
-        message: 'Services publiés de la société récupérés avec succès',
-        serviceCount: services.length,
-        data: services,
+        message: 'Prestataires publiés récupérés avec succès',
+        providerCount: uniquePrestataires.length,
+        data: uniquePrestataires,
       };
     } catch (error) {
-      console.error('💥 Erreur:', error);
+      console.error('💥 Erreur findPrestatairesByCompanyPublished:', error);
       throw error;
     }
   }
