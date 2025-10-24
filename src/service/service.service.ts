@@ -317,7 +317,7 @@ export class ServiceService {
           email: prestataire.email,
           phone: prestataire.phone,
           description: prestataire.description,
-          photo: prestataire.image,
+          image: prestataire.image,
           experience: prestataire.experience,
           competence: prestataire.competence,
           specialite: prestataire.specialite,
