@@ -606,7 +606,7 @@ export class ServiceService {
     if (!company) throw new NotFoundException('Entreprise introuvable');
 
     // 🔹 Récupération des services avec prestataires
-    const [services, total] = await this.serviceRepo.findAndCount({
+    const [services] = await this.serviceRepo.findAndCount({
       where: { company: { id: user.activeCompanyId } },
       relations: ['prestataires', 'prestataires.prestataire'],
       order: { createdAt: 'DESC' },
@@ -645,12 +645,7 @@ export class ServiceService {
                   code: company.country.code,
                 }
               : null,
-            city: company.city
-              ? {
-                  id: company.city.id,
-                  name: company.city.name,
-                }
-              : null,
+            city: company.city ? { id: company.city.id, name: company.city.name } : null,
           },
         })),
     );
@@ -662,7 +657,7 @@ export class ServiceService {
       message: 'Prestataires de la société récupérés avec succès.',
       data: {
         data: uniquePrestataires,
-        total,
+        total: uniquePrestataires.length,
         page,
         limit,
       },
@@ -680,14 +675,13 @@ export class ServiceService {
 
     const company = await this.compRepo.findOne({
       where: { id: companyId },
-      relations: ['country', 'city'], // 🔗 Inclure pays et ville
+      relations: ['country', 'city'],
     });
 
     if (!company) {
       throw new NotFoundException('Entreprise introuvable');
     }
 
-    // 🔍 Récupération des services publiés avec leurs prestataires
     const services = await this.serviceRepo.find({
       where: {
         company: { id: companyId },
@@ -697,7 +691,6 @@ export class ServiceService {
       order: { createdAt: 'DESC' },
     });
 
-    // 🧩 Extraction des prestataires
     const prestataires = services.flatMap((service) =>
       service.prestataires
         .filter((sp) => sp.prestataire)
@@ -715,7 +708,6 @@ export class ServiceService {
           createdAt: sp.prestataire.createdAt,
           updatedAt: sp.prestataire.updatedAt,
 
-          // 🏢 Ajout de la société et de ses relations
           company: {
             id: company.id,
             name: company.companyName,
@@ -739,12 +731,9 @@ export class ServiceService {
         })),
     );
 
-    // 🧹 Supprimer les doublons de prestataires
-    const uniquePrestataires = Array.from(new Map(prestataires.map((p) => [p.id, p])).values());
-
     return {
       message: 'Prestataires publiés de la société récupérés avec succès.',
-      data: uniquePrestataires,
+      data: prestataires, // on garde tous, pas de Map pour dédupliquer
     };
   }
 }
