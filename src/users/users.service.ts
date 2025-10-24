@@ -795,7 +795,9 @@ export class UsersService {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
       relations: [
-        'activeCompany',
+        'activeCompany.',
+        'activeCompany.country',
+        'activeCompany.city',
         'userHasCompany',
         'userHasCompany.company',
         'userHasCompany.company.tauxCompanies', // chemin correct
