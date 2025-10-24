@@ -289,21 +289,82 @@ export class ServiceService {
   }
 
   async getPrestatairesByService(serviceId: string) {
+    // Charger le service avec toutes les relations nécessaires
     const service = await this.serviceRepo.findOne({
       where: { id: serviceId },
-      relations: ['prestataires', 'prestataires.prestataire'],
+      relations: [
+        'prestataires',
+        'prestataires.prestataire',
+        'category',
+        'measure',
+        'company',
+        'company.country',
+        'company.city',
+      ],
     });
+
     if (!service) throw new NotFoundException('Service introuvable');
 
-    const data = service.prestataires.map((link) => ({
-      id: link.prestataire.id,
-      full_name: link.prestataire.full_name,
-      email: link.prestataire.email,
-      tarif: link.tarif,
-      actif: link.actif,
-    }));
+    // Construire la liste des prestataires avec la société du service
+    const data = service.prestataires
+      .filter((link) => link.prestataire)
+      .map((link) => {
+        const prestataire = link.prestataire;
 
-    return { message: `Prestataires du service ${service.name}`, data };
+        return {
+          id: prestataire.id,
+          full_name: prestataire.full_name,
+          email: prestataire.email,
+          phone: prestataire.phone,
+          description: prestataire.description,
+          photo: prestataire.image,
+          experience: prestataire.experience,
+          competence: prestataire.competence,
+          specialite: prestataire.specialite,
+          status: prestataire.status,
+          createdAt: prestataire.createdAt,
+          updatedAt: prestataire.updatedAt,
+          tarif: link.tarif,
+          actif: link.actif,
+
+          // Société provenant du service
+          company: service.company
+            ? {
+                id: service.company.id,
+                name: service.company.companyName,
+                email: service.company.email,
+                phone: service.company.phone,
+                logo: service.company.logo,
+                country: service.company.country
+                  ? {
+                      id: service.company.country.id,
+                      name: service.company.country.name,
+                      code: service.company.country.code,
+                    }
+                  : null,
+                city: service.company.city
+                  ? { id: service.company.city.id, name: service.company.city.name }
+                  : null,
+              }
+            : null,
+
+          service: {
+            id: service.id,
+            name: service.name,
+            description: service.description,
+            category: service.category || null,
+            measure: service.measure || null,
+            status: service.status,
+            createdAt: service.createdAt,
+            updatedAt: service.updatedAt,
+          },
+        };
+      });
+
+    return {
+      message: `Prestataires du service ${service.name}`,
+      data,
+    };
   }
 
   async getServicesByPrestataire(prestataireId: string) {

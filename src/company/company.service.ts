@@ -714,13 +714,10 @@ export class CompanyService {
       where: { company: { id: companyId }, ...dateFilter },
     });
 
-    // 🧰 Total services
-    let totalServices = 0;
-    if (company.typeCompany === CompanyType.SERVICE) {
-      totalServices = await this.serviceRepo.count({
-        where: { company: { id: companyId }, ...dateFilter },
-      });
-    }
+    // 🧰 Total services (calculé pour toutes les sociétés, pas seulement type SERVICE)
+    const totalServices = await this.serviceRepo.count({
+      where: { company: { id: companyId }, ...dateFilter },
+    });
 
     // 🕒 Total commandes en attente
     const totalPendingOrders = await this.orderRepo.count({
