@@ -1,26 +1,26 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { AppSetting } from './entities/app-setting.entity';
+import { Repository, DeepPartial } from 'typeorm';
 import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
+import { AppSettingEntity } from './entities/app-setting.entity';
 
 @Injectable()
 export class AppSettingService {
   constructor(
-    @InjectRepository(AppSetting)
-    private readonly appSettingRepo: Repository<AppSetting>,
+    @InjectRepository(AppSettingEntity)
+    private readonly appSettingRepo: Repository<AppSettingEntity>,
     private readonly cloudinary: CloudinaryService,
   ) {}
 
-  /** Méthode interne pour récupérer la configuration globale */
-  private async getSetting(): Promise<AppSetting> {
+  /** 🔹 Récupérer la configuration globale */
+  private async getSetting(): Promise<AppSettingEntity> {
     const setting = await this.appSettingRepo.findOne({ where: {} });
     if (!setting) throw new NotFoundException('Configuration globale non trouvée');
     return setting;
   }
 
-  /** Formatage des données pour le frontend */
-  private formatSetting(setting: AppSetting) {
+  /** 🔹 Formatage complet pour le frontend */
+  private formatSetting(setting: AppSettingEntity) {
     return {
       appName: setting.appName ?? '',
       slogan: setting.slogan ?? '',
@@ -38,6 +38,8 @@ export class AppSettingService {
       defaultLanguage: setting.defaultLanguage ?? 'fr',
       seo: setting.seo ?? {},
       config: setting.config ?? {},
+      support: setting.support ?? {},
+      legal: setting.legal ?? {},
       exchangeRate: setting.exchangeRate ?? 1,
       ecommerceDeliveryFee: setting.ecommerceDeliveryFee ?? 0,
       marketDeliveryFee: setting.marketDeliveryFee ?? 0,
@@ -45,13 +47,18 @@ export class AppSettingService {
       restaurantExtraFeePerItem: setting.restaurantExtraFeePerItem ?? 0,
       privacyPolicy: setting.privacyPolicy ?? '',
       termsOfUse: setting.termsOfUse ?? '',
-      support: setting.support ?? {},
+      createdAt: setting.createdAt,
+      updatedAt: setting.updatedAt,
     };
   }
 
-  /** Créer ou mettre à jour la configuration globale */
-  async createOrUpdate(config: Partial<AppSetting>): Promise<{ data: any; message: string }> {
-    // Conversion des champs numériques envoyés en string
+  /** 🔹 Créer ou mettre à jour la configuration globale */
+  async createOrUpdate(
+    config: DeepPartial<AppSettingEntity>,
+  ): Promise<{ data: any; message: string }> {
+    let setting = await this.appSettingRepo.findOne({ where: {} });
+
+    // Conversion des champs numériques
     const numericFields = [
       'exchangeRate',
       'ecommerceDeliveryFee',
@@ -59,26 +66,19 @@ export class AppSettingService {
       'restaurantBaseDeliveryFee',
       'restaurantExtraFeePerItem',
     ];
-
     numericFields.forEach((key) => {
       if (config[key] !== undefined && config[key] !== null) {
         const value = Number(config[key]);
-        if (!isNaN(value)) {
-          config[key] = value;
-        }
+        if (!isNaN(value)) config[key] = value;
       }
     });
 
-    let setting = await this.appSettingRepo.findOne({ where: {} });
-
-    if (setting) {
-      // Fusionne les anciennes données avec les nouvelles
-      setting = Object.assign(setting, config);
-      const updated = await this.appSettingRepo.save(setting);
-      return {
-        data: this.formatSetting(updated),
-        message: 'Configuration mise à jour avec succès',
-      };
+    if (config.config?.integrations) {
+      const normalizedIntegrations: Record<string, boolean> = {};
+      Object.entries(config.config.integrations).forEach(([key, value]) => {
+        normalizedIntegrations[key] = !!value; // force boolean
+      });
+      config.config.integrations = normalizedIntegrations;
     }
 
     setting = this.appSettingRepo.create(config);
@@ -86,7 +86,7 @@ export class AppSettingService {
     return { data: this.formatSetting(saved), message: 'Configuration créée avec succès' };
   }
 
-  /** Récupérer toute la configuration globale */
+  /** 🔹 Récupérer toute la configuration globale */
   async findOne(): Promise<{ data: any; message: string }> {
     const setting = await this.getSetting();
     return {
@@ -95,10 +95,18 @@ export class AppSettingService {
     };
   }
 
-  /** Mettre à jour une clé spécifique */
+  /** 🔹 Mettre à jour une clé simple ou imbriquée (ex: config.theme.primaryColor) */
   async updateKey(key: string, value: any): Promise<{ data: any; message: string }> {
     const setting = await this.getSetting();
-    (setting as any)[key] = value;
+
+    const keys = key.split('.');
+    let target: any = setting;
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!target[keys[i]]) target[keys[i]] = {};
+      target = target[keys[i]];
+    }
+    target[keys[keys.length - 1]] = value;
+
     const updated = await this.appSettingRepo.save(setting);
     return {
       data: this.formatSetting(updated),
@@ -106,14 +114,14 @@ export class AppSettingService {
     };
   }
 
-  /** Supprimer la configuration globale */
+  /** 🔹 Supprimer la configuration globale */
   async remove(): Promise<{ data: null; message: string }> {
     const setting = await this.getSetting();
     await this.appSettingRepo.remove(setting);
     return { data: null, message: 'Configuration supprimée avec succès' };
   }
 
-  /** Calcul dynamique des frais de livraison restaurant */
+  /** 🔹 Calcul dynamique des frais de livraison restaurant */
   async calculateRestaurantDeliveryFee(
     itemCount: number,
   ): Promise<{ data: number; message: string }> {
@@ -121,22 +129,19 @@ export class AppSettingService {
     const baseFee = Number(setting.restaurantBaseDeliveryFee ?? 3);
     const extraFee = Number(setting.restaurantExtraFeePerItem ?? 1);
     const totalFee = itemCount <= 1 ? baseFee : baseFee + (itemCount - 1) * extraFee;
-
     return { data: totalFee, message: `Frais de livraison calculés pour ${itemCount} plat(s)` };
   }
 
-  /** Upload fichier(s) vers Cloudinary */
+  /** 🔹 Upload fichier(s) vers Cloudinary */
   async uploadToCloudinary(
     files: Express.Multer.File | Express.Multer.File[],
     folder: string,
   ): Promise<string | string[]> {
     if (!files) throw new BadRequestException('Au moins un fichier est requis.');
-
     const fileArray = Array.isArray(files) ? files : [files];
     const uploadedUrls = await Promise.all(
       fileArray.map((file) => this.cloudinary.handleUploadFile(file, folder)),
     );
-
     return Array.isArray(files) ? uploadedUrls : uploadedUrls[0];
   }
 }

@@ -7,7 +7,7 @@ import {
 } from 'typeorm';
 
 @Entity('app_settings')
-export class AppSetting {
+export class AppSettingEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -54,56 +54,7 @@ export class AppSetting {
   @Column({ type: 'varchar', length: 10, default: 'fr' })
   defaultLanguage: string;
 
-  /** Paramètres configurables en JSON */
-  @Column({
-    type: 'longtext',
-    nullable: true,
-    transformer: {
-      to: (value: any) => JSON.stringify(value),
-      from: (value: string) => (value ? JSON.parse(value) : {}),
-    },
-  })
-  config?: {
-    modules?: {
-      ecommerce?: boolean;
-      restaurant?: boolean;
-      services?: boolean;
-      cars?: boolean;
-      rentals?: boolean;
-      delivery?: boolean;
-      tracking?: boolean;
-      booking?: boolean;
-    };
-    integrations?: {
-      stripe?: boolean;
-      paypal?: boolean;
-      mobileMoney?: boolean;
-      sms?: boolean;
-      pushNotification?: boolean;
-      manualPayment?: boolean;
-    };
-    theme?: {
-      mode?: 'light' | 'dark';
-      primaryColor?: string;
-      secondaryColor?: string;
-      logoDark?: string;
-      logoLight?: string;
-    };
-    socialLinks?: {
-      facebook?: string;
-      instagram?: string;
-      twitter?: string;
-      whatsapp?: string;
-      youtube?: string;
-    };
-    system?: {
-      maintenanceMode?: boolean;
-      maintenanceMessage?: string;
-      allowUserRegistration?: boolean;
-    };
-    advancedConfig?: Record<string, any>;
-  };
-
+  /** Support multi-plateforme */
   @Column({
     type: 'longtext',
     nullable: true,
@@ -118,9 +69,10 @@ export class AppSetting {
     workingHours?: string;
     faqUrl?: string;
     liveChatEnabled?: boolean;
+    platforms?: Record<string, any>;
   };
 
-  /** SEO */
+  /** SEO multi-plateforme */
   @Column({
     type: 'longtext',
     nullable: true,
@@ -135,22 +87,42 @@ export class AppSetting {
     keywords?: string[];
     ogImage?: string;
     favicon?: string;
+    platforms?: Record<string, any>;
+    advancedConfig?: Record<string, any>;
+  };
+
+  /** Config générale multi-plateforme */
+  @Column({
+    type: 'longtext',
+    nullable: true,
+    transformer: {
+      to: (value: any) => JSON.stringify(value),
+      from: (value: string) => (value ? JSON.parse(value) : {}),
+    },
+  })
+  config?: {
+    platforms?: Record<string, any>;
+    integrations?: Record<string, boolean>;
+    theme?: Record<string, any>;
+    socialLinks?: Record<string, string>;
+    system?: Record<string, any>;
+    advancedConfig?: Record<string, any>;
   };
 
   /** Paramètres financiers */
   @Column('decimal', { precision: 10, scale: 2, default: 1 })
   exchangeRate: number;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0 })
+  @Column('decimal', { precision: 10, scale: 2, default: 2.5 })
   ecommerceDeliveryFee: number;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0 })
+  @Column('decimal', { precision: 10, scale: 2, default: 3 })
   marketDeliveryFee: number;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 3 })
+  @Column('decimal', { precision: 10, scale: 2, default: 2 })
   restaurantBaseDeliveryFee: number;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 1 })
+  @Column('decimal', { precision: 10, scale: 2, default: 0.5 })
   restaurantExtraFeePerItem: number;
 
   /** Politique et conditions */
@@ -160,6 +132,23 @@ export class AppSetting {
   @Column({ type: 'longtext', nullable: true })
   termsOfUse?: string;
 
+  /** Informations légales */
+  @Column({
+    type: 'longtext',
+    nullable: true,
+    transformer: {
+      to: (value: any) => JSON.stringify(value),
+      from: (value: string) => (value ? JSON.parse(value) : {}),
+    },
+  })
+  legal?: {
+    companyName?: string;
+    registrationNumber?: string;
+    taxNumber?: string;
+    country?: string;
+    city?: string;
+  };
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -168,12 +157,15 @@ export class AppSetting {
 
   constructor() {
     this.config = {
-      modules: {},
+      platforms: {},
       integrations: {},
       theme: {},
       socialLinks: {},
       system: {},
       advancedConfig: {},
     };
+    this.support = {};
+    this.seo = {};
+    this.legal = {};
   }
 }

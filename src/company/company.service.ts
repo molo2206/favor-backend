@@ -692,7 +692,6 @@ export class CompanyService {
       },
     };
   }
-
   async getCompanyDashboard(user: UserEntity, startDate?: string, endDate?: string) {
     const companyId = user.activeCompanyId;
     const company = await this.companyRepository.findOne({ where: { id: companyId } });
@@ -714,10 +713,25 @@ export class CompanyService {
       where: { company: { id: companyId }, ...dateFilter },
     });
 
-    // 🧰 Total services (calculé pour toutes les sociétés, pas seulement type SERVICE)
+    // 🧰 Total services
     const totalServices = await this.serviceRepo.count({
       where: { company: { id: companyId }, ...dateFilter },
     });
+
+    // 👥 Total prestataires (distincts par service)
+    const services = await this.serviceRepo.find({
+      where: { company: { id: companyId }, ...dateFilter },
+      relations: ['prestataires', 'prestataires.prestataire'],
+    });
+
+    const prestataireIds = new Set<string>();
+    services.forEach((service) => {
+      service.prestataires.forEach((link) => {
+        if (link.prestataire) prestataireIds.add(link.prestataire.id);
+      });
+    });
+
+    const totalPrestataires = prestataireIds.size;
 
     // 🕒 Total commandes en attente
     const totalPendingOrders = await this.orderRepo.count({
@@ -753,6 +767,7 @@ export class CompanyService {
         companyName: company.companyName,
         totalProducts,
         totalServices,
+        totalPrestataires,
         totalPendingOrders,
         totalDeliveredOrders,
         totalTodayOrders,

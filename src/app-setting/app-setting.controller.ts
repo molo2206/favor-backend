@@ -25,9 +25,19 @@ export class AppSettingController {
   @Post()
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
-  async create(@Body() createDto: CreateAppSettingDto) {
+  async createOrUpdate(@Body() createDto: CreateAppSettingDto) {
     // Transformation en Record<string, any> pour éviter les erreurs de typage
     const config: Record<string, any> = { ...createDto };
+
+    // ⚙️ Normalisation intégrations pour éviter l'erreur TypeScript
+    if (config.config?.integrations) {
+      const normalizedIntegrations: Record<string, boolean> = {};
+      Object.entries(config.config.integrations).forEach(
+        ([key, value]) => (normalizedIntegrations[key] = !!value),
+      );
+      config.config.integrations = normalizedIntegrations;
+    }
+
     return this.appSettingService.createOrUpdate(config);
   }
 
@@ -52,10 +62,10 @@ export class AppSettingController {
     return this.appSettingService.calculateRestaurantDeliveryFee(itemCount);
   }
 
-  /** Upload d'un logo */
+  /** Upload d'un logo ou fichier unique */
   @Post('upload-logo')
-  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
   @UseGuards(AuthentificationGuard)
+  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN'])
   @UseInterceptors(FileInterceptor('logo'))
   async uploadSingle(@UploadedFile() logo: Express.Multer.File) {
     if (!logo) {
