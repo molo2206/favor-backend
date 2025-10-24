@@ -166,7 +166,7 @@ export class CompanyService {
       );
     }
     const message = `Bonjour ${user.fullName}, votre entreprise "${savedCompany.companyName}" a été créée avec succès sur FavorHelp. Elle est en attente de vérification.`;
-  
+
     if (hasPhone) {
       await this.smsHelper.sendSms(savedCompany.phone, message);
     }
@@ -352,7 +352,7 @@ export class CompanyService {
     company.status = dto.status;
     const updatedCompany = await this.companyRepository.save(company);
 
-    // Récupérer l'utilisateur lié (propriétaire ou associé)
+    // 🔹 Récupérer l'utilisateur lié (propriétaire ou associé)
     const userHasCompany = await this.userHasCompanyRepository.findOne({
       where: { company: { id: company.id } },
       relations: ['user'],
@@ -360,36 +360,41 @@ export class CompanyService {
 
     if (userHasCompany) {
       const user = userHasCompany.user;
-
-      // Supprimer le mot de passe pour sécurité
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password, ...userWithoutPassword } = user;
 
-      const hasEmail = user.email?.trim() !== '';
-      const hasPhone = user.phone?.trim() !== '';
+      const hasEmail = !!user.email?.trim();
+      const hasPhone = !!user.phone?.trim();
 
       const statusMessage = `Le statut de votre entreprise "${company.companyName}" a été mis à jour sur FavorHelp et est maintenant : ${company.status}.`;
 
-      // ✉️ Email
+      // ✉️ Envoyer un email si disponible
       if (hasEmail) {
-        await this.mailService.sendHtmlEmail(
-          user.email,
-          'Mise à jour du statut de votre entreprise sur FavorHelp',
-          'company-status-update.html', // template HTML
-          {
-            user: userWithoutPassword,
-            companyName: company.companyName,
-            status: company.status,
-            message: statusMessage,
-            year: new Date().getFullYear(),
-          },
-        );
+        try {
+          await this.mailService.sendHtmlEmail(
+            user.email,
+            'Mise à jour du statut de votre entreprise sur FavorHelp',
+            'company-status-update.html',
+            {
+              user: userWithoutPassword,
+              companyName: company.companyName,
+              status: company.status,
+              message: statusMessage,
+              year: new Date().getFullYear(),
+            },
+          );
+        } catch (err) {
+          console.error('Erreur lors de l’envoi de l’email :', err);
+        }
       }
 
-      // 📱 SMS
+      // 📱 Envoyer un SMS si disponible
       if (hasPhone) {
-        const smsMessage = `Bonjour ${user.fullName}, ${statusMessage}`;
-        await this.smsHelper.sendSms(user.phone, smsMessage);
+        try {
+          const smsMessage = `Bonjour ${user.fullName}, ${statusMessage}`;
+          await this.smsHelper.sendSms(user.phone, smsMessage);
+        } catch (err) {
+          console.error('Erreur lors de l’envoi du SMS :', err);
+        }
       }
     }
 
