@@ -632,7 +632,8 @@ export class ServiceService {
   }
   async findPrestatairesByCompanyPublished(user: UserEntity): Promise<{
     message: string;
-    data: Service[];
+    providerCount: number;
+    data: PrestataireEntity[];
   }> {
     const companyId = user.activeCompanyId;
     if (!companyId) {
@@ -644,19 +645,28 @@ export class ServiceService {
       throw new NotFoundException('Entreprise introuvable');
     }
 
-    // ✅ Recherche directe avec relations
+    // ✅ Charger uniquement les services publiés avec leurs prestataires
     const services = await this.serviceRepo.find({
       where: {
         company: { id: companyId },
         status: ProductStatus.PUBLISHED,
       },
-      relations: ['company', 'category', 'prestataires', 'prestataires.prestataire', 'measure'],
-      order: { createdAt: 'DESC' },
+      relations: ['prestataires', 'prestataires.prestataire'],
     });
 
+    // ✅ Extraire tous les prestataires (éliminer les doublons)
+    const allPrestataires = services.flatMap(
+      (s) => s.prestataires?.map((p) => p.prestataire) || [],
+    );
+
+    const uniquePrestataires = Array.from(
+      new Map(allPrestataires.map((p) => [p.id, p])).values(),
+    );
+
     return {
-      message: 'Services publiés de la société récupérés avec succès.',
-      data: services,
+      message: 'Prestataires publiés de la société récupérés avec succès.',
+      providerCount: uniquePrestataires.length,
+      data: uniquePrestataires,
     };
   }
 }
