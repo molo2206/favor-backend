@@ -568,8 +568,69 @@ export class ServiceService {
       data: prestataires,
     };
   }
+  async findPublishedByCompany(companyId: string, page = 1, limit = 10) {
+    if (!companyId) {
+      throw new BadRequestException('L’ID de la société est requis');
+    }
 
-  async findServicesByCompanyPublished(user: UserEntity) {
+    const skip = (page - 1) * limit;
+
+    try {
+      // 🔹 OPTION 1: Query Builder avec les bons noms de relations
+      const query = this.serviceRepo
+        .createQueryBuilder('service')
+        .leftJoinAndSelect('service.company', 'company')
+        .leftJoinAndSelect('company.country', 'country')
+        .leftJoinAndSelect('company.city', 'city')
+        .leftJoinAndSelect('service.category', 'category')
+        .leftJoinAndSelect('service.measure', 'measure')
+        // 🔹 CORRECTION: Utiliser le bon nom de relation
+        .leftJoinAndSelect('service.prestataires', 'prestataireService')
+        .leftJoinAndSelect('prestataireService.prestataire', 'prestataire')
+        .where('service.status = :status', { status: ProductStatus.PUBLISHED })
+        .andWhere('company.id = :companyId', { companyId })
+        .orderBy('service.createdAt', 'DESC');
+
+      const [services, total] = await query.skip(skip).take(limit).getManyAndCount();
+
+      // 🔹 OPTION 2: Avec find() et relations
+      const [services2, total2] = await this.serviceRepo.findAndCount({
+        relations: [
+          'company',
+          'company.country',
+          'company.city',
+          'category',
+          'measure',
+          'prestataires',
+          'prestataires.prestataire',
+        ],
+        where: {
+          status: ProductStatus.PUBLISHED,
+          company: { id: companyId },
+        },
+        order: { createdAt: 'DESC' },
+        skip,
+        take: limit,
+      });
+
+      console.log('Option 1 - QueryBuilder:', services.length);
+      console.log('Option 2 - Find method:', services2.length);
+
+      return {
+        message: 'Liste des services publiés de la société récupérée avec succès',
+        data: {
+          data: services, // ou services2
+          total,
+          page,
+          limit,
+        },
+      };
+    } catch (error) {
+      console.error('Erreur:', error);
+      throw error;
+    }
+  }
+  async findPrestatairesByCompanyPublished(user: UserEntity) {
     const companyId = user.activeCompanyId;
     if (!companyId) throw new BadRequestException("L'utilisateur n'a pas de société active");
 
