@@ -524,50 +524,6 @@ export class ServiceService {
     };
   }
 
-  async findPrestatairesByCompany(user: UserEntity) {
-    const companyId = user.activeCompanyId;
-    if (!companyId) throw new BadRequestException("L'utilisateur n'a pas de société active");
-
-    // 🔹 Trouver d'abord les services de la company
-    const services = await this.serviceRepo.find({
-      where: { company: { id: companyId } },
-      relations: ['prestataires', 'prestataires.prestataire', 'category'],
-    });
-
-    // 🔹 Extraire tous les prestataires uniques
-    const prestatairesMap = new Map();
-
-    services.forEach((service) => {
-      service.prestataires.forEach((ps) => {
-        if (ps.prestataire && !prestatairesMap.has(ps.prestataire.id)) {
-          prestatairesMap.set(ps.prestataire.id, {
-            ...ps.prestataire,
-            services: [], // Initialiser le tableau des services
-          });
-        }
-
-        // Ajouter le service au prestataire
-        if (ps.prestataire) {
-          const prestataire = prestatairesMap.get(ps.prestataire.id);
-          prestataire.services.push({
-            service: {
-              id: service.id,
-              name: service.name,
-              category: service.category,
-            },
-          });
-        }
-      });
-    });
-
-    const prestataires = Array.from(prestatairesMap.values());
-
-    return {
-      message: 'Prestataires récupérés avec succès',
-      count: prestataires.length,
-      data: prestataires,
-    };
-  }
   async findPublishedByCompany(companyId: string, page = 1, limit = 10) {
     if (!companyId) {
       throw new BadRequestException('L’ID de la société est requis');
@@ -630,6 +586,89 @@ export class ServiceService {
       throw error;
     }
   }
+
+  async findPrestatairesByCompany(
+    user: UserEntity,
+    page = 1,
+    limit = 10,
+  ): Promise<{ message: string; data: any }> {
+    if (!user.activeCompanyId) {
+      throw new BadRequestException("L'utilisateur n'a pas de société active");
+    }
+
+    const skip = (page - 1) * limit;
+
+    // 🔹 Charger la société avec country et city
+    const company = await this.compRepo.findOne({
+      where: { id: user.activeCompanyId },
+      relations: ['country', 'city'],
+    });
+    if (!company) throw new NotFoundException('Entreprise introuvable');
+
+    // 🔹 Récupération des services avec prestataires
+    const [services, total] = await this.serviceRepo.findAndCount({
+      where: { company: { id: user.activeCompanyId } },
+      relations: ['prestataires', 'prestataires.prestataire'],
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    // 🔹 Extraction des prestataires uniques avec info société, country et city
+    const prestataires = services.flatMap((service) =>
+      service.prestataires
+        .filter((sp) => sp.prestataire)
+        .map((sp) => ({
+          id: sp.prestataire.id,
+          full_name: sp.prestataire.full_name,
+          email: sp.prestataire.email,
+          phone: sp.prestataire.phone,
+          description: sp.prestataire.description,
+          photo: sp.prestataire.photo,
+          experience: sp.prestataire.experience,
+          competence: sp.prestataire.competence,
+          specialite: sp.prestataire.specialite,
+          status: sp.prestataire.status,
+          createdAt: sp.prestataire.createdAt,
+          updatedAt: sp.prestataire.updatedAt,
+
+          company: {
+            id: company.id,
+            name: company.companyName,
+            email: company.email,
+            phone: company.phone,
+            logo: company.logo,
+            country: company.country
+              ? {
+                  id: company.country.id,
+                  name: company.country.name,
+                  code: company.country.code,
+                }
+              : null,
+            city: company.city
+              ? {
+                  id: company.city.id,
+                  name: company.city.name,
+                }
+              : null,
+          },
+        })),
+    );
+
+    // 🔹 Supprimer les doublons de prestataires
+    const uniquePrestataires = Array.from(new Map(prestataires.map((p) => [p.id, p])).values());
+
+    return {
+      message: 'Prestataires de la société récupérés avec succès.',
+      data: {
+        data: uniquePrestataires,
+        total,
+        page,
+        limit,
+      },
+    };
+  }
+
   async findPrestatairesByCompanyPublished(user: UserEntity): Promise<{
     message: string;
     data: any[];
@@ -639,7 +678,11 @@ export class ServiceService {
       throw new BadRequestException("L'utilisateur n'a pas de société active");
     }
 
-    const company = await this.compRepo.findOne({ where: { id: companyId } });
+    const company = await this.compRepo.findOne({
+      where: { id: companyId },
+      relations: ['country', 'city'], // 🔗 Inclure pays et ville
+    });
+
     if (!company) {
       throw new NotFoundException('Entreprise introuvable');
     }
@@ -654,10 +697,10 @@ export class ServiceService {
       order: { createdAt: 'DESC' },
     });
 
-    // 🧩 Extraction des prestataires uniques
+    // 🧩 Extraction des prestataires
     const prestataires = services.flatMap((service) =>
       service.prestataires
-        .filter((sp) => sp.prestataire) // filtre sécurité
+        .filter((sp) => sp.prestataire)
         .map((sp) => ({
           id: sp.prestataire.id,
           full_name: sp.prestataire.full_name,
@@ -671,10 +714,32 @@ export class ServiceService {
           status: sp.prestataire.status,
           createdAt: sp.prestataire.createdAt,
           updatedAt: sp.prestataire.updatedAt,
+
+          // 🏢 Ajout de la société et de ses relations
+          company: {
+            id: company.id,
+            name: company.companyName,
+            email: company.email,
+            phone: company.phone,
+            logo: company.logo,
+            country: company.country
+              ? {
+                  id: company.country.id,
+                  name: company.country.name,
+                  code: company.country.code,
+                }
+              : null,
+            city: company.city
+              ? {
+                  id: company.city.id,
+                  name: company.city.name,
+                }
+              : null,
+          },
         })),
     );
 
-    // 🧹 Supprime les doublons si un prestataire apparaît dans plusieurs services
+    // 🧹 Supprimer les doublons de prestataires
     const uniquePrestataires = Array.from(new Map(prestataires.map((p) => [p.id, p])).values());
 
     return {
