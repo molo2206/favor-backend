@@ -348,7 +348,7 @@ export class ServiceService {
               }
             : null,
 
-          service: {
+          services: {
             id: service.id,
             name: service.name,
             description: service.description,
