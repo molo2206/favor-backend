@@ -258,28 +258,24 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
       ],
     });
 
-    if (!order) {
-      throw new NotFoundException('Commande introuvable');
-    }
+    if (!order) throw new NotFoundException('Commande introuvable');
 
-    // ✅ Vérifie la validité de la transition de statut
+    // Vérifie la validité de la transition de statut
     if (!isValidStatusTransition(order.status, dto.status)) {
       throw new BadRequestException(
         `Transition invalide de "${order.status}" vers "${dto.status}".`,
       );
     }
 
-    
-    // ✅ Empêche la modification du shippingCost pour certains statuts
+    // Validation shippingCost
     if (
       [OrderStatus.PROCESSING, OrderStatus.COMPLETED, OrderStatus.DELIVERED].includes(
         dto.status,
       )
     ) {
-      dto.shippingCost = order.shippingCost; // ignore la valeur fournie
+      dto.shippingCost = order.shippingCost;
     }
 
-    // ✅ Si le statut est VALIDATED, shippingCost est requis
     if (dto.status === OrderStatus.VALIDATED) {
       if (dto.shippingCost === undefined || dto.shippingCost === null) {
         throw new BadRequestException(
@@ -288,44 +284,38 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
       }
       order.shippingCost = dto.shippingCost;
       order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost);
+    } else if (dto.shippingCost !== undefined) {
+      order.shippingCost = dto.shippingCost;
+      order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost);
     }
 
-    // ✅ Sinon, on garde le shippingCost existant s’il ne doit pas être modifié
-    if (dto.status !== OrderStatus.VALIDATED) {
-      if (
-        ![OrderStatus.PROCESSING, OrderStatus.COMPLETED, OrderStatus.DELIVERED].includes(
-          dto.status,
-        )
-      ) {
-        if (dto.shippingCost !== undefined) {
-          order.shippingCost = dto.shippingCost;
-          order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost);
+    // Application du nouveau statut à la commande principale
+    order.status = dto.status;
+
+    // ✅ Mettre à jour les sous-commandes si nécessaire
+    if (order.subOrders?.length) {
+      for (const subOrder of order.subOrders) {
+        if (!isValidStatusTransition(subOrder.status, dto.status)) {
+          throw new BadRequestException(
+            `Impossible de passer la sous-commande ${subOrder.id} de "${subOrder.status}" à "${dto.status}".`,
+          );
         }
+        subOrder.status = dto.status;
+        await this.subOrderRepo.save(subOrder);
       }
     }
 
-    // ✅ Application du nouveau statut
-    order.status = dto.status;
-
-    // ✅ Si la commande devient VALIDATED
+    // Si la commande est VALIDATED → paiement et envoi notifications
     if (dto.status === OrderStatus.VALIDATED) {
       order.paymentStatus = PaymentStatus.PAID;
       order.paid = true;
       order.pin = this.generatePin();
-    }
 
-    const updatedOrder = await this.orderRepo.save(order);
+      const subOrders = order.subOrders;
 
-    const subOrders = await this.subOrderRepo.find({
-      where: { order: { id: updatedOrder.id } },
-      relations: ['company', 'items', 'items.product', 'order'],
-    });
-
-    // ✅ Si la commande est validée → envoi du mail, SMS, PDF, transaction
-    if (dto.status === OrderStatus.VALIDATED) {
       const paymentQrCode = await QRCode.toDataURL(order.invoiceNumber);
-      const hasEmail = order.user.email && order.user.email.trim() !== '';
-      const hasPhone = order.user.phone && order.user.phone.trim() !== '';
+      const hasEmail = order.user.email?.trim();
+      const hasPhone = order.user.phone?.trim();
 
       if (!hasEmail && !hasPhone) {
         throw new BadRequestException(
@@ -339,49 +329,43 @@ Merci pour votre confiance votre commande sera traitee des reception du paiement
           'Votre code PIN pour la commande FavorHelp',
           'sendPin.html',
           {
-            pinCode: updatedOrder.pin,
-            invoiceNumber: updatedOrder.invoiceNumber,
+            pinCode: order.pin,
+            invoiceNumber: order.invoiceNumber,
             user: order.user,
             subOrders,
-            order: updatedOrder,
+            order: order,
             year: new Date().getFullYear(),
           } as any,
         );
 
         await this.mailService.sendInvoicePaidWithPdf(
           order.user.email,
-          'Veuillez trouver ci-joint votre facture PDF, déjà payée et validée - FavorHelp',
-          {
-            user: order.user,
-            order: updatedOrder,
-            subOrders,
-            paymentQrCode,
-          },
+          'Facture payée et validée - FavorHelp',
+          { user: order.user, order, subOrders, paymentQrCode },
         );
       }
 
       if (hasPhone) {
-        const message = `Votre commande ${updatedOrder.invoiceNumber} a été validée avec succès.
-Pour récupérer votre commande ou colis, veuillez présenter ce code PIN au livreur : ${updatedOrder.pin}
-Merci pour votre confiance.`;
-        await this.smsHelper.sendSms(updatedOrder.user.phone, message);
+        const message = `Votre commande ${order.invoiceNumber} a été validée. Code PIN: ${order.pin}`;
+        await this.smsHelper.sendSms(order.user.phone, message);
       }
 
-      const createTransactionDto: CreateTransactionDto = {
-        orderId: updatedOrder.id,
-        amount: updatedOrder.totalAmount,
+      // Créer la transaction
+      const transaction = this.transactionRepository.create({
+        orderId: order.id,
+        amount: order.totalAmount,
         paymentStatus: PaymentStatus.PAID,
         transactionReference: uuidv4(),
         currency: 'USD',
         type: TransactionType.CREDIT,
-      };
-
-      const transaction = this.transactionRepository.create(createTransactionDto);
+      });
       await this.transactionRepository.save(transaction);
     }
 
+    const updatedOrder = await this.orderRepo.save(order);
+
     return {
-      message: `La commande ${orderId} a été mise à jour avec succès.`,
+      message: `La commande ${orderId} et ses sous-commandes ont été mises à jour avec succès.`,
       data: updatedOrder,
     };
   }
