@@ -354,7 +354,7 @@ export class ServiceService {
     }
 
     // Upload photo
-    const photo = file
+    const image = file
       ? await this.cloudinary.handleUploadImage(file, 'prestataires')
       : undefined;
 
@@ -364,7 +364,7 @@ export class ServiceService {
       email: dto.email,
       phone: dto.phone,
       description: dto.description,
-      photo,
+      image,
       experience: dto.experience || null,
       competence: dto.competence || null,
       specialite: dto.specialite || null,
@@ -417,7 +417,7 @@ export class ServiceService {
 
     // Mettre à jour la photo
     if (file) {
-      prestataire.photo = await this.cloudinary.handleUploadImage(file, 'prestataires');
+      prestataire.image = await this.cloudinary.handleUploadImage(file, 'prestataires');
     }
 
     // Mettre à jour les champs simples
@@ -629,7 +629,7 @@ export class ServiceService {
               email: sp.prestataire.email,
               phone: sp.prestataire.phone,
               description: sp.prestataire.description,
-              photo: sp.prestataire.photo,
+              image: sp.prestataire.image,
               experience: sp.prestataire.experience,
               competence: sp.prestataire.competence,
               specialite: sp.prestataire.specialite,
@@ -718,7 +718,7 @@ export class ServiceService {
               email: sp.prestataire.email,
               phone: sp.prestataire.phone,
               description: sp.prestataire.description,
-              photo: sp.prestataire.photo,
+              image: sp.prestataire.image,
               experience: sp.prestataire.experience,
               competence: sp.prestataire.competence,
               specialite: sp.prestataire.specialite,

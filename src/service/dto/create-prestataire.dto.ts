@@ -17,7 +17,7 @@ export class CreatePrestataireDto {
 
   @IsOptional()
   @IsString({ each: true })
-  photo?: string;
+  image?: string;
 
   @IsOptional()
   @IsString()

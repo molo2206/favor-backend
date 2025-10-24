@@ -27,7 +27,7 @@ export class PrestataireEntity {
   description?: string;
 
   @Column({ nullable: true })
-  photo?: string;
+  image?: string;
 
   @Column({ type: 'text', nullable: true })
   experience?: string;
