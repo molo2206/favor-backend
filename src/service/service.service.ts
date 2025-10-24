@@ -689,21 +689,21 @@ export class ServiceService {
       throw new BadRequestException("L'utilisateur n'a pas de société active");
     }
 
-    // Charger la société avec country et city
+    // 🔹 Charger la société avec country et city
     const company = await this.compRepo.findOne({
       where: { id: user.activeCompanyId },
       relations: ['country', 'city'],
     });
     if (!company) throw new NotFoundException('Entreprise introuvable');
 
-    // Récupération de tous les services publiés avec prestataires
+    // 🔹 Récupération de tous les services publiés avec prestataires
     const services = await this.serviceRepo.find({
       where: { company: { id: user.activeCompanyId }, status: ProductStatus.PUBLISHED },
       relations: ['prestataires', 'prestataires.prestataire', 'category', 'measure'],
       order: { createdAt: 'DESC' },
     });
 
-    // Map pour regrouper services par prestataire
+    // 🔹 Map pour regrouper services par prestataire
     const prestatairesMap = new Map<string, any>();
 
     services.forEach((service) => {
@@ -744,7 +744,7 @@ export class ServiceService {
             });
           }
 
-          // Ajouter le service au tableau services du prestataire
+          // 🔹 Ajouter le service dans le tableau services du prestataire
           prestatairesMap.get(id).services.push({
             id: service.id,
             name: service.name,
@@ -762,10 +762,7 @@ export class ServiceService {
 
     return {
       message: 'Prestataires publiés de la société récupérés avec succès.',
-      data: {
-        data: prestataires,
-        total: prestataires.length, // nombre de prestataires uniques
-      },
+      data: prestataires, // un seul objet data contenant tous les prestataires
     };
   }
 }
