@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -143,7 +143,25 @@ export class UsersService {
     otpEntry.user = savedUser;
     await this.otpRepository.save(otpEntry);
 
-    const { password: _pw, ...userWithoutPassword } = savedUser;
+    const userFull = await this.usersRepository.findOne({
+      where: { id: savedUser.id },
+      relations: [
+        'activeCompany',
+        'activeCompany.country',
+        'activeCompany.city',
+        'userHasCompany',
+        'userHasCompany.company',
+        'userHasCompany.company.tauxCompanies',
+        'userHasCompany.permissions',
+        'userHasCompany.permissions.permission',
+        'userPlatformRoles',
+        'userPlatformRoles.platform',
+        'userPlatformRoles.role',
+      ],
+    });
+    if (!userFull) throw new NotFoundException("Impossible de récupérer l'utilisateur créé.");
+
+    const { password: _pw, ...userWithoutPassword } = userFull;
 
     // 6️⃣ Envoyer email de bienvenue si c'est un email
     if (email && email !== '' && validator.isEmail(email)) {
@@ -171,28 +189,35 @@ export class UsersService {
     currentUser: UserEntity,
   ): Promise<{ message: string; data: any }> {
     try {
+      // 1️⃣ Récupérer l’utilisateur
       const user = await this.usersRepository.findOne({
         where: { id: currentUser.id },
       });
-
       if (!user) {
         throw new NotFoundException(`Utilisateur avec l'ID ${currentUser.id} non trouvé`);
       }
 
+      // 2️⃣ Appliquer les modifications
       Object.assign(user, updateUserDto);
       await this.usersRepository.save(user);
 
+      // 3️⃣ Récupérer l’utilisateur enrichi avec toutes les relations nécessaires
       const fullUser = await this.usersRepository.findOne({
         where: { id: user.id },
         relations: [
           'activeCompany',
+          'activeCompany.country',
+          'activeCompany.city',
           'userHasCompany',
           'userHasCompany.company',
-          'userHasCompany.permissions',
-          'userHasCompany.permissions.permission',
           'userHasCompany.company.tauxCompanies',
           'userHasCompany.company.country',
           'userHasCompany.company.city',
+          'userHasCompany.permissions',
+          'userHasCompany.permissions.permission',
+          'userPlatformRoles',
+          'userPlatformRoles.platform',
+          'userPlatformRoles.role',
         ],
       });
 
@@ -200,6 +225,7 @@ export class UsersService {
         throw new NotFoundException('Utilisateur enrichi introuvable après la mise à jour.');
       }
 
+      // 4️⃣ Sérialisation
       const userHasCompany =
         fullUser.userHasCompany?.map((uhc) => ({
           id: uhc.id,
@@ -250,6 +276,7 @@ export class UsersService {
             })) ?? [],
         })) ?? [];
 
+      // 5️⃣ Retour final
       return {
         message: 'Utilisateur mis à jour avec succès.',
         data: {
@@ -272,11 +299,17 @@ export class UsersService {
           defaultAddressId: fullUser.defaultAddressId,
           defaultAddress: fullUser.defaultAddress,
           userHasCompany,
+          userPlatformRoles:
+            fullUser.userPlatformRoles?.map((upr) => ({
+              id: upr.id,
+              platform: upr.platform,
+              role: upr.role,
+            })) ?? [],
         },
       };
     } catch (error) {
       console.error('Erreur lors de la mise à jour de l’utilisateur:', error);
-      throw new Error('Une erreur interne est survenue.');
+      throw new InternalServerErrorException('Une erreur interne est survenue.');
     }
   }
 
@@ -448,6 +481,19 @@ export class UsersService {
     // Vérifier si l'utilisateur existe déjà
     let user = await this.usersRepository.findOne({
       where: { email: email.toLowerCase() },
+      relations: [
+        'activeCompany',
+        'activeCompany.country',
+        'activeCompany.city',
+        'userHasCompany',
+        'userHasCompany.company',
+        'userHasCompany.company.tauxCompanies',
+        'userHasCompany.permissions',
+        'userHasCompany.permissions.permission',
+        'userPlatformRoles',
+        'userPlatformRoles.platform',
+        'userPlatformRoles.role',
+      ],
     });
 
     let isNewUser = false;
@@ -471,7 +517,7 @@ export class UsersService {
         password: '',
         isActive: true,
         image: image || undefined,
-        phone: '', //  valeur par défaut
+        phone: '',
       });
 
       user = await this.usersRepository.save(user);
@@ -495,61 +541,7 @@ export class UsersService {
     // Nettoyage de l'objet user
     const { password, ...userWithoutPassword } = user;
 
-    return {
-      message: isNewUser
-        ? 'Compte créé et connexion réussie via Google.'
-        : 'Connexion réussie via Google.',
-      data: userWithoutPassword,
-      access_token: token,
-      refresh_token: refresh_token,
-    };
-  }
-
-  async updateProfileImage(userId: string, file?: Express.Multer.File) {
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-      relations: [
-        'activeCompany',
-        'userHasCompany',
-        'userHasCompany.company',
-        'userHasCompany.permissions',
-        'userHasCompany.permissions.permission',
-        'userHasCompany.company.tauxCompanies',
-      ],
-    });
-
-    if (!user) throw new NotFoundException('Utilisateur non trouvé.');
-    if (!file) throw new BadRequestException('Image invalide.');
-
-    // 🧹 Gestion intelligente selon la source de l’image
-    if (user.image) {
-      if (user.image.includes('res.cloudinary.com')) {
-        // ✅ Image stockée sur Cloudinary → suppression
-        const publicId = this.extractPublicId(user.image);
-        if (publicId) {
-          try {
-            await this.cloudinary.handleDeleteImage(publicId);
-          } catch (err) {
-            console.warn('⚠️ Échec suppression Cloudinary :', err.message);
-          }
-        }
-      } else if (user.image.includes('googleusercontent.com')) {
-        // 🔵 Image Google (connexion Google) → on ne fait rien
-        console.log('🔵 Image Google détectée, aucune suppression nécessaire.');
-      } else {
-        // ⚪ Image locale ou inexistante
-        console.log('⚪ Aucune image Cloudinary à supprimer.');
-      }
-    }
-
-    // 📤 Upload de la nouvelle image sur Cloudinary
-    const imageUrl = await this.cloudinary.handleUploadImage(file, 'user');
-    user.image = imageUrl;
-
-    const updatedUser = await this.usersRepository.save(user);
-    const { password, ...userWithoutPassword } = updatedUser;
-
-    // 🏢 Sérialisation et normalisation de l’objet user
+    // 🏢 Sérialisation complète
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
         id: uhc.id,
@@ -577,8 +569,8 @@ export class UsersService {
               longitude: uhc.company.longitude,
               address: uhc.company.address,
               tauxCompanies: uhc.company.tauxCompanies || [],
-              country: uhc.company.country,
-              city: uhc.company.city,
+              country: uhc.company.country || null,
+              city: uhc.company.city || null,
               localCurrency: uhc.company.localCurrency,
               taux: uhc.company.taux,
             }
@@ -603,17 +595,189 @@ export class UsersService {
           })) ?? [],
       })) ?? [];
 
+    const userPlatformRoles =
+      userWithoutPassword.userPlatformRoles?.map((upr) => ({
+        id: upr.id,
+        platform: upr.platform
+          ? {
+              id: upr.platform.id,
+              name: upr.platform.name,
+              key: upr.platform.key,
+              status: upr.platform.status,
+            }
+          : null,
+        role: upr.role
+          ? {
+              id: upr.role.id,
+              key: upr.role.key,
+              name: upr.role.name,
+              status: upr.role.status,
+            }
+          : null,
+        createdAt: upr.createdAt,
+      })) ?? [];
+
     const responseUser = {
       ...userWithoutPassword,
       userHasCompany,
-      activeCompany: userWithoutPassword.activeCompany,
+      userPlatformRoles,
+      activeCompany: userWithoutPassword.activeCompany
+        ? {
+            ...userWithoutPassword.activeCompany,
+            country: userWithoutPassword.activeCompany.country || null,
+            city: userWithoutPassword.activeCompany.city || null,
+          }
+        : null,
     };
 
-    const sanitizedUser = instanceToPlain(responseUser);
+    return {
+      message: isNewUser
+        ? 'Compte créé et connexion réussie via Google.'
+        : 'Connexion réussie via Google.',
+      data: instanceToPlain(responseUser),
+      access_token: token,
+      refresh_token: refresh_token,
+    };
+  }
+
+  async updateProfileImage(userId: string, file?: Express.Multer.File) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: [
+        'activeCompany',
+        'activeCompany.country',
+        'activeCompany.city',
+        'userHasCompany',
+        'userHasCompany.company',
+        'userHasCompany.company.tauxCompanies',
+        'userHasCompany.permissions',
+        'userHasCompany.permissions.permission',
+        'userPlatformRoles', // <-- Ajouter
+        'userPlatformRoles.platform',
+        'userPlatformRoles.role',
+      ],
+    });
+
+    if (!user) throw new NotFoundException('Utilisateur non trouvé.');
+    if (!file) throw new BadRequestException('Image invalide.');
+
+    // 🧹 Gestion intelligente selon la source de l’image
+    if (user.image) {
+      if (user.image.includes('res.cloudinary.com')) {
+        const publicId = this.extractPublicId(user.image);
+        if (publicId) {
+          try {
+            await this.cloudinary.handleDeleteImage(publicId);
+          } catch (err) {
+            console.warn('⚠️ Échec suppression Cloudinary :', err.message);
+          }
+        }
+      } else if (user.image.includes('googleusercontent.com')) {
+        console.log('🔵 Image Google détectée, aucune suppression nécessaire.');
+      } else {
+        console.log('⚪ Aucune image Cloudinary à supprimer.');
+      }
+    }
+
+    const imageUrl = await this.cloudinary.handleUploadImage(file, 'user');
+    user.image = imageUrl;
+
+    const updatedUser = await this.usersRepository.save(user);
+    const { password, ...userWithoutPassword } = updatedUser;
+
+    // 🏢 Mapping des companies et permissions
+    const userHasCompany =
+      userWithoutPassword.userHasCompany?.map((uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+        company: uhc.company
+          ? {
+              id: uhc.company.id,
+              companyName: uhc.company.companyName || '',
+              logo: uhc.company.logo,
+              banner: uhc.company.banner,
+              companyAddress: uhc.company.companyAddress || '',
+              typeCompany: uhc.company.typeCompany,
+              phone: uhc.company.phone,
+              vatNumber: uhc.company.vatNumber,
+              registrationDocumentUrl: uhc.company.registrationDocumentUrl,
+              warehouseLocation: uhc.company.warehouseLocation,
+              email: uhc.company.email,
+              website: uhc.company.website,
+              status: uhc.company.status,
+              companyActivity: uhc.company.companyActivity,
+              open_time: uhc.company.open_time,
+              delivery_minutes: uhc.company.delivery_minutes,
+              distance_km: uhc.company.distance_km,
+              latitude: uhc.company.latitude,
+              longitude: uhc.company.longitude,
+              address: uhc.company.address,
+              tauxCompanies: uhc.company.tauxCompanies || [],
+              country: uhc.company.country || null,
+              city: uhc.company.city || null,
+              localCurrency: uhc.company.localCurrency,
+              taux: uhc.company.taux,
+            }
+          : null,
+        permissions:
+          uhc.permissions?.map((p) => ({
+            id: p.permission?.id,
+            name: p.permission?.name,
+            create: p.create,
+            read: p.read,
+            update: p.update,
+            delete: p.delete,
+            status: p.status,
+            createdAt:
+              p.permission?.createdAt instanceof Date
+                ? p.permission.createdAt
+                : new Date(p.permission?.createdAt),
+            updatedAt:
+              p.permission?.updatedAt instanceof Date
+                ? p.permission.updatedAt
+                : new Date(p.permission?.updatedAt),
+          })) ?? [],
+      })) ?? [];
+
+    // 🔑 Mapping des roles sur plateformes
+    const userPlatformRoles =
+      userWithoutPassword.userPlatformRoles?.map((upr) => ({
+        id: upr.id,
+        platform: upr.platform
+          ? {
+              id: upr.platform.id,
+              name: upr.platform.name,
+              key: upr.platform.key,
+              status: upr.platform.status,
+            }
+          : null,
+        role: upr.role
+          ? {
+              id: upr.role.id,
+              key: upr.role.key,
+              name: upr.role.name,
+              status: upr.role.status,
+            }
+          : null,
+        createdAt: upr.createdAt,
+      })) ?? [];
+
+    const responseUser = {
+      ...userWithoutPassword,
+      userHasCompany,
+      userPlatformRoles,
+      activeCompany: userWithoutPassword.activeCompany
+        ? {
+            ...userWithoutPassword.activeCompany,
+            country: userWithoutPassword.activeCompany.country || null,
+            city: userWithoutPassword.activeCompany.city || null,
+          }
+        : null,
+    };
 
     return {
       message: 'Image de profil mise à jour avec succès.',
-      data: sanitizedUser,
+      data: instanceToPlain(responseUser),
     };
   }
 
