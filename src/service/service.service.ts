@@ -53,11 +53,11 @@ export class ServiceService {
   ): Promise<{ message: string; data: Service }> {
     if (!user) throw new ForbiddenException('Utilisateur non authentifié');
 
-    if (user.companyStatus !== CompanyStatus.VALIDATED) {
-      throw new ForbiddenException(
-        'Votre société n’est pas encore validée. Impossible de créer un service.',
-      );
-    }
+    // if (user.companyStatus !== CompanyStatus.VALIDATED) {
+    //   throw new ForbiddenException(
+    //     'Votre société n’est pas encore validée. Impossible de créer un service.',
+    //   );
+    // }
 
     if (!files?.length || files.length > 4)
       throw new BadRequestException('Vous devez fournir entre 1 et 4 images');
