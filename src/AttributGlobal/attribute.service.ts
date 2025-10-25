@@ -13,6 +13,7 @@ import { UpdateAttributeDto } from './dto/update-attribute.dto';
 import { AttributeType } from './enum/attributeType.enum';
 import { AttributeValue } from './entities/attribute_values.entity';
 import { slugify } from '../users/utility/slug/slugify';
+import { CreateAttributeValueDto } from './dto/create-attribute-value.dto';
 
 @Injectable()
 export class AttributeService {
@@ -26,14 +27,15 @@ export class AttributeService {
     private readonly dataSource: DataSource,
   ) {}
 
+  // -------------------------------
+  // Création d’un attribut
+  // -------------------------------
   async create(
     createAttributeDto: CreateAttributeDto,
   ): Promise<{ message: string; data: Attribute }> {
-    const { name, type, description, isRequired, isFilterable, values } = createAttributeDto;
+    const { name, type, description, isRequired, isFilterable } = createAttributeDto;
 
-    const existingAttribute = await this.attributeRepo.findOne({
-      where: { name },
-    });
+    const existingAttribute = await this.attributeRepo.findOne({ where: { name } });
     if (existingAttribute) {
       throw new ConflictException('Un attribut avec ce nom existe déjà');
     }
@@ -41,7 +43,6 @@ export class AttributeService {
     const slug = slugify(name, { lower: true, strict: true });
 
     return await this.dataSource.transaction(async (manager) => {
-
       const attribute = manager.create(Attribute, {
         name,
         slug,
@@ -53,19 +54,10 @@ export class AttributeService {
 
       const savedAttribute = await manager.save(attribute);
 
-      if (Array.isArray(values) && values.length > 0) {
-        const attributeValues = values.map((value) =>
-          manager.create(AttributeValue, {
-            value: value.value,
-            attribute: savedAttribute,
-          }),
-        );
-        await manager.save(attributeValues);
-      }
-
+      // Recharger avec toutes les relations
       const attributeWithRelations = await manager.findOne(Attribute, {
         where: { id: savedAttribute.id },
-        relations: ['values'],
+        relations: ['values', 'categories', 'products', 'variations'],
       });
 
       this.logger.log(`✅ Attribut "${name}" créé avec succès`);
@@ -77,16 +69,17 @@ export class AttributeService {
     });
   }
 
-  async findAll(): Promise<Attribute[]> {
-    return await this.attributeRepo.find({
-      relations: ['values'],
-      order: {
-        name: 'ASC',
-      },
-    });
-  }
+  // -------------------------------
+  // Mise à jour d’un attribut
+  // -------------------------------
 
-  async findOne(id: string): Promise<Attribute> {
+  async update(
+    id: string,
+    updateAttributeDto: UpdateAttributeDto,
+  ): Promise<{ message: string; data: Attribute }> {
+    const { name, type, description, isRequired, isFilterable } = updateAttributeDto;
+
+    // Récupérer l'attribut existant avec toutes ses relations
     const attribute = await this.attributeRepo.findOne({
       where: { id },
       relations: ['values', 'categories', 'products', 'variations'],
@@ -96,49 +89,10 @@ export class AttributeService {
       throw new NotFoundException(`Attribut avec l'ID ${id} non trouvé`);
     }
 
-    return attribute;
-  }
-
-  async findByType(type: AttributeType): Promise<Attribute[]> {
-    const attributes = await this.attributeRepo.find({
-      where: { type },
-      relations: ['values'],
-      order: {
-        name: 'ASC',
-      },
-    });
-
-    if (!attributes.length) {
-      throw new NotFoundException(`Aucun attribut trouvé pour le type ${type}`);
-    }
-
-    return attributes;
-  }
-
-  async findByFilterable(): Promise<Attribute[]> {
-    return await this.attributeRepo.find({
-      where: { isFilterable: true },
-      relations: ['values'],
-      order: {
-        name: 'ASC',
-      },
-    });
-  }
-
-  async update(
-    id: string,
-    updateAttributeDto: UpdateAttributeDto,
-  ): Promise<{ message: string; data: Attribute }> {
-    const { name, type, description, isRequired, isFilterable, values } = updateAttributeDto;
-
-    const attribute = await this.findOne(id);
-
     return await this.dataSource.transaction(async (manager) => {
       // Vérifier l'unicité du nom si modifié
       if (name && name !== attribute.name) {
-        const existingAttribute = await manager.findOne(Attribute, {
-          where: { name },
-        });
+        const existingAttribute = await manager.findOne(Attribute, { where: { name } });
         if (existingAttribute && existingAttribute.id !== id) {
           throw new ConflictException('Un attribut avec ce nom existe déjà');
         }
@@ -153,27 +107,10 @@ export class AttributeService {
 
       const updatedAttribute = await manager.save(attribute);
 
-      // Mettre à jour les valeurs si fournies
-      if (Array.isArray(values)) {
-        // Supprimer les anciennes valeurs
-        await manager.delete(AttributeValue, { attribute: { id } });
-
-        // Créer les nouvelles valeurs
-        if (values.length > 0) {
-          const attributeValues = values.map((value) =>
-            manager.create(AttributeValue, {
-              value: value.value,
-              attribute: updatedAttribute,
-            }),
-          );
-          await manager.save(attributeValues);
-        }
-      }
-
-      // Recharger l'attribut avec ses relations
+      // Recharger avec toutes les relations
       const attributeWithRelations = await manager.findOne(Attribute, {
         where: { id: updatedAttribute.id },
-        relations: ['values'],
+        relations: ['values', 'categories', 'products', 'variations'],
       });
 
       this.logger.log(`✅ Attribut "${attribute.name}" mis à jour avec succès`);
@@ -185,10 +122,161 @@ export class AttributeService {
     });
   }
 
+  // -------------------------------
+  // Création de plusieurs valeurs pour un attribut
+  // -------------------------------
+  async createOrUpdateSingleAttributeValue(
+    body: CreateAttributeValueDto & { attributeId: string },
+  ): Promise<{ message: string; data: AttributeValue }> {
+    const { attributeId, value, displayName, color, imageUrl, position } = body;
+
+    // Vérifier que l'attribut existe
+    const attribute = await this.attributeRepo.findOne({ where: { id: attributeId } });
+    if (!attribute) {
+      throw new NotFoundException(`Attribut introuvable avec l'id ${attributeId}`);
+    }
+
+    return await this.dataSource.transaction(async (manager) => {
+      // Vérifier si la valeur existe déjà pour cet attribut
+      let attributeValue = await manager.findOne(AttributeValue, {
+        where: { value, attribute: { id: attributeId } },
+      });
+
+      if (attributeValue) {
+        // Mise à jour si existante
+        attributeValue.displayName = displayName ?? attributeValue.displayName;
+        attributeValue.color = color ?? attributeValue.color;
+        attributeValue.imageUrl = imageUrl ?? attributeValue.imageUrl;
+        attributeValue.position = position ?? attributeValue.position;
+      } else {
+        // Création sinon
+        attributeValue = manager.create(AttributeValue, {
+          attribute,
+          value,
+          displayName,
+          color,
+          imageUrl,
+          position,
+        });
+      }
+
+      const savedValue = await manager.save(attributeValue);
+
+      // Recharger avec relations
+      const valueWithRelations = await manager.findOne(AttributeValue, {
+        where: { id: savedValue.id },
+        relations: ['attribute'],
+      });
+
+      return {
+        message: 'Valeur créée ou mise à jour avec succès',
+        data: valueWithRelations!,
+      };
+    });
+  }
+
+  async getValuesByAttribute(
+    attributeId: string,
+  ): Promise<{ message: string; data: AttributeValue[] }> {
+    // Vérifier que l'attribut existe
+    const attribute = await this.attributeRepo.findOne({ where: { id: attributeId } });
+    if (!attribute) {
+      throw new NotFoundException(`Attribut introuvable avec l'id ${attributeId}`);
+    }
+
+    // Récupérer toutes les valeurs liées à cet attribut
+    const values = await this.attributeValueRepo.find({
+      where: { attribute: { id: attributeId } },
+      relations: ['attribute'],
+      order: { position: 'ASC' },
+    });
+
+    return {
+      message: `Valeurs de l'attribut "${attribute.name}" récupérées avec succès`,
+      data: values,
+    };
+  }
+
+  // -------------------------------
+  // Récupération de tous les attributs
+  // -------------------------------
+  async findAll(): Promise<Attribute[]> {
+    return await this.attributeRepo.find({
+      relations: ['values', 'categories', 'products', 'variations'],
+      order: { name: 'ASC' },
+    });
+  }
+
+  // -------------------------------
+  // Récupération d’un attribut par id
+  // -------------------------------
+  async findOne(id: string): Promise<Attribute> {
+    const attribute = await this.attributeRepo.findOne({
+      where: { id },
+      relations: ['values', 'categories', 'products', 'variations'],
+    });
+
+    if (!attribute) {
+      throw new NotFoundException(`Attribut avec l'ID ${id} non trouvé`);
+    }
+
+    return attribute;
+  }
+
+  async findAttributesByCategory(
+    categoryId: string,
+  ): Promise<{ message: string; data: Attribute[] }> {
+    const attributes = await this.attributeRepo
+      .createQueryBuilder('attribute')
+      .innerJoin('attribute.categories', 'categoryAttr')
+      .leftJoinAndSelect('attribute.values', 'values')
+      .leftJoinAndSelect('attribute.products', 'products')
+      .leftJoinAndSelect('attribute.variations', 'variations')
+      .leftJoinAndSelect('categoryAttr.category', 'category')
+      .where('categoryAttr.categoryId = :categoryId', { categoryId })
+      .orderBy('attribute.name', 'ASC')
+      .getMany();
+
+    return {
+      message: `Attributs de la catégorie ${categoryId} récupérés avec succès`,
+      data: attributes,
+    };
+  }
+
+  // -------------------------------
+  // Récupération par type
+  // -------------------------------
+  async findByType(type: AttributeType): Promise<Attribute[]> {
+    const attributes = await this.attributeRepo.find({
+      where: { type },
+      relations: ['values', 'categories', 'products', 'variations'],
+      order: { name: 'ASC' },
+    });
+
+    if (!attributes.length) {
+      throw new NotFoundException(`Aucun attribut trouvé pour le type ${type}`);
+    }
+
+    return attributes;
+  }
+
+  // -------------------------------
+  // Récupération filtrable
+  // -------------------------------
+  async findByFilterable(): Promise<Attribute[]> {
+    return await this.attributeRepo.find({
+      where: { isFilterable: true },
+      relations: ['values', 'categories', 'products', 'variations'],
+      order: { name: 'ASC' },
+    });
+  }
+
+  // -------------------------------
+  // Suppression complète
+  // -------------------------------
   async remove(id: string): Promise<{ message: string }> {
     const attribute = await this.findOne(id);
 
-    // Vérifier si l'attribut est utilisé
     const isUsed = await this.isAttributeUsed(id);
     if (isUsed) {
       throw new BadRequestException(
@@ -199,20 +287,23 @@ export class AttributeService {
     await this.attributeRepo.remove(attribute);
 
     this.logger.log(`✅ Attribut "${attribute.name}" supprimé avec succès`);
-
     return { message: 'Attribut supprimé avec succès' };
   }
 
+  // -------------------------------
+  // Soft delete
+  // -------------------------------
   async softDelete(id: string): Promise<{ message: string }> {
     const attribute = await this.findOne(id);
-
     await this.attributeRepo.softDelete(id);
 
     this.logger.log(`✅ Attribut "${attribute.name}" supprimé (soft delete) avec succès`);
-
     return { message: 'Attribut supprimé avec succès' };
   }
 
+  // -------------------------------
+  // Vérifie si l'attribut est utilisé
+  // -------------------------------
   private async isAttributeUsed(id: string): Promise<boolean> {
     const attribute = await this.attributeRepo.findOne({
       where: { id },
@@ -227,6 +318,9 @@ export class AttributeService {
     );
   }
 
+  // -------------------------------
+  // Ajout d’une valeur unique
+  // -------------------------------
   async addValueToAttribute(
     attributeId: string,
     valueData: { value: string; displayOrder?: number },
@@ -248,9 +342,14 @@ export class AttributeService {
 
     const savedValue = await this.attributeValueRepo.save(attributeValue);
 
+    const valueWithRelations = await this.attributeValueRepo.findOne({
+      where: { id: savedValue.id },
+      relations: ['attribute'],
+    });
+
     return {
       message: "Valeur ajoutée avec succès à l'attribut",
-      data: savedValue,
+      data: valueWithRelations!,
     };
   }
 }

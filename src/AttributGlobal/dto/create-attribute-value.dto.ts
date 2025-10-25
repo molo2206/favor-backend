@@ -1,6 +1,10 @@
-import { IsString, IsOptional, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, IsUUID } from 'class-validator';
 
 export class CreateAttributeValueDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string; // <- pour l'update
+
   @IsString()
   value: string;
 
@@ -20,4 +24,7 @@ export class CreateAttributeValueDto {
   @IsInt()
   @Min(0)
   position?: number;
+
+  @IsUUID()
+  attributeId: string;
 }

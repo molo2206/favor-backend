@@ -30,8 +30,8 @@ export class AttributeValue {
   @Column({ nullable: true })
   imageUrl?: string;
 
-  @Column({ default: 0 })
-  position: number;
+  @Column({ nullable: true })
+  position?: number;
 
   @Column()
   attributeId: string;

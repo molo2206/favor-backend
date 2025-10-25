@@ -1,100 +1,105 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Query,
-  HttpCode,
-  HttpStatus,
-  UseInterceptors,
-  ClassSerializerInterceptor,
-  Patch,
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Logger } from '@nestjs/common';
 import { AttributeService } from './attribute.service';
 import { CreateAttributeDto } from './dto/create-attribute.dto';
 import { UpdateAttributeDto } from './dto/update-attribute.dto';
-import { Attribute } from './entities/attributes.entity';
+import { CreateAttributeValueDto } from './dto/create-attribute-value.dto';
 import { AttributeType } from './enum/attributeType.enum';
 
-@Controller('global-attributes')
-@UseInterceptors(ClassSerializerInterceptor)
+@Controller('attributes')
 export class AttributeController {
+  private readonly logger = new Logger(AttributeController.name);
+
   constructor(private readonly attributeService: AttributeService) {}
 
+  // -------------------------------
+  // Création d'un attribut
+  // -------------------------------
   @Post()
   async create(@Body() createAttributeDto: CreateAttributeDto) {
-    return await this.attributeService.create(createAttributeDto);
+    return this.attributeService.create(createAttributeDto);
   }
 
+  // -------------------------------
+  // Mise à jour d'un attribut
+  // -------------------------------
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() updateAttributeDto: UpdateAttributeDto) {
+    return this.attributeService.update(id, updateAttributeDto);
+  }
+
+  // -------------------------------
+  // Récupération de tous les attributs
+  // -------------------------------
   @Get()
   async findAll() {
-    const attributes = await this.attributeService.findAll();
+    const data = await this.attributeService.findAll();
     return {
-      message: attributes.length
-        ? 'Tous les attributs récupérés avec succès.'
-        : 'Aucun attribut trouvé.',
-      data: attributes,
-      count: attributes.length,
-    };
-  }
-
-  @Get('filterable')
-  async findFilterable() {
-    const attributes = await this.attributeService.findByFilterable();
-    return {
-      message: attributes.length
-        ? 'Attributs filtrables récupérés avec succès.'
-        : 'Aucun attribut filtrable trouvé.',
-      data: attributes,
-      count: attributes.length,
-    };
-  }
-
-  @Get('type/:type')
-  async findByType(@Param('type') type: AttributeType) {
-    const attributes = await this.attributeService.findByType(type);
-    return {
-      message: attributes.length
-        ? `Attributs du type "${type}" récupérés avec succès.`
-        : `Aucun attribut trouvé pour le type "${type}".`,
-      data: attributes,
-      count: attributes.length,
+      message: 'Liste de tous les attributs récupérée avec succès',
+      data,
     };
   }
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    const attribute = await this.attributeService.findOne(id);
+    const data = await this.attributeService.findOne(id);
     return {
-      message: `Attribut avec l'id "${id}" récupéré avec succès.`,
-      data: attribute,
+      message: `Attribut avec l'ID ${id} récupéré avec succès`,
+      data,
     };
   }
 
-  @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateAttributeDto: UpdateAttributeDto) {
-    return await this.attributeService.update(id, updateAttributeDto);
+  @Get('type/:type')
+  async findByType(@Param('type') type: AttributeType) {
+    const data = await this.attributeService.findByType(type);
+    return {
+      message: `Attributs de type "${type}" récupérés avec succès`,
+      data,
+    };
   }
 
+  @Get('category/:categoryId/attributes/by-category')
+  async getAttributesByCategory(@Param('categoryId') categoryId: string) {
+    return this.attributeService.findAttributesByCategory(categoryId);
+  }
+
+  @Get('filterable')
+  async findFilterable() {
+    const data = await this.attributeService.findByFilterable();
+    return {
+      message: 'Attributs filtrables récupérés avec succès',
+      data,
+    };
+  }
+
+  // -------------------------------
+  // Supprimer un attribut
+  // -------------------------------
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string) {
-    return await this.attributeService.remove(id);
+    return this.attributeService.remove(id);
   }
 
-  @Delete(':id/soft')
+  // -------------------------------
+  // Soft delete d'un attribut
+  // -------------------------------
+  @Patch(':id/soft-delete')
   async softDelete(@Param('id') id: string) {
-    return await this.attributeService.softDelete(id);
+    return this.attributeService.softDelete(id);
   }
 
-  @Post(':id/values')
-  async addValueToAttribute(
-    @Param('id') attributeId: string,
-    @Body() valueData: { value: string; displayOrder?: number },
+  // -------------------------------
+  // Création de plusieurs valeurs pour un attribut
+  // -------------------------------
+
+  @Post('value')
+  async createOrUpdateSingleAttributeValue(
+    @Body() body: CreateAttributeValueDto & { attributeId: string },
   ) {
-    return await this.attributeService.addValueToAttribute(attributeId, valueData);
+    return this.attributeService.createOrUpdateSingleAttributeValue(body);
+  }
+
+  @Get(':attributeId/values')
+  async getValuesByAttribute(@Param('attributeId') attributeId: string) {
+    return this.attributeService.getValuesByAttribute(attributeId);
   }
 }
