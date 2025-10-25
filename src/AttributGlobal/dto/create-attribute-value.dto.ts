@@ -20,7 +20,4 @@ export class CreateAttributeValueDto {
   @IsInt()
   @Min(0)
   position?: number;
-
-  @IsString()
-  attributeId: string; // Lien vers l'attribut parent
 }

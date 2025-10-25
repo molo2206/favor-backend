@@ -31,7 +31,6 @@ export class AttributeService {
   ): Promise<{ message: string; data: Attribute }> {
     const { name, type, description, isRequired, isFilterable, values } = createAttributeDto;
 
-    // Vérifier l'unicité du nom
     const existingAttribute = await this.attributeRepo.findOne({
       where: { name },
     });
@@ -39,11 +38,10 @@ export class AttributeService {
       throw new ConflictException('Un attribut avec ce nom existe déjà');
     }
 
-    // Générer le slug
     const slug = slugify(name, { lower: true, strict: true });
 
     return await this.dataSource.transaction(async (manager) => {
-      // Créer l'attribut
+
       const attribute = manager.create(Attribute, {
         name,
         slug,
@@ -55,7 +53,6 @@ export class AttributeService {
 
       const savedAttribute = await manager.save(attribute);
 
-      // Créer les valeurs d'attribut si fournies
       if (Array.isArray(values) && values.length > 0) {
         const attributeValues = values.map((value) =>
           manager.create(AttributeValue, {
@@ -66,7 +63,6 @@ export class AttributeService {
         await manager.save(attributeValues);
       }
 
-      // Recharger l'attribut avec ses relations
       const attributeWithRelations = await manager.findOne(Attribute, {
         where: { id: savedAttribute.id },
         relations: ['values'],
