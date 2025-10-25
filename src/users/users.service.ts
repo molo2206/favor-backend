@@ -805,6 +805,9 @@ export class UsersService {
         'userHasCompany.permissions.permission',
         'userHasCompany.company.country',
         'userHasCompany.company.city',
+        'userPlatformRoles', // <-- Ajouter cette relation
+        'userPlatformRoles.platform',
+        'userPlatformRoles.role',
       ],
     });
 
@@ -814,6 +817,7 @@ export class UsersService {
 
     const { password, ...userWithoutPassword } = user;
 
+    // Mapping des companies et permissions
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
         id: uhc.id,
@@ -867,9 +871,33 @@ export class UsersService {
           })) ?? [],
       })) ?? [];
 
+    // Mapping des roles sur plateformes
+    const userPlatformRoles =
+      userWithoutPassword.userPlatformRoles?.map((upr) => ({
+        id: upr.id,
+        platform: upr.platform
+          ? {
+              id: upr.platform.id,
+              name: upr.platform.name,
+              key: upr.platform.key,
+              status: upr.platform.status,
+            }
+          : null,
+        role: upr.role
+          ? {
+              id: upr.role.id,
+              key: upr.role.key,
+              name: upr.role.name,
+              status: upr.role.status,
+            }
+          : null,
+        createdAt: upr.createdAt,
+      })) ?? [];
+
     return {
       ...userWithoutPassword,
       userHasCompany,
+      userPlatformRoles,
       activeCompany: userWithoutPassword.activeCompany
         ? {
             ...userWithoutPassword.activeCompany,
