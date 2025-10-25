@@ -125,7 +125,7 @@ export class AttributeService {
   // -------------------------------
   // Création de plusieurs valeurs pour un attribut
   // -------------------------------
-  async createOrUpdateSingleAttributeValue(
+  async createSingleAttributeValue(
     body: CreateAttributeValueDto & { attributeId: string },
   ): Promise<{ message: string; data: AttributeValue }> {
     const { attributeId, value, displayName, color, imageUrl, position } = body;
@@ -137,42 +137,84 @@ export class AttributeService {
     }
 
     return await this.dataSource.transaction(async (manager) => {
-      // Vérifier si la valeur existe déjà pour cet attribut
-      let attributeValue = await manager.findOne(AttributeValue, {
+      // Vérifier si la valeur existe déjà
+      const existingValue = await manager.findOne(AttributeValue, {
         where: { value, attribute: { id: attributeId } },
       });
 
-      if (attributeValue) {
-        // Mise à jour si existante
-        attributeValue.displayName = displayName ?? attributeValue.displayName;
-        attributeValue.color = color ?? attributeValue.color;
-        attributeValue.imageUrl = imageUrl ?? attributeValue.imageUrl;
-        attributeValue.position = position ?? attributeValue.position;
-      } else {
-        // Création sinon
-        attributeValue = manager.create(AttributeValue, {
-          attribute,
-          value,
-          displayName,
-          color,
-          imageUrl,
-          position,
-        });
+      if (existingValue) {
+        throw new ConflictException('Cette valeur existe déjà pour cet attribut');
       }
+
+      // Création
+      const attributeValue = manager.create(AttributeValue, {
+        attribute,
+        value,
+        displayName,
+        color,
+        imageUrl,
+        position,
+      });
 
       const savedValue = await manager.save(attributeValue);
 
-      // Recharger avec relations
       const valueWithRelations = await manager.findOne(AttributeValue, {
         where: { id: savedValue.id },
         relations: ['attribute'],
       });
 
       return {
-        message: 'Valeur créée ou mise à jour avec succès',
+        message: 'Valeur créée avec succès',
         data: valueWithRelations!,
       };
     });
+  }
+
+  async updateSingleAttributeValue(
+    id: string,
+    body: Partial<CreateAttributeValueDto>,
+  ): Promise<{ message: string; data: AttributeValue }> {
+    const { value, displayName, color, imageUrl, position } = body;
+
+    // Chercher la valeur existante
+    const attributeValue = await this.attributeValueRepo.findOne({
+      where: { id },
+      relations: ['attribute'],
+    });
+
+    if (!attributeValue) {
+      throw new NotFoundException(`Valeur avec l'ID ${id} non trouvée`);
+    }
+
+    // Mise à jour
+    if (value !== undefined) attributeValue.value = value;
+    if (displayName !== undefined) attributeValue.displayName = displayName;
+    if (color !== undefined) attributeValue.color = color;
+    if (imageUrl !== undefined) attributeValue.imageUrl = imageUrl;
+    if (position !== undefined) attributeValue.position = position;
+
+    const updatedValue = await this.attributeValueRepo.save(attributeValue);
+
+    return {
+      message: 'Valeur mise à jour avec succès',
+      data: updatedValue,
+    };
+  }
+
+  async getOneValue(id: string): Promise<{ message: string; data: AttributeValue }> {
+    const attributeValue = await this.attributeValueRepo.findOne({
+      where: { id },
+      relations: ['attribute'],
+    });
+
+    if (!attributeValue) {
+      throw new NotFoundException(`Valeur avec l'ID ${id} non trouvée`);
+    }
+
+    return {
+      message: 'Valeur récupérée avec succès',
+      data: attributeValue,
+    };
   }
 
   async getValuesByAttribute(

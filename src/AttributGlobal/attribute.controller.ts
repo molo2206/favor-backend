@@ -86,16 +86,23 @@ export class AttributeController {
   async softDelete(@Param('id') id: string) {
     return this.attributeService.softDelete(id);
   }
-
-  // -------------------------------
-  // Création de plusieurs valeurs pour un attribut
-  // -------------------------------
-
   @Post('value')
-  async createOrUpdateSingleAttributeValue(
-    @Body() body: CreateAttributeValueDto & { attributeId: string },
+  async createSingleValue(@Body() body: CreateAttributeValueDto & { attributeId: string }) {
+    return this.attributeService.createSingleAttributeValue(body);
+  }
+
+  // Modification
+  @Patch('value/:id')
+  async updateSingleValue(
+    @Param('id') id: string,
+    @Body() body: Partial<CreateAttributeValueDto>,
   ) {
-    return this.attributeService.createOrUpdateSingleAttributeValue(body);
+    return this.attributeService.updateSingleAttributeValue(id, body);
+  }
+
+  @Get('value/:id')
+  async getOneValue(@Param('id') id: string) {
+    return this.attributeService.getOneValue(id);
   }
 
   @Get(':attributeId/values')
