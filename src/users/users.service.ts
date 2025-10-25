@@ -1,7 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Injectable, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -345,6 +350,7 @@ export class UsersService {
     access_token: string;
     refresh_token: string;
   }> {
+    // 1️⃣ Récupération de l'utilisateur avec toutes les relations nécessaires
     const user = await this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
@@ -362,24 +368,22 @@ export class UsersService {
       .where('users.email = :login OR users.phone = :login', { login: userSignInDto.email })
       .getOne();
 
-    if (!user) {
+    if (!user)
       throw new BadRequestException(
         'Aucun utilisateur trouvé avec cet email ou numéro de téléphone.',
       );
-    }
-
-    if (!user.password) {
+    if (!user.password)
       throw new BadRequestException('Mot de passe non défini pour ce compte.');
-    }
 
+    // 2️⃣ Vérification du mot de passe
     const isPasswordValid = await bcrypt.compare(userSignInDto.password, user.password);
+    if (!isPasswordValid) throw new BadRequestException('Mot de passe incorrect.');
 
-    if (!isPasswordValid) {
-      throw new BadRequestException('Mot de passe incorrect.');
-    }
+    // 3️⃣ Génération des tokens
+    const access_token = await this.accessToken(user);
+    const refresh_token = await this.refreshToken(user);
 
-    const token = await this.accessToken(user);
-    const refresh_t = await this.refreshToken(user);
+    // 4️⃣ Sérialisation complète
     const { password, ...userWithoutPassword } = user;
 
     const userHasCompany =
@@ -439,32 +443,24 @@ export class UsersService {
       (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
     )?.company;
 
+    const userPlatformRoles =
+      userWithoutPassword.userPlatformRoles?.map((upr) => ({
+        id: upr.id,
+        platform: upr.platform,
+        role: upr.role,
+      })) ?? [];
+
+    // 5️⃣ Retour final
     return {
       message: 'Connexion réussie !',
       data: {
-        id: userWithoutPassword.id,
-        fullName: userWithoutPassword.fullName,
-        email: userWithoutPassword.email,
-        phone: userWithoutPassword.phone,
-        image: userWithoutPassword.image,
-        role: userWithoutPassword.role,
-        isActive: userWithoutPassword.isActive,
-        country: userWithoutPassword.country,
-        city: userWithoutPassword.city,
-        activeCompanyId: userWithoutPassword.activeCompanyId,
-        address: userWithoutPassword.address,
-        preferredLanguage: userWithoutPassword.preferredLanguage,
-        loyaltyPoints: userWithoutPassword.loyaltyPoints,
-        dateOfBirth: userWithoutPassword.dateOfBirth,
-        vehicleType: userWithoutPassword.vehicleType,
-        plateNumber: userWithoutPassword.plateNumber,
-        defaultAddressId: userWithoutPassword.defaultAddressId,
-        defaultAddress: userWithoutPassword.defaultAddress,
+        ...userWithoutPassword,
         userHasCompany,
         activeCompany,
+        userPlatformRoles,
       },
-      access_token: token,
-      refresh_token: refresh_t,
+      access_token,
+      refresh_token,
     };
   }
 
