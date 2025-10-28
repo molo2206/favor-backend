@@ -18,32 +18,35 @@ import { AuthentificationGuard } from 'src/users/utility/guards/authentification
 
 @Controller('measures')
 export class MeasureController {
-  constructor(private readonly measureService: MeasureService) { }
+  constructor(private readonly measureService: MeasureService) {}
 
   @Post()
   @UseGuards(AuthentificationGuard)
-  async createMeasure(
-    @Body() dto: CreateMeasureDto,
-    @CurrentUser() user: UserEntity,
-  ) {
+  async createMeasure(@Body() dto: CreateMeasureDto, @CurrentUser() user: UserEntity) {
     return this.measureService.create(dto, user);
   }
 
   @Get()
   async findAll(@CurrentUser() user: UserEntity) {
     if (!user.activeCompanyId) {
-      throw new BadRequestException('Aucune entreprise active n’est associée à cet utilisateur');
+      throw new BadRequestException(
+        'Aucune entreprise active n’est associée à cet utilisateur',
+      );
     }
     return await this.measureService.findAll(user.activeCompanyId);
   }
 
+  @Get('company/:id')
+  async findAllByCompany(@Param('id') id: string) {
+    return await this.measureService.findAll(id);
+  }
+
   @Get(':id')
-  async findOne(
-    @Param('id') id: string,
-    @CurrentUser() user: UserEntity,
-  ) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: UserEntity) {
     if (!user.activeCompanyId) {
-      throw new BadRequestException('Aucune entreprise active n’est associée à cet utilisateur');
+      throw new BadRequestException(
+        'Aucune entreprise active n’est associée à cet utilisateur',
+      );
     }
 
     return await this.measureService.findOne(id, user.activeCompanyId);
@@ -58,14 +61,12 @@ export class MeasureController {
     return this.measureService.update(id, dto, user);
   }
 
-
   @Delete(':id')
-  async remove(
-    @Param('id') id: string,
-    @CurrentUser() user: UserEntity,
-  ) {
+  async remove(@Param('id') id: string, @CurrentUser() user: UserEntity) {
     if (!user.activeCompanyId) {
-      throw new BadRequestException('Aucune entreprise active n’est associée à cet utilisateur');
+      throw new BadRequestException(
+        'Aucune entreprise active n’est associée à cet utilisateur',
+      );
     }
     return await this.measureService.remove(id, user.activeCompanyId);
   }
