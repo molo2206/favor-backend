@@ -46,6 +46,7 @@ export class TravelReservationEntity {
     @IsEnum(ReservationStatus, {
         message: `Le statut doit être : ${Object.values(ReservationStatus).join(', ')}`,
     })
+    
     @Column({
         type: 'enum',
         enum: ReservationStatus,

@@ -9,7 +9,7 @@ export const dataSourceOptions: DataSourceOptions = {
 
   username: 'admin',
   password: 'Favor@2025',
-  database: 'favor_db1',
+  database: 'favor_db',
 
   // username: 'root',
   // password: '',

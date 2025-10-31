@@ -68,7 +68,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
-  // ✅ VALIDATION SIMPLIFIÉE
+  //  VALIDATION SIMPLIFIÉE
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,

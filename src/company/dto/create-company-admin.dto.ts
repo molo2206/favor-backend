@@ -102,7 +102,7 @@ export class CreateCompanyAdminDto {
   @IsUUID('4', { message: "Le champ 'cityId' doit être un UUID valide" })
   cityId?: string;
 
-  @IsOptional()
-  @IsUUID('4', { message: "Le champ 'countryId' doit être un UUID valide" })
-  userId?: string;
+  @IsNotEmpty()
+  @IsUUID('4', { message: "Le champ 'userId' doit être un UUID valide" })
+  userId: string;
 }
