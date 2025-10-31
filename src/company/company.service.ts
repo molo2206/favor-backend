@@ -351,7 +351,6 @@ export class CompanyService {
       status: CompanyStatus.VALIDATED,
     });
 
-
     const savedCompany = await this.companyRepository.save(company);
 
     // Lier la company au user
@@ -656,6 +655,8 @@ export class CompanyService {
       .leftJoinAndSelect('userHasCompany.role', 'role')
       .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
       .leftJoinAndSelect('permissions.permission', 'permission')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .orderBy('company.companyName', 'ASC');
 
     if (type) {
@@ -685,6 +686,8 @@ export class CompanyService {
         'userHasCompany.role',
         'userHasCompany.permissions',
         'userHasCompany.permissions.permission',
+        'country', // ajouté
+        'city', // ajouté
       ],
     });
 
@@ -697,30 +700,24 @@ export class CompanyService {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async findByCompany(companyId: string): Promise<{ data: any }> {
-    // Récupère la compagnie avec ses relations nécessaires
     const company = await this.companyRepository.findOne({
       where: { id: companyId },
+      relations: ['country', 'city'], // ajouté
     });
 
     if (!company) {
       throw new NotFoundException(`Entreprise avec l'ID ${companyId} introuvable`);
     }
 
-    // Récupère les produits liés à la compagnie
     const products = await this.companyRepository.find({
-      where: {
-        company: {
-          id: companyId,
-        },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any, // <- permet à TypeScript de comprendre que tu cibles une relation
+      where: { company: { id: companyId } } as any,
       relations: ['category', 'images'],
     });
-    // Retourne tous les champs de la compagnie + les produits
+
     return {
       data: {
-        ...company, // toutes les propriétés de l'objet company à plat
-        products, // les produits dans un tableau
+        ...company,
+        products,
       },
     };
   }
@@ -761,6 +758,8 @@ export class CompanyService {
       .createQueryBuilder('users')
       .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
       .leftJoinAndSelect('userHasCompany.company', 'company')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
       .leftJoinAndSelect('permissions.permission', 'permission')
       .where('users.id = :id', { id: userId })
@@ -849,7 +848,14 @@ export class CompanyService {
   async findAllByUser(userId: string): Promise<Record<string, any>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['activeCompany', 'userHasCompany.company'],
+      relations: [
+        'activeCompany',
+        'activeCompany.country',
+        'activeCompany.city',
+        'userHasCompany.company',
+        'userHasCompany.company.country',
+        'userHasCompany.company.city',
+      ],
     });
 
     if (!user) {
@@ -860,10 +866,10 @@ export class CompanyService {
     const companies =
       user.userHasCompany?.map((uhc) => ({
         ...uhc.company,
+        country: uhc.company.country,
+        city: uhc.company.city,
         role: uhc.role,
-        permissions: uhc.permissions?.map((perm) => ({
-          ...perm.permission,
-        })),
+        permissions: uhc.permissions?.map((perm) => ({ ...perm.permission })),
         isOwner: uhc.isOwner,
       })) || [];
 
