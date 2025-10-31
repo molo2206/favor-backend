@@ -7,6 +7,7 @@ import {
   IsEnum,
   IsNumber,
   IsUUID,
+  isNotEmpty,
 } from 'class-validator';
 import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 import { CompanyType } from 'src/company/enum/type.company.enum';
@@ -102,7 +103,7 @@ export class CreateCompanyAdminDto {
   @IsUUID('4', { message: "Le champ 'cityId' doit être un UUID valide" })
   cityId?: string;
 
-  @IsOptional()
-  @IsUUID('4', { message: "Le champ 'countryId' doit être un UUID valide" })
-  userId?: string;
+  @IsNotEmpty({ message: "Le champ 'userId' ne doit pas être vide" })
+  @IsUUID('4', { message: "Le champ 'userId' doit être un UUID valide" })
+  userId: string;
 }

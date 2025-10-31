@@ -87,18 +87,14 @@ export class CompanyController {
   @UseGuards(AuthentificationGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   @UseInterceptors(AnyFilesInterceptor())
-  async createCompanyAmin(
+  async createCompanyAdmin(
     @UploadedFiles() files: Express.Multer.File[],
-    @Body() dto: CreateCompanyDto,
+    @Body() dto: CreateCompanyAdminDto,
   ) {
     const logo = files.find((file) => file.fieldname === 'logo');
     const banner = files.find((file) => file.fieldname === 'banner');
 
-    const result = await this.companyService.createCompanyWithUserAdmin(
-      dto,
-      logo,
-      banner,
-    );
+    const result = await this.companyService.createCompanyWithUserAdmin(dto, logo, banner);
     return result;
   }
 

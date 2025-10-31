@@ -353,8 +353,12 @@ export class CompanyService {
     const savedCompany = await this.companyRepository.save(company);
 
     // Lier la company au user
+    const userExist = await this.userRepository.findOne({ where: { id: dto.userId } });
+    if (!userExist) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
     const userHasCompany = this.userHasCompanyRepository.create({
-      user: dto.userId ? ({ id: dto.userId } as any) : null,
+      user: userExist.id ? ({ id: userExist.id } as any) : null,
       company: savedCompany,
       isOwner: true,
     });
