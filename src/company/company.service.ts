@@ -348,7 +348,9 @@ export class CompanyService {
       localCurrency: dto.localCurrency,
       country: dto.countryId ? ({ id: dto.countryId } as any) : null,
       city: dto.cityId ? ({ id: dto.cityId } as any) : null,
+      status: CompanyStatus.VALIDATED,
     });
+
 
     const savedCompany = await this.companyRepository.save(company);
 
@@ -404,7 +406,7 @@ export class CompanyService {
         user.email,
         'Votre entreprise a été créée avec succès',
         'company-status-update.html',
-        { companyName: dto.companyName, status: 'PENDING', year: new Date().getFullYear() },
+        { companyName: dto.companyName, status: 'VALIDATED', year: new Date().getFullYear() },
       );
     }
     if (hasPhone) {
