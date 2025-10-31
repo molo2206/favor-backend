@@ -364,7 +364,6 @@ export class CompanyService {
     user.activeCompanyId = savedCompany.id;
     await this.userRepository.save(user);
 
-    // Récupérer le user complet avec relations pour retour
     const fullUser = await this.userRepository.findOne({
       where: { id: user.id },
       relations: [
