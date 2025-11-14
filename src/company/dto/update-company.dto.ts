@@ -78,4 +78,8 @@ export class UpdateCompanyDto {
   @IsOptional()
   @IsUUID('4', { message: "Le champ 'cityId' doit être un UUID valide" })
   cityId?: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: "Le champ 'categoryId' doit être un UUID valide" })
+  categoryId?: string;
 }

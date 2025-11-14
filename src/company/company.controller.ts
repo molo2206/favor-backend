@@ -135,6 +135,7 @@ export class CompanyController {
     @Query('type') type?: string,
     @Query('countryId') countryId?: string,
     @Query('cityId') cityId?: string,
+    @Query('categoryId') categoryId?: string, // Ajout du filtre categoryId
     @Query('page') page = 1,
     @Query('limit') limit = 10,
   ) {
@@ -142,6 +143,7 @@ export class CompanyController {
       type,
       countryId,
       cityId,
+      categoryId, // Passage à la méthode du service
       Number(page),
       Number(limit),
     );
@@ -247,4 +249,3 @@ export class CompanyController {
     };
   }
 }
-

@@ -20,6 +20,7 @@ import { IsNumber, IsString } from 'class-validator';
 import { BranchEntity } from '../../branch/entity/branch.entity';
 import { Country } from './country.entity';
 import { City } from './city.entity';
+import { CategoryEntity } from 'src/category/entities/category.entity';
 
 @Entity('company')
 export class CompanyEntity {
@@ -121,6 +122,13 @@ export class CompanyEntity {
 
   @Column({ nullable: true })
   countryId?: string;
+
+  @ManyToOne(() => CategoryEntity, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'categoryId' })
+  category?: CategoryEntity | null;
+
+  @Column({ nullable: true })
+  categoryId?: string | null;
 
   @ManyToOne(() => City, { nullable: true })
   @JoinColumn({ name: 'cityId' })

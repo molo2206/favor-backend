@@ -128,6 +128,9 @@ export class CompanyService {
       localCurrency: dto.localCurrency,
       country: dto.countryId ? ({ id: dto.countryId } as any) : null,
       city: dto.cityId ? ({ id: dto.cityId } as any) : null,
+
+      category: dto.categoryId ? ({ id: dto.categoryId } as any) : null,
+      categoryId: dto.categoryId ?? null,
     });
 
     const savedCompany = await this.companyRepository.save(company);
@@ -271,6 +274,7 @@ export class CompanyService {
       'typeCompany',
       'countryId',
       'cityId',
+      'categoryId',
     ];
 
     for (const field of fieldsToUpdate) {
@@ -318,6 +322,11 @@ export class CompanyService {
     }
     if (dto.cityId) {
       company.city = { id: dto.cityId } as any;
+    }
+
+    if (dto.categoryId) {
+      company.category = { id: dto.categoryId } as any;
+      company.categoryId = dto.categoryId;
     }
 
     await this.companyRepository.save(company);
@@ -397,6 +406,8 @@ export class CompanyService {
       localCurrency: dto.localCurrency,
       country: dto.countryId ? ({ id: dto.countryId } as any) : null,
       city: dto.cityId ? ({ id: dto.cityId } as any) : null,
+      category: dto.categoryId ? ({ id: dto.categoryId } as any) : null,
+      categoryId: dto.categoryId ?? null,
       status: CompanyStatus.VALIDATED,
     });
 
@@ -514,6 +525,7 @@ export class CompanyService {
       'typeCompany',
       'countryId',
       'cityId',
+      'categoryId',
     ];
 
     for (const field of fieldsToUpdate) {
@@ -561,6 +573,16 @@ export class CompanyService {
     }
     if (dto.cityId) {
       company.city = { id: dto.cityId } as any;
+    }
+
+    if (dto.categoryId !== undefined) {
+      if (dto.categoryId === null) {
+        // Supprimer la catégorie
+      } else {
+        // Assigner une nouvelle catégorie
+        company.category = { id: dto.categoryId } as any;
+        company.categoryId = dto.categoryId;
+      }
     }
 
     await this.companyRepository.save(company);
@@ -705,6 +727,7 @@ export class CompanyService {
       .leftJoinAndSelect('permissions.permission', 'permission')
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.category', 'category')
       .orderBy('company.companyName', 'ASC');
 
     if (type) {
@@ -712,7 +735,7 @@ export class CompanyService {
     }
 
     query.orderBy('company.createdAt', 'DESC');
-    
+
     const companies = await query.getMany();
 
     if (companies.length === 0) {
@@ -738,6 +761,7 @@ export class CompanyService {
         'userHasCompany.permissions.permission',
         'country', // ajouté
         'city', // ajouté
+        'category',
       ],
     });
 
@@ -752,7 +776,7 @@ export class CompanyService {
   async findByCompany(companyId: string): Promise<{ data: any }> {
     const company = await this.companyRepository.findOne({
       where: { id: companyId },
-      relations: ['country', 'city'], // ajouté
+      relations: ['country', 'city', 'category'], // ajouté
     });
 
     if (!company) {
@@ -812,6 +836,7 @@ export class CompanyService {
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('userHasCompany.permissions', 'permissions')
       .leftJoinAndSelect('permissions.permission', 'permission')
+      .leftJoinAndSelect('company.category', 'category')
       .where('users.id = :id', { id: userId })
       .getOne();
 
@@ -822,10 +847,8 @@ export class CompanyService {
     const { password, ...userWithoutPassword } = enrichedUser;
 
     const userHasCompanyList =
-      userWithoutPassword.userHasCompany?.map((uhc) => ({
-        id: uhc.id,
-        isOwner: uhc.isOwner,
-        company: uhc.company
+      userWithoutPassword.userHasCompany?.map((uhc) => {
+        const company = uhc.company
           ? {
               id: uhc.company.id,
               companyName: uhc.company.companyName || '',
@@ -849,25 +872,39 @@ export class CompanyService {
               taux: uhc.company.taux,
               open_time: uhc.company.open_time,
               delivery_minutes: uhc.company.delivery_minutes,
+              categoryId: (uhc.company as any).category?.id || null, // ✅ ici
             }
-          : null,
-        permissions:
-          uhc.permissions?.map((p) => ({
-            id: p.permission?.id,
-            name: p.permission?.name,
-            create: p.create,
-            read: p.read,
-            update: p.update,
-            delete: p.delete,
-            status: p.status,
-            createdAt: p.permission?.createdAt ? new Date(p.permission.createdAt) : null,
-            updatedAt: p.permission?.updatedAt ? new Date(p.permission.updatedAt) : null,
-          })) ?? [],
-      })) ?? [];
+          : null;
+
+        return {
+          id: uhc.id,
+          isOwner: uhc.isOwner,
+          company,
+          permissions:
+            uhc.permissions?.map((p) => ({
+              id: p.permission?.id,
+              name: p.permission?.name,
+              create: p.create,
+              read: p.read,
+              update: p.update,
+              delete: p.delete,
+              status: p.status,
+              createdAt: p.permission?.createdAt ? new Date(p.permission.createdAt) : null,
+              updatedAt: p.permission?.updatedAt ? new Date(p.permission.updatedAt) : null,
+            })) ?? [],
+        };
+      }) ?? [];
 
     const activeCompany = userHasCompanyList.find(
       (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
     )?.company;
+
+    const activeCompanyWithCategory = activeCompany
+      ? {
+          ...activeCompany,
+          categoryId: activeCompany.categoryId ?? null, // Ajout du categoryId
+        }
+      : null;
 
     return {
       message: 'Entreprise active définie avec succès.',
@@ -889,7 +926,7 @@ export class CompanyService {
         vehicleType: userWithoutPassword.vehicleType,
         plateNumber: userWithoutPassword.plateNumber,
         userHasCompany: userHasCompanyList,
-        activeCompany,
+        activeCompany: activeCompanyWithCategory, // ✅ ici
       },
     };
   }
@@ -905,6 +942,7 @@ export class CompanyService {
         'userHasCompany.company',
         'userHasCompany.company.country',
         'userHasCompany.company.city',
+        'userHasCompany.company.category',
       ],
     });
 
@@ -918,6 +956,7 @@ export class CompanyService {
         ...uhc.company,
         country: uhc.company.country,
         city: uhc.company.city,
+        category: uhc.company.category,
         role: uhc.role,
         permissions: uhc.permissions?.map((perm) => ({ ...perm.permission })),
         isOwner: uhc.isOwner,
@@ -936,6 +975,7 @@ export class CompanyService {
     type?: string,
     countryId?: string,
     cityId?: string,
+    categoryId?: string, // ajout du filtre categoryId
     page = 1,
     limit = 10,
   ): Promise<{
@@ -956,6 +996,7 @@ export class CompanyService {
       .leftJoinAndSelect('permissions.permission', 'permission')
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.category', 'category') // inclure l'objet category complet
       .where('company.status = :status', { status: 'VALIDATED' })
       .orderBy('company.companyName', 'ASC');
 
@@ -971,6 +1012,10 @@ export class CompanyService {
       query.andWhere('company.cityId = :cityId', { cityId });
     }
 
+    if (categoryId) {
+      query.andWhere('company.categoryId = :categoryId', { categoryId });
+    }
+
     query.skip((page - 1) * limit).take(limit);
 
     const [companies, total] = await query.getManyAndCount();
@@ -982,16 +1027,20 @@ export class CompanyService {
               type ? ` pour le type : ${type}` : ''
             }${countryId ? ` dans le pays : ${countryId}` : ''}${
               cityId ? ` et la ville : ${cityId}` : ''
-            }.`
+            }${categoryId ? ` et la catégorie : ${categoryId}` : ''}.`
           : 'Aucune entreprise validée trouvée pour les critères donnés.',
       data: {
-        data: companies,
+        data: companies.map((company) => ({
+          ...company,
+          category: company.category || null, // s'assurer que l'objet category est renvoyé
+        })),
         total,
         page,
         limit,
       },
     };
   }
+
   async getCompanyDashboard(user: UserEntity, startDate?: string, endDate?: string) {
     const companyId = user.activeCompanyId;
     const company = await this.companyRepository.findOne({ where: { id: companyId } });

@@ -106,4 +106,8 @@ export class CreateCompanyAdminDto {
   @IsNotEmpty({ message: "Le champ 'userId' ne doit pas être vide" })
   @IsUUID('4', { message: "Le champ 'userId' doit être un UUID valide" })
   userId: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: "Le champ 'categoryId' doit être un UUID valide" })
+  categoryId?: string;
 }

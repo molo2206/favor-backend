@@ -6,4 +6,5 @@ export enum CompanyType {
   SERVICE = 'SERVICE',
   HOTEL = 'HOTEL',
   SHIPPING = 'SHIPPING',
+  AGENCE = 'AGENCE',
 }
