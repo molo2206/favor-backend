@@ -14,7 +14,7 @@ export class AddressUserService {
 
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
-  ) { }
+  ) {}
 
   async create(
     createDto: CreateAddressUserDto,
@@ -60,7 +60,6 @@ export class AddressUserService {
     };
   }
 
-
   async updateDefaultAddress(user: UserEntity, addressId: string): Promise<AddressUser> {
     const address = await this.addressUserRepo.findOne({
       where: { id: addressId, user: { id: user.id } },
@@ -90,7 +89,9 @@ export class AddressUserService {
 
   async findAll(user: UserEntity): Promise<AddressUser[]> {
     return this.addressUserRepo.find({
-      where: { user },
+      where: {
+        user: { id: user.id },
+      },
       order: { createdAt: 'DESC' },
     });
   }
@@ -146,7 +147,6 @@ export class AddressUserService {
     return this.addressUserRepo.save(address);
   }
 
-
   async findOne(id: string, user: UserEntity): Promise<AddressUser> {
     const address = await this.addressUserRepo.findOne({
       where: { id, user },
@@ -159,15 +159,16 @@ export class AddressUserService {
     return address;
   }
 
-  async update(id: string, updateDto: UpdateAddressUserDto, user: UserEntity): Promise<AddressUser> {
+  async update(
+    id: string,
+    updateDto: UpdateAddressUserDto,
+    user: UserEntity,
+  ): Promise<AddressUser> {
     const address = await this.findOne(id, user);
 
     if (updateDto.isDefault) {
       // Désactiver les autres adresses par défaut avant de mettre à jour
-      await this.addressUserRepo.update(
-        { user, isDefault: true },
-        { isDefault: false },
-      );
+      await this.addressUserRepo.update({ user, isDefault: true }, { isDefault: false });
     }
 
     Object.assign(address, updateDto);
