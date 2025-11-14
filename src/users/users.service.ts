@@ -367,6 +367,7 @@ export class UsersService {
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.category', 'category')
       .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
       .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
       .leftJoinAndSelect('userPlatformRoles.role', 'role')
@@ -425,6 +426,8 @@ export class UsersService {
               city: uhc.company.city ?? null,
               localCurrency: uhc.company.localCurrency ?? null,
               taux: uhc.company.taux ?? null,
+              category: (uhc.company as any).category || null, // ✅ Category complet
+              categoryId: (uhc.company as any).category?.id || null, // ✅ CategoryId
             }
           : null,
       })) ?? [];
@@ -432,6 +435,14 @@ export class UsersService {
     const activeCompany = userHasCompany.find(
       (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
     )?.company;
+
+    const activeCompanyWithCategory = activeCompany
+      ? {
+          ...activeCompany,
+          category: activeCompany.category || null,
+          categoryId: activeCompany.category?.id || null,
+        }
+      : null;
 
     const userPlatformRoles =
       userWithoutPassword.userPlatformRoles?.map((upr) => ({
@@ -474,7 +485,7 @@ export class UsersService {
       data: instanceToPlain({
         ...userWithoutPassword,
         userHasCompany,
-        activeCompany,
+        activeCompany: activeCompanyWithCategory,
         userPlatformRoles,
         userHasResources,
       }),
@@ -498,9 +509,13 @@ export class UsersService {
         'activeCompany',
         'activeCompany.country',
         'activeCompany.city',
+        'activeCompany.category', // ✅ Category pour activeCompany
         'userHasCompany',
         'userHasCompany.company',
         'userHasCompany.company.tauxCompanies',
+        'userHasCompany.company.country',
+        'userHasCompany.company.city',
+        'userHasCompany.company.category', // ✅ Category pour chaque company
         'userPlatformRoles',
         'userPlatformRoles.platform',
         'userPlatformRoles.role',
@@ -550,6 +565,7 @@ export class UsersService {
 
     const { password, ...userWithoutPassword } = user;
 
+    // Mapping des entreprises liées
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
         id: uhc.id,
@@ -581,10 +597,25 @@ export class UsersService {
               city: uhc.company.city || null,
               localCurrency: uhc.company.localCurrency,
               taux: uhc.company.taux,
+              category: (uhc.company as any).category || null, // ✅ Category complet
+              categoryId: (uhc.company as any).category?.id || null, // ✅ CategoryId
             }
           : null,
       })) ?? [];
 
+    const activeCompany = userHasCompany.find(
+      (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
+    )?.company;
+
+    const activeCompanyWithCategory = activeCompany
+      ? {
+          ...activeCompany,
+          category: activeCompany.category || null,
+          categoryId: activeCompany.category?.id || null,
+        }
+      : null;
+
+    // Mapping des rôles sur les plateformes
     const userPlatformRoles =
       userWithoutPassword.userPlatformRoles?.map((upr) => ({
         id: upr.id,
@@ -604,6 +635,7 @@ export class UsersService {
         createdAt: upr.createdAt,
       })) ?? [];
 
+    // Mapping des ressources utilisateurs
     const userHasResources =
       userWithoutPassword.userHasResources?.map((uhr) => ({
         id: uhr.id,
@@ -625,15 +657,9 @@ export class UsersService {
     const responseUser = {
       ...userWithoutPassword,
       userHasCompany,
+      activeCompany: activeCompanyWithCategory,
       userPlatformRoles,
       userHasResources,
-      activeCompany: userWithoutPassword.activeCompany
-        ? {
-            ...userWithoutPassword.activeCompany,
-            country: userWithoutPassword.activeCompany.country ?? null,
-            city: userWithoutPassword.activeCompany.city ?? null,
-          }
-        : null,
     };
 
     return {
@@ -653,9 +679,13 @@ export class UsersService {
         'activeCompany',
         'activeCompany.country',
         'activeCompany.city',
+        'activeCompany.category', // ✅ Category pour activeCompany
         'userHasCompany',
         'userHasCompany.company',
         'userHasCompany.company.tauxCompanies',
+        'userHasCompany.company.country',
+        'userHasCompany.company.city',
+        'userHasCompany.company.category', // ✅ Category pour chaque company
         'userPlatformRoles',
         'userPlatformRoles.platform',
         'userPlatformRoles.role',
@@ -694,7 +724,7 @@ export class UsersService {
     const updatedUser = await this.usersRepository.save(user);
     const { password, ...userWithoutPassword } = updatedUser;
 
-    // 🏢 Mapping des companies
+    // 🏢 Mapping des companies avec category
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
         id: uhc.id,
@@ -726,9 +756,23 @@ export class UsersService {
               city: uhc.company.city || null,
               localCurrency: uhc.company.localCurrency,
               taux: uhc.company.taux,
+              category: (uhc.company as any).category || null, // ✅ Category complet
+              categoryId: (uhc.company as any).category?.id || null, // ✅ CategoryId
             }
           : null,
       })) ?? [];
+
+    const activeCompany = userHasCompany.find(
+      (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
+    )?.company;
+
+    const activeCompanyWithCategory = activeCompany
+      ? {
+          ...activeCompany,
+          category: activeCompany.category || null,
+          categoryId: activeCompany.category?.id || null,
+        }
+      : null;
 
     // 🔑 Mapping des rôles sur plateformes avec branches et ressources
     const userPlatformRoles =
@@ -788,13 +832,7 @@ export class UsersService {
       userHasCompany,
       userPlatformRoles,
       userHasResources,
-      activeCompany: userWithoutPassword.activeCompany
-        ? {
-            ...userWithoutPassword.activeCompany,
-            country: userWithoutPassword.activeCompany.country || null,
-            city: userWithoutPassword.activeCompany.city || null,
-          }
-        : null,
+      activeCompany: activeCompanyWithCategory,
     };
 
     return {
@@ -984,19 +1022,21 @@ export class UsersService {
         'activeCompany',
         'activeCompany.country',
         'activeCompany.city',
+        'activeCompany.category', // ✅ Ajouter category pour activeCompany
         'userHasCompany',
         'userHasCompany.company',
         'userHasCompany.company.tauxCompanies',
         'userHasCompany.company.country',
         'userHasCompany.company.city',
+        'userHasCompany.company.category', // ✅ Ajouter category pour chaque company
         'userPlatformRoles',
         'userPlatformRoles.platform',
         'userPlatformRoles.role',
         'userPlatformRoles.branchUserPlatformRoleResources',
         'userPlatformRoles.branchUserPlatformRoleResources.branch',
         'userPlatformRoles.branchUserPlatformRoleResources.resource',
-        'userHasResources', // ajout de la relation
-        'userHasResources.resource', // ajout de la relation
+        'userHasResources',
+        'userHasResources.resource',
       ],
     });
 
@@ -1038,6 +1078,8 @@ export class UsersService {
               city: uhc.company.city || null,
               localCurrency: uhc.company.localCurrency,
               taux: uhc.company.taux,
+              category: (uhc.company as any).category || null, // ✅ Category complet
+              categoryId: (uhc.company as any).category?.id || null, // ✅ CategoryId
             }
           : null,
         permissions:
@@ -1123,6 +1165,8 @@ export class UsersService {
             ...userWithoutPassword.activeCompany,
             country: userWithoutPassword.activeCompany.country || null,
             city: userWithoutPassword.activeCompany.city || null,
+            category: userWithoutPassword.activeCompany.category || null, // ✅ Category actif
+            categoryId: userWithoutPassword.activeCompany.category?.id || null, // ✅ CategoryId actif
           }
         : null,
     };
@@ -1235,51 +1279,39 @@ export class UsersService {
     const roles = Object.values(UserRole);
 
     let users: UserEntity[];
+    const relations = [
+      'activeCompany',
+      'activeCompany.country',
+      'activeCompany.city',
+      'activeCompany.category', // ✅ Ajouter category
+      'addresses',
+      'userHasCompany',
+      'userHasCompany.company',
+      'userHasCompany.company.tauxCompanies',
+      'userHasCompany.company.country',
+      'userHasCompany.company.city',
+      'userHasCompany.company.category', // ✅ Ajouter category
+      'userHasCompany.permissions',
+      'userHasCompany.permissions.permission',
+      'userPlatformRoles',
+      'userPlatformRoles.platform',
+      'userPlatformRoles.role',
+      'userPlatformRoles.branchUserPlatformRoleResources',
+      'userPlatformRoles.branchUserPlatformRoleResources.branch',
+      'userPlatformRoles.branchUserPlatformRoleResources.resource',
+      'userHasResources',
+      'userHasResources.resource',
+    ];
+
     if (role && roles.includes(role as UserRole)) {
       users = await this.usersRepository.find({
         where: { role: role as UserRole },
-        relations: [
-          'activeCompany',
-          'activeCompany.country',
-          'activeCompany.city',
-          'addresses',
-          'userHasCompany',
-          'userHasCompany.company',
-          'userHasCompany.company.tauxCompanies',
-          'userHasCompany.permissions',
-          'userHasCompany.permissions.permission',
-          'userPlatformRoles',
-          'userPlatformRoles.platform',
-          'userPlatformRoles.role',
-          'userPlatformRoles.branchUserPlatformRoleResources',
-          'userPlatformRoles.branchUserPlatformRoleResources.branch',
-          'userPlatformRoles.branchUserPlatformRoleResources.resource',
-          'userHasResources',
-          'userHasResources.resource',
-        ],
+        relations,
         order: { createdAt: 'DESC' },
       });
     } else {
       users = await this.usersRepository.find({
-        relations: [
-          'activeCompany',
-          'activeCompany.country',
-          'activeCompany.city',
-          'addresses',
-          'userHasCompany',
-          'userHasCompany.company',
-          'userHasCompany.company.tauxCompanies',
-          'userHasCompany.permissions',
-          'userHasCompany.permissions.permission',
-          'userPlatformRoles',
-          'userPlatformRoles.platform',
-          'userPlatformRoles.role',
-          'userPlatformRoles.branchUserPlatformRoleResources',
-          'userPlatformRoles.branchUserPlatformRoleResources.branch',
-          'userPlatformRoles.branchUserPlatformRoleResources.resource',
-          'userHasResources',
-          'userHasResources.resource',
-        ],
+        relations,
         order: { createdAt: 'DESC' },
       });
     }
@@ -1318,6 +1350,8 @@ export class UsersService {
                 city: uhc.company.city || null,
                 localCurrency: uhc.company.localCurrency,
                 taux: uhc.company.taux,
+                category: uhc.company.category || null, // ✅ Category complet
+                categoryId: uhc.company.category?.id || null, // ✅ CategoryId
               }
             : null,
           permissions:
@@ -1394,6 +1428,8 @@ export class UsersService {
               ...userWithoutPassword.activeCompany,
               country: userWithoutPassword.activeCompany.country || null,
               city: userWithoutPassword.activeCompany.city || null,
+              category: userWithoutPassword.activeCompany.category || null, // ✅ Category actif
+              categoryId: userWithoutPassword.activeCompany.category?.id || null, // ✅ CategoryId actif
             }
           : null,
       };
@@ -1419,33 +1455,38 @@ export class UsersService {
   }
 
   async findAllWithDetails() {
+    const relations = [
+      'activeCompany',
+      'activeCompany.country',
+      'activeCompany.city',
+      'activeCompany.category', // ✅ Category actif
+      'addresses',
+      'userHasCompany',
+      'userHasCompany.company',
+      'userHasCompany.company.tauxCompanies',
+      'userHasCompany.company.country',
+      'userHasCompany.company.city',
+      'userHasCompany.company.category', // ✅ Category complet
+      'userHasCompany.permissions',
+      'userHasCompany.permissions.permission',
+      'userPlatformRoles',
+      'userPlatformRoles.platform',
+      'userPlatformRoles.role',
+      'userPlatformRoles.branchUserPlatformRoleResources',
+      'userPlatformRoles.branchUserPlatformRoleResources.branch',
+      'userPlatformRoles.branchUserPlatformRoleResources.resource',
+      'userHasResources',
+      'userHasResources.resource',
+    ];
+
     const users = await this.usersRepository.find({
-      relations: [
-        'activeCompany',
-        'activeCompany.country',
-        'activeCompany.city',
-        'addresses',
-        'userHasCompany',
-        'userHasCompany.company',
-        'userHasCompany.company.tauxCompanies',
-        'userHasCompany.permissions',
-        'userHasCompany.permissions.permission',
-        'userPlatformRoles',
-        'userPlatformRoles.platform',
-        'userPlatformRoles.role',
-        'userPlatformRoles.branchUserPlatformRoleResources',
-        'userPlatformRoles.branchUserPlatformRoleResources.branch',
-        'userPlatformRoles.branchUserPlatformRoleResources.resource',
-        'userHasResources',
-        'userHasResources.resource',
-      ],
+      relations,
       order: { createdAt: 'DESC' },
     });
 
     const sanitizedUsers = users.map((user) => {
       const { password, ...userWithoutPassword } = user;
 
-      // Mapping des companies et permissions
       const userHasCompany =
         userWithoutPassword.userHasCompany?.map((uhc) => ({
           id: uhc.id,
@@ -1477,6 +1518,8 @@ export class UsersService {
                 city: uhc.company.city || null,
                 localCurrency: uhc.company.localCurrency,
                 taux: uhc.company.taux,
+                category: uhc.company.category || null, // ✅ Category complet
+                categoryId: uhc.company.category?.id || null, // ✅ CategoryId
               }
             : null,
           permissions:
@@ -1499,7 +1542,6 @@ export class UsersService {
             })) ?? [],
         })) ?? [];
 
-      // Mapping des rôles sur plateformes avec branches et ressources
       const userPlatformRoles =
         userWithoutPassword.userPlatformRoles?.map((upr) => ({
           id: upr.id,
@@ -1533,7 +1575,6 @@ export class UsersService {
           createdAt: upr.createdAt,
         })) ?? [];
 
-      // Mapping des ressources directes de l'utilisateur
       const userHasResources =
         userWithoutPassword.userHasResources?.map((uhr) => ({
           id: uhr.id,
@@ -1555,6 +1596,8 @@ export class UsersService {
               ...userWithoutPassword.activeCompany,
               country: userWithoutPassword.activeCompany.country || null,
               city: userWithoutPassword.activeCompany.city || null,
+              category: userWithoutPassword.activeCompany.category || null, // ✅ Category actif
+              categoryId: userWithoutPassword.activeCompany.category?.id || null, // ✅ CategoryId actif
             }
           : null,
       };
