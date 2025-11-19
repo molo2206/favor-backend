@@ -23,10 +23,6 @@ export class RoomAvailabilityService {
     private userRepo: Repository<UserEntity>,
   ) {}
 
-  // --------------------------------------------------
-  // CREATE / UPDATE AVAILABILITY
-  // --------------------------------------------------
-
   async create(dto: CreateRoomAvailabilityDto) {
     const product = await this.productRepo.findOne({ where: { id: dto.productId } });
     if (!product) throw new NotFoundException('Product (room type) not found');
@@ -60,9 +56,6 @@ export class RoomAvailabilityService {
     };
   }
 
-  // --------------------------------------------------
-  // UPDATE (generic)
-  // --------------------------------------------------
 
   async update(id: string, changes: Partial<RoomAvailability>) {
     const existing = await this.availabilityRepo.findOne({
@@ -79,10 +72,6 @@ export class RoomAvailabilityService {
       data: saved,
     };
   }
-
-  // --------------------------------------------------
-  // GET CALENDAR BETWEEN DATES
-  // --------------------------------------------------
 
   async findForProductBetween(productId: string, from: string, to: string) {
     const data = await this.availabilityRepo

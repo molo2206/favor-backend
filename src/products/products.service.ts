@@ -47,6 +47,7 @@ import { slugify } from 'src/users/utility/slug/slugify';
 import { UserPlatformRoleEntity } from 'src/users/entities/user_plateform_roles.entity';
 import { NotificationsService } from 'src/notification/notifications.service';
 import { UserRole } from 'src/users/enum/user-role-enum';
+import { convertSpecValue } from 'src/users/utility/spec-value.util';
 @Injectable()
 export class ProductService {
   constructor(
@@ -771,17 +772,21 @@ export class ProductService {
           const specification = await manager.findOne(Specification, {
             where: { id: spec.specificationId },
           });
+
           if (!specification) {
             throw new BadRequestException(
               `La spécification avec l'ID ${spec.specificationId} n'existe pas.`,
             );
           }
 
+          const formattedValue = convertSpecValue(specification.type, spec.value);
+
           const specValue = manager.create(ProductSpecificationValue, {
             product: savedProduct,
             specification,
-            value: spec.value ?? undefined,
+            value: formattedValue,
           });
+
           await manager.save(specValue);
         }
       }
