@@ -383,7 +383,7 @@ export class ProductService {
         'specificationValues.specification',
         'attributes',
         'attributes.attribute',
-        'variations', // ✅ Ajouter les variations
+        'variations',
         'variations.image',
         'variations.attributeValues',
         'variations.attributeValues.attribute',
@@ -421,33 +421,33 @@ export class ProductService {
         if (brandId) {
           const brand = await manager.findOne(Brand, { where: { id: brandId } });
           if (!brand) {
-            this.logger.warn(` Catégorie non trouvée: ${brandId}`);
-            throw new NotFoundException('Catégorie non trouvée');
+            this.logger.warn(`❌ Marque non trouvée: ${brandId}`);
+            throw new NotFoundException('Marque non trouvée');
           }
           product.brand = brand;
-          this.logger.log(` Catégorie mise à jour: ${brand.name}`);
+          this.logger.log(`✅ Marque mise à jour: ${brand.name}`);
         } else {
           product.brand = undefined;
-          this.logger.log(' Catégorie supprimée du produit');
+          this.logger.log('🗑️ Marque supprimée du produit');
         }
 
         // 🔹 Gestion de la mesure
         if (measureId) {
           const measure = await manager.findOne(MeasureEntity, { where: { id: measureId } });
           if (!measure) {
-            this.logger.warn(` Mesure non trouvée: ${measureId}`);
+            this.logger.warn(`❌ Mesure non trouvée: ${measureId}`);
             throw new NotFoundException('Mesure non trouvée');
           }
           product.measure = measure;
-          this.logger.log(` Mesure mise à jour: ${measure.name}`);
+          this.logger.log(`✅ Mesure mise à jour: ${measure.name}`);
         } else {
           product.measure = undefined;
-          this.logger.log(' Mesure supprimée du produit');
+          this.logger.log('🗑️ Mesure supprimée du produit');
         }
 
         // 🔹 Gestion des images si fournies
         if (files && files.length > 0) {
-          this.logger.log(` Upload de ${files.length} nouvelles images`);
+          this.logger.log(`📸 Upload de ${files.length} nouvelles images`);
           const newImages: ImageProductEntity[] = [];
           for (const file of files) {
             const url = await this.cloudinary.handleUploadImage(file, 'product');
@@ -456,61 +456,62 @@ export class ProductService {
             newImages.push(savedImg);
           }
           product.images = [...(product.images || []), ...newImages];
-          this.logger.log(` ${newImages.length} nouvelles images ajoutées`);
+          this.logger.log(`✅ ${newImages.length} nouvelles images ajoutées`);
         }
 
         // 🔹 Sauvegarde du produit mis à jour
         const updatedProduct = await manager.save(product);
-        this.logger.log(` Produit sauvegardé: ${updatedProduct.name}`);
+        this.logger.log(`✅ Produit sauvegardé: ${updatedProduct.name}`);
 
-        // 🔹 Gestion des spécifications
-        if (specifications && Array.isArray(specifications)) {
-          this.logger.log(` Mise à jour de ${specifications.length} spécifications`);
+        // 🔹 Gestion des SPÉCIFICATIONS - SUPPRIMER PUIS CRÉER
+        if (specifications !== undefined) {
+          this.logger.log(`⚙️ Mise à jour des spécifications`);
 
-          // Supprimer les anciennes spécifications
-          if (product.specificationValues && product.specificationValues.length > 0) {
-            const oldSpecIds = product.specificationValues.map((sv) => sv.id);
-            await manager.delete(ProductSpecificationValue, oldSpecIds);
-            this.logger.log(` ${oldSpecIds.length} anciennes spécifications supprimées`);
-          }
+          // 🔹 SUPPRIMER toutes les anciennes spécifications
+          await manager.delete(ProductSpecificationValue, {
+            product: { id: updatedProduct.id },
+          });
+          this.logger.log(`🗑️ Anciennes spécifications supprimées`);
 
-          // Créer les nouvelles spécifications
-          for (const spec of specifications) {
-            if (!spec.specificationId) {
-              throw new BadRequestException(
-                'Chaque spécification doit contenir un specificationId',
-              );
+          // 🔹 CRÉER les nouvelles spécifications
+          if (Array.isArray(specifications) && specifications.length > 0) {
+            this.logger.log(`📋 Création de ${specifications.length} nouvelles spécifications`);
+
+            for (const spec of specifications) {
+              if (!spec.specificationId) {
+                throw new BadRequestException(
+                  'Chaque spécification doit contenir un specificationId',
+                );
+              }
+
+              const specExists = await manager.findOne(Specification, {
+                where: { id: spec.specificationId },
+              });
+              if (!specExists) {
+                throw new BadRequestException(
+                  `La spécification avec id ${spec.specificationId} n'existe pas`,
+                );
+              }
+
+              // 🔹 Créer l'entité manuellement
+              const specValue = new ProductSpecificationValue();
+              specValue.product = updatedProduct;
+              specValue.specification = specExists;
+              specValue.value = spec.value || undefined;
+
+              await manager.save(specValue);
             }
-
-            const specExists = await manager.findOne(Specification, {
-              where: { id: spec.specificationId },
-            });
-            if (!specExists) {
-              throw new BadRequestException(
-                `La spécification avec id ${spec.specificationId} n'existe pas`,
-              );
-            }
-
-            const specValue = manager.create(ProductSpecificationValue, {
-              product: updatedProduct,
-              specification: specExists,
-              value: spec.value,
-            });
-            await manager.save(specValue);
+            this.logger.log(`✅ ${specifications.length} spécifications créées`);
           }
-          this.logger.log(' Spécifications mises à jour');
         }
 
         // 🔹 Gestion des attributs
         if (attributes && Array.isArray(attributes)) {
-          this.logger.log(` Mise à jour de ${attributes.length} attributs`);
+          this.logger.log(`🏷️ Mise à jour de ${attributes.length} attributs`);
 
           // Supprimer les anciens attributs
-          if (product.attributes && product.attributes.length > 0) {
-            const oldAttrIds = product.attributes.map((pa) => pa.id);
-            await manager.delete(ProductAttribute, oldAttrIds);
-            this.logger.log(` ${oldAttrIds.length} anciens attributs supprimés`);
-          }
+          await manager.delete(ProductAttribute, { product: { id: updatedProduct.id } });
+          this.logger.log(`🗑️ Anciens attributs supprimés`);
 
           // Créer les nouveaux attributs
           for (const attributeId of attributes) {
@@ -529,26 +530,16 @@ export class ProductService {
             });
             await manager.save(productAttribute);
           }
-          this.logger.log(' Attributs mis à jour');
+          this.logger.log('✅ Attributs mis à jour');
         }
 
         // 🔹 Gestion des variations de produit
         if (variations && Array.isArray(variations)) {
-          this.logger.log(` Mise à jour de ${variations.length} variations`);
+          this.logger.log(`🔄 Mise à jour de ${variations.length} variations`);
 
-          // Supprimer les anciennes variations et leurs attributs
-          if (product.variations && product.variations.length > 0) {
-            for (const variation of product.variations) {
-              // Supprimer d'abord les valeurs d'attributs
-              if (variation.attributeValues && variation.attributeValues.length > 0) {
-                const attrValueIds = variation.attributeValues.map((av) => av.id);
-                await manager.delete(VariationAttributeValue, attrValueIds);
-              }
-              // Puis supprimer la variation
-              await manager.delete(ProductVariation, variation.id);
-            }
-            this.logger.log(` ${product.variations.length} anciennes variations supprimées`);
-          }
+          // Supprimer les anciennes variations
+          await manager.delete(ProductVariation, { product: { id: updatedProduct.id } });
+          this.logger.log(`🗑️ Anciennes variations supprimées`);
 
           // Créer les nouvelles variations
           for (const variationDto of variations) {
@@ -657,7 +648,7 @@ export class ProductService {
         };
       } catch (error) {
         this.logger.error(
-          ` Erreur lors de la mise à jour du produit: ${error.message}`,
+          `💥 Erreur lors de la mise à jour du produit: ${error.message}`,
           error.stack,
         );
         throw error;
