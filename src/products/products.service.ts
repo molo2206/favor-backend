@@ -435,15 +435,15 @@ export class ProductService {
         // 🔹 Sauvegarde du produit mis à jour
         const updatedProduct = await manager.save(product);
 
-        // 🔹 Gestion des SPÉCIFICATIONS - SUPPRIMER PUIS CRÉER (GARANTI)
+        // 🔹 Gestion des SPÉCIFICATIONS - SUPPRIMER PUIS CRÉER (CORRIGÉ)
         if (specifications !== undefined) {
-          // 🔹 1. SUPPRIMER TOUTES les anciennes spécifications avec SQL DIRECT
-          await manager.query('DELETE FROM product_specification_value WHERE productId = ?', [
-            id,
-          ]);
+          // 🔹 1. SUPPRIMER TOUTES les anciennes spécifications
+          await manager.delete(ProductSpecificationValue, { product: { id } });
 
-          // 🔹 2. CRÉER les nouvelles spécifications
+          // 🔹 2. CRÉER les nouvelles spécifications avec TypeORM (pas de SQL direct)
           if (Array.isArray(specifications) && specifications.length > 0) {
+            const specValuesToSave: ProductSpecificationValue[] = [];
+
             for (const spec of specifications) {
               if (!spec.specificationId) {
                 throw new BadRequestException(
@@ -461,12 +461,18 @@ export class ProductService {
                 );
               }
 
-              // INSERT SQL direct pour éviter tout cache
-              await manager.query(
-                'INSERT INTO product_specification_value (productId, specificationId, value) VALUES (?, ?, ?)',
-                [id, spec.specificationId, spec.value || null],
-              );
+              // 🔹 CORRECTION : Utiliser TypeORM pour créer l'entité (génération auto de l'ID)
+              const specValue = manager.create(ProductSpecificationValue, {
+                product: { id } as Product,
+                specification: specExists,
+                value: spec.value || undefined,
+              });
+
+              specValuesToSave.push(specValue);
             }
+
+            // Sauvegarder en une seule opération
+            await manager.save(ProductSpecificationValue, specValuesToSave);
           }
         }
 
@@ -937,15 +943,15 @@ export class ProductService {
         // 🔹 Sauvegarde du produit mis à jour
         const updatedProduct = await manager.save(product);
 
-        // 🔹 Gestion des SPÉCIFICATIONS - SUPPRIMER PUIS CRÉER (GARANTI)
+        // 🔹 Gestion des SPÉCIFICATIONS - SUPPRIMER PUIS CRÉER (CORRIGÉ)
         if (specifications !== undefined) {
-          // 🔹 1. SUPPRIMER TOUTES les anciennes spécifications avec SQL DIRECT
-          await manager.query('DELETE FROM product_specification_value WHERE productId = ?', [
-            id,
-          ]);
+          // 🔹 1. SUPPRIMER TOUTES les anciennes spécifications
+          await manager.delete(ProductSpecificationValue, { product: { id } });
 
-          // 🔹 2. CRÉER les nouvelles spécifications
+          // 🔹 2. CRÉER les nouvelles spécifications avec TypeORM (pas de SQL direct)
           if (Array.isArray(specifications) && specifications.length > 0) {
+            const specValuesToSave: ProductSpecificationValue[] = [];
+
             for (const spec of specifications) {
               if (!spec.specificationId) {
                 throw new BadRequestException(
@@ -963,12 +969,18 @@ export class ProductService {
                 );
               }
 
-              // INSERT SQL direct pour éviter tout cache
-              await manager.query(
-                'INSERT INTO product_specification_value (productId, specificationId, value) VALUES (?, ?, ?)',
-                [id, spec.specificationId, spec.value || null],
-              );
+              // 🔹 CORRECTION : Utiliser TypeORM pour créer l'entité (génération auto de l'ID)
+              const specValue = manager.create(ProductSpecificationValue, {
+                product: { id } as Product,
+                specification: specExists,
+                value: spec.value || undefined,
+              });
+
+              specValuesToSave.push(specValue);
             }
+
+            // Sauvegarder en une seule opération
+            await manager.save(ProductSpecificationValue, specValuesToSave);
           }
         }
 
