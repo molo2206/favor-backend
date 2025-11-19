@@ -1031,17 +1031,16 @@ export class ProductService {
         // 🔹 Gestion des SPÉCIFICATIONS - SUPPRIMER PUIS CRÉER
         // 🔹 Gestion des SPÉCIFICATIONS - SUPPRIMER PUIS CRÉER
         if (specifications !== undefined) {
-          this.logger.log(`⚙️ Mise à jour des spécifications (supprimer puis créer)`);
+          this.logger.log(`⚙️ Mise à jour des spécifications`);
 
-          // 🔹 ÉTAPE 1: SUPPRIMER toutes les anciennes spécifications
-          if (product.specificationValues && product.specificationValues.length > 0) {
-            const oldSpecIds = product.specificationValues.map((sv) => sv.id);
-            await manager.delete(ProductSpecificationValue, oldSpecIds);
-            this.logger.log(`🗑️ ${oldSpecIds.length} anciennes spécifications supprimées`);
-          }
+          // 🔹 SUPPRIMER toutes les anciennes spécifications
+          await manager.delete(ProductSpecificationValue, {
+            product: { id: updatedProduct.id },
+          });
+          this.logger.log(`🗑️ Anciennes spécifications supprimées`);
 
-          // 🔹 ÉTAPE 2: CRÉER les nouvelles spécifications
-          if (Array.isArray(specifications)) {
+          // 🔹 CRÉER les nouvelles spécifications
+          if (Array.isArray(specifications) && specifications.length > 0) {
             this.logger.log(`📋 Création de ${specifications.length} nouvelles spécifications`);
 
             for (const spec of specifications) {
@@ -1060,20 +1059,16 @@ export class ProductService {
                 );
               }
 
-              // 🔹 CORRECTION : Créer directement l'entité
+              // 🔹 Créer l'entité manuellement
               const specValue = new ProductSpecificationValue();
               specValue.product = updatedProduct;
               specValue.specification = specExists;
               specValue.value = spec.value || undefined;
 
-              await manager.save(ProductSpecificationValue, specValue);
+              await manager.save(specValue);
             }
             this.logger.log(`✅ ${specifications.length} spécifications créées`);
-          } else {
-            this.logger.log('🔶 Aucune spécification à créer (pas un tableau)');
           }
-        } else {
-          this.logger.log('🔶 Spécifications non modifiées');
         }
         // 🔹 Gestion des attributs (logique normale)
         if (attributes && Array.isArray(attributes)) {
