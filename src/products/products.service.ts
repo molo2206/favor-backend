@@ -922,7 +922,6 @@ export class ProductService {
       categoryId,
       brandId,
       companyId,
-      status,
       measureId,
       specifications,
       attributes,
@@ -968,7 +967,6 @@ export class ProductService {
         this.logger.log(`📝 Mise à jour des données du produit: ${product.name}`);
 
         // 🔹 Mise à jour des champs de base
-        if (status) product.status = status;
         Object.assign(product, data);
 
         // 🔹 Gestion de la catégorie
