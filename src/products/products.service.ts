@@ -919,6 +919,7 @@ export class ProductService {
     } = dto;
 
     this.logger.log(`🔄 Début mise à jour produit ID: ${id}`);
+    console.log(specifications);
 
     // 🔹 Recherche du produit avec toutes ses relations
     const product = await this.productRepo.findOne({
