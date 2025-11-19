@@ -47,7 +47,7 @@ import { slugify } from 'src/users/utility/slug/slugify';
 import { UserPlatformRoleEntity } from 'src/users/entities/user_plateform_roles.entity';
 import { NotificationsService } from 'src/notification/notifications.service';
 import { UserRole } from 'src/users/enum/user-role-enum';
-import { convertSpecValue } from 'src/users/utility/spec-value.util';
+import { convertSpecValue } from 'src/users/utility/helpers/spec-value.util';
 @Injectable()
 export class ProductService {
   constructor(

@@ -12,6 +12,7 @@ import { ProductSpecificationValue } from './entities/ProductSpecificationValue.
 import { CreateSpecificationDto } from './dto/create-specification.dto';
 import { UpdateSpecificationDto } from './dto/update-specification.dto';
 import { CloudinaryService } from 'src/users/utility/helpers/cloudinary.service';
+import { normalizeOptions } from 'src/users/utility/helpers/normalize-options.util';
 
 @Injectable()
 export class SpecificationService {
@@ -82,37 +83,41 @@ export class SpecificationService {
   async update(
     id: string,
     dto: UpdateSpecificationDto,
-    file?: Express.Multer.File, // ✅ image optionnelle
+    file?: Express.Multer.File,
   ): Promise<{ message: string; data: Specification }> {
     const spec = await this.specRepo.findOne({ where: { id } });
     if (!spec) throw new NotFoundException(`Spécification ${id} introuvable`);
 
-    // 🔹 Mettre à jour la clé
+    // 🔹 KEY
     if (dto.key !== undefined) spec.key = dto.key;
 
-    // 🔹 Mettre à jour le label
+    // 🔹 LABEL
     if (dto.label !== undefined) spec.label = dto.label;
 
-    // 🔹 Mettre à jour le type
+    // 🔹 TYPE
     if (dto.type !== undefined) spec.type = dto.type;
 
-    // 🔹 Mettre à jour l’unité
+    // 🔹 UNIT
     if (dto.unit !== undefined) spec.unit = dto.unit;
 
-    // 🔹 Mettre à jour les options
-    if (dto.options !== undefined) {
-      try {
-        spec.options = Array.isArray(dto.options)
-          ? dto.options
-          : dto.options.includes(',')
-            ? dto.options.split(',').map((o) => o.trim())
-            : JSON.parse(dto.options);
-      } catch {
-        throw new BadRequestException('Le format des options est invalide');
+    // ------------------------------------------------------------
+    // 🔥 GESTION DES OPTIONS
+    // ------------------------------------------------------------
+    if (dto.type === 'SELECT') {
+      // options obligatoires pour SELECT
+      if (!dto.options || dto.options.length === 0) {
+        throw new BadRequestException(
+          'Les options sont obligatoires lorsque le type est SELECT.',
+        );
       }
+
+      spec.options = normalizeOptions(dto.options);
+    } else {
+      // si le type n'est pas SELECT → vider les options
+      spec.options = null;
     }
 
-    // 🔹 Mettre à jour l’image si un fichier est fourni
+    // 🔹 IMAGE
     if (file) {
       spec.image = await this.cloudinary.handleUploadImage(file, 'specifications');
     }
