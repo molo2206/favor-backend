@@ -474,35 +474,35 @@ export class ProductService {
           this.logger.log(`🗑️ Anciennes spécifications supprimées`);
 
           // 🔹 CRÉER les nouvelles spécifications
-          if (Array.isArray(specifications) && specifications.length > 0) {
-            this.logger.log(`📋 Création de ${specifications.length} nouvelles spécifications`);
+          // if (Array.isArray(specifications) && specifications.length > 0) {
+          //   this.logger.log(`📋 Création de ${specifications.length} nouvelles spécifications`);
 
-            for (const spec of specifications) {
-              if (!spec.specificationId) {
-                throw new BadRequestException(
-                  'Chaque spécification doit contenir un specificationId',
-                );
-              }
+          //   for (const spec of specifications) {
+          //     if (!spec.specificationId) {
+          //       throw new BadRequestException(
+          //         'Chaque spécification doit contenir un specificationId',
+          //       );
+          //     }
 
-              const specExists = await manager.findOne(Specification, {
-                where: { id: spec.specificationId },
-              });
-              if (!specExists) {
-                throw new BadRequestException(
-                  `La spécification avec id ${spec.specificationId} n'existe pas`,
-                );
-              }
+          //     const specExists = await manager.findOne(Specification, {
+          //       where: { id: spec.specificationId },
+          //     });
+          //     if (!specExists) {
+          //       throw new BadRequestException(
+          //         `La spécification avec id ${spec.specificationId} n'existe pas`,
+          //       );
+          //     }
 
-              // 🔹 Créer l'entité manuellement
-              const specValue = new ProductSpecificationValue();
-              specValue.product = updatedProduct;
-              specValue.specification = specExists;
-              specValue.value = spec.value || undefined;
+          //     // 🔹 Créer l'entité manuellement
+          //     const specValue = new ProductSpecificationValue();
+          //     specValue.product = updatedProduct;
+          //     specValue.specification = specExists;
+          //     specValue.value = spec.value || undefined;
 
-              await manager.save(specValue);
-            }
-            this.logger.log(`✅ ${specifications.length} spécifications créées`);
-          }
+          //     await manager.save(specValue);
+          //   }
+          //   this.logger.log(`✅ ${specifications.length} spécifications créées`);
+          // }
         }
 
         // 🔹 Gestion des attributs
@@ -1030,35 +1030,35 @@ export class ProductService {
           this.logger.log(`🗑️ Anciennes spécifications supprimées`);
 
           // 🔹 CRÉER les nouvelles spécifications
-          if (Array.isArray(specifications) && specifications.length > 0) {
-            this.logger.log(`📋 Création de ${specifications.length} nouvelles spécifications`);
+          // if (Array.isArray(specifications) && specifications.length > 0) {
+          //   this.logger.log(`📋 Création de ${specifications.length} nouvelles spécifications`);
 
-            for (const spec of specifications) {
-              if (!spec.specificationId) {
-                throw new BadRequestException(
-                  'Chaque spécification doit contenir un specificationId',
-                );
-              }
+          //   for (const spec of specifications) {
+          //     if (!spec.specificationId) {
+          //       throw new BadRequestException(
+          //         'Chaque spécification doit contenir un specificationId',
+          //       );
+          //     }
 
-              const specExists = await manager.findOne(Specification, {
-                where: { id: spec.specificationId },
-              });
-              if (!specExists) {
-                throw new BadRequestException(
-                  `La spécification avec id ${spec.specificationId} n'existe pas`,
-                );
-              }
+          //     const specExists = await manager.findOne(Specification, {
+          //       where: { id: spec.specificationId },
+          //     });
+          //     if (!specExists) {
+          //       throw new BadRequestException(
+          //         `La spécification avec id ${spec.specificationId} n'existe pas`,
+          //       );
+          //     }
 
-              // 🔹 Créer l'entité manuellement
-              const specValue = new ProductSpecificationValue();
-              specValue.product = updatedProduct;
-              specValue.specification = specExists;
-              specValue.value = spec.value || undefined;
+          //     // 🔹 Créer l'entité manuellement
+          //     const specValue = new ProductSpecificationValue();
+          //     specValue.product = updatedProduct;
+          //     specValue.specification = specExists;
+          //     specValue.value = spec.value || undefined;
 
-              await manager.save(specValue);
-            }
-            this.logger.log(`✅ ${specifications.length} spécifications créées`);
-          }
+          //     await manager.save(specValue);
+          //   }
+          //   this.logger.log(`✅ ${specifications.length} spécifications créées`);
+          // }
         }
         // 🔹 Gestion des attributs (logique normale)
         if (attributes && Array.isArray(attributes)) {
