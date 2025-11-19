@@ -554,7 +554,7 @@ export class UsersService {
 
       await this.mailService.sendHtmlEmail(
         email,
-        'Inscription confirmée sur AfiaGap',
+        'Inscription confirmée sur FavorHelp',
         'createCount.html',
         { userWithoutPassword: user, year: new Date().getFullYear() },
       );
@@ -1232,7 +1232,7 @@ export class UsersService {
       throw new BadRequestException('Utilisateur introuvable.');
     }
 
-    return this.accessToken(user); // Génère un nouveau access_token
+    return this.accessToken(user); 
   }
 
   generateSecret(email: string) {

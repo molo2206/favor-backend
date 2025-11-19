@@ -48,6 +48,8 @@ import { AttributeModule } from './AttributGlobal/attribute.module';
 import { OpenaiModule } from './open-ai/openai.module';
 import { ResourceModule } from './ressource/resource.module';
 import { BranchModule } from './branch/branch.module';
+import { RoomAvailabilityModule } from './HotelRoomAvailability/hotelRoomAvailability.module';
+import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
@@ -124,7 +126,9 @@ import { BranchModule } from './branch/branch.module';
     ResourceModule,
     PlatformModule,
     BranchModule,
-    UserPlatformRoleModule
+    UserPlatformRoleModule,
+    RoomAvailabilityModule,
+    BackupModule
   ],
   controllers: [AppController],
   providers: [AppService, SmsHelper],

@@ -16,6 +16,8 @@ import { Type_rental_both_sale_car } from '../enum/type_rental_both_sale_car';
 import { FuelType } from '../enum/fuelType_enum';
 import { Transmission } from '../enum/transmission.enum';
 import { ProductSpecificationDto } from './create-product-specification.dto';
+import { BedType } from 'src/room/enum/bedtype.enum';
+import { BedTypes } from '../enum/bedtypes.enum';
 
 // DTO pour les valeurs d'attributs des variations
 export class VariationAttributeValueDto {
@@ -197,6 +199,25 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumberString()
+  capacityAdults?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumberString()
+  capacityChildren?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumberString()
+  capacityTotal?: number;
+
+  @IsOptional()
+  @IsEnum(BedTypes)
+  bedTypes?: BedTypes;
 
   @IsOptional()
   @IsArray()

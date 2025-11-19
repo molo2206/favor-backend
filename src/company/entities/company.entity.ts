@@ -139,4 +139,6 @@ export class CompanyEntity {
 
   @CreateDateColumn({ nullable: true })
   createdAt?: Date;
+
+  
 }

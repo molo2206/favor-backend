@@ -24,6 +24,7 @@ import { Booking } from 'src/booking/entities/booking.entity';
 import { UserPlatformRoleEntity } from './user_plateform_roles.entity';
 import { Wishlist } from 'src/products/entities/wishlists.entity';
 import { UserHasResourceEntity } from './user-has-resource.entity';
+import { Reservation } from 'src/HotelRoomAvailability/entity/Reservation.entity';
 
 @Entity('users')
 export class UserEntity {
@@ -144,4 +145,7 @@ export class UserEntity {
 
   @OneToMany(() => UserHasResourceEntity, (uhr) => uhr.user)
   userHasResources: UserHasResourceEntity[];
+
+  @OneToMany(() => Reservation, (reservation) => reservation.user)
+  reservations: Reservation[];
 }

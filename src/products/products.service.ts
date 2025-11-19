@@ -208,8 +208,6 @@ export class ProductService {
         await manager.save(savedProduct);
       }
 
-      savedProduct.images = imageEntities;
-
       // 🔸 4. Gestion des spécifications
       if (specifications && Array.isArray(specifications)) {
         for (const spec of specifications) {
@@ -247,7 +245,7 @@ export class ProductService {
         }
       }
 
-      // 🔸 6. Variations (inchangé)
+      // 🔸 6. Variations
       if (variations && Array.isArray(variations)) {
         for (const variationDto of variations) {
           const {
@@ -310,8 +308,8 @@ export class ProductService {
         }
       }
 
-      // 🔸 7. Recharger le produit complet
-      const productWithRelations = await manager.findOne(Product, {
+      // 🔸 7. Recharger le produit complet avec TOUTES les relations
+      const finalProduct = await manager.findOne(Product, {
         where: { id: savedProduct.id },
         relations: [
           'company',
@@ -331,15 +329,18 @@ export class ProductService {
         ],
       });
 
-      const serializedProduct = plainToInstance(Product, productWithRelations, {
-        excludeExtraneousValues: true,
-      });
+      if (!finalProduct) {
+        throw new NotFoundException('Produit non trouvé après création');
+      }
 
-      this.logger.log(`Produit "${savedProduct.name}" créé avec succès.`);
+      // 🔸 8. S'assurer que les images sont bien attachées au produit final
+      finalProduct.images = imageEntities;
+
+      this.logger.log(`Produit "${finalProduct.name}" créé avec succès.`);
 
       return {
         message: 'Produit créé avec succès.',
-        data: serializedProduct!,
+        data: finalProduct, // Retourne l'objet complet avec toutes les relations
       };
     });
   }
@@ -726,7 +727,7 @@ export class ProductService {
 
     // 🔹 Transaction
     return await this.dataSource.transaction(async (manager) => {
-      // 🔸 1. Créer le produit (sans image principale pour l’instant)
+      // 🔸 1. Créer le produit (sans image principale pour l'instant)
       const product = manager.create(Product, {
         ...data,
         min_quantity: min_quantity ?? 0,
@@ -763,8 +764,6 @@ export class ProductService {
         savedProduct.image = imageEntities[0].url;
         await manager.save(savedProduct);
       }
-
-      savedProduct.images = imageEntities;
 
       // 🔸 4. Spécifications
       if (specifications && Array.isArray(specifications)) {
@@ -872,7 +871,7 @@ export class ProductService {
       }
 
       // 🔸 7. Charger le produit complet avec ses relations
-      const productWithRelations = await manager.findOne(Product, {
+      const finalProduct = await manager.findOne(Product, {
         where: { id: savedProduct.id },
         relations: [
           'company',
@@ -893,15 +892,18 @@ export class ProductService {
         ],
       });
 
-      const serializedProduct = plainToInstance(Product, productWithRelations, {
-        excludeExtraneousValues: true,
-      });
+      if (!finalProduct) {
+        throw new NotFoundException('Produit non trouvé après création');
+      }
 
-      this.logger.log(`Produit "${savedProduct.name}" créé avec succès.`);
+      // 🔸 8. S'assurer que les images sont bien attachées
+      finalProduct.images = imageEntities;
+
+      this.logger.log(`Produit "${finalProduct.name}" créé avec succès.`);
 
       return {
         message: 'Produit créé avec succès.',
-        data: serializedProduct!,
+        data: finalProduct, // Retourne l'objet complet avec toutes les relations
       };
     });
   }

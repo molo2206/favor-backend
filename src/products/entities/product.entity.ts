@@ -25,6 +25,9 @@ import { ProductAttribute } from 'src/AttributGlobal/entities/product_attributes
 import { Wishlist } from './wishlists.entity';
 import { ProductSpecificationValue } from 'src/specification/entities/ProductSpecificationValue.entity';
 import { Brand } from './brand.entity';
+import { RoomAvailability } from 'src/HotelRoomAvailability/entity/RoomAvailability.entity';
+import { Reservation } from 'src/HotelRoomAvailability/entity/Reservation.entity';
+import { BedTypes } from '../enum/bedtypes.enum';
 
 @Entity('products')
 export class Product {
@@ -170,4 +173,26 @@ export class Product {
 
   @Column({ nullable: true })
   localization: string;
+
+  @Column({ type: 'int', default: 0 })
+  capacityAdults: number;
+
+  @Column({ type: 'int', default: 0 })
+  capacityChildren: number;
+
+  @Column({ type: 'int', default: 0 })
+  capacityTotal: number;
+
+  @Column({
+    type: 'enum',
+    enum: BedTypes,
+    default: BedTypes.DOUBLE,
+  })
+  bedTypes: BedTypes;
+
+  @OneToMany(() => RoomAvailability, (availability) => availability.product)
+  availability: RoomAvailability[];
+
+  @OneToMany(() => Reservation, (reservation) => reservation.product)
+  reservations: Reservation[];
 }

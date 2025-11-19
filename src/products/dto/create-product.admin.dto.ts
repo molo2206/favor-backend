@@ -144,6 +144,25 @@ export class CreateProductAdminDto {
   categoryId?: string;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumberString()
+  capacityAdults?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumberString()
+  capacityChildren?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumberString()
+  capacityTotal?: number;
+
+  @IsOptional()
+  @IsString()
+  bedTypes?: string;
+
+  @IsOptional()
   @IsUUID()
   brandId?: string;
 
