@@ -469,7 +469,7 @@ export class ProductService {
 
           // 🔹 SUPPRIMER toutes les anciennes spécifications
           await manager.delete(ProductSpecificationValue, {
-            product: { id: updatedProduct.id },
+            product: { id: id },
           });
           this.logger.log(`🗑️ Anciennes spécifications supprimées`);
 
@@ -557,7 +557,6 @@ export class ProductService {
               attributeValues,
             } = variationDto;
 
-            // Vérifier l'unicité du SKU
             const existingVariation = await manager.findOne(ProductVariation, {
               where: { sku },
             });
@@ -1026,7 +1025,7 @@ export class ProductService {
 
           // 🔹 SUPPRIMER toutes les anciennes spécifications
           await manager.delete(ProductSpecificationValue, {
-            product: { id: updatedProduct.id },
+            product: { id: id },
           });
           this.logger.log(`🗑️ Anciennes spécifications supprimées`);
 
