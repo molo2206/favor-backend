@@ -1,33 +1,30 @@
-import { IsDateString, IsInt, Min, IsOptional, IsUUID } from 'class-validator';
+import { IsDateString, IsInt, Min, IsOptional, IsString } from 'class-validator';
 
 export class SearchRoomsDto {
+  @IsOptional()
   @IsDateString()
-  startDate: string;
+  startDate?: string;
 
+  @IsOptional()
   @IsDateString()
-  endDate: string;
+  endDate?: string;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  adults: number;
+  adults?: number;
 
+  @IsOptional()
   @IsInt()
   @Min(0)
-  children: number;
+  children?: number;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  rooms: number;
+  rooms?: number;
 
   @IsOptional()
-  @IsUUID()
-  cityId?: string;
-
-  @IsOptional()
-  @IsUUID()
-  companyId?: string;
-
-  @IsOptional()
-  @IsUUID()
-  productId?: string;
+  @IsString()
+  destination?: string; // STRING pour LIKE, pas UUID
 }

@@ -1,8 +1,14 @@
-import { IsUUID, IsDateString, IsInt, Min } from 'class-validator';
+import {
+  IsUUID,
+  IsDateString,
+  IsInt,
+  Min,
+  IsOptional,
+} from 'class-validator';
 
 export class CreateRoomAvailabilityDto {
   @IsUUID()
-  productId: string; // l'id du Product (type de chambre)
+  productId: string;
 
   @IsDateString()
   date: string;
@@ -10,4 +16,14 @@ export class CreateRoomAvailabilityDto {
   @IsInt()
   @Min(0)
   roomsAvailable: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  roomsBooked?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  roomsRemaining?: number;
 }

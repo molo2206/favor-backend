@@ -1,4 +1,4 @@
-import { IsOptional, IsUUID, IsDateString, IsInt, Min } from 'class-validator';
+import { IsUUID, IsDateString, IsInt, Min, IsOptional } from 'class-validator';
 
 export class UpdateRoomAvailabilityDto {
   @IsOptional()
@@ -13,4 +13,14 @@ export class UpdateRoomAvailabilityDto {
   @IsInt()
   @Min(0)
   roomsAvailable?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  roomsBooked?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  roomsRemaining?: number;
 }

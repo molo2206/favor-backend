@@ -14,4 +14,10 @@ export class RoomAvailability {
 
   @Column()
   roomsAvailable: number;
+
+  @Column({ type: 'int', default: 0 })
+  roomsBooked: number;
+
+  @Column({ type: 'int', default: 0 })
+  roomsRemaining: number;
 }

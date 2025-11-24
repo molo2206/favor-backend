@@ -1,4 +1,14 @@
-import { IsOptional, IsUUID, IsDateString, IsInt, Min } from 'class-validator';
+import {
+  IsUUID,
+  IsDateString,
+  IsInt,
+  Min,
+  IsOptional,
+  IsNumber,
+  IsEnum,
+  IsString,
+} from 'class-validator';
+import { OrderStatus } from 'src/order/enum/order.status.enum';
 
 export class UpdateReservationDto {
   @IsOptional()
@@ -31,4 +41,21 @@ export class UpdateReservationDto {
   @IsInt()
   @Min(1)
   roomsBooked?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  quantity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  totalPrice?: number;
+
+  @IsOptional()
+  @IsEnum(OrderStatus)
+  status?: OrderStatus;
+
+  @IsOptional()
+  @IsString()
+  specialRequest?: string;
 }

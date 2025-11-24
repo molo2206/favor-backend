@@ -244,15 +244,16 @@ export class OrderService {
       });
     }
     if (hasPhone) {
-      const message = `Votre commande ${finalOrder.invoiceNumber} a ete creee avec succes sur FavorHelp
-Montant total ${finalOrder.grandTotal} ${finalOrder.currency}
-Pour le paiement vous pouvez envoyer votre argent via Mobile Money sur +243973760641 ou +243811824573
-Merci pour votre confiance votre commande sera traitee des reception du paiement`;
+      const message = `Votre commande ${finalOrder.invoiceNumber} a été créée avec succès sur FavorHelp.
+Montant total : ${finalOrder.grandTotal} ${finalOrder.currency}.
+Pour le paiement, vous pouvez envoyer votre argent via Mobile Money aux numéros suivants : +243 991 225 122.
+Vous pouvez également effectuer un dépôt sur notre compte bancaire Equity : 688200060761632.
+Merci pour votre confiance. Votre commande sera traitée dès réception du paiement.`;
 
       await this.smsHelper.sendSms(user.phone, message);
     }
 
-    // 🔹 Récupérer les utilisateurs liés à la plateforme
+    //  Récupérer les utilisateurs liés à la plateforme
     const platformUsers = await this.userPlatformRoleRepo.find({
       where: { platform: { key: order.type } },
       relations: ['user'],
