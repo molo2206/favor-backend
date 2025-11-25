@@ -246,9 +246,10 @@ export class OrderService {
     if (hasPhone) {
       const message = `Votre commande ${finalOrder.invoiceNumber} a été créée avec succès sur FavorHelp.
 Montant total : ${finalOrder.grandTotal} ${finalOrder.currency}.
-Pour le paiement, vous pouvez envoyer votre argent via Mobile Money aux numéros suivants : +243 991 225 122.
+Pour le paiement, vous pouvez faire un retrait sur ce numéro agent via Mobile Money : +243 962 646 653 (Nom affiché : Kavira Naomi).
 Vous pouvez également effectuer un dépôt sur notre compte bancaire Equity : 688200060761632.
-Merci pour votre confiance. Votre commande sera traitée dès réception du paiement.`;
+Pour vérifier votre facture, veuillez consulter la section "Commandes" afin de mieux la visualiser.
+Merci pour votre confiance. Votre commande sera traitée dès la réception du paiement.`;
 
       await this.smsHelper.sendSms(user.phone, message);
     }

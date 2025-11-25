@@ -18,20 +18,18 @@ export class Reservation {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  // Relation avec User - TypeORM créera automatiquement la colonne 'userId'
   @ManyToOne(() => UserEntity, (user) => user.reservations, {
     nullable: false,
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'userId' }) // Optionnel - pour spécifier le nom de la colonne
+  @JoinColumn({ name: 'userId' }) 
   user: UserEntity;
 
-  // Relation avec Product - TypeORM créera automatiquement la colonne 'productId'
   @ManyToOne(() => Product, (product) => product.reservations, {
     nullable: false,
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'productId' }) // Optionnel - pour spécifier le nom de la colonne
+  @JoinColumn({ name: 'productId' }) 
   product: Product;
 
   @Column({ type: 'date' })
