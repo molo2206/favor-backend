@@ -11,6 +11,12 @@ import { PriceCalculator } from 'src/users/utility/helpers/price-calculator.util
 import { SearchRoomsDto } from './dto/search-room-dtod';
 import { CompanyType } from 'src/company/enum/type.company.enum';
 import { CompanyEntity } from 'src/company/entities/company.entity';
+import { ImageProductEntity } from 'src/products/entities/imageProduct.entity';
+import { ProductSpecificationValue } from 'src/specification/entities/ProductSpecificationValue.entity';
+import { ProductAttribute } from 'src/AttributGlobal/entities/product_attributes.entity';
+import { ProductVariation } from 'src/AttributGlobal/entities/product_variations.entity';
+import { Country } from 'src/company/entities/country.entity';
+import { City } from 'src/company/entities/city.entity';
 
 @Injectable()
 export class RoomAvailabilityService {
@@ -222,6 +228,70 @@ export class RoomAvailabilityService {
     return res;
   }
 
+  // MÉTHODES POUR LA RECHERCHE FLEXIBLE
+  private prepareSearchTerms(destination: string): string[] {
+    // Nettoyer la destination : supprimer les caractères spéciaux, normaliser
+    const cleaned = destination
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Supprimer les accents
+      .replace(/[^a-z0-9\s,]/g, '') // Garder seulement lettres, chiffres, espaces et virgules
+      .trim();
+
+    // Séparer par virgules et espaces, puis filtrer les termes vides
+    const terms = cleaned.split(/[\s,]+/).filter((term) => term.length > 0);
+
+    // Ajouter le terme complet pour les correspondances exactes
+    const allTerms = [...terms, cleaned.replace(/[\s,]+/g, ' ')];
+
+    // Retirer les doublons
+    return [...new Set(allTerms)];
+  }
+
+  private buildFlexibleSearchConditions(searchTerms: string[]): string[] {
+    // CORRECTION : Déclarer explicitement le type du tableau
+    const conditions: string[] = [];
+
+    for (let i = 0; i < searchTerms.length; i++) {
+      const term = searchTerms[i];
+
+      // Pour chaque terme, créer des conditions LIKE pour chaque champ
+      conditions.push(`LOWER(city.name) LIKE :term${i}`);
+      conditions.push(`LOWER(country.name) LIKE :term${i}`);
+      conditions.push(`LOWER(company.companyName) LIKE :term${i}`);
+      conditions.push(`LOWER(company.address) LIKE :term${i}`);
+      conditions.push(`LOWER(company.companyAddress) LIKE :term${i}`);
+
+      // Recherche partielle avec seulement quelques lettres
+      if (term.length >= 2) {
+        conditions.push(`LOWER(city.name) LIKE :partial${i}`);
+        conditions.push(`LOWER(country.name) LIKE :partial${i}`);
+        conditions.push(`LOWER(company.companyName) LIKE :partial${i}`);
+      }
+    }
+
+    return conditions;
+  }
+
+  private buildSearchParameters(searchTerms: string[]): any {
+    // CORRECTION : Déclarer explicitement le type avec index signature
+    const parameters: { [key: string]: string } = {};
+
+    for (let i = 0; i < searchTerms.length; i++) {
+      const term = searchTerms[i];
+
+      // Recherche exacte
+      parameters[`term${i}`] = `%${term}%`;
+
+      // Recherche partielle (pour termes de 2 caractères ou plus)
+      if (term.length >= 2) {
+        parameters[`partial${i}`] = `%${term.substring(0, 2)}%`;
+      }
+    }
+
+    return parameters;
+  }
+
   async searchProductsByDestination({
     destination,
     startDate,
@@ -237,26 +307,34 @@ export class RoomAvailabilityService {
     children?: number;
     rooms?: number;
   }) {
-    // Construction du query builder pour les companies AVEC LES RELATIONS
+    // Construction du query builder pour les companies AVEC TOUTES LES RELATIONS
     const queryBuilder = this.companyRepo
       .createQueryBuilder('company')
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.products', 'product')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.brand', 'brand')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('product.productAttributes', 'productAttributes')
+      .leftJoinAndSelect('product.variations', 'variations')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('product.availability', 'availability')
       .where('company.typeCompany = :type', { type: CompanyType.HOTEL });
 
-    // Filtre par destination
+    // FILTRE PAR DESTINATION AMÉLIORÉ ET FLEXIBLE
     if (destination) {
-      const search = `%${destination.toLowerCase()}%`;
+      // Nettoyer et préparer les termes de recherche
+      const searchTerms = this.prepareSearchTerms(destination);
+
+      // Construire la condition de recherche flexible
+      const searchConditions = this.buildFlexibleSearchConditions(searchTerms);
+
       queryBuilder.andWhere(
-        `(
-        LOWER(city.name) LIKE :search
-        OR LOWER(country.name) LIKE :search
-        OR LOWER(company.companyName) LIKE :search
-        OR LOWER(company.address) LIKE :search
-        OR LOWER(company.companyAddress) LIKE :search
-      )`,
-        { search },
+        `(${searchConditions.join(' OR ')})`,
+        this.buildSearchParameters(searchTerms),
       );
     }
 
@@ -287,121 +365,247 @@ export class RoomAvailabilityService {
           adults <= capacityAdults &&
           children <= capacityChildren;
 
-        if (hasNoCapacityData || canAccommodateByTotal || canAccommodateBySeparate) {
-          console.log(
-            `✅ Produit ${product.name} peut accueillir ${adults} adultes et ${children} enfants`,
-          );
+        // TOUJOURS INCLURE LE PRODUIT MÊME SI CAPACITÉ INSUFFISANTE
+        const capacityInfo = {
+          canAccommodate:
+            hasNoCapacityData || canAccommodateByTotal || canAccommodateBySeparate,
+          hasNoCapacityData,
+          canAccommodateByTotal,
+          canAccommodateBySeparate,
+          requiredAdults: adults,
+          requiredChildren: children,
+          productCapacityAdults: capacityAdults,
+          productCapacityChildren: capacityChildren,
+          productCapacityTotal: capacityTotal,
+        };
 
-          let isAvailable = true;
-          if (startDate && endDate) {
-            const availabilities = await this.availabilityRepo.find({
-              where: {
-                product: { id: product.id },
-                date: Between(startDate, endDate),
-              },
-            });
+        console.log(
+          `✅ Produit ${product.name} inclus - Capacité suffisante: ${capacityInfo.canAccommodate}`,
+        );
 
-            if (!availabilities || availabilities.length === 0) {
-              isAvailable = false;
-              console.log(`❌ Aucune disponibilité pour ${product.name}`);
-            } else {
-              const start = new Date(startDate);
-              const end = new Date(endDate);
-              const daysDiff = Math.ceil(
-                (end.getTime() - start.getTime()) / (1000 * 3600 * 24),
-              );
+        let isAvailable = true;
+        // CORRECTION : Déclarer availabilityInfo avec un type union
+        let availabilityInfo: {
+          available: boolean;
+          message: string;
+          period?: { startDate: string; endDate: string };
+          unavailableDates?: string[];
+          roomsRemaining?: number;
+        } | null = null;
 
-              for (let i = 0; i < daysDiff; i++) {
-                const currentDate = new Date(start);
-                currentDate.setDate(start.getDate() + i);
-                const dateStr = currentDate.toISOString().split('T')[0];
+        // VÉRIFICATION DISPONIBILITÉ SEULEMENT SI DATES FOURNIES
+        if (startDate && endDate) {
+          const availabilities = await this.availabilityRepo.find({
+            where: {
+              product: { id: product.id },
+              date: Between(startDate, endDate),
+            },
+          });
 
-                const dayAvailability = availabilities.find((a) => a.date === dateStr);
+          if (!availabilities || availabilities.length === 0) {
+            isAvailable = false;
+            availabilityInfo = {
+              available: false,
+              message: 'Aucune disponibilité trouvée pour les dates demandées',
+              period: { startDate, endDate },
+            };
+          } else {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24));
+            let allDaysAvailable = true;
+            const unavailableDates: string[] = [];
 
-                const roomsAvailable = dayAvailability?.roomsAvailable ?? 0;
-                const roomsBooked = dayAvailability?.roomsBooked ?? 0;
-                const roomsRemaining =
-                  dayAvailability?.roomsRemaining ?? roomsAvailable - roomsBooked;
+            for (let i = 0; i < daysDiff; i++) {
+              const currentDate = new Date(start);
+              currentDate.setDate(start.getDate() + i);
+              const dateStr = currentDate.toISOString().split('T')[0];
 
-                if (!dayAvailability || roomsRemaining < rooms) {
-                  isAvailable = false;
-                  console.log(
-                    `❌ Plus de chambres disponibles le ${dateStr} pour ${product.name}`,
-                  );
-                  break;
-                }
+              const dayAvailability = availabilities.find((a) => a.date === dateStr);
+
+              const roomsAvailable = dayAvailability?.roomsAvailable ?? 0;
+              const roomsBooked = dayAvailability?.roomsBooked ?? 0;
+              const roomsRemaining =
+                dayAvailability?.roomsRemaining ?? roomsAvailable - roomsBooked;
+
+              if (!dayAvailability || roomsRemaining < rooms) {
+                allDaysAvailable = false;
+                unavailableDates.push(dateStr);
               }
             }
-          }
 
-          if (isAvailable) {
-            // Ajouter le produit avec TOUS LES CHAMPS IMPORTANTS
-            products.push({
-              // Informations de base
-              id: product.id,
-              name: product.name,
-              description: product.description,
-              price: product.price,
-              type: product.type,
-
-              // Prix et variations
-              detail_price_original: product.detail_price_original,
-              gros_price_original: product.gros_price_original,
-              detail: product.detail,
-              gros: product.gros,
-              dailyRate: product.dailyRate,
-              salePrice: product.salePrice,
-
-              // Capacités
-              capacityAdults: product.capacityAdults,
-              capacityChildren: product.capacityChildren,
-              capacityTotal: product.capacityTotal,
-              bedTypes: product.bedTypes,
-
-              // Caractéristiques
-              ingredients: product.ingredients,
-              quantity: product.quantity,
-              min_quantity: product.min_quantity,
-              stockAlert: product.stockAlert,
-
-              // Images et médias
-              image: product.image,
-              images: product.images,
-
-              // Localisation
-              localization: product.localization,
-
-              // Statut et métadonnées
-              status: product.status,
-              companyActivity: product.companyActivity,
-              createdAt: product.createdAt,
-              updatedAt: product.updatedAt,
-
-              // Spécifications voiture (si applicable)
-              registrationNumber: product.registrationNumber,
-              model: product.model,
-              year: product.year,
-              typecar: product.typecar,
-              fuelType: product.fuelType,
-              transmission: product.transmission,
-              color: product.color,
-              dailyRate_price_original: product.dailyRate_price_original,
-
-              // Relations (simplifiées)
-              category: product.category,
-              brand: product.brand,
-              measure: product.measure,
-            });
-            console.log(`✅ ${product.name} ajouté aux produits de ${company.companyName}`);
+            if (!allDaysAvailable) {
+              isAvailable = false;
+              availabilityInfo = {
+                available: false,
+                message: 'Chambres non disponibles pour certaines dates',
+                period: { startDate, endDate },
+                unavailableDates: unavailableDates,
+              };
+            } else {
+              availabilityInfo = {
+                available: true,
+                message: 'Chambres disponibles pour toute la période',
+                period: { startDate, endDate },
+                roomsRemaining: Math.min(
+                  ...availabilities.map(
+                    (a) => a.roomsRemaining ?? a.roomsAvailable - a.roomsBooked,
+                  ),
+                ),
+              };
+            }
           }
         } else {
-          console.log(`❌ Capacité insuffisante pour ${product.name}`);
+          availabilityInfo = {
+            available: true,
+            message: 'Aucune période spécifiée - vérifiez la disponibilité pour vos dates',
+          };
         }
+
+        // STRUCTURER LES IMAGES
+        const productImages = product.images
+          ? product.images.map((image: ImageProductEntity) => ({
+              id: image.id,
+              url: image.url,
+            }))
+          : [];
+
+        // STRUCTURER LES SPÉCIFICATIONS
+        const specifications = product.specificationValues
+          ? product.specificationValues.map((spec: ProductSpecificationValue) => ({
+              id: spec.id,
+              value: spec.value,
+              specification: spec.specification,
+            }))
+          : [];
+
+        // SUPPRIMÉ : Les attributs et variations comme demandé
+        // STRUCTURER LA DISPONIBILITÉ
+        const availability = product.availability
+          ? product.availability.map((avail: RoomAvailability) => ({
+              id: avail.id,
+              date: avail.date,
+              roomsAvailable: avail.roomsAvailable,
+              roomsBooked: avail.roomsBooked,
+              roomsRemaining: avail.roomsRemaining,
+            }))
+          : [];
+
+        // AJOUTER LE PRODUIT DANS TOUS LES CAS
+        products.push({
+          // === CHAMPS DE BASE DU PRODUIT ===
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          type: product.type,
+
+          // === PRIX ET VARIATIONS ===
+          detail_price_original: product.detail_price_original,
+          gros_price_original: product.gros_price_original,
+          detail: product.detail,
+          gros: product.gros,
+          dailyRate: product.dailyRate,
+          salePrice: product.salePrice,
+          dailyRate_price_original: product.dailyRate_price_original,
+
+          // === CAPACITÉS ET CARACTÉRISTIQUES CHAMBRE ===
+          capacityAdults: product.capacityAdults,
+          capacityChildren: product.capacityChildren,
+          capacityTotal: product.capacityTotal,
+          bedTypes: product.bedTypes,
+          localization: product.localization,
+
+          // === STOCK ET INVENTAIRE ===
+          ingredients: product.ingredients,
+          quantity: product.quantity,
+          min_quantity: product.min_quantity,
+          stockAlert: product.stockAlert,
+
+          // === IMAGES ET MÉDIAS ===
+          image: product.image,
+          images: productImages,
+
+          // === SPÉCIFICATIONS VOITURE ===
+          registrationNumber: product.registrationNumber,
+          model: product.model,
+          year: product.year,
+          typecar: product.typecar,
+          fuelType: product.fuelType,
+          transmission: product.transmission,
+          color: product.color,
+
+          // === STATUT ET MÉTADONNÉES ===
+          status: product.status,
+          companyActivity: product.companyActivity,
+          createdAt: product.createdAt,
+          updatedAt: product.updatedAt,
+
+          // === RELATIONS COMPLÈTES ===
+          category: product.category,
+          brand: product.brand,
+          measure: product.measure,
+
+          // === COLLECTIONS ET RELATIONS MULTIPLES ===
+          specificationValues: specifications,
+          // SUPPRIMÉ : productAttributes, variations, attributes
+          availability: availability,
+
+          // === RELATIONS (simplifiées pour éviter la récursion) ===
+          rentalContracts: product.rentalContracts ? product.rentalContracts.length : 0,
+          saleTransactions: product.saleTransactions ? product.saleTransactions.length : 0,
+          reservations: product.reservations ? product.reservations.length : 0,
+          wishlist: product.wishlist ? product.wishlist.length : 0,
+
+          // === INFORMATIONS DE CAPACITÉ ET DISPONIBILITÉ ===
+          capacityStatus: capacityInfo,
+          availabilityStatus: availabilityInfo,
+          isAvailable: capacityInfo.canAccommodate && isAvailable,
+          canAccommodate: capacityInfo.canAccommodate,
+          hasAvailability: isAvailable,
+        });
       }
 
-      // Si la company a au moins un produit disponible, l'ajouter aux résultats
+      // Si la company a au moins un produit, l'ajouter aux résultats
       if (products.length > 0) {
+        const companyCity = company.city
+          ? {
+              id: company.city.id,
+              name: company.city.name,
+              countryId: company.city.countryId,
+              status: company.city.status,
+              createdAt: company.city.createdAt,
+              updatedAt: company.city.updatedAt,
+            }
+          : null;
+
+        const companyCountry = company.country
+          ? {
+              id: company.country.id,
+              name: company.country.name,
+              code: company.country.code,
+              status: company.country.status,
+              createdAt: company.country.createdAt,
+              updatedAt: company.country.updatedAt,
+              cities: company.country.cities ? company.country.cities.length : 0,
+            }
+          : null;
+
+        const companyCategory = company.category
+          ? {
+              id: company.category.id,
+              name: company.category.name,
+              type: company.category.type,
+              image: company.category.image,
+              slug: company.category.slug,
+              status: company.category.status,
+              createdAt: company.category.createdAt,
+              updatedAt: company.category.updatedAt,
+            }
+          : null;
+
         companiesWithProducts.push({
+          // === CHAMPS DE BASE DE LA COMPANY ===
           id: company.id,
           companyName: company.companyName,
           companyAddress: company.companyAddress,
@@ -409,18 +613,74 @@ export class RoomAvailabilityService {
           email: company.email,
           phone: company.phone,
           website: company.website,
+
+          // === DOCUMENTS ET INFORMATIONS LÉGALES ===
+          vatNumber: company.vatNumber,
+          registrationDocumentUrl: company.registrationDocumentUrl,
+          warehouseLocation: company.warehouseLocation,
+
+          // === IMAGES ET MÉDIAS ===
+          banner: company.banner,
+          logo: company.logo,
+
+          // === STATUT ET TYPE ===
+          status: company.status,
+          typeCompany: company.typeCompany,
+          companyActivity: company.companyActivity,
+
+          // === INFORMATIONS DE LOCALISATION ===
           latitude: company.latitude,
           longitude: company.longitude,
-          city: company.city,
-          country: company.country,
+          delivery_minutes: company.delivery_minutes,
+          distance_km: company.distance_km,
+          open_time: company.open_time,
+
+          // === FINANCES ET TAUX ===
+          taux: company.taux,
+          localCurrency: company.localCurrency,
+
+          // === RELATIONS GÉOGRAPHIQUES ===
+          city: companyCity,
+          country: companyCountry,
+          category: companyCategory,
+          cityId: company.cityId,
+          countryId: company.countryId,
+          categoryId: company.categoryId,
+
+          // === MÉTADONNÉES ===
+          createdAt: company.createdAt,
+
+          // === COLLECTIONS (compteurs pour éviter trop de données) ===
+          userHasCompany: company.userHasCompany ? company.userHasCompany.length : 0,
+          measures: company.measures ? company.measures.length : 0,
+          services: company.services ? company.services.length : 0,
+          rooms: company.rooms ? company.rooms.length : 0,
+          tauxCompanies: company.tauxCompanies ? company.tauxCompanies.length : 0,
+
+          // === TOUS LES PRODUITS ===
           products: products,
         });
       }
     }
 
     return {
-      message: `Produits disponibles récupérés pour la destination : ${destination}`,
+      message: `Produits récupérés pour la destination : ${destination}${startDate && endDate ? ` pour la période ${startDate} - ${endDate}` : ''}`,
       data: companiesWithProducts,
+      summary: {
+        totalCompanies: companiesWithProducts.length,
+        totalProducts: companiesWithProducts.reduce(
+          (sum, company) => sum + company.products.length,
+          0,
+        ),
+        availableProducts: companiesWithProducts.reduce(
+          (sum, company) => sum + company.products.filter((p: any) => p.isAvailable).length,
+          0,
+        ),
+        productsWithCapacity: companiesWithProducts.reduce(
+          (sum, company) => sum + company.products.filter((p: any) => p.canAccommodate).length,
+          0,
+        ),
+      },
     };
   }
 }
