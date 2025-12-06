@@ -5,7 +5,6 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
@@ -24,7 +23,7 @@ export class AuthentificationGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     if (!request.currentUser) {
-      throw new ForbiddenException('Accès non autorisé. Veuillez vous connecter.');
+      throw new UnauthorizedException('Accès non autorisé. Veuillez vous connecter.');
     }
 
     return true;
