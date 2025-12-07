@@ -99,14 +99,15 @@ export class UsersController {
 
   @Post('refresh-token')
   async refresh(@Body('refresh_token') refreshToken: string) {
-    const accessToken = await this.usersService.refreshTokenWithValidation(refreshToken);
+    const tokens = await this.usersService.refreshTokenWithValidation(refreshToken);
+
     return {
-      message: 'Nouveau token généré',
-      access_token: accessToken,
+      message: 'Nouveaux tokens générés',
+      access_token: tokens.accessToken,
+      refresh_token: tokens.refreshToken,
     };
   }
 
-  // ──────  Authentification à deux facteurs ──────
   @UseGuards(AuthentificationGuard)
   @Get('generate-2fa')
   async generate2FA(@CurrentUser() currentUser: UserEntity) {
@@ -280,6 +281,4 @@ export class UsersController {
   async assignResources(@Body() dto: AssignResourcesDto) {
     return this.usersService.assignResourcesToUser(dto.userId, dto.resources);
   }
-
-  
 }

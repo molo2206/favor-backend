@@ -1201,23 +1201,24 @@ export class UsersService {
     }
 
     return await this.jwtService.signAsync(payload, {
-      expiresIn: '1m',
+      expiresIn: '7d',
       secret: secretKey,
     });
   }
 
-  async refreshTokenWithValidation(refresh_token: string): Promise<string> {
+  async refreshTokenWithValidation(
+    refresh_token: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     if (!refresh_token) {
       throw new BadRequestException('Le refresh_token est requis.');
     }
 
-    let decoded: any;
-    const secret = this.configService.get<string>('REFRESH_TOKEN_SECRET_KEY'); // Utilise la bonne clé ici
-
+    const secret = this.configService.get<string>('REFRESH_TOKEN_SECRET_KEY');
     if (!secret) {
       throw new Error('REFRESH_TOKEN_SECRET_KEY is not défini dans .env');
     }
 
+    let decoded: any;
     try {
       decoded = await this.jwtService.verifyAsync(refresh_token, { secret });
     } catch (err) {
@@ -1227,11 +1228,18 @@ export class UsersService {
     const user = await this.usersRepository.findOne({
       where: { id: decoded.id },
     });
+
     if (!user) {
       throw new BadRequestException('Utilisateur introuvable.');
     }
 
-    return this.accessToken(user); 
+    const newAccessToken = await this.accessToken(user);
+    const newRefreshToken = await this.refreshToken(user);
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    };
   }
 
   generateSecret(email: string) {
