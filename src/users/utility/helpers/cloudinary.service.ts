@@ -65,7 +65,10 @@ export class CloudinaryService {
       quality = 90;
     }
 
+    // Version corrigée - supprime les transformations d'orientation
     const processedBuffer = await sharp(file.buffer)
+      // Supprimé: .rotate(0) - cela forçait une rotation à 0 degrés
+      // Supprimé: .withMetadata({ orientation: 1 }) - cela forçait l'orientation à 1 (normale)
       .resize({
         width: maxWidth,
         height: maxHeight,
