@@ -66,8 +66,6 @@ export class CloudinaryService {
     }
 
     const processedBuffer = await sharp(file.buffer)
-      .rotate(0)
-      .withMetadata({ orientation: 1 })
       .resize({
         width: maxWidth,
         height: maxHeight,
