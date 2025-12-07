@@ -1054,11 +1054,10 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       .leftJoinAndSelect('specValues.specification', 'specValuesSpec')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
-      .leftJoinAndSelect('product.availability', 'availability') // Ajouté: récupérer toutes les disponibilités
+      .leftJoinAndSelect('product.availability', 'availability')
       .where('product.companyId = :companyId', { companyId })
-      // On enlève le filtre par disponibilité pour voir toutes les chambres, même sans disponibilité
       .orderBy('product.createdAt', 'DESC')
-      .addOrderBy('availability.date', 'ASC') // Ordonner les disponibilités par date
+      .addOrderBy('availability.date', 'ASC')
       .getMany();
 
     if (!products || products.length === 0) {
@@ -1104,7 +1103,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
           }))
           .sort((a, b) => a.displayOrder - b.displayOrder);
 
-        // Pousser les résultats dans le tableau
         categorySpecs.push(...filteredSpecs);
       }
 
@@ -1142,31 +1140,10 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
           url: img.url,
         })) || [];
 
-      // Formater les disponibilités
-      const availabilityList: Array<{
-        id: string;
-        date: string;
-        roomsAvailable: number;
-        roomsBooked: number;
-        roomsRemaining: number;
-      }> =
-        product.availability?.map((av) => ({
-          id: av.id,
-          date: av.date,
-          roomsAvailable: av.roomsAvailable,
-          roomsBooked: av.roomsBooked,
-          roomsRemaining: av.roomsRemaining,
-        })) || [];
-
-      // Calculer la disponibilité globale
-      const hasAvailability = availabilityList.some((av) => av.roomsRemaining > 0);
-      const totalAvailableRooms = availabilityList.reduce(
-        (sum, av) => sum + av.roomsRemaining,
-        0,
-      );
-      const nextAvailableDate = availabilityList
-        .filter((av) => av.roomsRemaining > 0)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0]?.date;
+      // Calculer SEULEMENT le nombre de chambres disponibles
+      const availabilityList = product.availability || [];
+      const availableRooms = availabilityList.reduce((sum, av) => sum + av.roomsRemaining, 0);
+      const hasAvailability = availableRooms > 0;
 
       return {
         id: product.id,
@@ -1209,25 +1186,16 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
             }
           : null,
 
-        // Disponibilités (nouveau champ)
-        availability: {
-          list: availabilityList,
-          summary: {
-            hasAvailability,
-            totalAvailableRooms,
-            nextAvailableDate,
-            totalDates: availabilityList.length,
-            availableDates: availabilityList.filter((av) => av.roomsRemaining > 0).length,
-            bookedDates: availabilityList.filter((av) => av.roomsBooked > 0).length,
-          },
-        },
+        // SEULEMENT le nombre de chambres disponibles
+        availableRooms: availableRooms,
+
+        // Indicateur simple pour le filtrage
+        isAvailable: hasAvailability,
       };
     });
 
     // Filtrer uniquement les produits qui ont de la disponibilité
-    const availableProducts = formattedProducts.filter(
-      (product) => product.availability.summary.hasAvailability,
-    );
+    const availableProducts = formattedProducts.filter((product) => product.isAvailable);
 
     return {
       message:
