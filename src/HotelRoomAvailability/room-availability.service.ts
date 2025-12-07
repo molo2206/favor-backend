@@ -1031,4 +1031,161 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       },
     };
   }
+
+  async getAvailableRoomsByCompany(
+    companyId: string,
+  ): Promise<{ message: string; data: any[] }> {
+    const company = await this.companyRepo.findOne({
+      where: { id: companyId },
+      select: ['id', 'companyName'],
+    });
+
+    if (!company) {
+      throw new NotFoundException('Entreprise non trouvée');
+    }
+
+    // Utiliser QueryBuilder avec une sous-requête pour la disponibilité
+    const products = await this.productRepo
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('category.specifications', 'categorySpec')
+      .leftJoinAndSelect('categorySpec.specification', 'spec')
+      .leftJoinAndSelect('product.specificationValues', 'specValues')
+      .leftJoinAndSelect('specValues.specification', 'specValuesSpec')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoin('product.availability', 'availability', 'availability.roomsRemaining > 0')
+      .where('product.companyId = :companyId', { companyId })
+      .andWhere('availability.id IS NOT NULL') // S'assurer qu'il y a de la disponibilité
+      .orderBy('product.createdAt', 'DESC')
+      .getMany();
+
+    if (!products || products.length === 0) {
+      return {
+        message: 'Aucune chambre disponible pour cette entreprise',
+        data: [],
+      };
+    }
+
+    // Formater les résultats
+    const formattedProducts = products.map((product) => {
+      // Définir le type correct pour categorySpecs
+      const categorySpecs: Array<{
+        id: string;
+        required: boolean;
+        displayOrder: number;
+        specification: {
+          id: string;
+          key: string;
+          label: string;
+          type: any; // Utiliser 'any' pour éviter les problèmes de type
+          unit?: string;
+          options?: any;
+        };
+      }> = [];
+
+      if (product.category?.specifications) {
+        // Ajouter les spécifications filtrées et formatées
+        const filteredSpecs = product.category.specifications
+          .filter((cs) => cs.specification)
+          .map((cs) => ({
+            id: cs.id,
+            required: cs.required,
+            displayOrder: cs.displayOrder || 0,
+            specification: {
+              id: cs.specification!.id,
+              key: cs.specification!.key,
+              label: cs.specification!.label,
+              type: cs.specification!.type,
+              unit: cs.specification!.unit,
+              options: cs.specification!.options,
+            },
+          }))
+          .sort((a, b) => a.displayOrder - b.displayOrder);
+
+        // Pousser les résultats dans le tableau
+        categorySpecs.push(...filteredSpecs);
+      }
+
+      // Définir le type pour les spécifications du produit
+      const productSpecs: Array<{
+        id: string;
+        value?: string;
+        specification: {
+          id: string;
+          key: string;
+          label: string;
+          type: any;
+        };
+      }> =
+        product.specificationValues
+          ?.filter((sv) => sv.specification)
+          .map((sv) => ({
+            id: sv.id,
+            value: sv.value,
+            specification: {
+              id: sv.specification!.id,
+              key: sv.specification!.key,
+              label: sv.specification!.label,
+              type: sv.specification!.type,
+            },
+          })) || [];
+
+      // Définir le type pour les images
+      const productImages: Array<{
+        id: string;
+        url: string;
+      }> =
+        product.images?.map((img) => ({
+          id: img.id.toString(), // Convertir en string
+          url: img.url,
+        })) || [];
+      return {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        gros: product.gros,
+        quantity: product.quantity,
+        image: product.image,
+        status: product.status,
+        capacityAdults: product.capacityAdults,
+        capacityChildren: product.capacityChildren,
+        capacityTotal: product.capacityTotal,
+        bedTypes: product.bedTypes,
+        localization: product.localization,
+
+        // Catégorie
+        category: product.category
+          ? {
+              id: product.category.id,
+              name: product.category.name,
+              image: product.category.image,
+              slug: product.category.slug,
+              specifications: categorySpecs,
+            }
+          : null,
+
+        // Spécifications du produit
+        specifications: productSpecs,
+
+        // Images
+        images: productImages,
+
+        // Mesure
+        measure: product.measure
+          ? {
+              id: product.measure.id,
+              name: product.measure.name,
+              abbreviation: product.measure.abbreviation,
+            }
+          : null,
+      };
+    });
+
+    return {
+      message: `${formattedProducts.length} chambre(s) disponible(s) trouvée(s) pour ${company.companyName}`,
+      data: formattedProducts,
+    };
+  }
 }

@@ -142,4 +142,11 @@ export class RoomAvailabilityController {
 
     return result;
   }
+
+  @Get('rooms/:companyId/available')
+  async getAvailableRooms(
+    @Param('companyId') companyId: string,
+  ): Promise<{ message: string; data: any[] }> {
+    return this.service.getAvailableRoomsByCompany(companyId);
+  }
 }
