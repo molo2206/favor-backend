@@ -20,6 +20,7 @@ import { ReservationStatus } from './enum/reservation-room.enum';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
 import { isValidReservationStatusTransition } from 'src/users/utility/helpers/reservation-status.util';
 import { sanitizeUser } from 'src/users/utility/helpers/anitizeUser.util';
+import { LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 
 @Injectable()
 export class RoomAvailabilityService {
@@ -189,26 +190,36 @@ export class RoomAvailabilityService {
       specialRequest?: string;
     },
   ) {
-    // --- Récupération du produit ---
     const product = await this.productRepo.findOne({
       where: { id: dto.productId },
       select: ['id', 'price', 'detail', 'gros', 'dailyRate', 'salePrice', 'name'],
     });
     if (!product) throw new NotFoundException('Type de chambre non trouvé');
 
-    // --- Récupération de l'utilisateur ---
     const user = await this.userRepo.findOne({
       where: { id: userId },
       select: ['id', 'fullName', 'email', 'phone', 'image', 'role', 'country', 'city'],
     });
     if (!user) throw new NotFoundException('Utilisateur non trouvé');
 
-    // --- Calcul des dates de réservation ---
+    const overlappingReservation = await this.reservationRepo.findOne({
+      where: {
+        product: { id: dto.productId },
+        startDate: LessThanOrEqual(dto.endDate),
+        endDate: MoreThanOrEqual(dto.startDate),
+      },
+    });
+
+    if (overlappingReservation) {
+      throw new BadRequestException(
+        `Impossible de réserver : les dates ${dto.startDate} - ${dto.endDate} sont déjà prises pour cette chambre.`,
+      );
+    }
+
     const dates = this.listDates(dto.startDate, dto.endDate);
     const DEFAULT_ROOMS_AVAILABLE = 10;
     const roomsToBook = dto.quantity ?? 1;
 
-    // --- Mise à jour de la disponibilité des chambres ---
     const availabilityRecords: RoomAvailability[] = [];
 
     for (const date of dates) {
@@ -242,7 +253,6 @@ export class RoomAvailabilityService {
 
     await this.availabilityRepo.save(availabilityRecords);
 
-    // --- Calcul du prix total ---
     const calculatedTotalPrice = PriceCalculator.calculateTotalPrice(
       product,
       dto.startDate,
@@ -250,7 +260,6 @@ export class RoomAvailabilityService {
       roomsToBook,
     );
 
-    // --- Création de la réservation ---
     const reservation = this.reservationRepo.create({
       user,
       product,
@@ -265,7 +274,6 @@ export class RoomAvailabilityService {
 
     const saved = await this.reservationRepo.save(reservation);
 
-    // --- Vérification des moyens de contact ---
     const hasEmail = user.email && user.email.trim() !== '';
     const hasPhone = user.phone && user.phone.trim() !== '';
 
@@ -275,7 +283,6 @@ export class RoomAvailabilityService {
       );
     }
 
-    // --- Email de confirmation ---
     if (hasEmail) {
       await this.mailService.sendReservationPdf(
         user.email,
