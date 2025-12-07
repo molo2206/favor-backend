@@ -48,6 +48,7 @@ import { UserPlatformRoleEntity } from 'src/users/entities/user_plateform_roles.
 import { NotificationsService } from 'src/notification/notifications.service';
 import { UserRole } from 'src/users/enum/user-role-enum';
 import { convertSpecValue } from 'src/users/utility/helpers/spec-value.util';
+import { RoomAvailability } from 'src/HotelRoomAvailability/entity/RoomAvailability.entity';
 @Injectable()
 export class ProductService {
   constructor(
@@ -123,7 +124,6 @@ export class ProductService {
       ...data
     } = createProductDto;
 
-    // 🔹 Validation images
     if (!files || files.length < 1 || files.length > 30) {
       throw new BadRequestException('Vous devez fournir entre 1 et 30 images.');
     }
@@ -135,28 +135,24 @@ export class ProductService {
     const company = await this.companyRepo.findOne({ where: { id: user.activeCompanyId } });
     if (!company) throw new NotFoundException('Entreprise active introuvable.');
 
-    // 🔹 Récupération catégorie
     let category: CategoryEntity | null = null;
     if (categoryId) {
       category = await this.categoryRepo.findOne({ where: { id: categoryId } });
       if (!category) throw new NotFoundException('Catégorie non trouvée.');
     }
 
-    // 🔹 Récupération marque
     let brand: Brand | null = null;
     if (brandId) {
       brand = await this.brandRepository.findOne({ where: { id: brandId } });
       if (!brand) throw new NotFoundException(`Marque avec l'ID ${brandId} non trouvée.`);
     }
 
-    // 🔹 Récupération mesure
     let measure: MeasureEntity | null = null;
     if (measureId) {
       measure = await this.measureRepo.findOne({ where: { id: measureId } });
       if (!measure) throw new NotFoundException('Mesure non trouvée.');
     }
 
-    // 🔹 Vérification min_quantity pour grossistes
     if (
       (company.companyActivity === CompanyActivity.WHOLESALER ||
         company.companyActivity === CompanyActivity.WHOLESALER_RETAILER) &&
@@ -169,9 +165,7 @@ export class ProductService {
 
     const productStatus = status || ProductStatus.PENDING;
 
-    // 🔹 Transaction
     return await this.dataSource.transaction(async (manager) => {
-      // 🔸 1. Créer le produit (sans image principale au départ)
       const product = manager.create(Product, {
         ...data,
         min_quantity: min_quantity ?? 0,
@@ -186,7 +180,6 @@ export class ProductService {
 
       const savedProduct = await manager.save(product);
 
-      // 🔸 2. Upload des images dans Cloudinary et création des entités ImageProductEntity
       const uploadedImages: string[] = [];
       for (const file of files) {
         const uploadedUrl = await this.cloudinary.handleUploadImage(file, 'product');
@@ -309,7 +302,6 @@ export class ProductService {
         }
       }
 
-      // 🔸 7. Recharger le produit complet avec TOUTES les relations
       const finalProduct = await manager.findOne(Product, {
         where: { id: savedProduct.id },
         relations: [
@@ -334,8 +326,40 @@ export class ProductService {
         throw new NotFoundException('Produit non trouvé après création');
       }
 
-      // 🔸 8. S'assurer que les images sont bien attachées au produit final
+      // 🔸 8. S'assurer que les images sont bien attachées
       finalProduct.images = imageEntities;
+
+      // 🔸 8.5 Génération RoomAvailability si hôtel
+      if (finalProduct.category?.name?.toLowerCase() === 'hotel') {
+        const DEFAULT_ROOMS = 10;
+        const daysToGenerate = 30;
+
+        const today = new Date();
+        const availabilityList: RoomAvailability[] = [];
+
+        for (let i = 0; i < daysToGenerate; i++) {
+          const date = new Date(today);
+          date.setDate(date.getDate() + i);
+
+          const formattedDate = date.toISOString().split('T')[0];
+
+          const availability = manager.create(RoomAvailability, {
+            product: finalProduct,
+            date: formattedDate,
+            roomsAvailable: DEFAULT_ROOMS,
+            roomsBooked: 0,
+            roomsRemaining: DEFAULT_ROOMS,
+          });
+
+          availabilityList.push(availability);
+        }
+
+        await manager.save(availabilityList);
+
+        this.logger.log(
+          `RoomAvailability généré automatiquement pour ${daysToGenerate} jours pour le produit hôtel : ${finalProduct.name}`,
+        );
+      }
 
       this.logger.log(`Produit "${finalProduct.name}" créé avec succès.`);
 
