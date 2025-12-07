@@ -1044,7 +1044,7 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       throw new NotFoundException('Entreprise non trouvée');
     }
 
-    // Utiliser QueryBuilder avec une sous-requête pour la disponibilité
+    // Utiliser QueryBuilder pour récupérer tout
     const products = await this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
@@ -1054,15 +1054,16 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       .leftJoinAndSelect('specValues.specification', 'specValuesSpec')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
-      .leftJoin('product.availability', 'availability', 'availability.roomsRemaining > 0')
+      .leftJoinAndSelect('product.availability', 'availability') // Ajouté: récupérer toutes les disponibilités
       .where('product.companyId = :companyId', { companyId })
-      .andWhere('availability.id IS NOT NULL') // S'assurer qu'il y a de la disponibilité
+      // On enlève le filtre par disponibilité pour voir toutes les chambres, même sans disponibilité
       .orderBy('product.createdAt', 'DESC')
+      .addOrderBy('availability.date', 'ASC') // Ordonner les disponibilités par date
       .getMany();
 
     if (!products || products.length === 0) {
       return {
-        message: 'Aucune chambre disponible pour cette entreprise',
+        message: 'Aucune chambre trouvée pour cette entreprise',
         data: [],
       };
     }
@@ -1078,7 +1079,7 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
           id: string;
           key: string;
           label: string;
-          type: any; // Utiliser 'any' pour éviter les problèmes de type
+          type: any;
           unit?: string;
           options?: any;
         };
@@ -1137,9 +1138,36 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
         url: string;
       }> =
         product.images?.map((img) => ({
-          id: img.id.toString(), // Convertir en string
+          id: img.id.toString(),
           url: img.url,
         })) || [];
+
+      // Formater les disponibilités
+      const availabilityList: Array<{
+        id: string;
+        date: string;
+        roomsAvailable: number;
+        roomsBooked: number;
+        roomsRemaining: number;
+      }> =
+        product.availability?.map((av) => ({
+          id: av.id,
+          date: av.date,
+          roomsAvailable: av.roomsAvailable,
+          roomsBooked: av.roomsBooked,
+          roomsRemaining: av.roomsRemaining,
+        })) || [];
+
+      // Calculer la disponibilité globale
+      const hasAvailability = availabilityList.some((av) => av.roomsRemaining > 0);
+      const totalAvailableRooms = availabilityList.reduce(
+        (sum, av) => sum + av.roomsRemaining,
+        0,
+      );
+      const nextAvailableDate = availabilityList
+        .filter((av) => av.roomsRemaining > 0)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0]?.date;
+
       return {
         id: product.id,
         name: product.name,
@@ -1180,12 +1208,33 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
               abbreviation: product.measure.abbreviation,
             }
           : null,
+
+        // Disponibilités (nouveau champ)
+        availability: {
+          list: availabilityList,
+          summary: {
+            hasAvailability,
+            totalAvailableRooms,
+            nextAvailableDate,
+            totalDates: availabilityList.length,
+            availableDates: availabilityList.filter((av) => av.roomsRemaining > 0).length,
+            bookedDates: availabilityList.filter((av) => av.roomsBooked > 0).length,
+          },
+        },
       };
     });
 
+    // Filtrer uniquement les produits qui ont de la disponibilité
+    const availableProducts = formattedProducts.filter(
+      (product) => product.availability.summary.hasAvailability,
+    );
+
     return {
-      message: `${formattedProducts.length} chambre(s) disponible(s) trouvée(s) pour ${company.companyName}`,
-      data: formattedProducts,
+      message:
+        availableProducts.length > 0
+          ? `${availableProducts.length} chambre(s) disponible(s) trouvée(s) pour ${company.companyName}`
+          : `Aucune chambre disponible pour ${company.companyName}`,
+      data: availableProducts,
     };
   }
 }
