@@ -21,6 +21,7 @@ import { SearchRoomsDto } from './dto/search-room-dtod';
 import { Product } from 'src/products/entities/product.entity';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
 import { Reservation } from './entity/Reservation.entity';
+import { ReservationStatus } from './enum/reservation-room.enum';
 
 @Controller('booking')
 export class RoomAvailabilityController {
@@ -64,12 +65,21 @@ export class RoomAvailabilityController {
 
   @UseGuards(AuthentificationGuard)
   @Get('by-company')
-  async getCompanyReservations(@CurrentUser() user: UserEntity) {
+  async getCompanyReservations(
+    @CurrentUser() user: UserEntity,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('status') status?: ReservationStatus,
+  ) {
     if (!user.activeCompanyId) {
       throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
     }
 
-    return await this.service.getCompanyReservations(user.activeCompanyId);
+    return await this.service.getCompanyReservations(user.activeCompanyId, {
+      startDate,
+      endDate,
+      status,
+    });
   }
 
   @Get('all-reservations')

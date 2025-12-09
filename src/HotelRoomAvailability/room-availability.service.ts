@@ -353,39 +353,57 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
     };
   }
 
-  async getCompanyReservations(companyId: string) {
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
-    if (!company) throw new NotFoundException('Société non trouvée.');
+  async getCompanyReservations(
+    companyId: string,
+    filters?: {
+      startDate?: string;
+      endDate?: string;
+      status?: ReservationStatus;
+    },
+  ) {
+    const { startDate, endDate, status } = filters || {};
 
-    const data = await this.reservationRepo.find({
-      where: {
-        product: {
-          company: { id: companyId },
-        },
-      },
-      relations: [
-        'user',
-        'product',
-        'product.company',
-        'product.category',
-        'product.images',
-        'product.measure',
-        'product.specificationValues',
-        'product.productAttributes',
-        'product.variations',
-        'product.attributes',
-        'product.wishlist',
-        'product.availability',
-      ],
-      order: { createdAt: 'DESC' },
-    });
+    const query = this.reservationRepo
+      .createQueryBuilder('reservation')
+      .leftJoinAndSelect('reservation.user', 'user')
+      .leftJoinAndSelect('reservation.product', 'product')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('product.productAttributes', 'productAttributes')
+      .leftJoinAndSelect('product.variations', 'variations')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('product.wishlist', 'wishlist')
+      .leftJoinAndSelect('product.availability', 'availability')
+      .leftJoinAndSelect('product.reservations', 'allReservations')
+      .where('company.id = :companyId', { companyId })
+      .orderBy('reservation.createdAt', 'DESC');
+
+    if (status) {
+      query.andWhere('reservation.status = :status', { status });
+    }
+
+    if (startDate) {
+      query.andWhere('reservation.startDate >= :startDate', { startDate });
+    }
+
+    if (endDate) {
+      query.andWhere('reservation.endDate <= :endDate', { endDate });
+    }
+
+    const data = await query.getMany();
 
     data.forEach((reservation) => {
       reservation.user = sanitizeUser(reservation.user);
     });
 
+    const total = data.length;
+
     return {
       message: 'Liste des réservations de la société récupérée avec succès.',
+      total,
       data,
     };
   }
