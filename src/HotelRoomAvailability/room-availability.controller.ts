@@ -59,8 +59,12 @@ export class RoomAvailabilityController {
 
   @UseGuards(AuthentificationGuard)
   @Get('user/reservations')
-  async getUserReservations(@CurrentUser() user: UserEntity) {
-    return await this.service.getUserReservations(user.id);
+  async getUserReservations(
+    @CurrentUser() user: UserEntity,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return await this.service.getUserReservations(user.id, { page, limit });
   }
 
   @UseGuards(AuthentificationGuard)
@@ -70,6 +74,8 @@ export class RoomAvailabilityController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('status') status?: ReservationStatus,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
     if (!user.activeCompanyId) {
       throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
@@ -79,12 +85,14 @@ export class RoomAvailabilityController {
       startDate,
       endDate,
       status,
+      page,
+      limit,
     });
   }
 
   @Get('all-reservations')
-  async getAllReservations() {
-    return await this.service.getAllReservations();
+  async getAllReservations(@Query('page') page?: number, @Query('limit') limit?: number) {
+    return await this.service.getAllReservations({ page, limit });
   }
 
   @Patch('action/:id/reject')

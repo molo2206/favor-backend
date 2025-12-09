@@ -322,26 +322,35 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
     };
   }
 
-  async getUserReservations(userId: string) {
-    const data = await this.reservationRepo.find({
-      where: { user: { id: userId } },
-      relations: [
-        'user',
-        'product',
-        'product.company',
-        'product.category',
-        'product.images',
-        'product.measure',
-        'product.specificationValues',
-        'product.productAttributes',
-        'product.variations',
-        'product.attributes',
-        'product.wishlist',
-        'product.availability',
-        'product.reservations',
-      ],
-      order: { createdAt: 'DESC' },
-    });
+  async getUserReservations(userId: string, filters?: { page?: number; limit?: number }) {
+    const page = filters?.page ? Number(filters.page) : undefined;
+    const limit = filters?.limit ? Number(filters.limit) : undefined;
+    const skip = page && limit ? (page - 1) * limit : undefined;
+
+    const query = this.reservationRepo
+      .createQueryBuilder('reservation')
+      .leftJoinAndSelect('reservation.user', 'user')
+      .leftJoinAndSelect('reservation.product', 'product')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('product.productAttributes', 'productAttributes')
+      .leftJoinAndSelect('product.variations', 'variations')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('product.wishlist', 'wishlist')
+      .leftJoinAndSelect('product.availability', 'availability')
+      .leftJoinAndSelect('product.reservations', 'allReservations')
+      .where('user.id = :userId', { userId })
+      .orderBy('reservation.createdAt', 'DESC');
+
+    if (limit !== undefined) query.take(limit);
+    if (skip !== undefined) query.skip(skip);
+
+    const [data, total] = await query.getManyAndCount();
 
     data.forEach((reservation) => {
       reservation.user = sanitizeUser(reservation.user);
@@ -349,7 +358,12 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
 
     return {
       message: 'Liste des réservations de l’utilisateur récupérée avec succès.',
-      data,
+      data: {
+        data,
+        total,
+        page: page ?? 1,
+        limit: limit ?? total,
+      },
     };
   }
 
@@ -359,15 +373,23 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
       startDate?: string;
       endDate?: string;
       status?: ReservationStatus;
+      page?: number;
+      limit?: number;
     },
   ) {
     const { startDate, endDate, status } = filters || {};
+
+    const page = filters?.page ? Number(filters.page) : 1;
+    const limit = filters?.limit ? Number(filters.limit) : 10;
+    const skip = (page - 1) * limit;
 
     const query = this.reservationRepo
       .createQueryBuilder('reservation')
       .leftJoinAndSelect('reservation.user', 'user')
       .leftJoinAndSelect('reservation.product', 'product')
       .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
@@ -379,7 +401,9 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
       .leftJoinAndSelect('product.availability', 'availability')
       .leftJoinAndSelect('product.reservations', 'allReservations')
       .where('company.id = :companyId', { companyId })
-      .orderBy('reservation.createdAt', 'DESC');
+      .orderBy('reservation.createdAt', 'DESC')
+      .take(limit)
+      .skip(skip);
 
     if (status) {
       query.andWhere('reservation.status = :status', { status });
@@ -393,43 +417,54 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
       query.andWhere('reservation.endDate <= :endDate', { endDate });
     }
 
-    const data = await query.getMany();
+    const [data, total] = await query.getManyAndCount();
 
     data.forEach((reservation) => {
       reservation.user = sanitizeUser(reservation.user);
     });
 
-    const total = data.length;
-
     return {
       message: 'Liste des réservations de la société récupérée avec succès.',
-      total,
-      data,
+      data: {
+        data,
+        total,
+        page,
+        limit,
+      },
     };
   }
 
-  async getAllReservations() {
-    const data = await this.reservationRepo.find({
-      relations: [
-        'user',
-        'product',
-        'product.company',
-        'product.category',
-        'product.brand',
-        'product.images',
-        'product.measure',
-        'product.rentalContracts',
-        'product.saleTransactions',
-        'product.specificationValues',
-        'product.productAttributes',
-        'product.variations',
-        'product.attributes',
-        'product.wishlist',
-        'product.availability',
-        'product.reservations',
-      ],
-      order: { createdAt: 'DESC' },
-    });
+  async getAllReservations(filters?: { page?: number; limit?: number }) {
+    const page = filters?.page ? Number(filters.page) : undefined;
+    const limit = filters?.limit ? Number(filters.limit) : undefined;
+    const skip = page && limit ? (page - 1) * limit : undefined;
+
+    const query = this.reservationRepo
+      .createQueryBuilder('reservation')
+      .leftJoinAndSelect('reservation.user', 'user')
+      .leftJoinAndSelect('reservation.product', 'product')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.brand', 'brand')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.rentalContracts', 'rentalContracts')
+      .leftJoinAndSelect('product.saleTransactions', 'saleTransactions')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('product.productAttributes', 'productAttributes')
+      .leftJoinAndSelect('product.variations', 'variations')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('product.wishlist', 'wishlist')
+      .leftJoinAndSelect('product.availability', 'availability')
+      .leftJoinAndSelect('product.reservations', 'allReservations')
+      .orderBy('reservation.createdAt', 'DESC');
+
+    if (limit !== undefined) query.take(limit);
+    if (skip !== undefined) query.skip(skip);
+
+    const [data, total] = await query.getManyAndCount();
 
     data.forEach((reservation) => {
       reservation.user = sanitizeUser(reservation.user);
@@ -437,7 +472,12 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
 
     return {
       message: 'Liste de toutes les réservations récupérée avec succès.',
-      data,
+      data: {
+        data,
+        total,
+        page: page ?? 1,
+        limit: limit ?? total,
+      },
     };
   }
 
@@ -448,6 +488,8 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
         'user',
         'product',
         'product.company',
+        'product.company.city',
+        'product.company.country',
         'product.category',
         'product.brand',
         'product.images',
