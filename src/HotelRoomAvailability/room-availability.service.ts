@@ -353,6 +353,43 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
     };
   }
 
+  async getCompanyReservations(companyId: string) {
+    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    if (!company) throw new NotFoundException('Société non trouvée.');
+
+    const data = await this.reservationRepo.find({
+      where: {
+        product: {
+          company: { id: companyId },
+        },
+      },
+      relations: [
+        'user',
+        'product',
+        'product.company',
+        'product.category',
+        'product.images',
+        'product.measure',
+        'product.specificationValues',
+        'product.productAttributes',
+        'product.variations',
+        'product.attributes',
+        'product.wishlist',
+        'product.availability',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+
+    data.forEach((reservation) => {
+      reservation.user = sanitizeUser(reservation.user);
+    });
+
+    return {
+      message: 'Liste des réservations de la société récupérée avec succès.',
+      data,
+    };
+  }
+
   async getAllReservations() {
     const data = await this.reservationRepo.find({
       relations: [

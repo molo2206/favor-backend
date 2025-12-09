@@ -332,7 +332,7 @@ export class ProductService {
       // 🔸 8.5 Génération RoomAvailability si hôtel
       if (finalProduct.category?.name?.toLowerCase() === 'hotel') {
         const DEFAULT_ROOMS = 10;
-        const daysToGenerate = 30;
+        const daysToGenerate = 90;
 
         const today = new Date();
         const availabilityList: RoomAvailability[] = [];

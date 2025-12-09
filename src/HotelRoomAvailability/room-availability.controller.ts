@@ -62,6 +62,16 @@ export class RoomAvailabilityController {
     return await this.service.getUserReservations(user.id);
   }
 
+  @UseGuards(AuthentificationGuard)
+  @Get('by-company')
+  async getCompanyReservations(@CurrentUser() user: UserEntity) {
+    if (!user.activeCompanyId) {
+      throw new BadRequestException('Aucune entreprise active trouvée pour cet utilisateur');
+    }
+
+    return await this.service.getCompanyReservations(user.activeCompanyId);
+  }
+
   @Get('all-reservations')
   async getAllReservations() {
     return await this.service.getAllReservations();
