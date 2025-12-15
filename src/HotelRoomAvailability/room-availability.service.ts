@@ -437,30 +437,37 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
   async getAllReservations() {
     const data = await this.reservationRepo
       .createQueryBuilder('reservation')
+
       .leftJoinAndSelect('reservation.user', 'user')
       .leftJoinAndSelect('reservation.product', 'product')
+
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('company.country', 'country')
+
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.brand', 'brand')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
+
       .leftJoinAndSelect('product.rentalContracts', 'rentalContracts')
       .leftJoinAndSelect('product.saleTransactions', 'saleTransactions')
+
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
       .leftJoinAndSelect('product.productAttributes', 'productAttributes')
       .leftJoinAndSelect('product.variations', 'variations')
       .leftJoinAndSelect('product.attributes', 'attributes')
+
       .leftJoinAndSelect('product.wishlist', 'wishlist')
       .leftJoinAndSelect('product.availability', 'availability')
-      .leftJoinAndSelect('product.reservations', 'allReservations')
+
       .orderBy('reservation.createdAt', 'DESC')
       .getMany();
 
-    // Nettoyage des données utilisateur
     data.forEach((reservation) => {
-      reservation.user = sanitizeUser(reservation.user);
+      if (reservation.user) {
+        reservation.user = sanitizeUser(reservation.user);
+      }
     });
 
     return {
