@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Like, Repository } from 'typeorm';
+import { Between, In, Like, Repository } from 'typeorm';
 import { RoomAvailability } from './entity/RoomAvailability.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { Reservation } from './entity/Reservation.entity';
@@ -474,6 +474,66 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
       message: 'Liste de toutes les réservations récupérée avec succès.',
       data,
       total: data.length,
+    };
+  }
+
+  async getMostReservedRooms(page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+
+    const stats = await this.reservationRepo
+      .createQueryBuilder('reservation')
+      .select('reservation.productId', 'productId')
+      .addSelect('COUNT(reservation.id)', 'totalReservations')
+      .groupBy('reservation.productId')
+      .orderBy('totalReservations', 'DESC')
+      .offset(skip)
+      .limit(limit)
+      .getRawMany();
+
+    const total = stats.length;
+
+    if (total === 0) {
+      return {
+        message: 'Liste des chambres les plus réservées',
+        data: {
+          data: [],
+          total: 0,
+          page,
+          limit,
+        },
+      };
+    }
+
+    const productIds = stats.map((s) => s.productId);
+
+    const products = await this.productRepo.find({
+      where: { id: In(productIds) },
+      relations: {
+        company: {
+          city: true,
+          country: true,
+        },
+        images: true,
+        category: true,
+      },
+    });
+
+    const data = products.map((product) => ({
+      ...product,
+      totalReservations:
+        Number(stats.find((s) => s.productId === product.id)?.totalReservations) || 0,
+    }));
+
+    data.sort((a, b) => b.totalReservations - a.totalReservations);
+
+    return {
+      message: 'Liste des chambres les plus réservées',
+      data: {
+        data,
+        total,
+        page,
+        limit,
+      },
     };
   }
 

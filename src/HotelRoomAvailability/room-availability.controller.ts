@@ -9,6 +9,8 @@ import {
   UseGuards,
   BadRequestException,
   NotFoundException,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { RoomAvailabilityService } from './room-availability.service';
 import { UpdateRoomAvailabilityDto } from './dto/update-room-availability.dto';
@@ -94,6 +96,14 @@ export class RoomAvailabilityController {
   @Get('all-reservations')
   async getAllReservations() {
     return await this.service.getAllReservations();
+  }
+
+  @Get('most-reserved')
+  async getMostReservedRooms(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+  ) {
+    return this.service.getMostReservedRooms(page, limit);
   }
 
   @Patch('action/:id/reject')
