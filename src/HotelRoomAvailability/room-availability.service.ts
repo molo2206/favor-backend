@@ -860,17 +860,22 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       .where('company.typeCompany = :type', { type: CompanyType.HOTEL });
 
     if (destination) {
-      // 🔹 Nettoyage et suppression des mots génériques
       const searchTerms = this.prepareSearchTerms(destination);
+      const termConditions: string[] = [];
+      const searchParams: Record<string, string> = {};
+
       searchTerms.forEach((term, i) => {
-        queryBuilder.andWhere(
-          `(LOWER(company.companyName) LIKE :term${i} 
-          OR LOWER(company.address) LIKE :term${i} 
-          OR LOWER(company.companyAddress) LIKE :term${i} 
-          OR LOWER(city.name) LIKE :term${i})`,
-          { [`term${i}`]: `%${term}%` },
-        );
+        const cols = [
+          `LOWER(company.companyName) LIKE :term${i}`,
+          `LOWER(company.address) LIKE :term${i}`,
+          `LOWER(company.companyAddress) LIKE :term${i}`,
+          `LOWER(city.name) LIKE :term${i}`,
+        ];
+        termConditions.push(`(${cols.join(' OR ')})`);
+        searchParams[`term${i}`] = `%${term}%`;
       });
+
+      queryBuilder.andWhere(termConditions.join(' AND '), searchParams);
     }
 
     const total = await queryBuilder.getCount();
