@@ -793,43 +793,30 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
 
     const terms = cleaned.split(/[\s,]+/).filter((term) => term.length > 0);
 
+    // Créer des combinaisons : "paris", "france", "paris france"
     const allTerms = [...terms, cleaned.replace(/[\s,]+/g, ' ')];
-
     return [...new Set(allTerms)];
   }
 
   private buildFlexibleSearchConditions(searchTerms: string[]): string[] {
     const conditions: string[] = [];
 
-    for (let i = 0; i < searchTerms.length; i++) {
-      const term = searchTerms[i];
-
-      conditions.push(`LOWER(city.name) LIKE :term${i}`);
+    searchTerms.forEach((_, i) => {
       conditions.push(`LOWER(company.companyName) LIKE :term${i}`);
       conditions.push(`LOWER(company.address) LIKE :term${i}`);
       conditions.push(`LOWER(company.companyAddress) LIKE :term${i}`);
-
-      if (term.length >= 2) {
-        conditions.push(`LOWER(city.name) LIKE :partial${i}`);
-        conditions.push(`LOWER(company.companyName) LIKE :partial${i}`);
-      }
-    }
+      conditions.push(`LOWER(city.name) LIKE :term${i}`);
+      conditions.push(`LOWER(country.name) LIKE :term${i}`);
+    });
 
     return conditions;
   }
+
   private buildSearchParameters(searchTerms: string[]): any {
     const parameters: { [key: string]: string } = {};
-
-    for (let i = 0; i < searchTerms.length; i++) {
-      const term = searchTerms[i];
-
+    searchTerms.forEach((term, i) => {
       parameters[`term${i}`] = `%${term}%`;
-
-      if (term.length >= 2) {
-        parameters[`partial${i}`] = `%${term.substring(0, 2)}%`;
-      }
-    }
-
+    });
     return parameters;
   }
 
@@ -1255,11 +1242,13 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
     if (destination) {
       const searchTerms = this.prepareSearchTerms(destination);
       const searchConditions = this.buildFlexibleSearchConditions(searchTerms);
-
-      queryBuilder.andWhere(
-        `(${searchConditions.join(' OR ')})`,
-        this.buildSearchParameters(searchTerms),
-      );
+      queryBuilder
+        .leftJoinAndSelect('company.city', 'city')
+        .leftJoinAndSelect('city.country', 'country')
+        .andWhere(
+          `(${searchConditions.join(' OR ')})`,
+          this.buildSearchParameters(searchTerms),
+        );
     }
 
     const total = await queryBuilder.getCount();
