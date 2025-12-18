@@ -791,11 +791,12 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       .replace(/[^a-z0-9\s,]/g, '')
       .trim();
 
-    const terms = cleaned.split(/[\s,]+/).filter((term) => term.length > 0);
-
-    // Créer des combinaisons : "paris", "france", "paris france"
-    const allTerms = [...terms, cleaned.replace(/[\s,]+/g, ' ')];
-    return [...new Set(allTerms)];
+    // Séparer uniquement par virgule pour chaque ville/pays
+    const terms = cleaned
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+    return terms;
   }
 
   private buildFlexibleSearchConditions(searchTerms: string[]): string[] {
