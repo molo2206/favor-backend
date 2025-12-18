@@ -791,11 +791,19 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       .replace(/[^a-z0-9\s,]/g, '')
       .trim();
 
-    // Séparer uniquement par virgule pour chaque ville/pays
+    const stopWords = ['the', 'of', 'republic', 'democratic'];
+
     const terms = cleaned
       .split(',')
-      .map((t) => t.trim())
+      .map((t) =>
+        t
+          .split(' ')
+          .filter((word) => !stopWords.includes(word))
+          .join(' ')
+          .trim(),
+      )
       .filter((t) => t.length > 0);
+
     return terms;
   }
 
@@ -858,23 +866,18 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       .leftJoinAndSelect('product.availability', 'availability')
       .where('company.typeCompany = :type', { type: CompanyType.HOTEL });
 
-    // Recherche par mot-clé uniquement sur company et city
     if (destination) {
+      // 🔹 Nettoyage et suppression des mots génériques
       const searchTerms = this.prepareSearchTerms(destination);
-      const searchConditions: string[] = [];
-      const searchParams: Record<string, string> = {};
-
       searchTerms.forEach((term, i) => {
-        searchConditions.push(
-          `LOWER(company.companyName) LIKE :term${i}`,
-          `LOWER(company.address) LIKE :term${i}`,
-          `LOWER(company.companyAddress) LIKE :term${i}`,
-          `LOWER(city.name) LIKE :term${i}`,
+        queryBuilder.andWhere(
+          `(LOWER(company.companyName) LIKE :term${i} 
+          OR LOWER(company.address) LIKE :term${i} 
+          OR LOWER(company.companyAddress) LIKE :term${i} 
+          OR LOWER(city.name) LIKE :term${i})`,
+          { [`term${i}`]: `%${term}%` },
         );
-        searchParams[`term${i}`] = `%${term}%`;
       });
-
-      queryBuilder.andWhere(`(${searchConditions.join(' OR ')})`, searchParams);
     }
 
     const total = await queryBuilder.getCount();
@@ -1034,8 +1037,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
     }
 
     const totalPages = Math.ceil(total / limit);
-    const hasNext = page < totalPages;
-    const hasPrev = page > 1;
 
     return {
       message: `Produits récupérés pour la destination : ${destination}${
@@ -1047,8 +1048,8 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
         page,
         limit,
         totalPages,
-        hasNext,
-        hasPrev,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
       },
     };
   }
