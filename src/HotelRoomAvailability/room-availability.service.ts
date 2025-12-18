@@ -784,13 +784,26 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
   }
 
   private prepareSearchTerms(destination: string): string[] {
-    // conserve lettres, chiffres, espaces, virgules, points, tirets
-    return destination
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter((t) => t.length > 0);
-  }
+    // Normalise et nettoie la chaîne
+    const cleaned = destination
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // retire accents
+      .replace(/[^a-z0-9\s,.-]/g, '') // conserve lettres, chiffres, espaces, virgules, points et tirets
+      .trim();
 
+    // Séparer par virgule pour chaque ville/pays
+    const terms = cleaned
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    console.log(`Destination input: "${destination}"`);
+    console.log(`Cleaned: "${cleaned}"`);
+    console.log(`Terms extracted:`, terms);
+
+    return terms;
+  }
   private buildFlexibleSearchConditions(searchTerms: string[]): string[] {
     const conditions: string[] = [];
 
@@ -852,29 +865,69 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
 
     if (destination) {
       const searchTerms = this.prepareSearchTerms(destination);
-      const termConditions: string[] = [];
-      const searchParams: Record<string, string> = {};
 
-      searchTerms.forEach((term, i) => {
-        const cols = [
-          `LOWER(company.companyName) LIKE :term${i}`,
-          `LOWER(company.address) LIKE :term${i}`,
-          `LOWER(company.companyAddress) LIKE :term${i}`,
-          `LOWER(city.name) LIKE :term${i}`,
-        ];
-        // chaque terme peut matcher n'importe quelle colonne, OR interne
-        termConditions.push(`(${cols.join(' OR ')})`);
-        searchParams[`term${i}`] = `%${term}%`;
-      });
+      // Si des termes ont été extraits, construisez la condition
+      if (searchTerms.length > 0) {
+        const termConditions: string[] = [];
+        const searchParams: Record<string, string> = {};
 
-      // MAIS ici on met AND entre les termes pour que tous soient trouvés
-      queryBuilder.andWhere(termConditions.join(' AND '), searchParams);
+        searchTerms.forEach((term, i) => {
+          // Utilisez ILIKE pour PostgreSQL (insensible à la casse) ou LIKE avec LOWER
+          const cols = [
+            `company.companyName ILIKE :term${i}`, // PostgreSQL seulement
+            `company.address ILIKE :term${i}`,
+            `company.companyAddress ILIKE :term${i}`,
+            `city.name ILIKE :term${i}`,
+          ];
+
+          // Pour MySQL ou sans ILIKE, utilisez:
+          // const cols = [
+          //   `LOWER(company.companyName) LIKE LOWER(:term${i})`,
+          //   `LOWER(company.address) LIKE LOWER(:term${i})`,
+          //   `LOWER(company.companyAddress) LIKE LOWER(:term${i})`,
+          //   `LOWER(city.name) LIKE LOWER(:term${i})`,
+          // ];
+
+          // Chaque terme doit matcher au moins une colonne (OR interne)
+          termConditions.push(`(${cols.join(' OR ')})`);
+          searchParams[`term${i}`] = `%${term}%`;
+        });
+
+        // Tous les termes doivent être trouvés (AND entre les termes)
+        queryBuilder.andWhere(termConditions.join(' AND '), searchParams);
+
+        // Pour debug
+        console.log('Search terms:', searchTerms);
+        console.log('Search params:', searchParams);
+      } else {
+        // Si aucun terme valide, faites une recherche générique
+        const normalizedTerm = destination.toLowerCase().trim();
+        queryBuilder.andWhere(
+          `(company.companyName ILIKE :term OR 
+          company.address ILIKE :term OR 
+          company.companyAddress ILIKE :term OR 
+          city.name ILIKE :term)`,
+          { term: `%${normalizedTerm}%` },
+        );
+      }
+    }
+
+    // Pour debug - afficher la requête SQL générée
+    try {
+      const sqlQuery = queryBuilder.getSql();
+      console.log('Generated SQL:', sqlQuery);
+    } catch (error) {
+      console.log('Cannot get SQL query:', error);
     }
 
     const total = await queryBuilder.getCount();
+    console.log(`Total companies found: ${total}`);
+
     queryBuilder.skip(skip).take(limit).orderBy('product.gros', 'ASC');
 
     const companies = await queryBuilder.getMany();
+    console.log(`Companies after pagination: ${companies.length}`);
+
     const companiesWithProducts: any[] = [];
 
     for (const company of companies) {
