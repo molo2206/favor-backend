@@ -1,6 +1,0 @@
-export enum RentalStatus {
-  PENDING = 'PENDING',
-  VALIDATED = 'VALIDATED',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
-}

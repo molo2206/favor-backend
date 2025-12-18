@@ -86,38 +86,29 @@ export class SpecificationService {
     file?: Express.Multer.File,
   ): Promise<{ message: string; data: Specification }> {
     const spec = await this.specRepo.findOne({ where: { id } });
-    if (!spec) throw new NotFoundException(`Spécification ${id} introuvable`);
+    if (!spec) {
+      throw new NotFoundException(`Spécification ${id} introuvable`);
+    }
 
-    // 🔹 KEY
     if (dto.key !== undefined) spec.key = dto.key;
-
-    // 🔹 LABEL
     if (dto.label !== undefined) spec.label = dto.label;
-
-    // 🔹 TYPE
     if (dto.type !== undefined) spec.type = dto.type;
-
-    // 🔹 UNIT
     if (dto.unit !== undefined) spec.unit = dto.unit;
 
-    // ------------------------------------------------------------
-    // 🔥 GESTION DES OPTIONS
-    // ------------------------------------------------------------
+    // 🔥 OPTIONS
     if (dto.type === 'SELECT') {
-      // options obligatoires pour SELECT
       if (!dto.options || dto.options.length === 0) {
         throw new BadRequestException(
           'Les options sont obligatoires lorsque le type est SELECT.',
         );
       }
 
-      spec.options = normalizeOptions(dto.options);
+      // ✔️ TOUJOURS STRING (JSON sérialisé)
+      spec.options = JSON.stringify(normalizeOptions(dto.options));
     } else {
-      // si le type n'est pas SELECT → vider les options
       spec.options = null;
     }
 
-    // 🔹 IMAGE
     if (file) {
       spec.image = await this.cloudinary.handleUploadImage(file, 'specifications');
     }

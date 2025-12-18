@@ -29,8 +29,8 @@ export class Specification {
   @Column({ nullable: true })
   unit?: string;
 
-  @Column({ type: 'json', nullable: true })
-  options?: any;
+  @Column({ type: 'longtext', nullable: true })
+  options: string | null;
 
   @Column({ default: false })
   deleted: boolean;

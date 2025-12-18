@@ -29,8 +29,6 @@ import { OrderItemModule } from './order-item/order-item.module';
 import { SubOrderModule } from './sub-order/sub-order.module';
 import { SubOrderItemModule } from './sub-order-item/sub-order-item.module';
 import { TransactionModule } from './transaction/transaction.module';
-import { SaleTransactionModule } from './sale-transaction/sale-transaction.module';
-import { RentalContractModule } from './rental-contract/rental-contract.module';
 import { ServiceModule } from './service/service.module';
 import { RoomImageModule } from './room-image/room-image.module';
 import { RoomModule } from './room/room.module';
@@ -105,8 +103,6 @@ import { ColisModule } from './logistique/colis.module';
     SubOrderModule,
     SubOrderItemModule,
     TransactionModule,
-    SaleTransactionModule,
-    RentalContractModule,
     ServiceModule,
     RoomImageModule,
     RoomModule,

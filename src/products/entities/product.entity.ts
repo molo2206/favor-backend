@@ -18,8 +18,6 @@ import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 import { Type_rental_both_sale_car } from 'src/products/enum/type_rental_both_sale_car';
 import { FuelType } from 'src/products/enum/fuelType_enum';
 import { Transmission } from '../enum/transmission.enum';
-import { RentalContract } from 'src/rental-contract/entities/rental-contract.entity';
-import { SaleTransaction } from 'src/sale-transaction/entities/sale-transaction.entity';
 import { ProductVariation } from 'src/AttributGlobal/entities/product_variations.entity';
 import { ProductAttribute } from 'src/AttributGlobal/entities/product_attributes.entity';
 import { Wishlist } from './wishlists.entity';
@@ -149,12 +147,6 @@ export class Product {
     default: CompanyActivity.RETAILER,
   })
   companyActivity: CompanyActivity;
-
-  @OneToMany(() => RentalContract, (contract) => contract.vehicle)
-  rentalContracts: RentalContract[];
-
-  @OneToMany(() => SaleTransaction, (sale) => sale.vehicle)
-  saleTransactions: SaleTransaction[];
 
   @OneToMany(() => ProductSpecificationValue, (pv) => pv.product, { cascade: true })
   specificationValues: ProductSpecificationValue[];

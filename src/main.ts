@@ -95,7 +95,7 @@ dotenv.config();
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  const HOST = '0.0.0.0'; // ← SEULE MODIFICATION IMPORTANTE
+  const HOST = '0.0.0.0';
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
   app.enableCors({
@@ -131,7 +131,6 @@ async function bootstrap() {
 
   await app.listen(PORT, HOST);
 
-  // Affichage pour confirmer le fonctionnement DHCP
   console.log(`Application démarrée avec support DHCP/VPN`);
   console.log(`Local: http://localhost:${PORT}`);
   console.log(`Réseau: Accessible via votre IP locale sur le port ${PORT}`);

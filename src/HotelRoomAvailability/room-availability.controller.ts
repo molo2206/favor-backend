@@ -103,7 +103,7 @@ export class RoomAvailabilityController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ) {
-    return this.service.getMostReservedRooms(page, limit);
+    return this.service.getMostVisitedHotels(page, limit);
   }
 
   @Patch('action/:id/reject')

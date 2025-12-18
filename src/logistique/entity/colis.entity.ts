@@ -3,50 +3,76 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  JoinColumn,
   OneToMany,
 } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { ColisStatus } from '../enum/colis-status.enum';
+import { ColisTrackingEntity } from './colis-tracking.entity';
+
+export enum ColisStatus {
+  PENDING = 'PENDING',
+  PICKED_UP = 'PICKED_UP',
+  IN_TRANSIT = 'IN_TRANSIT',
+  DELIVERED = 'DELIVERED',
+  CANCELLED = 'CANCELLED',
+}
 
 @Entity('colis')
 export class ColisEntity {
+  // UUID auto-généré
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
-  pickupAddress: string;
+  @Column({ type: 'varchar', length: 100, unique: true })
+  trackingNumber: string;
 
-  @Column()
-  deliveryAddress: string;
+  @Column('text')
+  description: string;
 
-  @Column('decimal', { precision: 10, scale: 2, nullable: true })
-  price?: number;
+  @Column('float')
+  weight: number;
 
-  @Column('float', { nullable: true })
-  weight?: number;
+  @Column({ type: 'float', nullable: true })
+  value?: number;
 
-  @Column('float', { nullable: true })
-  length?: number;
-
-  @Column('float', { nullable: true })
-  width?: number;
-
-  @Column('float', { nullable: true })
-  height?: number;
-
-  @Column({
-    type: 'enum',
-    enum: ColisStatus,
-    default: ColisStatus.PENDING,
-  })
+  @Column({ type: 'enum', enum: ColisStatus })
   status: ColisStatus;
 
-  @CreateDateColumn()
+  @Column({ type: 'varchar', length: 255 })
+  pickupAddress: string;
+
+  @Column({ type: 'varchar', length: 255 })
+  dropAddress: string;
+
+  @ManyToOne(() => UserEntity, { nullable: true, onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  @JoinColumn({ name: 'senderId' })
+  sender?: UserEntity;
+
+  @Column({ type: 'char', length: 36, nullable: true })
+  senderId?: string;
+
+  @ManyToOne(() => UserEntity, { nullable: true, onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  @JoinColumn({ name: 'receiverId' })
+  receiver?: UserEntity;
+
+  @Column({ type: 'char', length: 36, nullable: true })
+  receiverId?: string;
+
+  @Column({ type: 'json', nullable: true })
+  photos?: string[];
+
+  @OneToMany(() => ColisTrackingEntity, (tracking) => tracking.colis, { cascade: true })
+  trackings?: ColisTrackingEntity[];
+
+  @CreateDateColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({
+    type: 'datetime',
+    default: () => 'CURRENT_TIMESTAMP',
+    onUpdate: 'CURRENT_TIMESTAMP',
+  })
   updatedAt: Date;
 }

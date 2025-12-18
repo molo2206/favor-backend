@@ -1,3 +1,3 @@
 export class AssignCourierDto {
-  courierId: string;
+    receiverId?: string; 
 }

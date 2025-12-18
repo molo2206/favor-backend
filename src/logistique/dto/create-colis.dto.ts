@@ -1,6 +1,10 @@
+// create-colis.dto.ts
 export class CreateColisDto {
-  pickupAddress: string;
-  deliveryAddress: string;
   description: string;
-  weight?: number;
+  weight: number;
+  value?: number;
+  receiverId?: string; 
+  pickupAddress: any;
+  dropAddress: any;
+  photos?: string;
 }

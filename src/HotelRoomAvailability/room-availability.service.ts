@@ -477,24 +477,23 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
     };
   }
 
-  async getMostReservedRooms(page = 1, limit = 10) {
+  async getMostVisitedHotels(page = 1, limit = 10) {
     const skip = (page - 1) * limit;
-
-    const stats = await this.reservationRepo
+    const hotelStats = await this.reservationRepo
       .createQueryBuilder('reservation')
-      .select('reservation.productId', 'productId')
+      .leftJoin('reservation.product', 'product')
+      .leftJoin('product.company', 'company')
+      .select('company.id', 'companyId')
       .addSelect('COUNT(reservation.id)', 'totalReservations')
-      .groupBy('reservation.productId')
+      .groupBy('company.id')
       .orderBy('totalReservations', 'DESC')
       .offset(skip)
       .limit(limit)
       .getRawMany();
 
-    const total = stats.length;
-
-    if (total === 0) {
+    if (!hotelStats.length) {
       return {
-        message: 'Liste des chambres les plus réservées',
+        message: 'Liste des hôtels les plus visités',
         data: {
           data: [],
           total: 0,
@@ -504,33 +503,50 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
       };
     }
 
-    const productIds = stats.map((s) => s.productId);
+    const companyIds = hotelStats.map((h) => h.companyId);
 
-    const products = await this.productRepo.find({
-      where: { id: In(productIds) },
+    const hotels = await this.companyRepo.find({
+      where: { id: In(companyIds) },
       relations: {
-        company: {
-          city: true,
-          country: true,
+        city: true,
+        country: true,
+        products: {
+          images: true,
+          category: true,
         },
-        images: true,
-        category: true,
       },
     });
 
-    const data = products.map((product) => ({
-      ...product,
-      totalReservations:
-        Number(stats.find((s) => s.productId === product.id)?.totalReservations) || 0,
-    }));
+    const roomStats = await this.reservationRepo
+      .createQueryBuilder('reservation')
+      .select('reservation.productId', 'productId')
+      .addSelect('COUNT(reservation.id)', 'totalReservations')
+      .groupBy('reservation.productId')
+      .getRawMany();
+
+    const data = hotels.map((hotel) => {
+      const hotelStat = hotelStats.find((h) => h.companyId === hotel.id);
+
+      const rooms = hotel.products.map((room) => ({
+        ...room,
+        totalReservations:
+          Number(roomStats.find((r) => r.productId === room.id)?.totalReservations) || 0,
+      }));
+
+      return {
+        ...hotel,
+        totalReservations: Number(hotelStat?.totalReservations) || 0,
+        rooms,
+      };
+    });
 
     data.sort((a, b) => b.totalReservations - a.totalReservations);
 
     return {
-      message: 'Liste des chambres les plus réservées',
+      message: 'Liste des hôtels les plus visités',
       data: {
         data,
-        total,
+        total: data.length,
         page,
         limit,
       },
@@ -1453,8 +1469,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
           specificationValues: specifications,
           availability: availability,
 
-          rentalContracts: product.rentalContracts ? product.rentalContracts.length : 0,
-          saleTransactions: product.saleTransactions ? product.saleTransactions.length : 0,
           reservations: product.reservations ? product.reservations.length : 0,
           wishlist: product.wishlist ? product.wishlist.length : 0,
 

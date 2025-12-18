@@ -18,8 +18,6 @@ import { CompanyEntity } from 'src/company/entities/company.entity';
 import { TravelReservationEntity } from 'src/travel_reservation/entities/travel_reservation.entity';
 import { AddressUser } from 'src/address-user/entities/address-user.entity';
 import { OrderEntity } from 'src/order/entities/order.entity';
-import { RentalContract } from 'src/rental-contract/entities/rental-contract.entity';
-import { SaleTransaction } from 'src/sale-transaction/entities/sale-transaction.entity';
 import { Booking } from 'src/booking/entities/booking.entity';
 import { UserPlatformRoleEntity } from './user_plateform_roles.entity';
 import { Wishlist } from 'src/products/entities/wishlists.entity';
@@ -129,12 +127,6 @@ export class UserEntity {
   @OneToMany(() => OrderEntity, (order) => order.user)
   orders: OrderEntity[];
 
-  @OneToMany(() => RentalContract, (contract) => contract.customer)
-  rentalContracts: RentalContract[];
-
-  @OneToMany(() => SaleTransaction, (sale) => sale.customer)
-  saleTransactions: SaleTransaction[];
-
   @OneToMany(() => Booking, (booking) => booking.user)
   bookings: Booking[];
 
@@ -150,4 +142,9 @@ export class UserEntity {
   @OneToMany(() => Reservation, (reservation) => reservation.user)
   reservations: Reservation[];
 
+  @OneToMany(() => ColisEntity, (colis) => colis.sender)
+  sentColis: ColisEntity[];
+
+  @OneToMany(() => ColisEntity, (colis) => colis.receiver)
+  receivedColis: ColisEntity[];
 }
