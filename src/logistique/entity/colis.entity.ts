@@ -66,13 +66,9 @@ export class ColisEntity {
   @OneToMany(() => ColisTrackingEntity, (tracking) => tracking.colis, { cascade: true })
   trackings?: ColisTrackingEntity[];
 
-  @CreateDateColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date;
-
-  @UpdateDateColumn({
-    type: 'datetime',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
+  
+  @UpdateDateColumn({ type: 'timestamp' })
   updatedAt: Date;
 }

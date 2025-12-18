@@ -5,6 +5,7 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { ColisEntity } from './colis.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
@@ -49,6 +50,9 @@ export class ColisTrackingEntity {
   @Column({ type: 'text', nullable: true })
   note?: string;
 
-  @CreateDateColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date;
+  
+  @UpdateDateColumn({ type: 'timestamp' })
+  updatedAt: Date;
 }
