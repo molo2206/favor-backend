@@ -844,7 +844,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
     const queryBuilder = this.companyRepo
       .createQueryBuilder('company')
       .leftJoinAndSelect('company.city', 'city')
-      .leftJoinAndSelect('city.country', 'country')
       .leftJoinAndSelect('company.products', 'product')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.category', 'category')
@@ -858,7 +857,7 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       .leftJoinAndSelect('product.availability', 'availability')
       .where('company.typeCompany = :type', { type: CompanyType.HOTEL });
 
-    // ✅ Recherche par mot-clé
+    // Recherche par mot-clé uniquement sur company et city
     if (destination) {
       const searchTerms = this.prepareSearchTerms(destination);
       const searchConditions: string[] = [];
@@ -870,7 +869,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
           `LOWER(company.address) LIKE :term${i}`,
           `LOWER(company.companyAddress) LIKE :term${i}`,
           `LOWER(city.name) LIKE :term${i}`,
-          `LOWER(country.name) LIKE :term${i}`,
         );
         searchParams[`term${i}`] = `%${term}%`;
       });
@@ -890,7 +888,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       const products: any[] = [];
 
       for (const product of company.products) {
-        // 🔹 Capacité
         const capacityAdults = product.capacityAdults || 0;
         const capacityChildren = product.capacityChildren || 0;
         const capacityTotal = product.capacityTotal || 0;
@@ -917,7 +914,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
           productCapacityTotal: capacityTotal,
         };
 
-        // 🔹 Disponibilité
         let isAvailable = true;
         let availabilityInfo: any = null;
 
@@ -985,7 +981,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
           };
         }
 
-        // 🔹 Images et spécifications
         const productImages =
           product.images?.map((img) => ({ id: img.id, url: img.url })) || [];
         const specifications =
