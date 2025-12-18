@@ -820,387 +820,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
     return parameters;
   }
 
-  // async searchProductsByDestination({
-  //   destination,
-  //   startDate,
-  //   endDate,
-  //   adults = 1,
-  //   children = 0,
-  //   rooms = 1,
-  //   page = 1,
-  //   limit = 10,
-  // }: {
-  //   destination?: string;
-  //   startDate?: string;
-  //   endDate?: string;
-  //   adults?: number;
-  //   children?: number;
-  //   rooms?: number;
-  //   page?: number;
-  //   limit?: number;
-  // }) {
-  //   const skip = (page - 1) * limit;
-
-  //   const queryBuilder = this.companyRepo
-  //     .createQueryBuilder('company')
-  //     .leftJoinAndSelect('company.city', 'city')
-  //     .leftJoinAndSelect('city.country', 'country')
-  //     .leftJoinAndSelect('company.products', 'product')
-  //     .leftJoinAndSelect('product.images', 'images')
-  //     .leftJoinAndSelect('product.category', 'category')
-  //     .leftJoinAndSelect('product.brand', 'brand')
-  //     .leftJoinAndSelect('product.measure', 'measure')
-  //     .leftJoinAndSelect('product.specificationValues', 'specificationValues')
-  //     .leftJoinAndSelect('specificationValues.specification', 'specification')
-  //     .leftJoinAndSelect('product.productAttributes', 'productAttributes')
-  //     .leftJoinAndSelect('product.variations', 'variations')
-  //     .leftJoinAndSelect('product.attributes', 'attributes')
-  //     .leftJoinAndSelect('product.availability', 'availability')
-  //     .where('company.typeCompany = :type', { type: CompanyType.HOTEL });
-
-  //   if (destination) {
-  //     const searchTerms = this.prepareSearchTerms(destination);
-
-  //     const searchConditions = this.buildFlexibleSearchConditions(searchTerms);
-
-  //     queryBuilder.andWhere(
-  //       `(${searchConditions.join(' OR ')})`,
-  //       this.buildSearchParameters(searchTerms),
-  //     );
-  //   }
-
-  //   const total = await queryBuilder.getCount();
-
-  //   queryBuilder.skip(skip).take(limit);
-
-  //   const companies = await queryBuilder.getMany();
-  //   const companiesWithProducts: any[] = [];
-
-  //   for (const company of companies) {
-  //     if (!company.products || company.products.length === 0) continue;
-
-  //     const products: any[] = [];
-
-  //     for (const product of company.products) {
-  //       console.log(
-  //         `Produit: ${product.name}, Adults: ${product.capacityAdults}, Children: ${product.capacityChildren}, Total: ${product.capacityTotal}`,
-  //       );
-
-  //       const capacityAdults = product.capacityAdults || 0;
-  //       const capacityChildren = product.capacityChildren || 0;
-  //       const capacityTotal = product.capacityTotal || 0;
-
-  //       const hasNoCapacityData =
-  //         capacityAdults === 0 && capacityChildren === 0 && capacityTotal === 0;
-  //       const canAccommodateByTotal = capacityTotal > 0 && adults + children <= capacityTotal;
-  //       const canAccommodateBySeparate =
-  //         capacityAdults > 0 &&
-  //         capacityChildren > 0 &&
-  //         adults <= capacityAdults &&
-  //         children <= capacityChildren;
-
-  //       const capacityInfo = {
-  //         canAccommodate:
-  //           hasNoCapacityData || canAccommodateByTotal || canAccommodateBySeparate,
-  //         hasNoCapacityData,
-  //         canAccommodateByTotal,
-  //         canAccommodateBySeparate,
-  //         requiredAdults: adults,
-  //         requiredChildren: children,
-  //         productCapacityAdults: capacityAdults,
-  //         productCapacityChildren: capacityChildren,
-  //         productCapacityTotal: capacityTotal,
-  //       };
-
-  //       console.log(
-  //         ` Produit ${product.name} inclus - Capacité suffisante: ${capacityInfo.canAccommodate}`,
-  //       );
-
-  //       let isAvailable = true;
-  //       let availabilityInfo: {
-  //         available: boolean;
-  //         message: string;
-  //         period?: { startDate: string; endDate: string };
-  //         unavailableDates?: string[];
-  //         roomsRemaining?: number;
-  //       } | null = null;
-
-  //       if (startDate && endDate) {
-  //         const availabilities = await this.availabilityRepo.find({
-  //           where: {
-  //             product: { id: product.id },
-  //             date: Between(startDate, endDate),
-  //           },
-  //         });
-
-  //         if (!availabilities || availabilities.length === 0) {
-  //           isAvailable = false;
-  //           availabilityInfo = {
-  //             available: false,
-  //             message: 'Aucune disponibilité trouvée pour les dates demandées',
-  //             period: { startDate, endDate },
-  //           };
-  //         } else {
-  //           const start = new Date(startDate);
-  //           const end = new Date(endDate);
-  //           const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24));
-  //           let allDaysAvailable = true;
-  //           const unavailableDates: string[] = [];
-
-  //           for (let i = 0; i < daysDiff; i++) {
-  //             const currentDate = new Date(start);
-  //             currentDate.setDate(start.getDate() + i);
-  //             const dateStr = currentDate.toISOString().split('T')[0];
-
-  //             const dayAvailability = availabilities.find((a) => a.date === dateStr);
-
-  //             const roomsAvailable = dayAvailability?.roomsAvailable ?? 0;
-  //             const roomsBooked = dayAvailability?.roomsBooked ?? 0;
-  //             const roomsRemaining =
-  //               dayAvailability?.roomsRemaining ?? roomsAvailable - roomsBooked;
-
-  //             if (!dayAvailability || roomsRemaining < rooms) {
-  //               allDaysAvailable = false;
-  //               unavailableDates.push(dateStr);
-  //             }
-  //           }
-
-  //           if (!allDaysAvailable) {
-  //             isAvailable = false;
-  //             availabilityInfo = {
-  //               available: false,
-  //               message: 'Chambres non disponibles pour certaines dates',
-  //               period: { startDate, endDate },
-  //               unavailableDates: unavailableDates,
-  //             };
-  //           } else {
-  //             availabilityInfo = {
-  //               available: true,
-  //               message: 'Chambres disponibles pour toute la période',
-  //               period: { startDate, endDate },
-  //               roomsRemaining: Math.min(
-  //                 ...availabilities.map(
-  //                   (a) => a.roomsRemaining ?? a.roomsAvailable - a.roomsBooked,
-  //                 ),
-  //               ),
-  //             };
-  //           }
-  //         }
-  //       } else {
-  //         availabilityInfo = {
-  //           available: true,
-  //           message: 'Aucune période spécifiée - vérifiez la disponibilité pour vos dates',
-  //         };
-  //       }
-
-  //       const productImages = product.images
-  //         ? product.images.map((image: ImageProductEntity) => ({
-  //             id: image.id,
-  //             url: image.url,
-  //           }))
-  //         : [];
-
-  //       const specifications = product.specificationValues
-  //         ? product.specificationValues.map((specValue: ProductSpecificationValue) => {
-  //             const hasSpecification =
-  //               specValue.specification &&
-  //               specValue.specification.id &&
-  //               specValue.specification.key;
-
-  //             return {
-  //               id: specValue.id,
-  //               value: specValue.value,
-  //               specification: hasSpecification
-  //                 ? {
-  //                     id: specValue.specification.id,
-  //                     key: specValue.specification.key,
-  //                     label: specValue.specification.label,
-  //                     image: specValue.specification.image,
-  //                     type: specValue.specification.type,
-  //                     unit: specValue.specification.unit,
-  //                     options: specValue.specification.options,
-  //                     deleted: specValue.specification.deleted,
-  //                     status: specValue.specification.status,
-  //                     createdAt: specValue.specification.createdAt,
-  //                     updatedAt: specValue.specification.updatedAt,
-  //                   }
-  //                 : null,
-  //             };
-  //           })
-  //         : [];
-
-  //       const availability = product.availability
-  //         ? product.availability.map((avail: RoomAvailability) => ({
-  //             id: avail.id,
-  //             date: avail.date,
-  //             roomsAvailable: avail.roomsAvailable,
-  //             roomsBooked: avail.roomsBooked,
-  //             roomsRemaining: avail.roomsRemaining,
-  //           }))
-  //         : [];
-
-  //       products.push({
-  //         id: product.id,
-  //         name: product.name,
-  //         description: product.description,
-  //         price: product.price,
-  //         type: product.type,
-
-  //         detail_price_original: product.detail_price_original,
-  //         gros_price_original: product.gros_price_original,
-  //         detail: product.detail,
-  //         gros: product.gros,
-  //         dailyRate: product.dailyRate,
-  //         salePrice: product.salePrice,
-  //         dailyRate_price_original: product.dailyRate_price_original,
-
-  //         capacityAdults: product.capacityAdults,
-  //         capacityChildren: product.capacityChildren,
-  //         capacityTotal: product.capacityTotal,
-  //         bedTypes: product.bedTypes,
-  //         localization: product.localization,
-
-  //         ingredients: product.ingredients,
-  //         quantity: product.quantity,
-  //         min_quantity: product.min_quantity,
-  //         stockAlert: product.stockAlert,
-
-  //         image: product.image,
-  //         images: productImages,
-
-  //         registrationNumber: product.registrationNumber,
-  //         model: product.model,
-  //         year: product.year,
-  //         typecar: product.typecar,
-  //         fuelType: product.fuelType,
-  //         transmission: product.transmission,
-  //         color: product.color,
-
-  //         status: product.status,
-  //         companyActivity: product.companyActivity,
-  //         createdAt: product.createdAt,
-  //         updatedAt: product.updatedAt,
-
-  //         category: product.category,
-  //         brand: product.brand,
-  //         measure: product.measure,
-
-  //         specificationValues: specifications,
-  //         availability: availability,
-
-  //         rentalContracts: product.rentalContracts ? product.rentalContracts.length : 0,
-  //         saleTransactions: product.saleTransactions ? product.saleTransactions.length : 0,
-  //         reservations: product.reservations ? product.reservations.length : 0,
-  //         wishlist: product.wishlist ? product.wishlist.length : 0,
-
-  //         capacityStatus: capacityInfo,
-  //         availabilityStatus: availabilityInfo,
-  //         isAvailable: capacityInfo.canAccommodate && isAvailable,
-  //         canAccommodate: capacityInfo.canAccommodate,
-  //         hasAvailability: isAvailable,
-  //       });
-  //     }
-
-  //     if (products.length > 0) {
-  //       const companyCity = company.city
-  //         ? {
-  //             id: company.city.id,
-  //             name: company.city.name,
-  //             countryId: company.city.countryId,
-  //             status: company.city.status,
-  //             createdAt: company.city.createdAt,
-  //             updatedAt: company.city.updatedAt,
-  //             country: company.city.country
-  //               ? {
-  //                   id: company.city.country.id,
-  //                   name: company.city.country.name,
-  //                   code: company.city.country.code,
-  //                   status: company.city.country.status,
-  //                   createdAt: company.city.country.createdAt,
-  //                   updatedAt: company.city.country.updatedAt,
-  //                 }
-  //               : null,
-  //           }
-  //         : null;
-
-  //       const companyCategory = company.category
-  //         ? {
-  //             id: company.category.id,
-  //             name: company.category.name,
-  //             type: company.category.type,
-  //             image: company.category.image,
-  //             slug: company.category.slug,
-  //             status: company.category.status,
-  //             createdAt: company.category.createdAt,
-  //             updatedAt: company.category.updatedAt,
-  //           }
-  //         : null;
-
-  //       companiesWithProducts.push({
-  //         id: company.id,
-  //         companyName: company.companyName,
-  //         companyAddress: company.companyAddress,
-  //         address: company.address,
-  //         email: company.email,
-  //         phone: company.phone,
-  //         website: company.website,
-
-  //         vatNumber: company.vatNumber,
-  //         registrationDocumentUrl: company.registrationDocumentUrl,
-  //         warehouseLocation: company.warehouseLocation,
-
-  //         banner: company.banner,
-  //         logo: company.logo,
-
-  //         status: company.status,
-  //         typeCompany: company.typeCompany,
-  //         companyActivity: company.companyActivity,
-
-  //         latitude: company.latitude,
-  //         longitude: company.longitude,
-  //         delivery_minutes: company.delivery_minutes,
-  //         distance_km: company.distance_km,
-  //         open_time: company.open_time,
-
-  //         taux: company.taux,
-  //         localCurrency: company.localCurrency,
-
-  //         city: companyCity,
-  //         category: companyCategory,
-  //         cityId: company.cityId,
-  //         categoryId: company.categoryId,
-
-  //         createdAt: company.createdAt,
-
-  //         userHasCompany: company.userHasCompany ? company.userHasCompany.length : 0,
-  //         measures: company.measures ? company.measures.length : 0,
-  //         services: company.services ? company.services.length : 0,
-  //         rooms: company.rooms ? company.rooms.length : 0,
-  //         tauxCompanies: company.tauxCompanies ? company.tauxCompanies.length : 0,
-
-  //         products: products,
-  //       });
-  //     }
-  //   }
-
-  //   const totalPages = Math.ceil(total / limit);
-  //   const hasNext = page < totalPages;
-  //   const hasPrev = page > 1;
-
-  //   return {
-  //     message: `Produits récupérés pour la destination : ${destination}${startDate && endDate ? ` pour la période ${startDate} - ${endDate}` : ''}`,
-  //     data: {
-  //       data: companiesWithProducts,
-  //       total: total,
-  //       page: page,
-  //       limit: limit,
-  //       totalPages: totalPages,
-  //       hasNext: hasNext,
-  //       hasPrev: hasPrev,
-  //     },
-  //   };
-  // }
-
   async searchProductsByDestination({
     destination,
     startDate,
@@ -1239,23 +858,28 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       .leftJoinAndSelect('product.availability', 'availability')
       .where('company.typeCompany = :type', { type: CompanyType.HOTEL });
 
+    // ✅ Recherche par mot-clé
     if (destination) {
       const searchTerms = this.prepareSearchTerms(destination);
-      const searchConditions = this.buildFlexibleSearchConditions(searchTerms);
-      queryBuilder
-        .leftJoinAndSelect('company.city', 'city')
-        .leftJoinAndSelect('city.country', 'country')
-        .andWhere(
-          `(${searchConditions.join(' OR ')})`,
-          this.buildSearchParameters(searchTerms),
+      const searchConditions: string[] = [];
+      const searchParams: Record<string, string> = {};
+
+      searchTerms.forEach((term, i) => {
+        searchConditions.push(
+          `LOWER(company.companyName) LIKE :term${i}`,
+          `LOWER(company.address) LIKE :term${i}`,
+          `LOWER(company.companyAddress) LIKE :term${i}`,
+          `LOWER(city.name) LIKE :term${i}`,
+          `LOWER(country.name) LIKE :term${i}`,
         );
+        searchParams[`term${i}`] = `%${term}%`;
+      });
+
+      queryBuilder.andWhere(`(${searchConditions.join(' OR ')})`, searchParams);
     }
 
     const total = await queryBuilder.getCount();
-
-    queryBuilder.skip(skip).take(limit);
-
-    queryBuilder.orderBy('product.gros', 'ASC');
+    queryBuilder.skip(skip).take(limit).orderBy('product.gros', 'ASC');
 
     const companies = await queryBuilder.getMany();
     const companiesWithProducts: any[] = [];
@@ -1266,6 +890,7 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       const products: any[] = [];
 
       for (const product of company.products) {
+        // 🔹 Capacité
         const capacityAdults = product.capacityAdults || 0;
         const capacityChildren = product.capacityChildren || 0;
         const capacityTotal = product.capacityTotal || 0;
@@ -1292,21 +917,13 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
           productCapacityTotal: capacityTotal,
         };
 
+        // 🔹 Disponibilité
         let isAvailable = true;
-        let availabilityInfo: {
-          available: boolean;
-          message: string;
-          period?: { startDate: string; endDate: string };
-          unavailableDates?: string[];
-          roomsRemaining?: number;
-        } | null = null;
+        let availabilityInfo: any = null;
 
         if (startDate && endDate) {
           const availabilities = await this.availabilityRepo.find({
-            where: {
-              product: { id: product.id },
-              date: Between(startDate, endDate),
-            },
+            where: { product: { id: product.id }, date: Between(startDate, endDate) },
           });
 
           if (!availabilities || availabilities.length === 0) {
@@ -1329,7 +946,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
               const dateStr = currentDate.toISOString().split('T')[0];
 
               const dayAvailability = availabilities.find((a) => a.date === dateStr);
-
               const roomsAvailable = dayAvailability?.roomsAvailable ?? 0;
               const roomsBooked = dayAvailability?.roomsBooked ?? 0;
               const roomsRemaining =
@@ -1347,7 +963,7 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
                 available: false,
                 message: 'Chambres non disponibles pour certaines dates',
                 period: { startDate, endDate },
-                unavailableDates: unavailableDates,
+                unavailableDates,
               };
             } else {
               availabilityInfo = {
@@ -1369,104 +985,44 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
           };
         }
 
-        const productImages = product.images
-          ? product.images.map((image: ImageProductEntity) => ({
-              id: image.id,
-              url: image.url,
-            }))
-          : [];
+        // 🔹 Images et spécifications
+        const productImages =
+          product.images?.map((img) => ({ id: img.id, url: img.url })) || [];
+        const specifications =
+          product.specificationValues?.map((specValue) => ({
+            id: specValue.id,
+            value: specValue.value,
+            specification: specValue.specification
+              ? {
+                  id: specValue.specification.id,
+                  key: specValue.specification.key,
+                  label: specValue.specification.label,
+                  image: specValue.specification.image,
+                  type: specValue.specification.type,
+                  unit: specValue.specification.unit,
+                  options: specValue.specification.options,
+                  deleted: specValue.specification.deleted,
+                  status: specValue.specification.status,
+                  createdAt: specValue.specification.createdAt,
+                  updatedAt: specValue.specification.updatedAt,
+                }
+              : null,
+          })) || [];
 
-        const specifications = product.specificationValues
-          ? product.specificationValues.map((specValue: ProductSpecificationValue) => {
-              const hasSpecification =
-                specValue.specification &&
-                specValue.specification.id &&
-                specValue.specification.key;
-
-              return {
-                id: specValue.id,
-                value: specValue.value,
-                specification: hasSpecification
-                  ? {
-                      id: specValue.specification.id,
-                      key: specValue.specification.key,
-                      label: specValue.specification.label,
-                      image: specValue.specification.image,
-                      type: specValue.specification.type,
-                      unit: specValue.specification.unit,
-                      options: specValue.specification.options,
-                      deleted: specValue.specification.deleted,
-                      status: specValue.specification.status,
-                      createdAt: specValue.specification.createdAt,
-                      updatedAt: specValue.specification.updatedAt,
-                    }
-                  : null,
-              };
-            })
-          : [];
-
-        const availability = product.availability
-          ? product.availability.map((avail: RoomAvailability) => ({
-              id: avail.id,
-              date: avail.date,
-              roomsAvailable: avail.roomsAvailable,
-              roomsBooked: avail.roomsBooked,
-              roomsRemaining: avail.roomsRemaining,
-            }))
-          : [];
+        const availability =
+          product.availability?.map((avail) => ({
+            id: avail.id,
+            date: avail.date,
+            roomsAvailable: avail.roomsAvailable,
+            roomsBooked: avail.roomsBooked,
+            roomsRemaining: avail.roomsRemaining,
+          })) || [];
 
         products.push({
-          id: product.id,
-          name: product.name,
-          description: product.description,
-          price: product.price,
-          type: product.type,
-
-          detail_price_original: product.detail_price_original,
-          gros_price_original: product.gros_price_original,
-          detail: product.detail,
-          gros: product.gros,
-          dailyRate: product.dailyRate,
-          salePrice: product.salePrice,
-          dailyRate_price_original: product.dailyRate_price_original,
-
-          capacityAdults: product.capacityAdults,
-          capacityChildren: product.capacityChildren,
-          capacityTotal: product.capacityTotal,
-          bedTypes: product.bedTypes,
-          localization: product.localization,
-
-          ingredients: product.ingredients,
-          quantity: product.quantity,
-          min_quantity: product.min_quantity,
-          stockAlert: product.stockAlert,
-
-          image: product.image,
+          ...product,
           images: productImages,
-
-          registrationNumber: product.registrationNumber,
-          model: product.model,
-          year: product.year,
-          typecar: product.typecar,
-          fuelType: product.fuelType,
-          transmission: product.transmission,
-          color: product.color,
-
-          status: product.status,
-          companyActivity: product.companyActivity,
-          createdAt: product.createdAt,
-          updatedAt: product.updatedAt,
-
-          category: product.category,
-          brand: product.brand,
-          measure: product.measure,
-
           specificationValues: specifications,
-          availability: availability,
-
-          reservations: product.reservations ? product.reservations.length : 0,
-          wishlist: product.wishlist ? product.wishlist.length : 0,
-
+          availability,
           capacityStatus: capacityInfo,
           availabilityStatus: availabilityInfo,
           isAvailable: capacityInfo.canAccommodate && isAvailable,
@@ -1477,85 +1033,7 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
 
       if (products.length > 0) {
         products.sort((a, b) => (a.gros || 0) - (b.gros || 0));
-
-        const companyCity = company.city
-          ? {
-              id: company.city.id,
-              name: company.city.name,
-              countryId: company.city.countryId,
-              status: company.city.status,
-              createdAt: company.city.createdAt,
-              updatedAt: company.city.updatedAt,
-              country: company.city.country
-                ? {
-                    id: company.city.country.id,
-                    name: company.city.country.name,
-                    code: company.city.country.code,
-                    status: company.city.country.status,
-                    createdAt: company.city.country.createdAt,
-                    updatedAt: company.city.country.updatedAt,
-                  }
-                : null,
-            }
-          : null;
-
-        const companyCategory = company.category
-          ? {
-              id: company.category.id,
-              name: company.category.name,
-              type: company.category.type,
-              image: company.category.image,
-              slug: company.category.slug,
-              status: company.category.status,
-              createdAt: company.category.createdAt,
-              updatedAt: company.category.updatedAt,
-            }
-          : null;
-
-        companiesWithProducts.push({
-          id: company.id,
-          companyName: company.companyName,
-          companyAddress: company.companyAddress,
-          address: company.address,
-          email: company.email,
-          phone: company.phone,
-          website: company.website,
-
-          vatNumber: company.vatNumber,
-          registrationDocumentUrl: company.registrationDocumentUrl,
-          warehouseLocation: company.warehouseLocation,
-
-          banner: company.banner,
-          logo: company.logo,
-
-          status: company.status,
-          typeCompany: company.typeCompany,
-          companyActivity: company.companyActivity,
-
-          latitude: company.latitude,
-          longitude: company.longitude,
-          delivery_minutes: company.delivery_minutes,
-          distance_km: company.distance_km,
-          open_time: company.open_time,
-
-          taux: company.taux,
-          localCurrency: company.localCurrency,
-
-          city: companyCity,
-          category: companyCategory,
-          cityId: company.cityId,
-          categoryId: company.categoryId,
-
-          createdAt: company.createdAt,
-
-          userHasCompany: company.userHasCompany ? company.userHasCompany.length : 0,
-          measures: company.measures ? company.measures.length : 0,
-          services: company.services ? company.services.length : 0,
-          rooms: company.rooms ? company.rooms.length : 0,
-          tauxCompanies: company.tauxCompanies ? company.tauxCompanies.length : 0,
-
-          products: products,
-        });
+        companiesWithProducts.push({ ...company, products });
       }
     }
 
@@ -1569,12 +1047,12 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       }`,
       data: {
         data: companiesWithProducts,
-        total: total,
-        page: page,
-        limit: limit,
-        totalPages: totalPages,
-        hasNext: hasNext,
-        hasPrev: hasPrev,
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNext,
+        hasPrev,
       },
     };
   }
