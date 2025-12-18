@@ -872,21 +872,13 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
         const searchParams: Record<string, string> = {};
 
         searchTerms.forEach((term, i) => {
-          // Utilisez ILIKE pour PostgreSQL (insensible à la casse) ou LIKE avec LOWER
+          // Pour MySQL, utilisez LIKE avec LOWER()
           const cols = [
-            `company.companyName ILIKE :term${i}`, // PostgreSQL seulement
-            `company.address ILIKE :term${i}`,
-            `company.companyAddress ILIKE :term${i}`,
-            `city.name ILIKE :term${i}`,
+            `LOWER(company.companyName) LIKE LOWER(:term${i})`,
+            `LOWER(company.address) LIKE LOWER(:term${i})`,
+            `LOWER(company.companyAddress) LIKE LOWER(:term${i})`,
+            `LOWER(city.name) LIKE LOWER(:term${i})`,
           ];
-
-          // Pour MySQL ou sans ILIKE, utilisez:
-          // const cols = [
-          //   `LOWER(company.companyName) LIKE LOWER(:term${i})`,
-          //   `LOWER(company.address) LIKE LOWER(:term${i})`,
-          //   `LOWER(company.companyAddress) LIKE LOWER(:term${i})`,
-          //   `LOWER(city.name) LIKE LOWER(:term${i})`,
-          // ];
 
           // Chaque terme doit matcher au moins une colonne (OR interne)
           termConditions.push(`(${cols.join(' OR ')})`);
@@ -896,37 +888,77 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
         // Tous les termes doivent être trouvés (AND entre les termes)
         queryBuilder.andWhere(termConditions.join(' AND '), searchParams);
 
-        // Pour debug
         console.log('Search terms:', searchTerms);
         console.log('Search params:', searchParams);
       } else {
         // Si aucun terme valide, faites une recherche générique
         const normalizedTerm = destination.toLowerCase().trim();
         queryBuilder.andWhere(
-          `(company.companyName ILIKE :term OR 
-          company.address ILIKE :term OR 
-          company.companyAddress ILIKE :term OR 
-          city.name ILIKE :term)`,
+          `(LOWER(company.companyName) LIKE LOWER(:term) OR 
+          LOWER(company.address) LIKE LOWER(:term) OR 
+          LOWER(company.companyAddress) LIKE LOWER(:term) OR 
+          LOWER(city.name) LIKE LOWER(:term))`,
           { term: `%${normalizedTerm}%` },
         );
       }
     }
 
-    // Pour debug - afficher la requête SQL générée
-    try {
-      const sqlQuery = queryBuilder.getSql();
-      console.log('Generated SQL:', sqlQuery);
-    } catch (error) {
-      console.log('Cannot get SQL query:', error);
-    }
+    console.log('Generated SQL:', await queryBuilder.getSql());
+    console.log('Parameters:', await queryBuilder.getParameters());
 
     const total = await queryBuilder.getCount();
     console.log(`Total companies found: ${total}`);
 
     queryBuilder.skip(skip).take(limit).orderBy('product.gros', 'ASC');
 
-    const companies = await queryBuilder.getMany();
+    let companies = await queryBuilder.getMany();
     console.log(`Companies after pagination: ${companies.length}`);
+
+    // Si aucun résultat, essayez une recherche plus simple
+    if (companies.length === 0 && destination) {
+      console.log('No results with complex search. Trying simplified search...');
+
+      const simplifiedQueryBuilder = this.companyRepo
+        .createQueryBuilder('company')
+        .leftJoinAndSelect('company.city', 'city')
+        .leftJoinAndSelect('company.products', 'product')
+        .leftJoinAndSelect('product.images', 'images')
+        .leftJoinAndSelect('product.category', 'category')
+        .leftJoinAndSelect('product.brand', 'brand')
+        .leftJoinAndSelect('product.measure', 'measure')
+        .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+        .leftJoinAndSelect('specificationValues.specification', 'specification')
+        .leftJoinAndSelect('product.productAttributes', 'productAttributes')
+        .leftJoinAndSelect('product.variations', 'variations')
+        .leftJoinAndSelect('product.attributes', 'attributes')
+        .leftJoinAndSelect('product.availability', 'availability')
+        .where('company.typeCompany = :type', { type: CompanyType.HOTEL });
+
+      const searchTerms = this.prepareSearchTerms(destination);
+      if (searchTerms.length > 0) {
+        // Essayez juste avec le premier terme (goma)
+        const firstTerm = searchTerms[0];
+        simplifiedQueryBuilder.andWhere(
+          `(LOWER(company.companyName) LIKE LOWER(:term) OR 
+          LOWER(company.address) LIKE LOWER(:term) OR 
+          LOWER(company.companyAddress) LIKE LOWER(:term) OR 
+          LOWER(city.name) LIKE LOWER(:term))`,
+          { term: `%${firstTerm}%` },
+        );
+
+        console.log('Trying simplified search with term:', firstTerm);
+        const simplifiedCompanies = await simplifiedQueryBuilder
+          .skip(skip)
+          .take(limit)
+          .orderBy('product.gros', 'ASC')
+          .getMany();
+
+        console.log(`Simplified search results: ${simplifiedCompanies.length}`);
+
+        // Utilisez les résultats simplifiés
+        companies = simplifiedCompanies;
+      }
+    }
 
     const companiesWithProducts: any[] = [];
 
