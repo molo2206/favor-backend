@@ -784,20 +784,11 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
   }
 
   private prepareSearchTerms(destination: string): string[] {
-    const cleaned = destination
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // retire accents
-      .replace(/[^a-z0-9\s,.-]/g, '') // conserve lettres, chiffres, espaces, virgules, points et tirets
-      .trim();
-
-    // Séparer uniquement par virgule pour chaque ville/pays
-    const terms = cleaned
+    // conserve lettres, chiffres, espaces, virgules, points, tirets
+    return destination
       .split(',')
-      .map((t) => t.trim())
+      .map((t) => t.trim().toLowerCase())
       .filter((t) => t.length > 0);
-
-    return terms;
   }
 
   private buildFlexibleSearchConditions(searchTerms: string[]): string[] {
@@ -871,11 +862,13 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
           `LOWER(company.companyAddress) LIKE :term${i}`,
           `LOWER(city.name) LIKE :term${i}`,
         ];
+        // chaque terme peut matcher n'importe quelle colonne, OR interne
         termConditions.push(`(${cols.join(' OR ')})`);
         searchParams[`term${i}`] = `%${term}%`;
       });
 
-      queryBuilder.andWhere(termConditions.join(' OR '), searchParams);
+      // MAIS ici on met AND entre les termes pour que tous soient trouvés
+      queryBuilder.andWhere(termConditions.join(' AND '), searchParams);
     }
 
     const total = await queryBuilder.getCount();
