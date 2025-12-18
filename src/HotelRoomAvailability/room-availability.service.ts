@@ -483,6 +483,8 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
       .createQueryBuilder('reservation')
       .leftJoin('reservation.product', 'product')
       .leftJoin('product.company', 'company')
+      .leftJoin('product.measure', 'measure')
+      .where('company.type = :type', { type: CompanyType.HOTEL })
       .select('company.id', 'companyId')
       .addSelect('COUNT(reservation.id)', 'totalReservations')
       .groupBy('company.id')
