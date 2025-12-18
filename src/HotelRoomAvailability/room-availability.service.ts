@@ -875,7 +875,7 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
         searchParams[`term${i}`] = `%${term}%`;
       });
 
-      queryBuilder.andWhere(termConditions.join(' AND '), searchParams);
+      queryBuilder.andWhere(termConditions.join(' OR '), searchParams);
     }
 
     const total = await queryBuilder.getCount();
