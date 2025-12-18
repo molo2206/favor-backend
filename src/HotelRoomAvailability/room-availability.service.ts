@@ -787,21 +787,14 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
     const cleaned = destination
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9\s,]/g, '')
+      .replace(/[\u0300-\u036f]/g, '') // retire accents
+      .replace(/[^a-z0-9\s,.-]/g, '') // conserve lettres, chiffres, espaces, virgules, points et tirets
       .trim();
 
-    const stopWords = ['the', 'of', 'republic', 'democratic'];
-
+    // Séparer uniquement par virgule pour chaque ville/pays
     const terms = cleaned
       .split(',')
-      .map((t) =>
-        t
-          .split(' ')
-          .filter((word) => !stopWords.includes(word))
-          .join(' ')
-          .trim(),
-      )
+      .map((t) => t.trim())
       .filter((t) => t.length > 0);
 
     return terms;
