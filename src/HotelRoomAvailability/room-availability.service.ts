@@ -479,11 +479,11 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
 
   async getMostVisitedHotels(page = 1, limit = 10) {
     const skip = (page - 1) * limit;
+
     const hotelStats = await this.reservationRepo
       .createQueryBuilder('reservation')
       .leftJoin('reservation.product', 'product')
       .leftJoin('product.company', 'company')
-      .leftJoin('product.measure', 'measure')
       .select('company.id', 'companyId')
       .addSelect('COUNT(reservation.id)', 'totalReservations')
       .groupBy('company.id')
@@ -514,6 +514,11 @@ Merci pour votre confiance. Votre réservation sera confirmée après réception
         products: {
           images: true,
           category: true,
+          measure: true,
+          brand: true,
+          specificationValues: {
+            specification: true, // valeur + définition
+          },
         },
       },
     });
