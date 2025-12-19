@@ -29,6 +29,7 @@ import { UserPlatformRoleEntity } from 'src/users/entities/user_plateform_roles.
 import { UserRole } from 'src/users/enum/user-role-enum';
 import { CompanyType } from 'src/company/enum/type.company.enum';
 import { CompanyEntity } from 'src/company/entities/company.entity';
+import { GeneratePin } from 'src/users/utility/helpers/GeneratePin.util';
 
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -84,9 +85,7 @@ export class OrderService {
 
     private readonly smsHelper: SmsHelper,
   ) {}
-  private generatePin(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
+
 
   async createOrder(createOrderDto: CreateOrderDto, user: UserEntity): Promise<OrderEntity> {
     const { totalAmount, currency, orderItems, addressUserId, type, shopType } = createOrderDto;
@@ -351,11 +350,10 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
       }
     }
 
-    // Si la commande est VALIDATED → paiement et envoi notifications
     if (dto.status === OrderStatus.VALIDATED) {
       order.paymentStatus = PaymentStatus.PAID;
       order.paid = true;
-      order.pin = this.generatePin();
+      order.pin = GeneratePin.generate();
 
       const subOrders = order.subOrders;
 
@@ -369,7 +367,7 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
         );
       }
 
-      if (hasEmail) {
+        if (hasEmail) {
         await this.mailService.sendHtmlEmail(
           order.user.email,
           'Votre code PIN pour la commande FavorHelp',

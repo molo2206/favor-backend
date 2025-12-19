@@ -63,12 +63,17 @@ export class ColisEntity {
   @Column({ type: 'json', nullable: true })
   photos?: string[];
 
+  @Column({ nullable: true, length: 6 })
+  pin: string;
+
+  
+
   @OneToMany(() => ColisTrackingEntity, (tracking) => tracking.colis, { cascade: true })
   trackings?: ColisTrackingEntity[];
 
   @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date;
-  
+
   @UpdateDateColumn({ type: 'timestamp' })
   updatedAt: Date;
 }

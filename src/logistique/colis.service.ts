@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
 import { ColisEntity, ColisStatus } from './entity/colis.entity';
@@ -8,6 +8,9 @@ import { CreateColisDto } from './dto/create-colis.dto';
 import { SetColisPriceDto } from './dto/set-price.dto';
 import { AssignCourierDto } from './dto/assign-courier.dto';
 import { TrackingNumberUtil } from 'src/users/utility/helpers/tracking-number.util';
+import { GeneratePin } from 'src/users/utility/helpers/GeneratePin.util';
+import { MailOrderService } from 'src/email/emailorder.service';
+import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 
 @Injectable()
 export class ColisService {
@@ -20,9 +23,12 @@ export class ColisService {
 
     @InjectRepository(ColisTrackingEntity)
     private readonly trackingRepo: Repository<ColisTrackingEntity>,
+
+    private readonly mailService: MailOrderService,
+
+    private readonly smsHelper: SmsHelper,
   ) {}
 
-  // Création d'un colis
   async createColis(
     createColisDto: CreateColisDto,
     currentUser: UserEntity,
@@ -53,7 +59,6 @@ export class ColisService {
     return { message: 'Colis créé avec succès', data: savedColis };
   }
 
-  // Assigner un ramasseur / transporteur
   async assignDriver(
     colisId: string,
     assignCourierDto: AssignCourierDto,
@@ -74,21 +79,71 @@ export class ColisService {
     return { message: 'Rammasseur assigné avec succès', data: savedColis };
   }
 
-  // Définir le prix
   async setPrice(
     colisId: string,
     setColisPriceDto: SetColisPriceDto,
   ): Promise<{ message: string; data: ColisEntity }> {
-    const colis = await this.colisRepository.findOne({ where: { id: colisId } });
-    if (!colis) throw new NotFoundException('Colis non trouvé');
+    const colis = await this.colisRepository.findOne({
+      where: { id: colisId },
+      relations: ['sender'],
+    });
+
+    if (!colis) {
+      throw new NotFoundException('Colis non trouvé');
+    }
+
+    if (!colis.sender) {
+      throw new BadRequestException('Ce colis ne possède pas d’expéditeur');
+    }
 
     colis.value = setColisPriceDto.price;
+    colis.pin = GeneratePin.generate();
+
+    const hasEmail = colis.sender.email?.trim();
+    const hasPhone = colis.sender.phone?.trim();
+
+    if (!hasEmail && !hasPhone) {
+      throw new BadRequestException(
+        'Aucun moyen de contact disponible (ni email, ni numéro de téléphone).',
+      );
+    }
+
+    if (hasEmail) {
+      await this.mailService.sendHtmlEmail(
+        colis.sender.email,
+        'Confirmation de paiement et code PIN – FavorHelp',
+        'sendPinColis.html',
+        {
+          pinCode: colis.pin,
+          trackingNumber: colis.trackingNumber,
+          user: colis.sender,
+          colis,
+          year: new Date().getFullYear(),
+        } as any,
+      );
+    }
+
+    if (hasPhone) {
+      const message = `Paiement confirmé.
+
+Votre colis sera récupéré dans les plus brefs délais par notre livreur.
+
+Numéro de suivi : ${colis.trackingNumber}
+Code PIN (à présenter au livreur) : ${colis.pin}
+
+FavorHelp`;
+
+      await this.smsHelper.sendSms(colis.sender.phone, message);
+    }
 
     const savedColis = await this.colisRepository.save(colis);
-    return { message: 'Prix défini avec succès', data: savedColis };
+
+    return {
+      message: 'Prix défini avec succès',
+      data: savedColis,
+    };
   }
 
-  // Récupérer un colis par ID
   async getColisById(colisId: string): Promise<{ message: string; data: ColisEntity }> {
     const colis = await this.colisRepository.findOne({
       where: { id: colisId },
@@ -98,7 +153,6 @@ export class ColisService {
     return { message: 'Colis récupéré avec succès', data: colis };
   }
 
-  // Récupérer tous les colis
   async getAllColis(): Promise<{ message: string; data: ColisEntity[] }> {
     const colisList = await this.colisRepository.find({
       relations: ['sender', 'receiver', 'trackings', 'trackings.updatedBy'],
@@ -107,7 +161,6 @@ export class ColisService {
     return { message: 'Liste des colis récupérée', data: colisList };
   }
 
-  // Ajouter un tracking
   async addTracking(
     colisId: string,
     status: ColisTrackingStatus,
@@ -119,22 +172,21 @@ export class ColisService {
     if (!colis) throw new NotFoundException('Colis non trouvé');
 
     const tracking: DeepPartial<ColisTrackingEntity> = {
-      colisId, // juste l'ID
+      colisId,
       status,
-      location: location ?? undefined,
-      note: note ?? undefined,
-      updatedById: updatedById ?? undefined, // undefined si pas de user
+      location,
+      note,
+      updatedById,
     };
 
     return this.trackingRepo.save(tracking);
   }
 
-  // Historique des trackings
   async getTrackingHistory(colisId: string) {
     const history = await this.trackingRepo.find({
       where: { colisId },
       relations: ['updatedBy'],
-      order: { createdAt: 'ASC' },
+      order: { createdAt: 'DESC' },
     });
 
     return history.map((t) => ({
@@ -157,7 +209,7 @@ export class ColisService {
   async trackColis(trackingNumber: string) {
     const colis = await this.colisRepository.findOne({
       where: { trackingNumber },
-      relations: ['sender', 'receiver', 'trackings', 'trackings.updatedBy'],
+      relations: ['trackings', 'trackings.updatedBy'],
     });
     if (!colis)
       throw new NotFoundException(`Colis avec trackingNumber ${trackingNumber} introuvable`);
@@ -174,22 +226,7 @@ export class ColisService {
       status: colis.status,
       pickupAddress: colis.pickupAddress,
       dropAddress: colis.dropAddress,
-      sender: colis.sender
-        ? {
-            id: colis.sender.id,
-            fullName: colis.sender.fullName,
-            email: colis.sender.email,
-            phone: colis.sender.phone,
-          }
-        : null,
-      receiver: colis.receiver
-        ? {
-            id: colis.receiver.id,
-            fullName: colis.receiver.fullName,
-            email: colis.receiver.email,
-            phone: colis.receiver.phone,
-          }
-        : null,
+
       trackings: sortedTrackings?.map((t) => ({
         id: t.id,
         status: t.status,

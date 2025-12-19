@@ -866,13 +866,11 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
     if (destination) {
       const searchTerms = this.prepareSearchTerms(destination);
 
-      // Si des termes ont été extraits, construisez la condition
       if (searchTerms.length > 0) {
         const termConditions: string[] = [];
         const searchParams: Record<string, string> = {};
 
         searchTerms.forEach((term, i) => {
-          // Pour MySQL, utilisez LIKE avec LOWER()
           const cols = [
             `LOWER(company.companyName) LIKE LOWER(:term${i})`,
             `LOWER(company.address) LIKE LOWER(:term${i})`,
@@ -880,18 +878,15 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
             `LOWER(city.name) LIKE LOWER(:term${i})`,
           ];
 
-          // Chaque terme doit matcher au moins une colonne (OR interne)
           termConditions.push(`(${cols.join(' OR ')})`);
           searchParams[`term${i}`] = `%${term}%`;
         });
 
-        // Tous les termes doivent être trouvés (AND entre les termes)
         queryBuilder.andWhere(termConditions.join(' AND '), searchParams);
 
         console.log('Search terms:', searchTerms);
         console.log('Search params:', searchParams);
       } else {
-        // Si aucun terme valide, faites une recherche générique
         const normalizedTerm = destination.toLowerCase().trim();
         queryBuilder.andWhere(
           `(LOWER(company.companyName) LIKE LOWER(:term) OR 
@@ -914,7 +909,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
     let companies = await queryBuilder.getMany();
     console.log(`Companies after pagination: ${companies.length}`);
 
-    // Si aucun résultat, essayez une recherche plus simple
     if (companies.length === 0 && destination) {
       console.log('No results with complex search. Trying simplified search...');
 
@@ -936,7 +930,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
 
       const searchTerms = this.prepareSearchTerms(destination);
       if (searchTerms.length > 0) {
-        // Essayez juste avec le premier terme (goma)
         const firstTerm = searchTerms[0];
         simplifiedQueryBuilder.andWhere(
           `(LOWER(company.companyName) LIKE LOWER(:term) OR 
@@ -955,7 +948,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
 
         console.log(`Simplified search results: ${simplifiedCompanies.length}`);
 
-        // Utilisez les résultats simplifiés
         companies = simplifiedCompanies;
       }
     }
@@ -1142,7 +1134,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       throw new NotFoundException('Entreprise non trouvée');
     }
 
-    // Utiliser QueryBuilder pour récupérer tout
     const products = await this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
@@ -1165,9 +1156,8 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       };
     }
 
-    // Formater les résultats
     const formattedProducts = products.map((product) => {
-      // Définir le type correct pour categorySpecs
+
       const categorySpecs: Array<{
         id: string;
         required: boolean;
@@ -1183,7 +1173,7 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
       }> = [];
 
       if (product.category?.specifications) {
-        // Ajouter les spécifications filtrées et formatées
+
         const filteredSpecs = product.category.specifications
           .filter((cs) => cs.specification)
           .map((cs) => ({
@@ -1204,7 +1194,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
         categorySpecs.push(...filteredSpecs);
       }
 
-      // Définir le type pour les spécifications du produit
       const productSpecs: Array<{
         id: string;
         value?: string;
@@ -1228,7 +1217,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
             },
           })) || [];
 
-      // Définir le type pour les images
       const productImages: Array<{
         id: string;
         url: string;
@@ -1238,7 +1226,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
           url: img.url,
         })) || [];
 
-      // Calculer SEULEMENT le nombre de chambres disponibles
       const availabilityList = product.availability || [];
       const availableRooms = availabilityList.reduce((sum, av) => sum + av.roomsRemaining, 0);
       const hasAvailability = availableRooms > 0;
@@ -1258,7 +1245,6 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
         bedTypes: product.bedTypes,
         localization: product.localization,
 
-        // Catégorie
         category: product.category
           ? {
               id: product.category.id,
@@ -1269,13 +1255,10 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
             }
           : null,
 
-        // Spécifications du produit
         specifications: productSpecs,
 
-        // Images
         images: productImages,
 
-        // Mesure
         measure: product.measure
           ? {
               id: product.measure.id,
@@ -1284,15 +1267,12 @@ Merci pour votre confiance. Votre réservation est confirmée.`;
             }
           : null,
 
-        // SEULEMENT le nombre de chambres disponibles
         availableRooms: availableRooms,
 
-        // Indicateur simple pour le filtrage
         isAvailable: hasAvailability,
       };
     });
 
-    // Filtrer uniquement les produits qui ont de la disponibilité
     const availableProducts = formattedProducts.filter((product) => product.isAvailable);
 
     return {

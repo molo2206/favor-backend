@@ -20,6 +20,7 @@ import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator
 import { UserEntity } from 'src/users/entities/user.entity';
 import { ParseUUIDPipe } from '@nestjs/common';
 import { ColisTrackingStatus } from './entity/colis-tracking.entity';
+import { CreateColisTrackingDto } from './dto/eate-colis-tracking.dto';
 
 @Controller('colis')
 @UseInterceptors(ClassSerializerInterceptor)
@@ -61,31 +62,27 @@ export class ColisController {
     return await this.colisService.getAllColis();
   }
 
-  // @Get('track/:trackingNumber')
-  // async trackColis(@Param('trackingNumber') trackingNumber: string) {
-  //   const colis = await this.colisService.trackColis(trackingNumber);
-  //   return {
-  //     message: 'Colis retrouvé avec succès',
-  //     colis,
-  //   };
-  // }
+  @Get('track/:trackingNumber')
+  async trackColis(@Param('trackingNumber') trackingNumber: string) {
+    const colis = await this.colisService.trackColis(trackingNumber);
+    return {
+      message: 'Colis retrouvé avec succès',
+      colis,
+    };
+  }
 
   @Post(':id/tracking')
   async addTracking(
     @Param('id') colisId: string,
-    @Body('status') status: string,
+    @Body() dto: CreateColisTrackingDto,
     @CurrentUser() user: UserEntity,
   ) {
-    if (!Object.values(ColisTrackingStatus).includes(status as ColisTrackingStatus)) {
-      throw new BadRequestException(
-        `Statut invalide. Valeurs acceptées: ${Object.values(ColisTrackingStatus).join(', ')}`,
-      );
-    }
-
     const tracking = await this.colisService.addTracking(
       colisId,
-      status as ColisTrackingStatus,
+      dto.status,
       user?.id,
+      dto.location,
+      dto.note,
     );
 
     return { message: 'Statut ajouté', tracking };

@@ -487,7 +487,7 @@ export class CategoryService {
     // Utiliser Query Builder avec le bon nom de relation
     const categorySpecs = await this.categorySpecificationRepo
       .createQueryBuilder('cs')
-      .leftJoinAndSelect('cs.specification', 'spec') // Utiliser leftJoinAndSelect au lieu de innerJoinAndSelect
+      .leftJoinAndSelect('cs.specification', 'spec')
       .where('cs.categoryId = :categoryId', { categoryId })
       .andWhere('spec.deleted = :deleted', { deleted: false })
       .orderBy('cs.displayOrder', 'ASC')
@@ -513,7 +513,11 @@ export class CategoryService {
             label: cs.specification.label,
             type: cs.specification.type,
             unit: cs.specification.unit,
-            options: cs.specification.options,
+            // 🔹 s'assurer que options est un tableau
+            options:
+              typeof cs.specification.options === 'string'
+                ? JSON.parse(cs.specification.options)
+                : cs.specification.options || [],
           }
         : null,
     }));
