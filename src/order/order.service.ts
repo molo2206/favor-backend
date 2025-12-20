@@ -1,7 +1,7 @@
 // order.service.ts
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { OrderEntity } from './entities/order.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -742,36 +742,34 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
       topProducts: any[];
     };
   }> {
-    // Ajouter un jour à la date de fin pour inclure toute la journée
+    // Ajouter un jour à la date de fin
     const adjustedDateFin = new Date(dateFin);
     adjustedDateFin.setDate(adjustedDateFin.getDate() + 1);
 
-    // Construction des conditions WHERE en fonction des filtres
+    // Construction des conditions WHERE
     const whereConditions: string[] = [];
-    const whereParams: any = {};
+    const whereParams: any = {
+      start: dateDebut,
+      end: adjustedDateFin,
+    };
 
-    // Filtre par type de company
+    // Base condition pour la date
+    whereConditions.push('order.createdAt BETWEEN :start AND :end');
+
+    // Filtre par type de company (directement depuis le champ type de OrderEntity)
     if (type && type !== 'ALL') {
-      whereConditions.push('company.type = :type');
+      whereConditions.push('order.type = :type');
       whereParams.type = type;
     }
 
-    // Filtre par date (commun à tous)
-    whereConditions.push('order.createdAt BETWEEN :start AND :end');
-    whereParams.start = dateDebut;
-    whereParams.end = adjustedDateFin;
-
     // Joindre les conditions
-    const whereClause = whereConditions.length > 0 ? whereConditions.join(' AND ') : '1=1';
+    const whereClause = whereConditions.join(' AND ');
 
     // 1. Récupérer les commandes avec les filtres
-    const ordersQuery = this.orderRepo
+    const orders = await this.orderRepo
       .createQueryBuilder('order')
-      .innerJoinAndSelect('order.company', 'company')
-      .leftJoinAndSelect('order.user', 'user')
-      .where(whereClause, whereParams);
-
-    const orders = await ordersQuery.getMany();
+      .where(whereClause, whereParams)
+      .getMany();
 
     // Calculs basés sur les commandes
     const totalOrders = orders.length;
@@ -781,88 +779,94 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
     const totalShippingFees = orders.reduce((acc, o) => acc + Number(o.shippingCost || 0), 0);
 
     // 2. Commandes par jour
-    const ordersByDayQuery = this.orderRepo
+    const ordersByDay = await this.orderRepo
       .createQueryBuilder('order')
-      .innerJoin('order.company', 'company')
       .select('DATE(order.createdAt)', 'date')
       .addSelect('COUNT(order.id)', 'count')
       .addSelect('SUM(order.totalAmount)', 'amount')
       .where(whereClause, whereParams)
       .groupBy('DATE(order.createdAt)')
-      .orderBy('DATE(order.createdAt)', 'ASC');
-
-    const ordersByDay = await ordersByDayQuery.getRawMany();
+      .orderBy('DATE(order.createdAt)', 'ASC')
+      .getRawMany();
 
     // 3. Revenus par jour
-    const revenueByDayQuery = this.orderRepo
+    const revenueByDay = await this.orderRepo
       .createQueryBuilder('order')
-      .innerJoin('order.company', 'company')
       .select('DATE(order.createdAt)', 'date')
       .addSelect('SUM(order.totalAmount)', 'revenue')
       .addSelect('SUM(order.shippingCost)', 'shipping')
       .where(whereClause, whereParams)
       .groupBy('DATE(order.createdAt)')
-      .orderBy('DATE(order.createdAt)', 'ASC');
-
-    const revenueByDay = await revenueByDayQuery.getRawMany();
+      .orderBy('DATE(order.createdAt)', 'ASC')
+      .getRawMany();
 
     // 4. Top produits avec filtres
-    const topProductsQuery = this.orderItemRepo
+    // Note: Vous devez vérifier si OrderItemEntity a une relation avec OrderEntity
+    const topProductsQueryBuilder = this.orderItemRepo
       .createQueryBuilder('oi')
       .innerJoin('oi.product', 'product')
       .innerJoin('oi.order', 'order')
-      .innerJoin('order.company', 'company')
       .select('product.name', 'name')
       .addSelect('product.id', 'productId')
       .addSelect('SUM(oi.quantity)', 'count')
       .addSelect('SUM(oi.quantity * oi.price)', 'amount')
-      .where(whereClause, whereParams)
+      .where('order.createdAt BETWEEN :start AND :end', {
+        start: dateDebut,
+        end: adjustedDateFin,
+      });
+
+    // Ajouter le filtre par type si nécessaire
+    if (type && type !== 'ALL') {
+      topProductsQueryBuilder.andWhere('order.type = :type', { type });
+    }
+
+    const topProducts = await topProductsQueryBuilder
       .groupBy('product.id, product.name')
       .orderBy('count', 'DESC')
-      .limit(10);
+      .limit(10)
+      .getRawMany();
 
-    const topProducts = await topProductsQuery.getRawMany();
-
-    // 5. Total produits avec filtres par type de company
-    const totalProductsQuery = this.productRepo
+    // 5. Total produits
+    // Si les produits sont liés à des companies, filtrez par type de company
+    const totalProductsQueryBuilder = this.productRepo
       .createQueryBuilder('product')
-      .innerJoin('product.company', 'company')
       .select('COUNT(product.id)', 'count');
 
     if (type && type !== 'ALL') {
-      totalProductsQuery.where('company.type = :type', { type });
+      // Si Product a une relation avec Company
+      totalProductsQueryBuilder
+        .innerJoin('product.company', 'company')
+        .where('company.typeCompany = :type', { type });
     }
 
-    const totalProductsResult = await totalProductsQuery.getRawOne();
+    // Ajouter le filtre par date si les produits ont une date de création
+    totalProductsQueryBuilder.andWhere('product.createdAt BETWEEN :start AND :end', {
+      start: dateDebut,
+      end: adjustedDateFin,
+    });
+
+    const totalProductsResult = await totalProductsQueryBuilder.getRawOne();
     const totalProducts = parseInt(totalProductsResult?.count || 0);
 
-    // 6. Total utilisateurs (filtrés par date d'inscription si nécessaire)
-    const totalUsersQuery = this.userRepository
-      .createQueryBuilder('user')
-      .select('COUNT(user.id)', 'count')
-      .where('user.createdAt BETWEEN :start AND :end', {
-        start: dateDebut,
-        end: adjustedDateFin,
-      });
-
-    const totalUsersResult = await totalUsersQuery.getRawOne();
-    const totalUsers = parseInt(totalUsersResult?.count || 0);
+    // 6. Total utilisateurs (filtrés par date d'inscription)
+    const totalUsers = await this.userRepository.count({
+      where: {
+        createdAt: Between(dateDebut, adjustedDateFin),
+      },
+    });
 
     // 7. Total companies avec filtres par type et date
-    const totalCompaniesQuery = this.companyRepo
-      .createQueryBuilder('company')
-      .select('COUNT(company.id)', 'count')
-      .where('company.createdAt BETWEEN :start AND :end', {
-        start: dateDebut,
-        end: adjustedDateFin,
-      });
+    const totalCompaniesWhere: any = {
+      createdAt: Between(dateDebut, adjustedDateFin),
+    };
 
     if (type && type !== 'ALL') {
-      totalCompaniesQuery.andWhere('company.type = :type', { type });
+      totalCompaniesWhere.typeCompany = type;
     }
 
-    const totalCompaniesResult = await totalCompaniesQuery.getRawOne();
-    const totalCompanies = parseInt(totalCompaniesResult?.count || 0);
+    const totalCompanies = await this.companyRepo.count({
+      where: totalCompaniesWhere,
+    });
 
     return {
       message: 'Dashboard data fetched successfully',
