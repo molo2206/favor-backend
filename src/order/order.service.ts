@@ -742,35 +742,46 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
       topProducts: any[];
     };
   }> {
-    dateFin.setDate(dateFin.getDate() + 1); // Inclure le dernier jour
+    // Inclure le dernier jour
+    dateFin.setDate(dateFin.getDate() + 1);
 
-    // Query Builder de base pour les commandes
+    // Query de base pour récupérer les commandes avec items, produit et company
     const orderQB = this.orderRepo
       .createQueryBuilder('order')
-      .leftJoinAndSelect('order.orderItems', 'oi') // ⚡ correction ici
+      .leftJoinAndSelect('order.orderItems', 'oi')
       .leftJoinAndSelect('oi.product', 'product')
       .leftJoinAndSelect('product.company', 'company')
-      .leftJoinAndSelect('order.user', 'user')
       .where('order.createdAt BETWEEN :start AND :end', {
         start: dateDebut,
         end: dateFin,
       });
 
-    // Filtrer par type de company si ce n'est pas ALL
     if (type && type !== 'ALL') {
       orderQB.andWhere('company.typeCompany = :type', { type });
     }
 
     const orders = await orderQB.getMany();
 
-    // Totaux globaux
+    // 🔹 Totaux globaux
     const totalOrders = orders.length;
     const deliveredOrders = orders.filter((o) => o.status === OrderStatus.DELIVERED);
     const totalSales = deliveredOrders.length;
-    const totalRevenue = orders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
-    const totalShippingFees = orders.reduce((acc, o) => acc + Number(o.shippingCost || 0), 0);
 
-    // Statistiques par jour : nombre de commandes et revenus
+    // Total revenue et shipping fees corrects à partir des orderItems
+    const totalRevenue = orders.reduce((acc, order) => {
+      const orderTotal = order.orderItems.reduce(
+        (sum, item) => sum + Number(item.price) * Number(item.quantity),
+        0,
+      );
+      return acc + orderTotal;
+    }, 0);
+
+    const totalShippingFees = orders.reduce(
+      (acc, order) => acc + Number(order.shippingCost || 0),
+      0,
+    );
+
+    // 🔹 Statistiques par jour
     const ordersByDay = await this.orderRepo
       .createQueryBuilder('order')
       .select('DATE(order.createdAt)', 'date')
@@ -799,7 +810,7 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
       .orderBy('DATE(order.createdAt)', 'ASC')
       .getRawMany();
 
-    // Top produits
+    // 🔹 Top produits
     const topProducts = await this.orderItemRepo
       .createQueryBuilder('oi')
       .innerJoin('oi.product', 'product')
