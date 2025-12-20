@@ -742,129 +742,86 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
       topProducts: any[];
     };
   }> {
-    dateFin.setDate(dateFin.getDate() + 1);
+    dateFin.setDate(dateFin.getDate() + 1); // Inclure le dernier jour
 
+    // Query Builder de base pour les commandes
     const orderQB = this.orderRepo
       .createQueryBuilder('order')
-      .leftJoin('order.orderItems', 'oi')
-      .leftJoin('oi.product', 'product')
-      .leftJoin('product.company', 'company')
+      .leftJoinAndSelect('order.orderItems', 'oi') // ⚡ correction ici
+      .leftJoinAndSelect('oi.product', 'product')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('order.user', 'user')
       .where('order.createdAt BETWEEN :start AND :end', {
         start: dateDebut,
         end: dateFin,
       });
 
-    if (type !== 'ALL') {
-      orderQB.andWhere('company.type = :type', { type });
+    // Filtrer par type de company si ce n'est pas ALL
+    if (type && type !== 'ALL') {
+      orderQB.andWhere('company.typeCompany = :type', { type });
     }
 
     const orders = await orderQB.getMany();
 
+    // Totaux globaux
     const totalOrders = orders.length;
-
     const deliveredOrders = orders.filter((o) => o.status === OrderStatus.DELIVERED);
     const totalSales = deliveredOrders.length;
-
     const totalRevenue = orders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
-
     const totalShippingFees = orders.reduce((acc, o) => acc + Number(o.shippingCost || 0), 0);
 
-    const ordersByDayQB = this.orderRepo
+    // Statistiques par jour : nombre de commandes et revenus
+    const ordersByDay = await this.orderRepo
       .createQueryBuilder('order')
+      .select('DATE(order.createdAt)', 'date')
+      .addSelect('COUNT(order.id)', 'count')
+      .addSelect('SUM(order.totalAmount)', 'amount')
       .leftJoin('order.orderItems', 'oi')
       .leftJoin('oi.product', 'product')
       .leftJoin('product.company', 'company')
-      .select('DATE(order.createdAt)', 'date')
-      .addSelect('COUNT(DISTINCT order.id)', 'count')
-      .addSelect('SUM(order.totalAmount)', 'amount')
-      .where('order.createdAt BETWEEN :start AND :end', {
-        start: dateDebut,
-        end: dateFin,
-      });
-
-    if (type !== 'ALL') {
-      ordersByDayQB.andWhere('company.type = :type', { type });
-    }
-
-    const ordersByDay = await ordersByDayQB
+      .where('order.createdAt BETWEEN :start AND :end', { start: dateDebut, end: dateFin })
+      .andWhere(type !== 'ALL' ? 'company.typeCompany = :type' : '1=1', { type })
       .groupBy('DATE(order.createdAt)')
       .orderBy('DATE(order.createdAt)', 'ASC')
       .getRawMany();
 
-    const revenueByDayQB = this.orderRepo
+    const revenueByDay = await this.orderRepo
       .createQueryBuilder('order')
-      .leftJoin('order.orderItems', 'oi')
-      .leftJoin('oi.product', 'product')
-      .leftJoin('product.company', 'company')
       .select('DATE(order.createdAt)', 'date')
       .addSelect('SUM(order.totalAmount)', 'revenue')
       .addSelect('SUM(order.shippingCost)', 'shipping')
-      .where('order.createdAt BETWEEN :start AND :end', {
-        start: dateDebut,
-        end: dateFin,
-      });
-
-    if (type !== 'ALL') {
-      revenueByDayQB.andWhere('company.type = :type', { type });
-    }
-
-    const revenueByDay = await revenueByDayQB
+      .leftJoin('order.orderItems', 'oi')
+      .leftJoin('oi.product', 'product')
+      .leftJoin('product.company', 'company')
+      .where('order.createdAt BETWEEN :start AND :end', { start: dateDebut, end: dateFin })
+      .andWhere(type !== 'ALL' ? 'company.typeCompany = :type' : '1=1', { type })
       .groupBy('DATE(order.createdAt)')
       .orderBy('DATE(order.createdAt)', 'ASC')
       .getRawMany();
 
+    // Top produits
     const topProducts = await this.orderItemRepo
       .createQueryBuilder('oi')
-      .innerJoin('oi.order', 'order')
       .innerJoin('oi.product', 'product')
+      .innerJoin('oi.order', 'order')
       .innerJoin('product.company', 'company')
       .select('product.name', 'name')
       .addSelect('SUM(oi.quantity)', 'count')
       .addSelect('SUM(oi.quantity * oi.price)', 'amount')
-      .where('order.createdAt BETWEEN :start AND :end', {
-        start: dateDebut,
-        end: dateFin,
-      })
-      .andWhere(type !== 'ALL' ? 'company.type = :type' : '1=1', { type })
+      .where('order.createdAt BETWEEN :start AND :end', { start: dateDebut, end: dateFin })
+      .andWhere(type !== 'ALL' ? 'company.typeCompany = :type' : '1=1', { type })
       .groupBy('product.id')
       .orderBy('count', 'DESC')
       .limit(10)
       .getRawMany();
 
-    const productQB = this.productRepo
-      .createQueryBuilder('product')
-      .leftJoin('product.company', 'company')
-      .where('product.createdAt BETWEEN :start AND :end', {
-        start: dateDebut,
-        end: dateFin,
-      });
+    // Totaux généraux
+    const [totalProducts, totalUsers, totalCompanies] = await Promise.all([
+      this.productRepo.count(),
+      this.userRepository.count(),
+      this.companyRepo.count(),
+    ]);
 
-    if (type !== 'ALL') {
-      productQB.andWhere('company.type = :type', { type });
-    }
-
-    const totalProducts = await productQB.getCount();
-
-    const companyQB = this.companyRepo
-      .createQueryBuilder('company')
-      .where('company.createdAt BETWEEN :start AND :end', {
-        start: dateDebut,
-        end: dateFin,
-      });
-
-    if (type !== 'ALL') {
-      companyQB.andWhere('company.type = :type', { type });
-    }
-
-    const totalCompanies = await companyQB.getCount();
-
-    const totalUsers = await this.userRepository
-      .createQueryBuilder('user')
-      .where('user.createdAt BETWEEN :start AND :end', {
-        start: dateDebut,
-        end: dateFin,
-      })
-      .getCount();
     return {
       message: 'Dashboard data fetched successfully',
       data: {
