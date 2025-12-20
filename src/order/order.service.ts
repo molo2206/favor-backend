@@ -86,7 +86,6 @@ export class OrderService {
     private readonly smsHelper: SmsHelper,
   ) {}
 
-
   async createOrder(createOrderDto: CreateOrderDto, user: UserEntity): Promise<OrderEntity> {
     const { totalAmount, currency, orderItems, addressUserId, type, shopType } = createOrderDto;
 
@@ -367,7 +366,7 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
         );
       }
 
-        if (hasEmail) {
+      if (hasEmail) {
         await this.mailService.sendHtmlEmail(
           order.user.email,
           'Votre code PIN pour la commande FavorHelp',
@@ -617,6 +616,113 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
     return { data: subOrders };
   }
 
+  // async getDashboardData(
+  //   type: CompanyType | 'ALL',
+  //   dateDebut: Date,
+  //   dateFin: Date,
+  // ): Promise<{
+  //   message: string;
+  //   data: {
+  //     totalOrders: number;
+  //     totalSales: number;
+  //     totalRevenue: number;
+  //     totalShippingFees: number;
+  //     totalProducts: number;
+  //     totalUsers: number;
+  //     totalCompanies: number;
+  //     ordersByDay: any[];
+  //     revenueByDay: any[];
+  //     topProducts: any[];
+  //   };
+  // }> {
+
+  //   dateFin.setDate(dateFin.getDate() + 1);
+
+  //   const whereType = type && type !== 'ALL' ? 'order.type = :type' : '1=1';
+
+  //   const orders = await this.orderRepo
+  //     .createQueryBuilder('order')
+  //     .where(whereType, { type })
+  //     .andWhere('order.createdAt BETWEEN :start AND :end', {
+  //       start: dateDebut,
+  //       end: dateFin,
+  //     })
+  //     .getMany();
+
+  //   const totalOrders = orders.length;
+  //   const deliveredOrders = orders.filter((o) => o.status === OrderStatus.DELIVERED);
+  //   const totalSales = deliveredOrders.length;
+  //   const totalRevenue = orders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
+  //   const totalShippingFees = orders.reduce((acc, o) => acc + Number(o.shippingCost || 0), 0);
+
+  //   const ordersByDay = await this.orderRepo
+  //     .createQueryBuilder('order')
+  //     .select('DATE(order.createdAt)', 'date')
+  //     .addSelect('COUNT(order.id)', 'count')
+  //     .addSelect('SUM(order.totalAmount)', 'amount')
+  //     .where(whereType, { type })
+  //     .andWhere('order.createdAt BETWEEN :start AND :end', {
+  //       start: dateDebut,
+  //       end: dateFin,
+  //     })
+  //     .groupBy('DATE(order.createdAt)')
+  //     .orderBy('DATE(order.createdAt)', 'ASC')
+  //     .getRawMany();
+
+  //   const revenueByDay = await this.orderRepo
+  //     .createQueryBuilder('order')
+  //     .select('DATE(order.createdAt)', 'date')
+  //     .addSelect('SUM(order.totalAmount)', 'revenue')
+  //     .addSelect('SUM(order.shippingCost)', 'shipping')
+  //     .where(whereType, { type })
+  //     .andWhere('order.createdAt BETWEEN :start AND :end', {
+  //       start: dateDebut,
+  //       end: dateFin,
+  //     })
+  //     .groupBy('DATE(order.createdAt)')
+  //     .orderBy('DATE(order.createdAt)', 'ASC')
+  //     .getRawMany();
+
+  //   const topProducts = await this.orderItemRepo
+  //     .createQueryBuilder('oi')
+  //     .innerJoin('oi.product', 'product')
+  //     .innerJoin('oi.order', 'order')
+  //     .select('product.name', 'name')
+  //     .addSelect('SUM(oi.quantity)', 'count')
+  //     .addSelect('SUM(oi.quantity * oi.price)', 'amount')
+  //     .where(whereType, { type })
+  //     .andWhere('order.createdAt BETWEEN :start AND :end', {
+  //       start: dateDebut,
+  //       end: dateFin,
+  //     })
+  //     .groupBy('product.id')
+  //     .orderBy('count', 'DESC')
+  //     .limit(10)
+  //     .getRawMany();
+
+  //   const [totalProducts, totalUsers, totalCompanies] = await Promise.all([
+  //     this.productRepo.count(),
+  //     this.userRepository.count(),
+  //     this.companyRepo.count(),
+  //   ]);
+
+  //   return {
+  //     message: 'Dashboard data fetched successfully',
+  //     data: {
+  //       totalOrders,
+  //       totalSales,
+  //       totalRevenue,
+  //       totalShippingFees,
+  //       totalProducts,
+  //       totalUsers,
+  //       totalCompanies,
+  //       ordersByDay,
+  //       revenueByDay,
+  //       topProducts,
+  //     },
+  //   };
+  // }
+
   async getDashboardData(
     type: CompanyType | 'ALL',
     dateDebut: Date,
@@ -636,84 +742,129 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
       topProducts: any[];
     };
   }> {
-    // ✅ Inclure le dernier jour dans le filtre
     dateFin.setDate(dateFin.getDate() + 1);
 
-    // 🧩 Condition dynamique (filtre sur `order.type`)
-    const whereType = type && type !== 'ALL' ? 'order.type = :type' : '1=1';
-
-    // 1️⃣ Commandes filtrées
-    const orders = await this.orderRepo
+    const orderQB = this.orderRepo
       .createQueryBuilder('order')
-      .where(whereType, { type })
-      .andWhere('order.createdAt BETWEEN :start AND :end', {
+      .leftJoin('order.orderItems', 'oi')
+      .leftJoin('oi.product', 'product')
+      .leftJoin('product.company', 'company')
+      .where('order.createdAt BETWEEN :start AND :end', {
         start: dateDebut,
         end: dateFin,
-      })
-      .getMany();
+      });
+
+    if (type !== 'ALL') {
+      orderQB.andWhere('company.type = :type', { type });
+    }
+
+    const orders = await orderQB.getMany();
 
     const totalOrders = orders.length;
+
     const deliveredOrders = orders.filter((o) => o.status === OrderStatus.DELIVERED);
     const totalSales = deliveredOrders.length;
+
     const totalRevenue = orders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
+
     const totalShippingFees = orders.reduce((acc, o) => acc + Number(o.shippingCost || 0), 0);
 
-    // 2️⃣ Commandes groupées par jour
-    const ordersByDay = await this.orderRepo
+    const ordersByDayQB = this.orderRepo
       .createQueryBuilder('order')
+      .leftJoin('order.orderItems', 'oi')
+      .leftJoin('oi.product', 'product')
+      .leftJoin('product.company', 'company')
       .select('DATE(order.createdAt)', 'date')
-      .addSelect('COUNT(order.id)', 'count')
+      .addSelect('COUNT(DISTINCT order.id)', 'count')
       .addSelect('SUM(order.totalAmount)', 'amount')
-      .where(whereType, { type })
-      .andWhere('order.createdAt BETWEEN :start AND :end', {
+      .where('order.createdAt BETWEEN :start AND :end', {
         start: dateDebut,
         end: dateFin,
-      })
+      });
+
+    if (type !== 'ALL') {
+      ordersByDayQB.andWhere('company.type = :type', { type });
+    }
+
+    const ordersByDay = await ordersByDayQB
       .groupBy('DATE(order.createdAt)')
       .orderBy('DATE(order.createdAt)', 'ASC')
       .getRawMany();
 
-    // 3️⃣ Revenus par jour
-    const revenueByDay = await this.orderRepo
+    const revenueByDayQB = this.orderRepo
       .createQueryBuilder('order')
+      .leftJoin('order.orderItems', 'oi')
+      .leftJoin('oi.product', 'product')
+      .leftJoin('product.company', 'company')
       .select('DATE(order.createdAt)', 'date')
       .addSelect('SUM(order.totalAmount)', 'revenue')
       .addSelect('SUM(order.shippingCost)', 'shipping')
-      .where(whereType, { type })
-      .andWhere('order.createdAt BETWEEN :start AND :end', {
+      .where('order.createdAt BETWEEN :start AND :end', {
         start: dateDebut,
         end: dateFin,
-      })
+      });
+
+    if (type !== 'ALL') {
+      revenueByDayQB.andWhere('company.type = :type', { type });
+    }
+
+    const revenueByDay = await revenueByDayQB
       .groupBy('DATE(order.createdAt)')
       .orderBy('DATE(order.createdAt)', 'ASC')
       .getRawMany();
 
-    // 4️⃣ Produits les plus vendus
     const topProducts = await this.orderItemRepo
       .createQueryBuilder('oi')
-      .innerJoin('oi.product', 'product')
       .innerJoin('oi.order', 'order')
+      .innerJoin('oi.product', 'product')
+      .innerJoin('product.company', 'company')
       .select('product.name', 'name')
       .addSelect('SUM(oi.quantity)', 'count')
       .addSelect('SUM(oi.quantity * oi.price)', 'amount')
-      .where(whereType, { type })
-      .andWhere('order.createdAt BETWEEN :start AND :end', {
+      .where('order.createdAt BETWEEN :start AND :end', {
         start: dateDebut,
         end: dateFin,
       })
+      .andWhere(type !== 'ALL' ? 'company.type = :type' : '1=1', { type })
       .groupBy('product.id')
       .orderBy('count', 'DESC')
       .limit(10)
       .getRawMany();
 
-    // 5️⃣ Comptes globaux
-    const [totalProducts, totalUsers, totalCompanies] = await Promise.all([
-      this.productRepo.count(),
-      this.userRepository.count(),
-      this.companyRepo.count(),
-    ]);
+    const productQB = this.productRepo
+      .createQueryBuilder('product')
+      .leftJoin('product.company', 'company')
+      .where('product.createdAt BETWEEN :start AND :end', {
+        start: dateDebut,
+        end: dateFin,
+      });
 
-    // ✅ Retour
+    if (type !== 'ALL') {
+      productQB.andWhere('company.type = :type', { type });
+    }
+
+    const totalProducts = await productQB.getCount();
+
+    const companyQB = this.companyRepo
+      .createQueryBuilder('company')
+      .where('company.createdAt BETWEEN :start AND :end', {
+        start: dateDebut,
+        end: dateFin,
+      });
+
+    if (type !== 'ALL') {
+      companyQB.andWhere('company.type = :type', { type });
+    }
+
+    const totalCompanies = await companyQB.getCount();
+
+    const totalUsers = await this.userRepository
+      .createQueryBuilder('user')
+      .where('user.createdAt BETWEEN :start AND :end', {
+        start: dateDebut,
+        end: dateFin,
+      })
+      .getCount();
     return {
       message: 'Dashboard data fetched successfully',
       data: {
