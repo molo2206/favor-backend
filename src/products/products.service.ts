@@ -2269,10 +2269,6 @@ export class ProductService {
         'product.variations.image',
         'product.variations.attributeValues',
         'product.variations.attributeValues.attribute',
-
-        // 🔹 Liens métiers
-        'product.rentalContracts',
-        'product.saleTransactions',
       ],
       order: { createdAt: 'DESC' },
     });

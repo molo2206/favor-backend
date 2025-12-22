@@ -592,8 +592,6 @@ export class CategoryService {
       // toutes les relations du produit
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
-      .leftJoinAndSelect('product.rentalContracts', 'rentalContracts')
-      .leftJoinAndSelect('product.saleTransactions', 'saleTransactions')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
       .leftJoinAndSelect('specificationValues.specification', 'specificationDetail') // si tu veux le détail
       .leftJoinAndSelect('product.attributes', 'attributes')
