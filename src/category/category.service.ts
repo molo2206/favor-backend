@@ -576,7 +576,49 @@ export class CategoryService {
     };
   }
 
-  async findAllWithProducts(companyId: string, type?: string) {
+  // async findAllWithProducts(companyId: string, type?: string) {
+  //   const queryBuilder = this.categoryRepo
+  //     .createQueryBuilder('category')
+  //     .leftJoinAndSelect('category.parent', 'parent')
+  //     .leftJoinAndSelect('category.children', 'children')
+  //     .leftJoinAndSelect('category.specifications', 'categorySpec')
+  //     .leftJoinAndSelect('categorySpec.specification', 'specification')
+  //     .leftJoinAndSelect('category.categoryAttributes', 'categoryAttribute')
+  //     .leftJoinAndSelect('categoryAttribute.attribute', 'attribute')
+  //     // join avec produits filtrés par companyId
+  //     .leftJoinAndSelect('category.products', 'product', 'product.companyId = :companyId', {
+  //       companyId,
+  //     })
+  //     // toutes les relations du produit
+  //     .leftJoinAndSelect('product.images', 'images')
+  //     .leftJoinAndSelect('product.measure', 'measure')
+  //     .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+  //     .leftJoinAndSelect('specificationValues.specification', 'specificationDetail') // si tu veux le détail
+  //     .leftJoinAndSelect('product.attributes', 'attributes')
+  //     .leftJoinAndSelect('product.wishlist', 'wishlist')
+  //     .leftJoinAndSelect('product.company', 'company')
+  //     .leftJoinAndSelect('company.country', 'country')
+  //     .leftJoinAndSelect('company.city', 'city');
+
+  //   if (type) {
+  //     queryBuilder.andWhere('category.type = :type', { type });
+  //   }
+
+  //   queryBuilder.orderBy('category.name', 'ASC');
+
+  //   const categories = await queryBuilder.getMany();
+
+  //   // On ne garde que les catégories avec au moins un produit
+  //   const categoriesWithProducts = categories.filter((c) => c.products?.length);
+
+  //   return {
+  //     message: categoriesWithProducts.length
+  //       ? 'Catégories avec produits récupérées avec succès.'
+  //       : 'Aucune catégorie avec produit trouvé.',
+  //     data: categoriesWithProducts,
+  //   };
+  // }
+  async findAllWithProducts(companyId?: string, type?: string) {
     const queryBuilder = this.categoryRepo
       .createQueryBuilder('category')
       .leftJoinAndSelect('category.parent', 'parent')
@@ -585,15 +627,18 @@ export class CategoryService {
       .leftJoinAndSelect('categorySpec.specification', 'specification')
       .leftJoinAndSelect('category.categoryAttributes', 'categoryAttribute')
       .leftJoinAndSelect('categoryAttribute.attribute', 'attribute')
-      // join avec produits filtrés par companyId
-      .leftJoinAndSelect('category.products', 'product', 'product.companyId = :companyId', {
-        companyId,
-      })
+      // 🔹 join produits (conditionnellement filtré)
+      .leftJoinAndSelect(
+        'category.products',
+        'product',
+        companyId ? 'product.companyId = :companyId' : undefined,
+        companyId ? { companyId } : undefined,
+      )
       // toutes les relations du produit
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
-      .leftJoinAndSelect('specificationValues.specification', 'specificationDetail') // si tu veux le détail
+      .leftJoinAndSelect('specificationValues.specification', 'specificationDetail')
       .leftJoinAndSelect('product.attributes', 'attributes')
       .leftJoinAndSelect('product.wishlist', 'wishlist')
       .leftJoinAndSelect('product.company', 'company')
@@ -608,8 +653,10 @@ export class CategoryService {
 
     const categories = await queryBuilder.getMany();
 
-    // On ne garde que les catégories avec au moins un produit
-    const categoriesWithProducts = categories.filter((c) => c.products?.length);
+    // 🔹 Filtrer seulement si companyId est fourni
+    const categoriesWithProducts = companyId
+      ? categories.filter((c) => c.products?.length)
+      : categories;
 
     return {
       message: categoriesWithProducts.length
