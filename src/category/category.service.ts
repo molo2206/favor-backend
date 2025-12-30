@@ -638,6 +638,7 @@ export class CategoryService {
       // relations produit
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
       .leftJoinAndSelect('specificationValues.specification', 'specificationDetail')
       .leftJoinAndSelect('product.attributes', 'attributes')
@@ -654,7 +655,6 @@ export class CategoryService {
 
     const categories = await queryBuilder.getMany();
 
-    // 🔴 TOUJOURS enlever les catégories sans produit
     const categoriesWithProducts = categories.filter(
       (c) => c.products && c.products.length > 0,
     );
@@ -668,7 +668,7 @@ export class CategoryService {
   }
 
   async deleteCategory(id: string): Promise<{ message: string; data: CategoryEntity }> {
-    // Récupérer la catégorie
+
     const category = await this.categoryRepo.findOne({
       where: { id },
       relations: [
@@ -687,7 +687,6 @@ export class CategoryService {
       throw new NotFoundException(`Catégorie avec l'ID ${id} introuvable`);
     }
 
-    // Soft delete : on marque deleted = true
     category.deleted = true;
     await this.categoryRepo.save(category);
 
