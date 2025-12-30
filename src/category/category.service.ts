@@ -638,6 +638,7 @@ export class CategoryService {
       // relations produit
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.category', 'productCategory')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
       .leftJoinAndSelect('specificationValues.specification', 'specificationDetail')
       .leftJoinAndSelect('product.attributes', 'attributes')
