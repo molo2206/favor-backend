@@ -618,6 +618,7 @@ export class CategoryService {
   //     data: categoriesWithProducts,
   //   };
   // }
+
   async findAllWithProducts(companyId?: string, type?: string) {
     const queryBuilder = this.categoryRepo
       .createQueryBuilder('category')
@@ -627,14 +628,14 @@ export class CategoryService {
       .leftJoinAndSelect('categorySpec.specification', 'specification')
       .leftJoinAndSelect('category.categoryAttributes', 'categoryAttribute')
       .leftJoinAndSelect('categoryAttribute.attribute', 'attribute')
-      // 🔹 join produits (conditionnellement filtré)
+      // join produits (filtré si companyId existe)
       .leftJoinAndSelect(
         'category.products',
         'product',
         companyId ? 'product.companyId = :companyId' : undefined,
         companyId ? { companyId } : undefined,
       )
-      // toutes les relations du produit
+      // relations produit
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
@@ -653,10 +654,10 @@ export class CategoryService {
 
     const categories = await queryBuilder.getMany();
 
-    // 🔹 Filtrer seulement si companyId est fourni
-    const categoriesWithProducts = companyId
-      ? categories.filter((c) => c.products?.length)
-      : categories;
+    // 🔴 TOUJOURS enlever les catégories sans produit
+    const categoriesWithProducts = categories.filter(
+      (c) => c.products && c.products.length > 0,
+    );
 
     return {
       message: categoriesWithProducts.length
