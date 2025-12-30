@@ -576,7 +576,7 @@ export class CategoryService {
     };
   }
 
-  async findAllWithProducts(companyId?: string, type?: string) {
+  async findAllWithProducts(companyId: string, type?: string) {
     const queryBuilder = this.categoryRepo
       .createQueryBuilder('category')
       .leftJoinAndSelect('category.parent', 'parent')
@@ -584,24 +584,16 @@ export class CategoryService {
       .leftJoinAndSelect('category.specifications', 'categorySpec')
       .leftJoinAndSelect('categorySpec.specification', 'specification')
       .leftJoinAndSelect('category.categoryAttributes', 'categoryAttribute')
-      .leftJoinAndSelect('categoryAttribute.attribute', 'attribute');
-
-    if (companyId) {
-      queryBuilder.leftJoinAndSelect(
-        'category.products',
-        'product',
-        'product.companyId = :companyId',
-        { companyId },
-      );
-    } else {
-      queryBuilder.leftJoinAndSelect('category.products', 'product');
-    }
-
-    queryBuilder
+      .leftJoinAndSelect('categoryAttribute.attribute', 'attribute')
+      // join avec produits filtrés par companyId
+      .leftJoinAndSelect('category.products', 'product', 'product.companyId = :companyId', {
+        companyId,
+      })
+      // toutes les relations du produit
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
-      .leftJoinAndSelect('specificationValues.specification', 'specificationDetail')
+      .leftJoinAndSelect('specificationValues.specification', 'specificationDetail') // si tu veux le détail
       .leftJoinAndSelect('product.attributes', 'attributes')
       .leftJoinAndSelect('product.wishlist', 'wishlist')
       .leftJoinAndSelect('product.company', 'company')
@@ -616,13 +608,14 @@ export class CategoryService {
 
     const categories = await queryBuilder.getMany();
 
-    const result = companyId ? categories.filter((c) => c.products?.length) : categories;
+    // On ne garde que les catégories avec au moins un produit
+    const categoriesWithProducts = categories.filter((c) => c.products?.length);
 
     return {
-      message: result.length
-        ? 'Catégories récupérées avec succès.'
-        : 'Aucune catégorie trouvée.',
-      data: result,
+      message: categoriesWithProducts.length
+        ? 'Catégories avec produits récupérées avec succès.'
+        : 'Aucune catégorie avec produit trouvé.',
+      data: categoriesWithProducts,
     };
   }
 
