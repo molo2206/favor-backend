@@ -639,6 +639,8 @@ export class CategoryService {
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.category', 'productCategory')
+      .leftJoinAndSelect('productCategory.parent', 'productCategoryParent')
+
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
       .leftJoinAndSelect('specificationValues.specification', 'specificationDetail')
       .leftJoinAndSelect('product.attributes', 'attributes')
@@ -668,7 +670,6 @@ export class CategoryService {
   }
 
   async deleteCategory(id: string): Promise<{ message: string; data: CategoryEntity }> {
-
     const category = await this.categoryRepo.findOne({
       where: { id },
       relations: [
