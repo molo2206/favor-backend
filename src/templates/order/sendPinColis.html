@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Confirmation de paiement et code PIN – FavorHelp</title>
+    <style>
+      body {
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        background: linear-gradient(to bottom right, #e7f0fd, #ffffff);
+        margin: 0;
+        padding: 40px 20px;
+        color: #1c1e21;
+      }
+      .container {
+        background: white;
+        padding: 50px 30px;
+        max-width: 520px;
+        margin: 0 auto;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        text-align: center;
+      }
+      .header {
+        font-size: 26px;
+        font-weight: bold;
+        color: #1877f2;
+        margin-bottom: 20px;
+      }
+      .description {
+        font-size: 16px;
+        color: #606770;
+        margin-bottom: 30px;
+        line-height: 1.6;
+      }
+      .pin-code {
+        font-size: 40px;
+        font-weight: bold;
+        letter-spacing: 8px;
+        color: #1c1e21;
+        background: #f0f2f5;
+        padding: 18px 0;
+        border-radius: 8px;
+        margin: 20px 0;
+      }
+      .info {
+        background: #f5f6f7;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 20px;
+        font-size: 14px;
+        color: #1c1e21;
+        text-align: left;
+      }
+      .note {
+        font-size: 14px;
+        color: #606770;
+        margin-top: 20px;
+      }
+      .footer {
+        margin-top: 40px;
+        font-size: 12px;
+        color: #90949c;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="header">Confirmation de paiement</div>
+
+      <div class="description">
+        Bonjour <strong>{{ user.firstName }}</strong>,<br /><br />
+        Nous vous confirmons que le paiement des frais liés à votre colis a bien
+        été enregistré.<br />
+        Notre équipe passera dans les plus brefs délais pour le
+        <strong>ramassage de votre colis</strong>.
+      </div>
+
+      <div class="info">
+        <strong>Numéro de suivi :</strong> {{ trackingNumber }}<br />
+        <strong>Code PIN de validation :</strong>
+      </div>
+
+      <div class="pin-code">{{ pinCode }}</div>
+
+      <div class="note">
+        Veuillez présenter ce <strong>code PIN</strong> au livreur lors du
+        ramassage afin de valider votre colis.<br /><br />
+        Ne partagez jamais ce code avec une personne non autorisée.
+      </div>
+
+      <div class="footer">© {{ year }} FavorHelp. Tous droits réservés.</div>
+    </div>
+  </body>
+</html>
