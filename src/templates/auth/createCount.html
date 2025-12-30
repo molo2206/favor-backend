@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Compte créé avec succès</title>
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(to bottom right, #e7f0fd, #ffffff);
+      margin: 0;
+      padding: 40px 20px;
+      color: #1c1e21;
+    }
+    .container {
+      background: white;
+      padding: 50px 30px;
+      max-width: 550px;
+      margin: 0 auto;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      text-align: center;
+    }
+    .header {
+      font-size: 30px;
+      font-weight: bold;
+      color: #1877f2;
+      margin-bottom: 10px;
+    }
+    .sub-header {
+      font-size: 20px;
+      font-weight: 500;
+      margin-bottom: 25px;
+      color: #333;
+    }
+    .success-icon {
+      font-size: 48px;
+      color: #28a745;
+      margin: 20px 0;
+    }
+    .description {
+      font-size: 17px;
+      color: #606770;
+      margin-bottom: 25px;
+      line-height: 1.6;
+    }
+    .highlight {
+      background-color: #f0f2f5;
+      padding: 10px 15px;
+      border-radius: 8px;
+      display: inline-block;
+      font-weight: bold;
+      color: #1c1e21;
+      margin: 10px 0;
+    }
+    .button {
+      display: inline-block;
+      margin-top: 30px;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: bold;
+      color: white;
+      background-color: #1877f2;
+      text-decoration: none;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3);
+    }
+    .support {
+      margin-top: 30px;
+      font-size: 14px;
+      color: #90949c;
+    }
+    .footer {
+      margin-top: 40px;
+      font-size: 12px;
+      color: #90949c;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Bienvenue sur FavorHelp !</div>
+
+    <div class="sub-header">Votre compte a été créé avec succès</div>
+
+    <div class="success-icon"></div>
+
+    <div class="description">
+      Merci <strong>{{ userWithoutPassword.fullName }}</strong> pour votre inscription.<br>
+      Vous pouvez maintenant accéder à votre tableau de bord et commencer à explorer les fonctionnalités.
+    </div>
+
+    <div class="highlight">Un email de confirmation a été envoyé à <br><strong>{{ userWithoutPassword.email }}</strong></div>
+
+    <!-- <div class="description">
+      Veuillez cliquer sur le lien dans cet email pour valider votre adresse et activer votre compte.
+    </div> -->
+
+    <!-- <a href="{{ loginUrl }}" class="button">Aller à la page de connexion</a> -->
+
+    <div class="support">
+      Besoin d’aide ? Contactez-nous à<br>
+      <a href="mailto:devmolomolo@gmail.com">devmolomolo@gmail.com</a>
+    </div>
+
+    <div class="footer">
+      &copy; {{ year }} FavorHelp. Tous droits réservés.
+    </div>
+  </div>
+</body>
+</html>
