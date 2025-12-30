@@ -7,13 +7,13 @@ export const dataSourceOptions: DataSourceOptions = {
   host: 'localhost',
   port: 3306,
 
-  // username: 'admin',
-  // password: 'Favor@2025',
-  // database: 'favor_db',
+  username: 'admin',
+  password: 'Favor@2025',
+  database: 'favor_db',
 
-  username: 'root',
-  password: '',
-  database: 'favor_db1',
+  // username: 'root',
+  // password: '',
+  // database: 'favor_db1',
 
   entities: ['dist/**/*.entity{.ts,.js}'],
   migrations: ['dist/db/migrations/*{.ts,.js}'],
