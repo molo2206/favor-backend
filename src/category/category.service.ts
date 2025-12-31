@@ -16,6 +16,7 @@ import { CategorySpecification } from 'src/specification/entities/CategorySpecif
 import { CategorySpecificationService } from 'src/specification/category-specification.service';
 import { CategoryAttribute } from 'src/AttributGlobal/entities/category_attributes.entity';
 import { Attribute } from 'src/AttributGlobal/entities/attributes.entity';
+import { Product } from 'src/products/entities/product.entity';
 
 @Injectable()
 export class CategoryService {
@@ -35,6 +36,9 @@ export class CategoryService {
     private readonly categorySpecification: CategorySpecificationService,
 
     private readonly cloudinary: CloudinaryService,
+
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
   ) {}
 
   async create(
@@ -660,6 +664,81 @@ export class CategoryService {
     const categoriesWithProducts = categories.filter(
       (c) => c.products && c.products.length > 0,
     );
+
+    return {
+      message: categoriesWithProducts.length
+        ? 'Catégories avec produits récupérées avec succès.'
+        : 'Aucune catégorie avec produit trouvé.',
+      data: categoriesWithProducts,
+    };
+  }
+
+  async findAllWithProductsLimitTen(companyId?: string, type?: string) {
+    const categories = await this.categoryRepo
+      .createQueryBuilder('category')
+      .leftJoinAndSelect('category.parent', 'parent')
+      .leftJoinAndSelect('category.children', 'children')
+      .leftJoinAndSelect('category.specifications', 'categorySpec')
+      .leftJoinAndSelect('categorySpec.specification', 'specification')
+      .leftJoinAndSelect('category.categoryAttributes', 'categoryAttribute')
+      .leftJoinAndSelect('categoryAttribute.attribute', 'attribute')
+      .where('category.deleted = false')
+      .andWhere('category.status = true')
+      .andWhere(type ? 'category.type = :type' : '1=1', { type })
+      .orderBy('category.name', 'ASC')
+      .take(10)
+      .getMany();
+
+    if (!categories.length) {
+      return {
+        message: 'Aucune catégorie trouvée.',
+        data: [],
+      };
+    }
+
+    const categoryIds = categories.map((c) => c.id);
+
+    const products = await this.productRepo
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('specificationValues.specification', 'specificationDetail')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('product.wishlist', 'wishlist')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
+      .where('category.id IN (:...categoryIds)', { categoryIds })
+      .andWhere(companyId ? 'company.id = :companyId' : '1=1', {
+        companyId,
+      })
+      .andWhere('product.status != :status', { status: 'DELETED' })
+      .orderBy('product.createdAt', 'DESC')
+      .getMany();
+
+    const productsByCategory: Record<string, Product[]> = {};
+
+    for (const product of products) {
+      const categoryId = product.category?.id;
+      if (!categoryId) continue;
+
+      if (!productsByCategory[categoryId]) {
+        productsByCategory[categoryId] = [];
+      }
+
+      if (productsByCategory[categoryId].length < 10) {
+        productsByCategory[categoryId].push(product);
+      }
+    }
+
+    const categoriesWithProducts = categories
+      .map((category) => ({
+        ...category,
+        products: productsByCategory[category.id] || [],
+      }))
+      .filter((category) => category.products.length > 0);
 
     return {
       message: categoriesWithProducts.length

@@ -35,11 +35,7 @@ export class CategoryController {
   @AuthorizeRoles(UserRole.ADMIN)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   @UseInterceptors(FileInterceptor('image'))
-  async create(
-    @Body() body: any, // on parse manuellement les JSON
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    // 🔹 Parse les specifications si fournies
+  async create(@Body() body: any, @UploadedFile() file: Express.Multer.File) {
     let specifications;
     if (body.specifications) {
       try {
@@ -49,7 +45,6 @@ export class CategoryController {
       }
     }
 
-    // 🔹 Parse les attributs si fournis
     let attributes;
     if (body.attributes) {
       try {
@@ -64,20 +59,17 @@ export class CategoryController {
       parentId: body.parentId,
       type: body.type,
       color: body.color,
-      specifications, // undefined si non fourni
-      attributes, // undefined si non fourni
+      specifications,
+      attributes,
     };
 
     return await this.categoryService.create(createCategoryDto, file);
   }
 
   @Get()
-  async findAll(
-    @Query('type') type?: string, // type est un paramètre de requête
-  ): Promise<{ data: CategoryEntity[] }> {
-    // Retourne un objet avec "data" contenant un tableau
+  async findAll(@Query('type') type?: string): Promise<{ data: CategoryEntity[] }> {
     const categories = await this.categoryService.findAll(type);
-    return { data: categories }; // Encapsule le tableau de catégories dans "data"
+    return { data: categories };
   }
 
   @Get('with-products')
@@ -88,6 +80,14 @@ export class CategoryController {
     return this.categoryService.findAllWithProducts(companyId, type);
   }
 
+  @Get('with-products-limit-ten')
+  async findAllWithProductsLimitTen(
+    @Query('companyId') companyId?: string,
+    @Query('type') type?: string,
+  ) {
+    return this.categoryService.findAllWithProductsLimitTen(companyId, type);
+  }
+
   @Get('parents')
   async findAllParents(@Query('type') type?: string): Promise<{ data: CategoryEntity[] }> {
     const categories = await this.categoryService.findAllParent(type);
@@ -96,12 +96,10 @@ export class CategoryController {
 
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<{ data: CategoryEntity }> {
-    // Retourne un objet avec "data"
     const category = await this.categoryService.findOne(id);
-    return { data: category }; // Retourne la catégorie encapsulée dans "data"
+    return { data: category };
   }
 
-  // Mettre à jour une catégorie existante
   @Patch(':id')
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(UserRole.ADMIN)
@@ -112,7 +110,6 @@ export class CategoryController {
     @Body() body: any,
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<{ message: string; data: CategoryEntity }> {
-    // 🔹 Parse specifications
     let specifications;
     if (body.specifications) {
       try {
@@ -125,7 +122,6 @@ export class CategoryController {
       }
     }
 
-    // 🔹 Parse attributes
     let attributes;
     if (body.attributes) {
       try {
@@ -143,8 +139,8 @@ export class CategoryController {
       parentId: body.parentId,
       type: body.type,
       color: body.color,
-      specifications, // undefined si non fourni
-      attributes, // undefined si non fourni
+      specifications,
+      attributes,
     };
 
     return await this.categoryService.update(id, updateCategoryDto, file);
@@ -162,7 +158,6 @@ export class CategoryController {
   ): Promise<{ message: string; data: CategoryEntity[] }> {
     const parent = parentId === 'null' ? null : parentId;
 
-    // Appel de la méthode pour obtenir les catégories par parentId sans pagination
     const categories = await this.categoryService.findByParentId(parent);
 
     return {
