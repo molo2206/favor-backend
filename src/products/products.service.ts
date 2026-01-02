@@ -2313,7 +2313,6 @@ export class ProductService {
   }
 
   async search(keyword?: string, type?: CompanyType) {
-    // const searchKey = keyword ? `%${keyword}%` : '%';
     if (!keyword || keyword.trim() === '') {
       return {
         data: {
@@ -2329,12 +2328,11 @@ export class ProductService {
 
     const searchKey = `%${keyword}%`;
 
-    // 1️⃣ Recherche des entreprises
     const companyQuery = this.companyRepo
       .createQueryBuilder('company')
       .leftJoinAndSelect('company.userHasCompany', 'userHasCompany')
       .leftJoinAndSelect('company.products', 'products')
-      .leftJoinAndSelect('products.brand', 'brand') // ✅ Correctement lié ici
+      .leftJoinAndSelect('products.brand', 'brand')
       .leftJoinAndSelect('company.measures', 'measures')
       .leftJoinAndSelect('company.services', 'services')
       .leftJoinAndSelect('company.rooms', 'rooms')
@@ -2349,7 +2347,6 @@ export class ProductService {
 
     const companies = await companyQuery.getMany();
 
-    // 2️⃣ Recherche des produits
     const productQuery = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
@@ -2387,7 +2384,6 @@ export class ProductService {
 
     const products = await productQuery.orderBy('product.createdAt', 'DESC').getMany();
 
-    // 3️⃣ Recherche des services
     const serviceQuery = this.serviceRepo
       .createQueryBuilder('service')
       .leftJoinAndSelect('service.company', 'company')
@@ -2415,12 +2411,13 @@ export class ProductService {
 
     const services = await serviceQuery.orderBy('service.createdAt', 'DESC').getMany();
 
-    // 4️⃣ Structure finale
     const groupedResults: Record<string, any> = {
       [CompanyType.RESTAURANT]: [],
       [CompanyType.GROCERY]: [],
       [CompanyType.SHOP]: [],
       [CompanyType.SERVICE]: [],
+      [CompanyType.CAR]: [],
+      [CompanyType.HOTEL]: [],
       PRODUCT: [],
       SERVICE_LIST: [],
     };
