@@ -2320,6 +2320,8 @@ export class ProductService {
           [CompanyType.GROCERY]: [],
           [CompanyType.SHOP]: [],
           [CompanyType.SERVICE]: [],
+          [CompanyType.CAR]: [],
+          [CompanyType.HOTEL]: [],
           PRODUCT: [],
           SERVICE_LIST: [],
         },
@@ -2422,26 +2424,22 @@ export class ProductService {
       SERVICE_LIST: [],
     };
 
-    // 5️⃣ Grouper les entreprises par type
     for (const company of companies) {
       if (groupedResults[company.typeCompany]) {
         groupedResults[company.typeCompany].push(company);
       }
     }
 
-    // 6️⃣ Ajouter les produits dans PRODUCT
     for (const prod of products) {
       if (prod.company?.typeCompany === CompanyType.SHOP) {
         groupedResults.PRODUCT.push(prod);
       }
     }
 
-    // 7️⃣ Ajouter les services dans SERVICE_LIST
     for (const serv of services) {
       groupedResults.SERVICE_LIST.push(serv);
     }
 
-    // 8️⃣ Retour final
     return {
       message:
         companies.length === 0 && products.length === 0 && services.length === 0
