@@ -2431,7 +2431,11 @@ export class ProductService {
     }
 
     for (const prod of products) {
-      if (prod.company?.typeCompany === CompanyType.SHOP) {
+      if (
+        [CompanyType.SHOP, CompanyType.HOTEL, CompanyType.CAR].includes(
+          prod.company?.typeCompany,
+        )
+      ) {
         groupedResults.PRODUCT.push(prod);
       }
     }
