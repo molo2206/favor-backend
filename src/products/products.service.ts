@@ -2321,9 +2321,9 @@ export class ProductService {
           [CompanyType.SHOP]: [],
           [CompanyType.SERVICE]: [],
           [CompanyType.CAR]: [],
-          [CompanyType.HOTEL]: [],
           PRODUCT: [],
           SERVICE_LIST: [],
+          HOTEL_LIST: [],
         },
       };
     }
@@ -2419,23 +2419,23 @@ export class ProductService {
       [CompanyType.SHOP]: [],
       [CompanyType.SERVICE]: [],
       [CompanyType.CAR]: [],
-      [CompanyType.HOTEL]: [],
       PRODUCT: [],
       SERVICE_LIST: [],
+      HOTEL_LIST: [],
     };
 
     for (const company of companies) {
       if (groupedResults[company.typeCompany]) {
         groupedResults[company.typeCompany].push(company);
       }
+
+      if (company.typeCompany === CompanyType.HOTEL) {
+        groupedResults.HOTEL_LIST.push(company);
+      }
     }
 
     for (const prod of products) {
-      if (
-        [CompanyType.SHOP, CompanyType.HOTEL, CompanyType.CAR].includes(
-          prod.company?.typeCompany,
-        )
-      ) {
+      if ([CompanyType.SHOP, CompanyType.CAR].includes(prod.company?.typeCompany)) {
         groupedResults.PRODUCT.push(prod);
       }
     }

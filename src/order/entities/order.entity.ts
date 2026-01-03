@@ -87,8 +87,11 @@ export class OrderEntity {
   @OneToOne(() => DeliveryEntity, (delivery) => delivery.order)
   delivery: DeliveryEntity;
 
-  @Column({ type: 'enum', enum: CompanyActivity }) // Ajout du champ
+  @Column({ type: 'enum', enum: CompanyActivity }) 
   shopType: CompanyActivity;
+
+  @Column({ nullable: true })
+  whatsapp_number: string;
 
   @CreateDateColumn()
   createdAt: Date;

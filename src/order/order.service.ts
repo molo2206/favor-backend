@@ -31,16 +31,34 @@ import { CompanyType } from 'src/company/enum/type.company.enum';
 import { CompanyEntity } from 'src/company/entities/company.entity';
 import { GeneratePin } from 'src/users/utility/helpers/GeneratePin.util';
 
+// function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
+//   const transitions: Record<OrderStatus, OrderStatus[]> = {
+//     [OrderStatus.PENDING]: [OrderStatus.VALIDATED, OrderStatus.REJECTED],
+//     [OrderStatus.VALIDATED]: [OrderStatus.PROCESSING, OrderStatus.REJECTED],
+//     [OrderStatus.PROCESSING]: [OrderStatus.COMPLETED],
+//     [OrderStatus.COMPLETED]: [OrderStatus.DELIVERED],
+//     [OrderStatus.DELIVERED]: [],
+//     [OrderStatus.REJECTED]: [],
+//     [OrderStatus.CANCELED]: [],
+//   };
+//   return transitions[current]?.includes(next);
+// }
+
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
     [OrderStatus.PENDING]: [OrderStatus.VALIDATED, OrderStatus.REJECTED],
-    [OrderStatus.VALIDATED]: [OrderStatus.PROCESSING, OrderStatus.REJECTED],
+
+    [OrderStatus.VALIDATED]: [OrderStatus.PROCESSING],
+
     [OrderStatus.PROCESSING]: [OrderStatus.COMPLETED],
+
     [OrderStatus.COMPLETED]: [OrderStatus.DELIVERED],
+
     [OrderStatus.DELIVERED]: [],
     [OrderStatus.REJECTED]: [],
   };
-  return transitions[current]?.includes(next);
+
+  return transitions[current]?.includes(next) ?? false;
 }
 
 @Injectable()
@@ -87,7 +105,15 @@ export class OrderService {
   ) {}
 
   async createOrder(createOrderDto: CreateOrderDto, user: UserEntity): Promise<OrderEntity> {
-    const { totalAmount, currency, orderItems, addressUserId, type, shopType } = createOrderDto;
+    const {
+      totalAmount,
+      currency,
+      orderItems,
+      addressUserId,
+      type,
+      shopType,
+      whatsapp_number,
+    } = createOrderDto;
 
     const addressUser = await this.addressUserRepo.findOne({ where: { id: addressUserId } });
     if (!addressUser) throw new NotFoundException('Adresse introuvable');
@@ -128,6 +154,7 @@ export class OrderService {
       type,
       invoiceNumber: invoiceNumb,
       paymentStatus: PaymentStatus.PENDING,
+      whatsapp_number: whatsapp_number,
     });
 
     await this.orderRepo.save(order);
@@ -175,7 +202,6 @@ export class OrderService {
 
     await this.orderItemRepo.save(orderItemEntities);
 
-    // ✅ Étape 5 : Création des subOrders
     for (const [, group] of groupedByCompany) {
       const subOrder = this.subOrderRepo.create({
         order,
@@ -193,7 +219,6 @@ export class OrderService {
       await this.subOrderItemRepo.save(group.items);
     }
 
-    // ✅ Étape 6 : Récupération de la commande finale
     const finalOrder = await this.orderRepo.findOne({
       where: { id: order.id },
       relations: [
@@ -252,23 +277,19 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
       await this.smsHelper.sendSms(user.phone, message);
     }
 
-    //  Récupérer les utilisateurs liés à la plateforme
     const platformUsers = await this.userPlatformRoleRepo.find({
       where: { platform: { key: order.type } },
       relations: ['user'],
     });
 
-    // 🔹 Récupérer les super administrateurs
     const superAdmins = await this.userRepository.find({
       where: { role: UserRole.SUPER_ADMIN },
     });
 
-    // 🔹 Fusionner les destinataires et éviter les doublons (basé sur l'id utilisateur)
     const allRecipients = [...platformUsers.map((p) => p.user), ...superAdmins].filter(
       (user, index, self) => index === self.findIndex((u) => u.id === user.id),
     );
 
-    // 🔹 Envoyer la notification à tous les destinataires
     for (const user of allRecipients) {
       await this.notificationsService.sendNotificationToUser(
         user.id,
@@ -304,14 +325,16 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
 
     if (!order) throw new NotFoundException('Commande introuvable');
 
-    // Vérifie la validité de la transition de statut
+    if (dto.status === OrderStatus.REJECTED && order.status === OrderStatus.VALIDATED) {
+      throw new BadRequestException('Impossible d’annuler une commande déjà validée (payée).');
+    }
+
     if (!isValidStatusTransition(order.status, dto.status)) {
       throw new BadRequestException(
         `Transition invalide de "${order.status}" vers "${dto.status}".`,
       );
     }
 
-    // Validation shippingCost
     if (
       [OrderStatus.PROCESSING, OrderStatus.COMPLETED, OrderStatus.DELIVERED].includes(
         dto.status,
@@ -333,10 +356,8 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
       order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost);
     }
 
-    // Application du nouveau statut à la commande principale
     order.status = dto.status;
 
-    // ✅ Mettre à jour les sous-commandes si nécessaire
     if (order.subOrders?.length) {
       for (const subOrder of order.subOrders) {
         if (!isValidStatusTransition(subOrder.status, dto.status)) {
@@ -398,7 +419,7 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
 
         await this.smsHelper.sendSms(order.user.phone, message);
       }
-      // Créer la transaction
+
       const transaction = this.transactionRepository.create({
         orderId: order.id,
         amount: order.totalAmount,
@@ -482,7 +503,7 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
         },
       },
       relations: ['order', 'order.user'],
-      order: { createdAt: 'DESC' }, // Pour trier par date la plus récente
+      order: { createdAt: 'DESC' },
     });
 
     return {
@@ -591,8 +612,8 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
   async findSubOrdersByCompanys(companyId: string): Promise<{ data: SubOrderEntity[] }> {
     const orders = await this.orderRepo.find({
       relations: [
-        'user', // ✅ Relation directe avec OrderEntity
-        'addressUser', // ✅ Relation directe avec OrderEntity
+        'user',
+        'addressUser',
         'subOrders',
         'subOrders.items.product.company',
         'subOrders.items.product.category',
@@ -602,13 +623,12 @@ Merci pour votre confiance. Votre commande sera traitée dès la réception du p
       order: { createdAt: 'DESC' },
     });
 
-    // Récupération et filtrage des subOrders
     const subOrders: SubOrderEntity[] = orders
       .flatMap((order) =>
         order.subOrders.map((sub) => ({
           ...sub,
-          user: order.user, // ✅ on rattache le client à la sous-commande
-          addressUser: order.addressUser, // ✅ on rattache l'adresse client à la sous-commande
+          user: order.user,
+          addressUser: order.addressUser,
         })),
       )
       .filter((sub) => sub.company.id === companyId);

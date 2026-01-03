@@ -37,6 +37,10 @@ export class CreateOrderDto {
   @IsNotEmpty()
   currency: string;
 
+  @IsOptional()
+  @IsString()
+  whatsapp_number?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
