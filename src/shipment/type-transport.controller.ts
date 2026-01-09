@@ -46,8 +46,15 @@ export class TypeTransportController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateTypeTransportDto: UpdateTypeTransportDto) {
-    return this.typeTransportService.update(id, updateTypeTransportDto);
+  @UseGuards(AuthentificationGuard)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  @UseInterceptors(FileInterceptor('image'))
+  async update(
+    @Param('id') id: string,
+    @Body() updateTypeTransportDto: UpdateTypeTransportDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.typeTransportService.update(id, updateTypeTransportDto, file);
   }
 
   @Delete(':id')

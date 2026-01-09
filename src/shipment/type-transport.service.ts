@@ -62,18 +62,38 @@ export class TypeTransportService {
   }
 
   // Modifier un type de transport
+
   async update(
     id: string,
     updateDto: UpdateTypeTransportDto,
+    file?: Express.Multer.File,
   ): Promise<{ message: string; data: TypeTransport }> {
     const transport = await this.transportRepo.findOne({ where: { id } });
-    if (!transport) throw new NotFoundException('TypeTransport non trouvé');
+
+    if (!transport) {
+      throw new NotFoundException('TypeTransport non trouvé');
+    }
+
     Object.assign(transport, updateDto);
+
+    if (file) {
+      if (transport.image) {
+        await this.cloudinary.handleDeleteImage(transport.image);
+      }
+
+      const imageUrl = await this.cloudinary.handleUploadImage(file, 'transport-types');
+
+      transport.image = imageUrl;
+    }
+
     const updated = await this.transportRepo.save(transport);
-    return { message: 'Type de transport mis à jour', data: updated };
+
+    return {
+      message: 'Type de transport mis à jour avec succès',
+      data: updated,
+    };
   }
 
-  // Supprimer un type de transport
   async remove(id: string): Promise<{ message: string }> {
     const transport = await this.transportRepo.findOne({ where: { id } });
     if (!transport) throw new NotFoundException('TypeTransport non trouvé');

@@ -426,7 +426,6 @@ export class ProductService {
           product.category = undefined;
         }
 
-        // 🔹 Gestion de la marque
         if (brandId) {
           const brand = await manager.findOne(Brand, { where: { id: brandId } });
           if (!brand) throw new NotFoundException('Marque non trouvée');
@@ -435,7 +434,6 @@ export class ProductService {
           product.brand = undefined;
         }
 
-        // 🔹 Gestion de la mesure
         if (measureId) {
           const measure = await manager.findOne(MeasureEntity, { where: { id: measureId } });
           if (!measure) throw new NotFoundException('Mesure non trouvée');
@@ -444,7 +442,6 @@ export class ProductService {
           product.measure = undefined;
         }
 
-        // 🔹 Gestion des images si fournies
         if (files && files.length > 0) {
           const newImages: ImageProductEntity[] = [];
           for (const file of files) {
@@ -456,15 +453,11 @@ export class ProductService {
           product.images = [...(product.images || []), ...newImages];
         }
 
-        // 🔹 Sauvegarde du produit mis à jour
         const updatedProduct = await manager.save(product);
 
-        // 🔹 Gestion des SPÉCIFICATIONS - SUPPRIMER PUIS CRÉER (CORRIGÉ)
         if (specifications !== undefined) {
-          // 🔹 1. SUPPRIMER TOUTES les anciennes spécifications
           await manager.delete(ProductSpecificationValue, { product: { id } });
 
-          // 🔹 2. CRÉER les nouvelles spécifications avec TypeORM (pas de SQL direct)
           if (Array.isArray(specifications) && specifications.length > 0) {
             const specValuesToSave: ProductSpecificationValue[] = [];
 
@@ -475,7 +468,6 @@ export class ProductService {
                 );
               }
 
-              // Vérifier que la spécification existe
               const specExists = await manager.findOne(Specification, {
                 where: { id: spec.specificationId },
               });
@@ -485,7 +477,6 @@ export class ProductService {
                 );
               }
 
-              // 🔹 CORRECTION : Utiliser TypeORM pour créer l'entité (génération auto de l'ID)
               const specValue = manager.create(ProductSpecificationValue, {
                 product: { id } as Product,
                 specification: specExists,
@@ -495,17 +486,13 @@ export class ProductService {
               specValuesToSave.push(specValue);
             }
 
-            // Sauvegarder en une seule opération
             await manager.save(ProductSpecificationValue, specValuesToSave);
           }
         }
 
-        // 🔹 Gestion des attributs
         if (attributes && Array.isArray(attributes)) {
-          // Supprimer les anciens attributs
           await manager.delete(ProductAttribute, { product: { id } });
 
-          // Créer les nouveaux attributs
           for (const attributeId of attributes) {
             const attribute = await manager.findOne(Attribute, {
               where: { id: attributeId },
@@ -524,12 +511,9 @@ export class ProductService {
           }
         }
 
-        // 🔹 Gestion des variations de produit
         if (variations && Array.isArray(variations)) {
-          // Supprimer les anciennes variations
           await manager.delete(ProductVariation, { product: { id } });
 
-          // Créer les nouvelles variations
           for (const variationDto of variations) {
             const {
               imageId,
@@ -552,7 +536,6 @@ export class ProductService {
               throw new ConflictException(`Une variation avec le SKU ${sku} existe déjà`);
             }
 
-            // Gérer l'image de la variation
             let variationImage: ImageProductEntity | undefined = undefined;
             if (imageId) {
               const imageIdNumber = parseInt(imageId, 10);
@@ -569,7 +552,6 @@ export class ProductService {
               variationImage = foundImage;
             }
 
-            // Créer la variation
             const variation = manager.create(ProductVariation, {
               sku,
               wholesalePrice,
@@ -586,7 +568,6 @@ export class ProductService {
 
             const savedVariation = await manager.save(variation);
 
-            // Créer les valeurs d'attributs si fournies
             if (Array.isArray(attributeValues) && attributeValues.length > 0) {
               const attributeValueEntities = attributeValues.map((attrValue) =>
                 manager.create(VariationAttributeValue, {
@@ -600,7 +581,6 @@ export class ProductService {
           }
         }
 
-        // 🔹 Recharger le produit avec toutes ses relations
         const productWithRelations = await manager.findOne(Product, {
           where: { id: updatedProduct.id },
           relations: [
