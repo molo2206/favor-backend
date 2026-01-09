@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Commande validée - FavorHelp</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 40px 20px;
+            color: #1c1e21;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background-color: #1877f2;
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .content {
+            padding: 30px 20px;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #4b4f56;
+        }
+
+        .content ul {
+            padding-left: 20px;
+        }
+
+        .button {
+            display: inline-block;
+            margin-top: 25px;
+            background-color: #1877f2;
+            color: #fff;
+            text-decoration: none;
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            transition: background-color 0.3s ease;
+        }
+
+        .button:hover {
+            background-color: #145db2;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #90949c;
+            background-color: #f5f6f7;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            🎉 Votre commande a été validée !
+        </div>
+        <div class="content">
+            <p>Bonjour <strong>{{ user.fullName }}</strong>,</p>
+            <p>Nous avons le plaisir de vous confirmer que votre commande <strong>#{{ order.id }}</strong> a été
+                validée.</p>
+
+            <p><strong>Détails de la commande :</strong></p>
+            <ul>
+                <li><strong>Date :</strong> {{ order.createdAt }}</li>
+                <li><strong>Montant total :</strong> {{ order.totalAmount }} {{ order.currency }}</li>
+                <li><strong>Adresse de livraison :</strong> {{ order.addressUser.address }}</li>
+            </ul>
+
+            <a href="{{ loginUrl }}" class="button">Consulter ma commande</a>
+
+            <p style="margin-top: 30px;">
+                Merci de faire confiance à <strong>FavorHelp</strong>.
+            </p>
+        </div>
+        <div class="footer">
+            &copy; {{ year }} FavorHelp. Tous droits réservés.
+        </div>
+    </div>
+</body>
+
+</html>

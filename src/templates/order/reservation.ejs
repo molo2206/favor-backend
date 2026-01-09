@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Facture Réservation - FavorHelp</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <style>
+      /* Reset et styles de base pour PDF */
+      @page {
+        margin: 0;
+        size: A4;
+      }
+      
+      body {
+        font-family: 'Inter', sans-serif;
+        margin: 0;
+        padding: 20px;
+        color: #1f2937;
+        line-height: 1.4;
+        font-size: 12px;
+        background: #ffffff;
+      }
+      
+      .invoice-container {
+        max-width: 21cm;
+        margin: 0 auto;
+        background: white;
+        position: relative;
+      }
+      
+      /* Header */
+      .invoice-header {
+        border-bottom: 2px solid #1d4ed8;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+      }
+      
+      .header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+      }
+      
+      .company-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+      
+      .logo {
+        width: 80px;
+        height: 80px;
+        border-radius: 6px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        padding: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      }
+      
+      .company-text h1 {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1d4ed8;
+        margin: 0 0 5px 0;
+        letter-spacing: -0.5px;
+      }
+      
+      .company-text .subtitle {
+        font-size: 14px;
+        color: #6b7280;
+        margin: 0;
+      }
+      
+      .invoice-meta {
+        text-align: right;
+      }
+      
+      .invoice-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0 0 8px 0;
+      }
+      
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      
+      .status-paid { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
+      .status-pending { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
+      .status-cancelled { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+      
+      .invoice-ref {
+        font-size: 11px;
+        color: #6b7280;
+      }
+      
+      /* Legal info */
+      .legal-info {
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 10px 15px;
+        margin-top: 10px;
+        font-size: 10px;
+        color: #4b5563;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 8px;
+      }
+      
+      .legal-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      
+      .legal-label {
+        font-weight: 600;
+        color: #374151;
+        min-width: 100px;
+      }
+      
+      /* Sections */
+      .section {
+        margin-bottom: 20px;
+        page-break-inside: avoid;
+      }
+      
+      .section-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: white;
+        background: #1d4ed8;
+        padding: 8px 12px;
+        border-radius: 4px 4px 0 0;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .section-content {
+        border: 1px solid #e5e7eb;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        padding: 15px;
+        background: #f9fafb;
+      }
+      
+      /* Client info */
+      .client-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+      }
+      
+      .info-block {
+        font-size: 11px;
+      }
+      
+      .info-label {
+        font-weight: 600;
+        color: #374151;
+        display: block;
+        margin-bottom: 4px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+      
+      .info-value {
+        color: #6b7280;
+        line-height: 1.4;
+      }
+      
+      /* Reservation details */
+      .details-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      
+      .detail-item {
+        font-size: 11px;
+      }
+      
+      .detail-label {
+        font-weight: 600;
+        color: #374151;
+        display: block;
+        margin-bottom: 3px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+      
+      /* Table */
+      .invoice-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        margin-top: 10px;
+      }
+      
+      .invoice-table thead {
+        background: #1d4ed8;
+      }
+      
+      .invoice-table th {
+        padding: 10px 12px;
+        text-align: left;
+        font-weight: 600;
+        color: white;
+        border: none;
+        font-size: 11px;
+      }
+      
+      .invoice-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #e5e7eb;
+        color: #374151;
+      }
+      
+      .invoice-table tfoot td {
+        border-top: 2px solid #e5e7eb;
+        background: #f9fafb;
+        font-weight: 600;
+      }
+      
+      .text-right {
+        text-align: right;
+      }
+      
+      /* Payment instructions */
+      .payment-box {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 6px;
+        padding: 15px;
+        margin-top: 15px;
+      }
+      
+      .payment-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #92400e;
+        margin: 0 0 10px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .payment-methods {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-top: 12px;
+      }
+      
+      .method {
+        background: white;
+        border: 1px solid #fde68a;
+        border-radius: 4px;
+        padding: 10px;
+      }
+      
+      .method strong {
+        display: block;
+        font-size: 11px;
+        color: #374151;
+        margin-bottom: 4px;
+      }
+      
+      .method p {
+        font-size: 10px;
+        color: #6b7280;
+        margin: 0;
+        line-height: 1.4;
+      }
+      
+      .warning {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 4px;
+        padding: 8px 10px;
+        margin-top: 12px;
+        font-size: 10px;
+        color: #dc2626;
+      }
+      
+      /* Confirmation box */
+      .confirmation-box {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 6px;
+        padding: 15px;
+        margin-top: 15px;
+      }
+      
+      .confirmation-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #065f46;
+        margin: 0 0 10px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      /* Footer */
+      .footer {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+        margin-top: 20px;
+        font-size: 10px;
+      }
+      
+      .footer-section h4 {
+        font-size: 11px;
+        font-weight: 600;
+        color: #374151;
+        margin: 0 0 8px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .footer-section p, .footer-section ul {
+        color: #6b7280;
+        margin: 4px 0;
+        line-height: 1.4;
+      }
+      
+      .footer-section ul {
+        padding-left: 15px;
+      }
+      
+      .footer-section li {
+        margin-bottom: 3px;
+      }
+      
+      /* Optimisations pour impression PDF */
+      @media print {
+        body {
+          padding: 0.5cm;
+          font-size: 10pt;
+        }
+        
+        .invoice-container {
+          max-width: 100%;
+          box-shadow: none;
+        }
+        
+        .section {
+          margin-bottom: 15px;
+        }
+        
+        .invoice-table {
+          font-size: 9pt;
+        }
+        
+        .invoice-table th,
+        .invoice-table td {
+          padding: 6px 8px;
+        }
+        
+        /* Éviter les coupures dans les sections */
+        .section,
+        .payment-box,
+        .confirmation-box {
+          page-break-inside: avoid;
+        }
+        
+        /* Masquer les éléments non nécessaires pour l'impression */
+        .no-print {
+          display: none !important;
+        }
+      }
+      
+      /* Responsive pour le PDF */
+      @media screen and (max-width: 768px) {
+        body {
+          padding: 15px;
+        }
+        
+        .header-top {
+          flex-direction: column;
+          gap: 15px;
+        }
+        
+        .invoice-meta {
+          text-align: left;
+        }
+        
+        .client-grid,
+        .details-grid {
+          grid-template-columns: 1fr;
+        }
+        
+        .payment-methods {
+          grid-template-columns: 1fr;
+        }
+        
+        .footer {
+          grid-template-columns: 1fr;
+          gap: 15px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="invoice-container">
+      <!-- Header -->
+      <div class="invoice-header">
+        <div class="header-top">
+          <div class="company-info">
+            <img src="https://cosamed.org/1%20Favor.png" alt="FavorHelp" class="logo" />
+            <div class="company-text">
+              <h1>FACTURE RÉSERVATION</h1>
+              <p class="subtitle">FavorHelp • Hôtel & Réservation</p>
+            </div>
+          </div>
+          
+          <div class="invoice-meta">
+            <div class="invoice-title">CONFIRMATION</div>
+            <div class="status-badge 
+              <% if(reservation.status === 'CONFIRMED') { %>status-paid<% } 
+                else if(reservation.status === 'PENDING') { %>status-pending<% } 
+                else { %>status-cancelled<% } %>">
+              <% if(reservation.status === 'CONFIRMED') { %>
+                <i class="fas fa-check-circle"></i> Payée
+              <% } else if(reservation.status === 'PENDING') { %>
+                <i class="fas fa-hourglass-half"></i> En attente
+              <% } else { %>
+                <i class="fas fa-times-circle"></i> Annulée
+              <% } %>
+            </div>
+            <div class="invoice-ref">
+              Réf: #<%= reservation.invoiceNumber %> | Date: <%= new Date().toLocaleDateString('fr-FR') %>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Legal Info -->
+        <div class="legal-info">
+          <div class="legal-item">
+            <span class="legal-label">RCCM:</span>
+            <span>21-A-770</span>
+          </div>
+          <div class="legal-item">
+            <span class="legal-label">N° IMPÔT:</span>
+            <span>A2156062L</span>
+          </div>
+          <div class="legal-item">
+            <span class="legal-label">NATIONAL ID:</span>
+            <span>19-G4701-N74976H</span>
+          </div>
+          <div class="legal-item">
+            <span class="legal-label">IMPORT/EXPORT:</span>
+            <span>PP/0023/EWX-23/1002234MK/W</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Client Information -->
+      <div class="section">
+        <h3 class="section-title">Informations du client</h3>
+        <div class="section-content">
+          <div class="client-grid">
+            <div class="info-block">
+              <span class="info-label">Client</span>
+              <div class="info-value">
+                <%= user.fullName %><br/>
+                <%= user.email %><br/>
+                <% if (user.phone) { %><%= user.phone %><% } %>
+              </div>
+            </div>
+            <div class="info-block">
+              <span class="info-label">Adresse</span>
+              <div class="info-value">
+                <% if (user.city) { %><%= user.city %><% } %>
+                <% if (user.country) { %><br/><%= user.country %><% } %>
+                <% if (!user.city && !user.country) { %>Non spécifiée<% } %>
+              </div>
+            </div>
+            <div class="info-block">
+              <span class="info-label">Facture</span>
+              <div class="info-value">
+                N° #<%= reservation.invoiceNumber || reservation.id %><br/>
+                Statut: <%= reservation.paymentStatus || 'En attente' %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Reservation Details -->
+      <div class="section">
+        <h3 class="section-title">Détails de la réservation</h3>
+        <div class="section-content">
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="detail-label">Chambre</span>
+              <%= reservation.productName %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Arrivée</span>
+              <%= new Date(reservation.startDate).toLocaleDateString('fr-FR') %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Départ</span>
+              <%= new Date(reservation.endDate).toLocaleDateString('fr-FR') %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Nuits</span>
+              <%= reservation.nights || Math.ceil((new Date(reservation.endDate) - new Date(reservation.startDate)) / (1000 * 60 * 60 * 24)) %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Adultes</span>
+              <%= reservation.adults %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Enfants</span>
+              <%= reservation.children || 0 %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Chambres</span>
+              <%= reservation.roomsBooked %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Statut</span>
+              <%= reservation.paymentStatus || 'En attente' %>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Invoice Details -->
+      <div class="section">
+        <h3 class="section-title">Détails financiers</h3>
+        <div class="section-content">
+          <table class="invoice-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Chambres</th>
+                <th>Nuits</th>
+                <th>Prix/nuit</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><%= reservation.productName %></td>
+                <td><%= reservation.roomsBooked %></td>
+                <td><%= reservation.nights || Math.ceil((new Date(reservation.endDate) - new Date(reservation.startDate)) / (1000 * 60 * 60 * 24)) %></td>
+                <td><%= reservation.productPrice || 'N/A' %> <%= reservation.currency || 'USD' %></td>
+                <td class="text-right"><%= reservation.totalPrice %> <%= reservation.currency || 'USD' %></td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" class="text-right"><strong>Total à payer</strong></td>
+                <td class="text-right"><strong><%= reservation.totalPrice %> <%= reservation.currency || 'USD' %></strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Payment Instructions -->
+      <% if ((reservation.status || '').toLowerCase() === 'pending') { %>
+      <div class="payment-box">
+        <div class="payment-title"><i class="fas fa-credit-card"></i> Instructions de paiement</div>
+        <p style="margin: 0 0 12px 0; font-size: 11px; color: #92400e;">
+          Effectuez le paiement pour confirmer votre réservation
+        </p>
+        
+        <div class="payment-methods">
+          <div class="method">
+            <strong>Mobile Money</strong>
+            <p>+243 962 646 653<br/><small>Nom: Kavira Naomi</small></p>
+          </div>
+          <div class="method">
+            <strong>Banque</strong>
+            <p>Equity Bank<br/><small>Compte: 688200060761632</small></p>
+          </div>
+        </div>
+        
+        <div class="warning">
+          <strong><i class="fas fa-exclamation-triangle"></i> Important:</strong>
+          Contactez le +243 962 646 653 après paiement pour confirmation.
+        </div>
+      </div>
+      <% } %>
+      
+      <!-- Confirmation Message -->
+      <% if ((reservation.status || '').toLowerCase() === 'confirmed' 
+        || (reservation.status || '').toLowerCase() === 'paid') { %>
+      <div class="confirmation-box">
+        <div class="confirmation-title"><i class="fas fa-check-circle"></i> Réservation confirmée</div>
+        <p style="margin: 0 0 12px 0; font-size: 11px; color: #065f46;">
+          Votre réservation est confirmée. Nous vous attendons.
+        </p>
+        <div class="method">
+          <strong>Contact hôtel</strong>
+          <p>📞 +243 991 225 122<br/>✉️ baenisam@gmail.com</p>
+        </div>
+      </div>
+      <% } %>
+      
+      <!-- Footer -->
+      <div class="footer">
+        <div class="footer-section">
+          <h4>Contact</h4>
+          <p>
+            <strong>FavorHelp</strong><br/>
+            +243 991 225 122<br/>
+            baenisam@gmail.com<br/>
+            www.favorhelp.com
+          </p>
+        </div>
+        
+        <div class="footer-section">
+          <h4>Conditions</h4>
+          <ul>
+            <li>Annulation gratuite 24h avant</li>
+            <li>Arrivée: 7h00 - 00h00</li>
+            <li>Départ: 9h00 - 10h00</li>
+          </ul>
+        </div>
+        
+        <div class="footer-section">
+          <h4>Note</h4>
+          <p>
+            Facture officielle<br/>
+            Merci pour votre confiance
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
