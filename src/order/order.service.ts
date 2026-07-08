@@ -1079,6 +1079,7 @@ export class OrderService {
     if (!user.activeBranchId) {
       console.log('⚠️ L\'utilisateur n\'a pas de branche active');
     } else if (isCityFilterable) {
+      // 🔥 Charger la branche avec sa ville si elle n'est pas déjà chargée
       const branch = await this.branchRepo.findOne({
         where: { id: user.activeBranchId },
         relations: ['city'],
@@ -1153,7 +1154,7 @@ export class OrderService {
       query.where('order.type = :type', { type: company.typeCompany });
     }
 
-    // 🔥 Règle métier CORRIGÉE :
+    // 🔥 Règle métier :
     // - SUPER ADMIN voit tout (pas de filtre)
     // - TOUS les autres utilisateurs (même avec canManage) doivent avoir une branche active
     if (isSuperAdmin) {
@@ -1248,6 +1249,7 @@ export class OrderService {
       data: paginatedData,
     };
   }
+
   async findOne(orderId: string): Promise<{ data: OrderEntity }> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
