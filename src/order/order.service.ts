@@ -480,15 +480,15 @@ export class OrderService {
       console.log(`🔍 Resource name: ${resourceName}`);
 
       // 🔥 Récupérer tous les ADMINISTRATEURS qui ont la permission canManage sur cette ressource
-      // Peu importe leur branche
+      // Utiliser "resources" (pluriel) car la table s'appelle resources
       const adminUsers = await this.userRepository
         .createQueryBuilder('u')
         .innerJoin('user_has_company', 'uhc', 'uhc.userId = u.id')
         .innerJoin('company_has_user_resource', 'chur', 'chur.userCompanyId = uhc.id')
-        .innerJoin('resource', 'r', 'r.id = chur.resourceId')
+        .innerJoin('resources', 'r', 'r.id = chur.resourceId')
         .where('u.role = :role', { role: 'ADMIN' })
         .andWhere('r.name = :resourceName', { resourceName })
-        .andWhere('chur.canManage = :canManage', { canManage: true })
+        .andWhere('chur.can_manage = :canManage', { canManage: true })
         .getMany();
 
       console.log(`👥 Admins avec canManage sur ${resourceName}: ${adminUsers.length}`);
@@ -545,7 +545,10 @@ export class OrderService {
       }
 
       // 🔥 SUPER ADMIN (toujours notifiés)
-      const superAdmins = await this.userRepository.find({ where: { role: UserRole.SUPER_ADMIN } });
+      const superAdmins = await this.userRepository.find({
+        where: { role: UserRole.SUPER_ADMIN },
+      });
+
       for (const admin of superAdmins) {
         if (processedRecipients.has(admin.id)) continue;
 
