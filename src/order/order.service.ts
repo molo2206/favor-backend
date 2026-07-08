@@ -1056,10 +1056,9 @@ export class OrderService {
       throw new BadRequestException(this.i18nService.translate('order.no_active_company', lang));
     }
 
-    // Récupérer l'entreprise active
+    // Récupérer l'entreprise active (uniquement pour le type et les permissions)
     const company = await this.companyRepo.findOne({
       where: { id: user.activeCompanyId },
-      relations: ['city', 'branches', 'branches.city']
     });
 
     if (!company) {
@@ -1073,19 +1072,18 @@ export class OrderService {
     const isCityFilterable = orderType === 'RESTAURANT' || orderType === 'GROCERY';
 
     // 🔥 Récupérer UNIQUEMENT la ville de la branche active de l'utilisateur
+    // Pas de fallback sur company.city
     let userCityId: string | null = null;
     let userCityName: string | null = null;
 
-    if (isCityFilterable && !isSuperAdmin) {
-      if (user.activeBranchId) {
-        const branch = await this.branchRepo.findOne({
-          where: { id: user.activeBranchId },
-          relations: ['city']
-        });
-        if (branch?.city) {
-          userCityId = branch.city.id;
-          userCityName = branch.city.name;
-        }
+    if (isCityFilterable && !isSuperAdmin && user.activeBranchId) {
+      const branch = await this.branchRepo.findOne({
+        where: { id: user.activeBranchId },
+        relations: ['city'],
+      });
+      if (branch?.city) {
+        userCityId = branch.city.id;
+        userCityName = branch.city.name;
       }
     }
 
@@ -1129,8 +1127,6 @@ export class OrderService {
       .leftJoinAndSelect('subOrderProduct.measure', 'subOrderProductMeasure')
       .leftJoinAndSelect('subOrder.company', 'subOrderCompany')
       .leftJoinAndSelect('subOrderCompany.city', 'subOrderCompanyCity')
-      .leftJoinAndSelect('subOrderCompany.branches', 'subOrderCompanyBranches')
-      .leftJoinAndSelect('subOrderCompanyBranches.city', 'subOrderCompanyBranchCity')
       .orderBy('order.createdAt', 'DESC');
 
     // 🔥 Appliquer les filtres
@@ -1140,25 +1136,17 @@ export class OrderService {
       query.where('order.type = :type', { type: company.typeCompany });
     }
 
-    // 🔥 Si l'utilisateur a canManage ET n'est pas SUPER ADMIN, il voit les commandes de sa ville UNIQUEMENT
-    // 🔥 Si l'utilisateur n'a pas canManage, il voit les commandes de sa ville UNIQUEMENT
-    // 🔥 Si l'utilisateur est SUPER ADMIN, il voit TOUTES les commandes
+    // 🔥 Règle métier :
+    // - SUPER ADMIN voit tout
+    // - Les autres utilisateurs voient uniquement les commandes des entreprises 
+    //   dont la ville = ville de leur branche active
     if (isSuperAdmin) {
       // SUPER ADMIN voit tout, pas de filtre
     } else if (hasCityFilter) {
-      // 🔥 FILTRE PAR VILLE : ville de l'entreprise qui vend = ville de la branche de l'utilisateur
-      query.andWhere(
-        `(subOrderCompany.cityId = :userCityId OR 
-        EXISTS (
-          SELECT 1 FROM branches b 
-          WHERE b.company_id = subOrderCompany.id 
-          AND b.cityId = :userCityId
-        ))`,
-        { userCityId }
-      );
+      // 🔥 FILTRE SIMPLIFIÉ : ville de l'entreprise qui vend = ville de la branche de l'utilisateur
+      query.andWhere('subOrderCompany.cityId = :userCityId', { userCityId });
     } else if (!hasManagePermission) {
-      // 🔥 Si l'utilisateur n'a pas canManage ET pas de ville, il ne voit rien
-      // (cas normalement géré par les permissions)
+      // Si l'utilisateur n'a pas canManage ET pas de ville, il ne voit rien
       query.andWhere('1 = 0');
     }
 
@@ -1168,33 +1156,16 @@ export class OrderService {
 
     const [orders, total] = await query.getManyAndCount();
 
-    // 🔥 Enrichir les commandes
+    // 🔥 Enrichir les commandes avec la ville de l'entreprise
     const enrichedOrders = orders.map(order => {
       let cityId: string | null = null;
       let cityName: string | null = null;
-      let branchId: string | null = null;
-      let branchName: string | null = null;
 
       if (order.subOrders && order.subOrders.length > 0) {
         const firstSubOrder = order.subOrders[0];
-
         if (firstSubOrder.company?.city) {
           cityId = firstSubOrder.company.city.id;
           cityName = firstSubOrder.company.city.name;
-        }
-
-        if (firstSubOrder.company?.branches && firstSubOrder.company.branches.length > 0) {
-          const matchingBranch = firstSubOrder.company.branches.find(
-            b => b.city?.id === userCityId
-          );
-          if (matchingBranch) {
-            branchId = matchingBranch.id;
-            branchName = matchingBranch.name;
-            if (matchingBranch.city) {
-              cityId = matchingBranch.city.id;
-              cityName = matchingBranch.city.name;
-            }
-          }
         }
       }
 
@@ -1202,8 +1173,6 @@ export class OrderService {
         ...order,
         cityId,
         cityName,
-        branchId,
-        branchName,
       };
     });
 
