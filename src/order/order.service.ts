@@ -1170,14 +1170,14 @@ export class OrderService {
 
       // 🔥 FILTRAGE PAR VILLE UNIQUEMENT pour RESTAURANT, GROCERY et si pas SUPER ADMIN
       if (hasCityFilter && userCityId) {
-        // 🔥 CORRECTION: Utiliser le nom correct de la table 'branches' et 'company_id'
+        // 🔥 CORRECTION: Utiliser 'cityId' (camelCase) au lieu de 'city_id'
         query.andWhere(
           `(subOrderCompanyCity.id = :userCityId OR 
           subOrderCompanyBranchCity.id = :userCityId OR
           EXISTS (
             SELECT 1 FROM branches b 
             WHERE b.company_id = subOrderCompany.id 
-            AND b.city_id = :userCityId
+            AND b.cityId = :userCityId
           ))`,
           { userCityId }
         );
@@ -1208,14 +1208,14 @@ export class OrderService {
           .innerJoin('filterCompanyBranches.city', 'filterCompanyBranchCity');
 
         if (hasCityFilter && userCityId) {
-          // 🔥 CORRECTION: Utiliser le nom correct de la table 'branches' et 'company_id'
+          // 🔥 CORRECTION: Utiliser 'cityId' (camelCase) au lieu de 'city_id'
           query.andWhere(
             `(filterCompanyCity.id = :userCityId OR 
             filterCompanyBranchCity.id = :userCityId OR
             EXISTS (
               SELECT 1 FROM branches b 
               WHERE b.company_id = filterCompany.id 
-              AND b.city_id = :userCityId
+              AND b.cityId = :userCityId
             ))`,
             { userCityId }
           );
