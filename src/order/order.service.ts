@@ -1052,155 +1052,52 @@ export class OrderService {
   ): Promise<{ message: string; data: PaginatedResponseDto<OrderEntity> }> {
     const lang = langHeader || this.getUserLanguage(user);
 
-    console.log('🔍 [DEBUG] User reçu:', {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      activeBranchId: user.activeBranchId,
-      activeCompanyId: user.activeCompanyId,
-    });
-
     if (!user.activeCompanyId) {
       throw new BadRequestException(this.i18nService.translate('order.no_active_company', lang));
     }
 
-    // 🔥 RECHARGER L'UTILISATEUR COMPLET AVEC SES RELATIONS
-    const fullUser = await this.userRepository.findOne({
-      where: { id: user.id },
-      relations: ['activeBranch', 'activeBranch.city'],
-    });
-
-    console.log('🔍 [DEBUG] Full user chargé:', {
-      id: fullUser?.id,
-      activeBranchId: fullUser?.activeBranchId,
-      activeBranchName: fullUser?.activeBranch?.name,
-      activeBranchCity: fullUser?.activeBranch?.city?.name,
-      activeBranchCityId: fullUser?.activeBranch?.city?.id,
-    });
-
-    if (!fullUser) {
-      throw new NotFoundException(this.i18nService.translate('user.not_found', lang));
-    }
-
-    // Récupérer l'entreprise active avec sa ville
+    // Récupérer l'entreprise active (uniquement pour le type et les permissions)
     const company = await this.companyRepo.findOne({
       where: { id: user.activeCompanyId },
-      relations: ['city'],
-    });
-
-    console.log('🔍 [DEBUG] Company:', {
-      id: company?.id,
-      name: company?.companyName,
-      type: company?.typeCompany,
-      city: company?.city?.name,
-      cityId: company?.city?.id,
     });
 
     if (!company) {
       throw new NotFoundException(this.i18nService.translate('order.company_not_found', lang));
     }
 
-    const isSuperAdmin = user.role === UserRole.SUPER_ADMIN;
+    const isSuperAdmin = user.role === 'SUPER ADMIN';
     const orderType = type || company.typeCompany;
 
     // 🔥 Filtrage par ville pour RESTAURANT et GROCERY uniquement
-    const isCityFilterable = orderType === CompanyType.RESTAURANT || orderType === CompanyType.GROCERY;
+    const isCityFilterable = orderType === 'RESTAURANT' || orderType === 'GROCERY';
 
-    console.log('🔍 [DEBUG] Type de commande:', {
-      orderType,
-      isCityFilterable,
-      isSuperAdmin,
-    });
-
-    // 🔥 Récupérer la ville de la branche active
+    // 🔥 Récupérer UNIQUEMENT la ville de la branche active de l'utilisateur (sans aucun fallback)
     let userCityId: string | null = null;
     let userCityName: string | null = null;
 
-    if (isCityFilterable && !isSuperAdmin) {
-      // 1. PRIORITÉ 1 : Branche active de l'utilisateur (déjà chargée)
-      if (fullUser.activeBranch?.city) {
-        userCityId = fullUser.activeBranch.city.id;
-        userCityName = fullUser.activeBranch.city.name;
-        console.log('✅ [DEBUG] Branche active trouvée:', userCityName);
-      }
-
-      // 2. PRIORITÉ 2 : Si pas de branche active, chercher la première branche de l'entreprise
-      if (!userCityId && user.activeCompanyId) {
-        console.log('🔍 [DEBUG] Recherche de la première branche...');
-        const firstBranch = await this.branchRepo.findOne({
-          where: {
-            company_id: user.activeCompanyId,
-            deleted: false,
-            status: true,
-          },
-          relations: ['city'],
-          order: { createdAt: 'ASC' },
-        });
-        if (firstBranch?.city) {
-          userCityId = firstBranch.city.id;
-          userCityName = firstBranch.city.name;
-          console.log('✅ [DEBUG] Première branche trouvée:', userCityName);
-
-          // 🔥 Mettre à jour l'utilisateur avec cette branche
-          if (!fullUser.activeBranchId) {
-            fullUser.activeBranchId = firstBranch.id;
-            await this.userRepository.save(fullUser);
-            console.log('✅ [DEBUG] Utilisateur mis à jour avec branchId:', firstBranch.id);
-          }
-        }
-      }
-
-      // 3. PRIORITÉ 3 : N'importe quelle branche active de l'entreprise
-      if (!userCityId && user.activeCompanyId) {
-        console.log('🔍 [DEBUG] Recherche d\'une branche quelconque...');
-        const anyBranch = await this.branchRepo.findOne({
-          where: {
-            company_id: user.activeCompanyId,
-            deleted: false,
-            status: true,
-          },
-          relations: ['city'],
-        });
-        if (anyBranch?.city) {
-          userCityId = anyBranch.city.id;
-          userCityName = anyBranch.city.name;
-          console.log('✅ [DEBUG] Branche quelconque trouvée:', userCityName);
-
-          // 🔥 Mettre à jour l'utilisateur avec cette branche
-          if (!fullUser.activeBranchId) {
-            fullUser.activeBranchId = anyBranch.id;
-            await this.userRepository.save(fullUser);
-            console.log('✅ [DEBUG] Utilisateur mis à jour avec branchId:', anyBranch.id);
-          }
-        }
-      }
-
-      // 4. DERNIER FALLBACK : Ville de l'entreprise
-      if (!userCityId && company.city) {
-        userCityId = company.city.id;
-        userCityName = company.city.name;
-        console.log('✅ [DEBUG] Fallback sur la ville de l\'entreprise:', userCityName);
+    if (isCityFilterable && !isSuperAdmin && user.activeBranchId) {
+      const branch = await this.branchRepo.findOne({
+        where: { id: user.activeBranchId },
+        relations: ['city'],
+      });
+      if (branch?.city) {
+        userCityId = branch.city.id;
+        userCityName = branch.city.name;
       }
     }
 
     const hasCityFilter = isCityFilterable && !isSuperAdmin && !!userCityId;
 
-    console.log('🎯 [DEBUG] Résultat filtrage:', {
-      userCityId,
-      userCityName,
-      hasCityFilter,
-      willApplyFilter: hasCityFilter && userCityId,
-    });
-
-    // 🔥 Déterminer la ressource et les permissions
+    // Déterminer la ressource et les permissions
     let hasManagePermission = false;
     let targetResource: string;
 
     const typeToResource: Record<string, string> = {
-      [CompanyType.RESTAURANT]: 'ORDERS_RESTAURANT',
-      [CompanyType.SHOP]: 'ORDERS_SHOP',
-      [CompanyType.CAR]: 'ORDERS_CAR',
-      [CompanyType.GROCERY]: 'ORDERS_GROCERY',
+      RESTAURANT: 'ORDERS_RESTAURANT',
+      SHOP: 'ORDERS_SHOP',
+      CAR: 'ORDERS_CAR',
+      GROCERY: 'ORDERS_MARKET',
+      MARKET: 'ORDERS_MARKET',
     };
 
     if (type) {
@@ -1209,14 +1106,9 @@ export class OrderService {
       targetResource = this.permissionHelper.getOrderResourceByCompanyType(company.typeCompany);
     }
 
-    hasManagePermission = await this.permissionHelper.hasManageOnResource(fullUser, targetResource);
+    hasManagePermission = await this.permissionHelper.hasManageOnResource(user, targetResource);
 
-    console.log('🔑 [DEBUG] Permissions:', {
-      targetResource,
-      hasManagePermission,
-    });
-
-    // 🔥 Construire la requête avec toutes les relations nécessaires
+    // 🔥 Construire la requête
     const query = this.orderRepo
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.user', 'user')
@@ -1243,17 +1135,15 @@ export class OrderService {
       query.where('order.type = :type', { type: company.typeCompany });
     }
 
-    // 🔥 RÈGLE MÉTIER PRINCIPALE : Application du filtre par ville
+    // 🔥 Application de la nouvelle règle métier
     if (isSuperAdmin) {
-      console.log('👑 [DEBUG] SUPER ADMIN - Pas de filtre');
-    } else if (hasCityFilter && userCityId) {
-      console.log(`📍 [DEBUG] Application du filtre: subOrderCompany.cityId = ${userCityId} (${userCityName})`);
+      // SUPER ADMIN voit tout, pas de filtre sur la ville
+    } else if (hasCityFilter) {
+      // 🔥 FILTRE DIRECT SIMPLIFIÉ : la ville de l'entreprise qui vend = la ville de la branche active de l'utilisateur
       query.andWhere('subOrderCompany.cityId = :userCityId', { userCityId });
     } else if (!hasManagePermission) {
-      console.log('🚫 [DEBUG] Pas de permission et pas de ville - Aucune commande');
+      // Si l'utilisateur n'a pas la permission de gestion ET pas de filtre de ville valide, il ne voit rien
       query.andWhere('1 = 0');
-    } else {
-      console.log('ℹ️ [DEBUG] Aucun filtre appliqué - Affichage de toutes les commandes');
     }
 
     // 🔥 Pagination
@@ -1262,9 +1152,7 @@ export class OrderService {
 
     const [orders, total] = await query.getManyAndCount();
 
-    console.log(`📊 [DEBUG] Résultat: ${total} commandes trouvées`);
-
-    // 🔥 Enrichir les commandes avec la ville de l'entreprise pour le frontend
+    // 🔥 Enrichir les commandes avec la ville de l'entreprise vendeuse
     const enrichedOrders = orders.map(order => {
       let cityId: string | null = null;
       let cityName: string | null = null;
@@ -1286,7 +1174,7 @@ export class OrderService {
 
     const paginatedData = new PaginatedResponseDto(enrichedOrders, total, page, limit);
 
-    // 🔥 Construction du message de réponse
+    // 🔥 Formatage du message de retour (I18n)
     let message: string;
 
     if (total === 0 && hasCityFilter && userCityName) {
@@ -1321,8 +1209,6 @@ export class OrderService {
         });
       }
     }
-
-    console.log('📝 [DEBUG] Message final:', message);
 
     return {
       message,
