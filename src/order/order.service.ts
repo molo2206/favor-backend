@@ -1075,7 +1075,7 @@ export class OrderService {
     let userCityId: string | null = null;
     let userCityName: string | null = null;
 
-    if (isCityFilterable && !isSuperAdmin && user.activeBranchId) {
+    if (isCityFilterable && user.activeBranchId) {
       const branch = await this.branchRepo.findOne({
         where: { id: user.activeBranchId },
         relations: ['city'],
@@ -1086,7 +1086,9 @@ export class OrderService {
       }
     }
 
-    const hasCityFilter = isCityFilterable && !isSuperAdmin && !!userCityId;
+    // 🔥 hasCityFilter = true si on a une ville ET que le type est filtrable
+    // 🔥 On n'utilise PAS isSuperAdmin ici car on veut filtrer tout le monde sauf SUPER ADMIN
+    const hasCityFilter = isCityFilterable && !!userCityId;
 
     // 🔥 LOGS DE DEBUG
     console.log('🔍 DEBUG findByType:');
@@ -1147,26 +1149,22 @@ export class OrderService {
       query.where('order.type = :type', { type: company.typeCompany });
     }
 
-    // 🔥 Règle métier :
+    // 🔥 Règle métier CORRIGÉE :
     // - SUPER ADMIN voit tout (pas de filtre)
-    // - Les autres utilisateurs voient uniquement les commandes des entreprises 
-    //   dont la ville = ville de leur branche active
+    // - TOUS les autres utilisateurs (même avec canManage) voient UNIQUEMENT les commandes de leur ville
     if (isSuperAdmin) {
       // SUPER ADMIN voit tout, pas de filtre
       console.log('✅ SUPER ADMIN - Pas de filtre');
     } else if (hasCityFilter) {
       // 🔥 FILTRE STRICT : ville de l'entreprise qui vend = ville de la branche de l'utilisateur
+      // 🔥 MÊME pour les utilisateurs avec canManage
       query.andWhere('subOrderCompany.cityId = :userCityId', { userCityId });
       console.log('✅ Filtre appliqué: subOrderCompany.cityId =', userCityId);
     } else {
-      // Si l'utilisateur n'a pas de ville (pas de branche active), 
-      // il ne voit aucune commande (sauf s'il a canManage)
-      if (!hasManagePermission) {
-        query.andWhere('1 = 0');
-        console.log('⚠️ Aucune ville trouvée et pas de permission - 0 résultat');
-      } else {
-        console.log('⚠️ Aucune ville trouvée mais canManage = true - voir toutes les commandes');
-      }
+      // Si l'utilisateur n'a pas de ville (pas de branche active ou type non filtrable)
+      // Il ne voit AUCUNE commande (sauf SUPER ADMIN)
+      query.andWhere('1 = 0');
+      console.log('⚠️ Aucune ville trouvée ou type non filtrable - 0 résultat');
     }
 
     // 🔥 Pagination
@@ -1243,7 +1241,6 @@ export class OrderService {
       data: paginatedData,
     };
   }
-
   async findOne(orderId: string): Promise<{ data: OrderEntity }> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
