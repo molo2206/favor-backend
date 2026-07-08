@@ -1042,6 +1042,7 @@ export class OrderService {
 
   //   return new PaginatedResponseDto(orders, total, page, limit);
   // }
+
   async findByType(
     user: UserEntity,
     type?: string,
@@ -1149,15 +1150,10 @@ export class OrderService {
       .leftJoinAndSelect('subOrderProduct.category', 'subOrderProductCategory')
       .leftJoinAndSelect('subOrderProduct.measure', 'subOrderProductMeasure')
       .leftJoinAndSelect('subOrder.company', 'subOrderCompany')
+      .leftJoinAndSelect('subOrderCompany.city', 'subOrderCompanyCity')
+      .leftJoinAndSelect('subOrderCompany.branches', 'subOrderCompanyBranches')
+      .leftJoinAndSelect('subOrderCompanyBranches.city', 'subOrderCompanyBranchCity')
       .orderBy('order.createdAt', 'DESC');
-
-    // 🔥 Joindre la ville et les branches UNIQUEMENT si le filtrage par ville est applicable
-    if (isCityFilterable && !isSuperAdmin) {
-      query
-        .leftJoinAndSelect('subOrderCompany.city', 'subOrderCompanyCity')
-        .leftJoinAndSelect('subOrderCompany.branches', 'subOrderCompanyBranches')
-        .leftJoinAndSelect('subOrderCompanyBranches.city', 'subOrderCompanyBranchCity');
-    }
 
     // Appliquer les filtres
     if (hasManagePermission || isSuperAdmin) {
@@ -1170,15 +1166,11 @@ export class OrderService {
 
       // 🔥 FILTRAGE PAR VILLE UNIQUEMENT pour RESTAURANT, GROCERY et si pas SUPER ADMIN
       if (hasCityFilter && userCityId) {
-        // 🔥 CORRECTION: Utiliser 'cityId' (camelCase) au lieu de 'city_id'
+        // 🔥 CORRECTION: Filtrer par la ville de l'entreprise ET de ses branches
         query.andWhere(
           `(subOrderCompanyCity.id = :userCityId OR 
           subOrderCompanyBranchCity.id = :userCityId OR
-          EXISTS (
-            SELECT 1 FROM branches b 
-            WHERE b.company_id = subOrderCompany.id 
-            AND b.cityId = :userCityId
-          ))`,
+          subOrderCompany.cityId = :userCityId)`,
           { userCityId }
         );
       }
@@ -1198,28 +1190,19 @@ export class OrderService {
       query
         .innerJoin('order.subOrders', 'filterSubOrder')
         .innerJoin('filterSubOrder.company', 'filterCompany')
+        .leftJoin('filterCompany.city', 'filterCompanyCity')
+        .leftJoin('filterCompany.branches', 'filterCompanyBranches')
+        .leftJoin('filterCompanyBranches.city', 'filterCompanyBranchCity')
         .andWhere('filterCompany.id = :activeCompanyId', { activeCompanyId: user.activeCompanyId });
 
-      // 🔥 Joindre et filtrer par ville UNIQUEMENT pour RESTAURANT et GROCERY
-      if (isCityFilterable && !isSuperAdmin) {
-        query
-          .innerJoin('filterCompany.city', 'filterCompanyCity')
-          .innerJoin('filterCompany.branches', 'filterCompanyBranches')
-          .innerJoin('filterCompanyBranches.city', 'filterCompanyBranchCity');
-
-        if (hasCityFilter && userCityId) {
-          // 🔥 CORRECTION: Utiliser 'cityId' (camelCase) au lieu de 'city_id'
-          query.andWhere(
-            `(filterCompanyCity.id = :userCityId OR 
-            filterCompanyBranchCity.id = :userCityId OR
-            EXISTS (
-              SELECT 1 FROM branches b 
-              WHERE b.company_id = filterCompany.id 
-              AND b.cityId = :userCityId
-            ))`,
-            { userCityId }
-          );
-        }
+      if (hasCityFilter && userCityId) {
+        // 🔥 CORRECTION: Filtrer par la ville de l'entreprise ET de ses branches
+        query.andWhere(
+          `(filterCompanyCity.id = :userCityId OR 
+          filterCompanyBranchCity.id = :userCityId OR
+          filterCompany.cityId = :userCityId)`,
+          { userCityId }
+        );
       }
 
       if (type) {
@@ -1245,9 +1228,14 @@ export class OrderService {
       if (isCityFilterable && order.subOrders && order.subOrders.length > 0) {
         const firstSubOrder = order.subOrders[0];
 
+        // Vérifier la ville de l'entreprise
+        if (firstSubOrder.company?.city) {
+          cityId = firstSubOrder.company.city.id;
+          cityName = firstSubOrder.company.city.name;
+        }
+
         // Chercher la branche associée à cette commande
         if (firstSubOrder.company?.branches && firstSubOrder.company.branches.length > 0) {
-          // Trouver la branche qui correspond à la ville de l'utilisateur
           const matchingBranch = firstSubOrder.company.branches.find(
             b => b.city?.id === userCityId
           );
@@ -1260,7 +1248,6 @@ export class OrderService {
               cityName = matchingBranch.city.name;
             }
           } else {
-            // Si pas de branche correspondante, prendre la première
             const branch = firstSubOrder.company.branches[0];
             if (branch.city) {
               cityId = branch.city.id;
@@ -1269,12 +1256,6 @@ export class OrderService {
             branchId = branch.id;
             branchName = branch.name;
           }
-        }
-
-        // Fallback sur la ville de l'entreprise
-        if (!cityId && firstSubOrder.company?.city) {
-          cityId = firstSubOrder.company.city.id;
-          cityName = firstSubOrder.company.city.name;
         }
       }
 
@@ -1289,22 +1270,10 @@ export class OrderService {
 
     const paginatedData = new PaginatedResponseDto(enrichedOrders, total, page, limit);
 
-    // 🔥 Construire le message de retour avec la ville et la branche
+    // 🔥 Construire le message de retour
     let message: string;
     if (hasManagePermission || isSuperAdmin) {
-      if (hasCityFilter && userCityName && userBranchId) {
-        // Récupérer le nom de la branche
-        const branch = await this.branchRepo.findOne({
-          where: { id: userBranchId }
-        });
-        const branchName = branch?.name || 'Branche';
-
-        message = this.i18nService.translate('order.orders_fetched_manage_branch', lang, {
-          resource: targetResource,
-          city: userCityName,
-          branch: branchName
-        });
-      } else if (hasCityFilter && userCityName) {
+      if (hasCityFilter && userCityName) {
         message = this.i18nService.translate('order.orders_fetched_manage_city', lang, {
           resource: targetResource,
           city: userCityName
@@ -1319,18 +1288,7 @@ export class OrderService {
         });
       }
     } else {
-      if (hasCityFilter && userCityName && userBranchId) {
-        const branch = await this.branchRepo.findOne({
-          where: { id: userBranchId }
-        });
-        const branchName = branch?.name || 'Branche';
-
-        message = this.i18nService.translate('order.orders_fetched_company_branch', lang, {
-          companyName: company.companyName,
-          city: userCityName,
-          branch: branchName
-        });
-      } else if (hasCityFilter && userCityName) {
+      if (hasCityFilter && userCityName) {
         message = this.i18nService.translate('order.orders_fetched_company_city', lang, {
           companyName: company.companyName,
           city: userCityName
