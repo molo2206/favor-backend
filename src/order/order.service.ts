@@ -1058,7 +1058,7 @@ export class OrderService {
 
     // 🔥 FORCER le rechargement de l'utilisateur avec ses relations
     // Même si le contrôleur l'a déjà fait, on le refait pour être sûr
-    const userWithRelations = await this.userRepo.findOne({
+    const userWithRelations = await this.userRepository.findOne({
       where: { id: user.id },
       relations: ['activeBranch', 'activeBranch.city']
     });
