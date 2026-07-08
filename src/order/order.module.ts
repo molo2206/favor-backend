@@ -32,6 +32,7 @@ import { PermissionHelper } from 'src/users/utility/helpers/permission.helper';
 import { I18nService } from 'src/libs/common/src';
 import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/company_has_userResource.entity';
+import { City } from 'src/company/entities/city.entity';
 
 @Module({
   imports: [
@@ -50,7 +51,8 @@ import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/com
       DeviceToken,
       UserSettingsEntity,
       BranchEntity,
-      CompanyHasUserResource
+      CompanyHasUserResource,
+      City
     ]),
     PawapayModule,
     AddressUserModule,

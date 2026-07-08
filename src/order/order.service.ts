@@ -48,6 +48,7 @@ import { I18nService } from 'src/libs/common/src';
 import { CancelOrderDto } from './dto/create-cancel-order.dto';
 import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/company_has_userResource.entity';
+import { City } from 'src/company/entities/city.entity';
 
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -72,6 +73,8 @@ export class OrderService {
     @InjectRepository(CompanyEntity) private readonly companyRepo: Repository<CompanyEntity>,
     @InjectRepository(AddressUser) private readonly addressUserRepo: Repository<AddressUser>,
     @InjectRepository(BranchEntity) private readonly branchRepo: Repository<BranchEntity>,
+    @InjectRepository(City) private readonly cityRepo: Repository<City>,
+
     private readonly mailService: MailOrderService,
     private readonly pdfService: PdfService,
     private readonly invoiceService: InvoiceService,
@@ -475,37 +478,79 @@ export class OrderService {
         finalOrder.id,
       );
 
-      // 🔥🔥🔥 ENVOYER À TOUS LES ADMINISTRATEURS AVEC canManage 🔥🔥🔥
+      // 🔥🔥🔥 ENVOYER AUX ADMINISTRATEURS PAR VILLE 🔥🔥🔥
       const resourceName = this.permissionHelper.getOrderResourceByCompanyType(finalOrder.type);
       console.log(`🔍 Resource name: ${resourceName}`);
 
-      // 🔥 Récupérer tous les ADMINISTRATEURS qui ont la permission canManage sur cette ressource
-      // Utiliser "resources" (pluriel) car la table s'appelle resources
+      // 🔥 ÉTAPE 1: Récupérer la ville de la commande
+      // La ville de la commande = ville de l'entreprise qui vend le produit
+      let orderCityId: string | null = null;
+      let orderCityName: string | null = null;
+
+      // Récupérer la première sous-commande pour avoir l'entreprise
+      if (subOrders.length > 0) {
+        const firstSubOrder = subOrders[0];
+        if (firstSubOrder.company?.cityId) {
+          orderCityId = firstSubOrder.company.cityId;
+          // Récupérer le nom de la ville
+          const city = await this.cityRepo.findOne({
+            where: { id: orderCityId }
+          });
+          if (city) {
+            orderCityName = city.name;
+          }
+        }
+      }
+
+      console.log(`🏙️ Ville de la commande: ${orderCityName} (${orderCityId})`);
+
+      if (!orderCityId) {
+        console.log('⚠️ Impossible de déterminer la ville de la commande');
+        return;
+      }
+
+      // 🔥 ÉTAPE 2: Récupérer les branches qui sont dans la ville de la commande
+      const branchesInCity = await this.branchRepo.find({
+        where: { cityId: orderCityId },
+        select: ['id']
+      });
+
+      const branchIdsInCity = branchesInCity.map(b => b.id);
+      console.log(`🏢 Branches dans la ville ${orderCityName}: ${branchIdsInCity.length}`);
+
+      if (branchIdsInCity.length === 0) {
+        console.log('⚠️ Aucune branche trouvée dans cette ville');
+        return;
+      }
+
+      // 🔥 ÉTAPE 3: Récupérer les ADMINISTRATEURS qui ont canManage sur la ressource
+      // ET qui sont dans une branche de la ville
       const adminUsers = await this.userRepository
         .createQueryBuilder('u')
         .innerJoin('user_has_company', 'uhc', 'uhc.userId = u.id')
         .innerJoin('company_has_user_resource', 'chur', 'chur.userCompanyId = uhc.id')
         .innerJoin('resources', 'r', 'r.id = chur.resourceId')
+        .innerJoin('branches', 'b', 'b.id = uhc.branchId') // 🔥 Jointure sur la branche de l'utilisateur
         .where('u.role = :role', { role: 'ADMIN' })
         .andWhere('r.name = :resourceName', { resourceName })
         .andWhere('chur.can_manage = :canManage', { canManage: true })
+        .andWhere('b.cityId = :orderCityId', { orderCityId }) // 🔥 Filtrer par ville
         .getMany();
 
-      console.log(`👥 Admins avec canManage sur ${resourceName}: ${adminUsers.length}`);
+      console.log(`👥 Admins avec canManage sur ${resourceName} dans la ville ${orderCityName}: ${adminUsers.length}`);
       if (adminUsers.length > 0) {
         console.log(`👥 Admins: ${adminUsers.map(a => a.fullName).join(', ')}`);
       }
 
       const processedRecipients = new Set<string>([user.id]);
 
-      // 🔥 Envoyer les notifications à tous les admins
+      // 🔥 Envoyer les notifications aux admins de la ville
       for (const admin of adminUsers) {
         if (processedRecipients.has(admin.id)) continue;
         processedRecipients.add(admin.id);
 
-        console.log(`📨 Envoi notification à l'admin: ${admin.fullName} (${admin.id})`);
+        console.log(`📨 Envoi notification à l'admin: ${admin.fullName} (${admin.id}) - Ville: ${orderCityName}`);
 
-        // Envoyer via WebSocket si connecté
         await this.notificationsService.sendNotificationToUser(
           admin.id,
           this.i18nService.translate('notification.order_created_title', lang),
@@ -521,10 +566,10 @@ export class OrderService {
             totalAmount: finalOrder.totalAmount,
             currency: finalOrder.currency,
             type: finalOrder.type,
+            city: orderCityName,
           }
         );
 
-        // Sauvegarder en base
         await this.notificationsService.sendAndSaveNotification(
           admin.id,
           this.i18nService.translate('notification.order_created_title', lang),
@@ -540,11 +585,12 @@ export class OrderService {
             totalAmount: finalOrder.totalAmount,
             currency: finalOrder.currency,
             type: finalOrder.type,
+            city: orderCityName,
           }
         );
       }
 
-      // 🔥 SUPER ADMIN (toujours notifiés)
+      // 🔥 SUPER ADMIN (toujours notifiés, sans filtre de ville)
       const superAdmins = await this.userRepository.find({
         where: { role: UserRole.SUPER_ADMIN },
       });
@@ -569,6 +615,7 @@ export class OrderService {
             totalAmount: finalOrder.totalAmount,
             currency: finalOrder.currency,
             type: finalOrder.type,
+            city: orderCityName,
           }
         );
       }
