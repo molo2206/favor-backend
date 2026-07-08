@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="<%= lang || 'fr' %>">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= translations.invoice %> | Favor Help</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      /* Vos styles inchangés */
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      :root { --primary: #0014D2; --primary-dark: #0014D2; --secondary: #0f172a; --muted: #64748b; --border: #e2e8f0; --bg: #f4f7fb; }
+      body { font-family: 'Inter', sans-serif; background: var(--bg); padding: 12px; color: #1e293b; }
+      .invoice-container { max-width: 950px; margin: auto; background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 10px 35px rgba(15,23,42,0.08); }
+      .invoice { padding: 1.2rem; }
+      .brand-section { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-bottom: 0.8rem; margin-bottom: 1rem; border-bottom: 2px solid #eff6ff; }
+      .logo-container { display: flex; align-items: center; gap: 0.8rem; }
+      .logo-image { width: 64px; height: 64px; object-fit: contain; border-radius: 12px; background: white; border: 1px solid #dbeafe; padding: 5px; }
+      .brand { font-size: 1.7rem; font-weight: 800; color: var(--secondary); }
+      .slogan { font-size: 0.65rem; color: var(--primary); letter-spacing: 1px; text-transform: uppercase; font-weight: 700; }
+      .invoice-badge { background: linear-gradient(135deg, #0014D2, #0014D2); color: white; padding: 0.8rem 1rem; border-radius: 14px; text-align: right; }
+      .invoice-badge small { display: block; font-size: 0.65rem; opacity: 0.8; }
+      .invoice-badge strong { font-size: 0.95rem; }
+      .to-invoice-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+      .to-section { background: #f8fbff; border: 1px solid #dbeafe; padding: 0.8rem 1rem; border-radius: 14px; min-width: 240px; }
+      .to-label { font-size: 0.65rem; text-transform: uppercase; color: var(--muted); font-weight: 700; display: block; margin-bottom: 3px; }
+      .to-name { font-size: 0.92rem; font-weight: 700; color: var(--secondary); }
+      .invoice-status { display: flex; align-items: center; gap: 8px; padding: 0.55rem 1rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; border: 1px solid; }
+      .invoice-status.paid { background: #dcfce7; color: #15803d; border-color: #86efac; }
+      .invoice-status.pending { background: #fff7ed; color: #b45309; border-color: #fde68a; }
+      .invoice-status.rejected { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
+      .status-badge { width: 10px; height: 10px; border-radius: 50%; }
+      .status-badge.paid { background: #22c55e; }
+      .status-badge.pending { background: #f59e0b; }
+      .status-badge.rejected { background: #ef4444; box-shadow: 0 0 0 2px #fecaca; }
+      .details-row { display: grid; grid-template-columns: 1fr 250px; gap: 1rem; margin-bottom: 1rem; }
+      .client-info, .invoice-date, .summary-box, .payment-info { background: white; border: 1px solid #edf2f7; border-radius: 16px; padding: 1rem; }
+      .info-title, .summary-title { font-size: 0.9rem; font-weight: 800; margin-bottom: 0.7rem; color: var(--primary-dark); }
+      .client-info p { margin-bottom: 8px; font-size: 0.8rem; display: flex; gap: 5px; flex-wrap: wrap; }
+      .bold-label { min-width: 80px; font-weight: 700; color: var(--secondary); }
+      .total-due-box { background: linear-gradient(135deg, #0014D2, #0014D2); color: white; padding: 1rem; border-radius: 18px; }
+      .total-label { font-size: 0.7rem; text-transform: uppercase; opacity: 0.8; }
+      .total-amount-main { font-size: 1.5rem; font-weight: 800; margin-top: 5px; }
+      .invoice-date { margin-top: 0.8rem; font-size: 0.8rem; line-height: 1.6; }
+      .table-wrapper { background: white; border: 1px solid #edf2f7; border-radius: 18px; overflow: hidden; margin-bottom: 1rem; }
+      .items-table { width: 100%; border-collapse: collapse; }
+      .items-table thead { background: #eff6ff; }
+      .items-table th { padding: 0.75rem; font-size: 0.68rem; text-transform: uppercase; color: #1e3a8a; text-align: left; }
+      .items-table td { padding: 0.7rem; border-top: 1px solid #f1f5f9; font-size: 0.78rem; }
+      .items-table tbody tr:nth-child(even) { background: #fafcff; }
+      .text-right, .unit-price, .qty, .total-amount { text-align: right; }
+      .line-number { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, #0014D2, #3b82f6); color: white; display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; }
+      .product-name { font-weight: 700; color: var(--secondary); }
+      .payment-summary { display: grid; grid-template-columns: 1fr 300px; gap: 1rem; }
+      .payment-info { background: #fffdf4; border: 1px solid #fde68a; }
+      .payment-info strong { display: block; margin-bottom: 0.8rem; color: #92400e; }
+      .payment-info p { margin-bottom: 6px; font-size: 0.8rem; }
+      .summary-line { display: flex; justify-content: space-between; padding: 0.65rem 0; border-bottom: 1px dashed #dbeafe; font-size: 0.8rem; }
+      .summary-line.total { border-top: 2px solid #0014D2; border-bottom: none; margin-top: 0.5rem; padding-top: 0.8rem; font-size: 1rem; font-weight: 800; color: #0014D2; }
+      .thankyou { margin-top: 1rem; background: #eff6ff; border: 1px solid #dbeafe; padding: 1rem; border-radius: 16px; text-align: center; }
+      .thankyou h2 { font-size: 1.1rem; color: #0014D2; margin-bottom: 4px; }
+      .thankyou p { font-size: 0.78rem; color: #475569; }
+      .company-card { margin-top: 1rem; background: linear-gradient(135deg, #0f172a, #1e293b); border-radius: 18px; padding: 1rem; color: white; box-shadow: 0 10px 30px rgba(15,23,42,0.12); }
+      .company-card-header { display: flex; align-items: center; gap: 0.8rem; padding-bottom: 0.8rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
+      .company-card-logo { width: 48px; height: 48px; object-fit: contain; border-radius: 12px; background: white; padding: 4px; }
+      .company-card-header h3 { font-size: 1rem; font-weight: 800; margin-bottom: 2px; }
+      .company-card-header p { font-size: 0.7rem; opacity: 0.7; }
+      .company-card-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 0.8rem; }
+      .company-item { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.06); padding: 0.8rem; border-radius: 14px; }
+      .company-label { display: block; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin-bottom: 5px; }
+      .company-item strong { font-size: 0.78rem; line-height: 1.4; display: block; }
+      .bottom-note { margin-top: 1rem; background: #f8fbff; border: 1px solid #dbeafe; padding: 0.8rem; border-radius: 12px; text-align: center; font-size: 0.65rem; color: #64748b; }
+      @media (max-width:780px) { .brand-section, .payment-summary, .details-row { grid-template-columns: 1fr; flex-direction: column; } .invoice-badge { width: 100%; text-align: left; } .table-wrapper { overflow-x: auto; } .items-table { min-width: 650px; } .company-card-grid { grid-template-columns: 1fr; } }
+      @media print { body { background: white; padding: 0; } .invoice-container { max-width: 100%; box-shadow: none; } .invoice { padding: 0.5rem; } }
+    </style>
+  </head>
+  <body>
+    <div class="invoice-container">
+      <div class="invoice">
+        <!-- HEADER -->
+        <div class="brand-section">
+          <div class="logo-container">
+            <img src="https://api-prod.favorhelp.com/uploads/1%20Favor.webp" alt="Favor Help Logo" class="logo-image" onerror="this.onerror=null; this.src='https://via.placeholder.com/80x60?text=Favor';" />
+            <div>
+              <div class="brand"><%= translations.invoice %></div>
+              <div class="slogan">FavorHelp • Service Client</div>
+            </div>
+          </div>
+          <div class="invoice-badge">
+            <small><%= translations.number %></small>
+            <strong>#<%= order ? order.invoiceNumber : 'INV-001' %></strong>
+          </div>
+        </div>
+
+        <!-- TO -->
+        <div class="to-invoice-row">
+          <div class="to-section">
+            <span class="to-label"><%= translations.billed_to %></span>
+            <div class="to-name"><%= user ? user.fullName : 'Client' %></div>
+          </div>
+
+          <% const status = (order && order.paymentStatus ? order.paymentStatus.trim().toUpperCase() : 'PENDING'); %>
+          <div class="invoice-status <%= status === 'PAID' ? 'paid' : status === 'REJECTED' ? 'rejected' : 'pending' %>">
+            <span class="status-badge <%= status === 'PAID' ? 'paid' : status === 'REJECTED' ? 'rejected' : 'pending' %>"></span>
+            <span>
+              <%= status === 'PAID' ? translations.status_paid : status === 'REJECTED' ? translations.status_rejected : translations.status_pending %>
+            </span>
+          </div>
+        </div>
+
+        <!-- DETAILS -->
+        <div class="details-row">
+          <div class="client-info">
+            <div class="info-title"><%= translations.customer_info %></div>
+            <p><span class="bold-label"><%= translations.client %> :</span> <span><%= user ? user.fullName : 'Client' %></span></p>
+            <p><span class="bold-label"><%= translations.email_label %> :</span> <span><%= user ? user.email : 'client@email.com' %></span></p>
+            <p><span class="bold-label"><%= translations.phone_label %> :</span> <span><%= user ? user.phone : 'Non renseigné' %></span></p>
+            <p><span class="bold-label"><%= translations.address_label %> :</span> <span><%= order && order.address ? order.address : 'Adresse non renseignée' %></span></p>
+            <% if (typeof pinCode !== 'undefined' && pinCode && pinCode !== null) { %>
+            <p><span class="bold-label"><%= translations.pin %> :</span> <span style="background:#dbeafe; color:#0014D2; padding:4px 10px; border-radius:10px; font-weight:800; letter-spacing:2px;"><%= pinCode %></span></p>
+            <% } %>
+          </div>
+          <div>
+            <div class="invoice-date">
+              <strong><%= translations.date %> :</strong> <%= new Date().toLocaleDateString('fr-FR') %><br/><br/>
+              <strong><%= translations.reference %> :</strong> #<%= order ? order.invoiceNumber : 'INV-001' %>
+            </div>
+          </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="table-wrapper">
+          <table class="items-table">
+            <thead>
+              <tr><th style="width:60px"><%= translations.number %></th><th><%= translations.products %></th><th class="text-right"><%= translations.unit_price %></th><th class="text-right"><%= translations.qty %></th><th class="text-right"><%= translations.total %></th></tr>
+            </thead>
+            <tbody>
+              <% if (subOrders && subOrders.length) { var lineNumber = 1; subOrders.forEach(function(subOrder) { if (subOrder.items && subOrder.items.length) { subOrder.items.forEach(function(item) { %>
+              <tr><td style="text-align:center"><span class="line-number"><%= lineNumber++ %></span></td>
+                <td><div class="product-name"><%= item.product ? item.product.name : 'Produit' %></div></td>
+                <td class="unit-price"><%= order ? order.currency : 'USD' %> <%= item.price || '0.00' %></td>
+                <td class="qty"><%= item.quantity || '0' %></td>
+                <td class="total-amount"><strong><%= order ? order.currency : 'USD' %> <%= (item.price * item.quantity) || '0.00' %></strong></td>
+              </tr>
+              <% }); } }); } else { %>
+              <tr><td colspan="5" style="text-align:center; padding:1.5rem"><%= translations.no_items %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- PAYMENT -->
+        <div class="payment-summary">
+          <% if (!(order && order.paymentStatus === 'PAID')) { %>
+          <div class="payment-info">
+            <strong><%= translations.payment_info %></strong>
+            <p><b><%= translations.account %> :</b> 688200060761632</p>
+            <p><b><%= translations.name %> :</b> Kavira Naomi</p>
+            <p><b><%= translations.mobile_money %> :</b> +243 962 646 653</p>
+          </div>
+          <% } %>
+          <div class="summary-box">
+            <div class="summary-title"><%= translations.summary %></div>
+            <div class="summary-line"><span><%= translations.subtotal %></span><span><%= order ? order.currency : 'USD' %> <%= order ? order.totalAmount : '0.00' %></span></div>
+            <div class="summary-line"><span><%= translations.delivery %></span><span><%= order ? order.currency : 'USD' %> <%= order && order.shippingCost ? order.shippingCost : '0.00' %></span></div>
+            <div class="summary-line total"><span><%= translations.total_amount %></span><span><%= order ? order.currency : 'USD' %> <% var finalTotal = order ? (Number(order.totalAmount) + Number(order.shippingCost || 0)) : 0; %><%= finalTotal.toFixed(2) %></span></div>
+          </div>
+        </div>
+
+        <!-- THANK YOU -->
+        <div class="thankyou">
+          <h2><%= translations.thank_you %></h2>
+          <p><%= translations.thanks_team %></p>
+          <p>+243 991 225 122, www.favorhelp.com</p>
+          <div class="company-item">
+            <strong>RCCM: 21-A-770 | N° IMPÔT: A2156062L</strong>
+            <p><%= new Date().getFullYear() %></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

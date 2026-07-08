@@ -1,0 +1,14 @@
+{
+  "ride.rider_not_found": "Abiria hapatikani.",
+  "ride.driver_not_found": "Dereva hapatikani.",
+  "ride.city_not_found_or_inactive": "Mji haupatikani au haufanyi kazi.",
+  "ride.category_not_found_or_inactive": "Jamii haipatikani au haifanyi kazi.",
+  "ride.ride_created_searching_drivers": "Safari yako imeundwa. Inatafuta madereva...",
+  "ride.ride_created_success": "Safari imeundwa kwa mafanikio",
+  "ride.rides_list_retrieved": "Orodha ya safari imepatikana",
+  "ride.ride_not_found": "Safari haipatikani.",
+  "ride.ride_retrieved": "Safari imepatikana",
+  "ride.ride_updated": "Safari imesasishwa",
+  "ride.ride_deleted": "Safari imefutwa",
+  "ride.ride_already_accepted": "Safari tayari imekubaliwa"
+}

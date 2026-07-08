@@ -1,0 +1,533 @@
+<!-- shipment.ejs -->
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Confirmation de Colis - FavorHelp</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <style>
+      @page { margin: 0; size: A4; }
+      
+      body {
+        font-family: 'Inter', sans-serif;
+        margin: 0;
+        padding: 20px;
+        color: #1f2937;
+        line-height: 1.4;
+        font-size: 12px;
+        background: #ffffff;
+      }
+      
+      .container {
+        max-width: 21cm;
+        margin: 0 auto;
+        background: white;
+        position: relative;
+      }
+      
+      /* Header */
+      .header {
+        border-bottom: 2px solid #1d4ed8;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+      }
+      
+      .header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+      }
+      
+      .company-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+      
+      .logo {
+        width: 80px;
+        height: 80px;
+        border-radius: 6px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        padding: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      }
+      
+      .company-text h1 {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1d4ed8;
+        margin: 0 0 5px 0;
+        letter-spacing: -0.5px;
+      }
+      
+      .company-text .subtitle {
+        font-size: 14px;
+        color: #6b7280;
+        margin: 0;
+      }
+      
+      .shipment-meta {
+        text-align: right;
+      }
+      
+      .shipment-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0 0 8px 0;
+      }
+      
+      .tracking-number {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1d4ed8;
+        padding: 8px 16px;
+        background: #eff6ff;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        border: 1px solid #dbeafe;
+      }
+      
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      
+      .status-pending { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
+      .status-in-transit { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+      .status-delivered { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
+      .status-cancelled { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+      
+      .shipment-ref {
+        font-size: 11px;
+        color: #6b7280;
+      }
+      
+      /* Legal info */
+      .legal-info {
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 10px 15px;
+        margin-top: 10px;
+        font-size: 10px;
+        color: #4b5563;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 8px;
+      }
+      
+      .legal-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      
+      .legal-label {
+        font-weight: 600;
+        color: #374151;
+        min-width: 100px;
+      }
+      
+      /* Sections */
+      .section {
+        margin-bottom: 20px;
+        page-break-inside: avoid;
+      }
+      
+      .section-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: white;
+        background: #1d4ed8;
+        padding: 8px 12px;
+        border-radius: 4px 4px 0 0;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .section-content {
+        border: 1px solid #e5e7eb;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        padding: 15px;
+        background: #f9fafb;
+      }
+      
+      /* Client info */
+      .client-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+      }
+      
+      .info-block {
+        font-size: 11px;
+      }
+      
+      .info-label {
+        font-weight: 600;
+        color: #374151;
+        display: block;
+        margin-bottom: 4px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+      
+      .info-value {
+        color: #6b7280;
+        line-height: 1.4;
+      }
+      
+      /* Package details */
+      .details-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+      
+      .detail-item {
+        font-size: 11px;
+      }
+      
+      .detail-label {
+        font-weight: 600;
+        color: #374151;
+        display: block;
+        margin-bottom: 3px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+      
+      /* Service sections */
+      .service-section {
+        margin-bottom: 15px;
+        padding: 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        background: white;
+      }
+      
+      .service-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      
+      .service-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #eff6ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #1d4ed8;
+      }
+      
+      .service-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0;
+      }
+      
+      .service-content {
+        font-size: 11px;
+        color: #4b5563;
+      }
+      
+      /* Footer */
+      .footer {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+        margin-top: 20px;
+        font-size: 10px;
+      }
+      
+      .footer-section h4 {
+        font-size: 11px;
+        font-weight: 600;
+        color: #374151;
+        margin: 0 0 8px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .footer-section p {
+        color: #6b7280;
+        margin: 4px 0;
+        line-height: 1.4;
+      }
+      
+      /* Styles pour les sections combinées */
+      .services-combined {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+      }
+      
+      .service-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        background: white;
+        padding: 12px;
+      }
+      
+      .service-card .service-header {
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 1px dashed #e5e7eb;
+      }
+      
+      /* Style pour l'icône fragile */
+      .fragile-icon {
+        color: #d40511;
+        margin-right: 5px;
+      }
+      
+      @media print {
+        body {
+          padding: 0.5cm;
+          font-size: 10pt;
+        }
+        
+        .container {
+          max-width: 100%;
+          box-shadow: none;
+        }
+        
+        .section {
+          margin-bottom: 15px;
+        }
+        
+        .service-section {
+          page-break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <div class="header-top">
+          <div class="company-info">
+            <img src="https://cosamed.org/1%20Favor.png" alt="FavorHelp" class="logo" />
+            <div class="company-text">
+              <h1>CONFIRMATION DE COLIS</h1>
+              <p class="subtitle">FavorHelp • Service de Livraison</p>
+            </div>
+          </div>
+          
+          <div class="shipment-meta">
+            <div class="shipment-title">BORDEREAU D'EXPÉDITION</div>
+         
+            <div class="status-badge 
+              <% if(shipment.status === 'PENDING') { %>status-pending<% } 
+                else if(shipment.status === 'IN_TRANSIT') { %>status-in-transit<% }
+                else if(shipment.status === 'DELIVERED') { %>status-delivered<% }
+                else { %>status-cancelled<% } %>">
+              <% if(shipment.status === 'PENDING') { %>
+                <i class="fas fa-hourglass-half"></i> En attente
+              <% } else if(shipment.status === 'IN_TRANSIT') { %>
+                <i class="fas fa-shipping-fast"></i> En transit
+              <% } else if(shipment.status === 'DELIVERED') { %>
+                <i class="fas fa-check-circle"></i> Livré
+              <% } else { %>
+                <i class="fas fa-times-circle"></i> Annulé
+              <% } %>
+            </div>
+            <div class="shipment-ref">
+               <div class="tracking-number">
+              <i class="fas fa-barcode"></i> <%= shipment.trackingNumber %>
+            </div> | Date: <%= new Date().toLocaleDateString('fr-FR') %>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Client Information -->
+      <div class="section">
+        <h3 class="section-title">Informations du client</h3>
+        <div class="section-content">
+          <div class="client-grid">
+            <div class="info-block">
+              <span class="info-label">Client</span>
+              <div class="info-value">
+                <%= user.fullName %><br/>
+                <%= user.email %><br/>
+                <% if (user.phone) { %><%= user.phone %><% } %>
+              </div>
+            </div>
+            <div class="info-block">
+              <span class="info-label">Adresse</span>
+              <div class="info-value">
+                <% if (user.address) { %><%= user.address %><% } %>
+                <% if (user.city) { %><br/><%= user.city %><% } %>
+                <% if (user.country) { %><br/><%= user.country %><% } %>
+                <% if (!user.address && !user.city && !user.country) { %>Non spécifiée<% } %>
+              </div>
+            </div>
+            <div class="info-block">
+              <span class="info-label">Expédition</span>
+              <div class="info-value">
+                N° #SHIP-<%= shipment.id %><br/>
+                Statut: <%= shipment.status === 'PENDING' ? 'En attente' : (shipment.status === 'IN_TRANSIT' ? 'En transit' : (shipment.status === 'DELIVERED' ? 'Livré' : 'Annulé')) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Package Details -->
+      <div class="section">
+        <h3 class="section-title">Détails du colis</h3>
+        <div class="section-content">
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="detail-label">Description</span>
+              <%= shipment.package.description %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Quantité</span>
+              <%= shipment.package.external_quantity %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Poids</span>
+              <%= shipment.package.weight ? shipment.package.weight + ' kg' : 'Non spécifié' %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Valeur déclarée</span>
+              <%= shipment.package.value ? shipment.package.value + ' USD' : 'Non spécifiée' %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Fragile</span>
+              <% if (shipment.package.fragile === true || shipment.package.fragile === 'true' || shipment.package.fragile === 'oui' || shipment.package.fragile === 'Oui') { %>
+                <i class="fas fa-exclamation-triangle fragile-icon"></i> Oui
+              <% } else if (shipment.package.fragile === false || shipment.package.fragile === 'false' || shipment.package.fragile === 'non' || shipment.package.fragile === 'Non') { %>
+                Non
+              <% } else { %>
+                <%= shipment.package.fragile || 'Non' %>
+              <% } %>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Dimensions</span>
+              <%= shipment.package.dimensions ? shipment.package.dimensions : 'Non spécifiées' %>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Services combinés (Ramassage + Transport + Livraison) -->
+      <div class="section">
+        <h3 class="section-title">SERVICES SOUSCRITS</h3>
+        <div class="section-content">
+          <div class="services-combined">
+            
+            <!-- Service Ramassage -->
+            <% if (shipment.pickupEnabled) { %>
+            <div class="service-card">
+              <div class="service-header">
+                <div class="service-icon">
+                  <i class="fas fa-hand-holding-box"></i>
+                </div>
+                <h4 class="service-title">Ramassage</h4>
+              </div>
+              <div class="service-content">
+                <div class="detail-item">
+                  <span class="detail-label">De</span>
+                  <%= shipment.pickupFrom %>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">À</span>
+                  <%= shipment.pickupTo %>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Contact</span>
+                  <%= shipment.pickupContactName %>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Téléphone</span>
+                  <%= shipment.pickupContactPhone %>
+                </div>
+              </div>
+            </div>
+            <% } %>
+            
+            <!-- Service Transport -->
+            <% if (shipment.shippingEnabled) { %>
+            <div class="service-card">
+              <div class="service-header">
+                <div class="service-icon">
+                  <i class="fas fa-truck"></i>
+                </div>
+                <h4 class="service-title">Transport</h4>
+              </div>
+              <div class="service-content">
+                <div class="detail-item">
+                  <span class="detail-label">De</span>
+                  <%= shipment.shippingFrom %>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">À</span>
+                  <%= shipment.shippingTo %>
+                </div>
+              </div>
+            </div>
+            <% } %>
+            
+            <!-- Service Livraison -->
+            <% if (shipment.deliveryEnabled) { %>
+            <div class="service-card">
+              <div class="service-header">
+                <div class="service-icon">
+                  <i class="fas fa-map-marker-alt"></i>
+                </div>
+                <h4 class="service-title">Livraison</h4>
+              </div>
+              <div class="service-content">
+                <div class="detail-item">
+                  <span class="detail-label">Adresse</span>
+                  <%= shipment.deliveryFrom || 'Non spécifiée' %>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Contact</span>
+                  <%= shipment.deliveryContactName %>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Téléphone</span>
+                  <%= shipment.deliveryContactPhone %>
+                </div>
+              </div>
+            </div>
+            <% } %>
+            
+          </div>
+        </div>
+      </div>
+      <!-- Ligne légale finale -->
+      <div style="text-align: center; font-size: 0.6rem; color: #6c86a3; margin-top: 1rem; padding-top: 0.7rem; border-top: 1px solid #eef2ff;">
+        Favor Help — Écosystème digital par Favor Group | RCCM: 21-A-770 | N° IMPÔT: A2156062L
+      </div>
+    </div>
+  </body>
+</html>
