@@ -1077,6 +1077,7 @@ export class OrderService {
     // 🔥 Récupérer la ville de la branche active de l'utilisateur
     let userCityId: string | null = null;
     let userCityName: string | null = null;
+    let userBranchId: string | null = null;
 
     if (isCityFilterable && !isSuperAdmin) {
       // 🔥 PRIORITÉ 1: Utiliser la branche active de l'utilisateur
@@ -1088,6 +1089,7 @@ export class OrderService {
         if (branch?.city) {
           userCityId = branch.city.id;
           userCityName = branch.city.name;
+          userBranchId = branch.id;
         }
       }
 
@@ -1168,10 +1170,18 @@ export class OrderService {
         query.where('order.type = :type', { type: company.typeCompany });
       }
 
-      // 🔥 Filtrer par ville UNIQUEMENT pour RESTAURANT, GROCERY et si pas SUPER ADMIN
-      if (hasCityFilter) {
+      // 🔥 FILTRAGE PAR VILLE UNIQUEMENT pour RESTAURANT, GROCERY et si pas SUPER ADMIN
+      if (hasCityFilter && userCityId) {
+        // 🔥 CORRECTION IMPORTANTE: Filtrer par la ville de la branche active de l'utilisateur
+        // OU par la ville de l'entreprise si la branche n'a pas de ville
         query.andWhere(
-          '(subOrderCompanyCity.id = :userCityId OR subOrderCompanyBranchCity.id = :userCityId)',
+          `(subOrderCompanyCity.id = :userCityId OR 
+          subOrderCompanyBranchCity.id = :userCityId OR
+          EXISTS (
+            SELECT 1 FROM branch b 
+            WHERE b.company_id = subOrderCompany.id 
+            AND b.city_id = :userCityId
+          ))`,
           { userCityId }
         );
       }
@@ -1200,9 +1210,16 @@ export class OrderService {
           .innerJoin('filterCompany.branches', 'filterCompanyBranches')
           .innerJoin('filterCompanyBranches.city', 'filterCompanyBranchCity');
 
-        if (hasCityFilter) {
+        if (hasCityFilter && userCityId) {
+          // 🔥 CORRECTION: Filtrer par la ville de la branche active
           query.andWhere(
-            '(filterCompanyCity.id = :userCityId OR filterCompanyBranchCity.id = :userCityId)',
+            `(filterCompanyCity.id = :userCityId OR 
+            filterCompanyBranchCity.id = :userCityId OR
+            EXISTS (
+              SELECT 1 FROM branch b 
+              WHERE b.company_id = filterCompany.id 
+              AND b.city_id = :userCityId
+            ))`,
             { userCityId }
           );
         }
@@ -1225,18 +1242,39 @@ export class OrderService {
     const enrichedOrders = orders.map(order => {
       let cityId: string | null = null;
       let cityName: string | null = null;
+      let branchId: string | null = null;
+      let branchName: string | null = null;
 
       if (isCityFilterable && order.subOrders && order.subOrders.length > 0) {
         const firstSubOrder = order.subOrders[0];
 
+        // Chercher la branche associée à cette commande
         if (firstSubOrder.company?.branches && firstSubOrder.company.branches.length > 0) {
-          const branch = firstSubOrder.company.branches[0];
-          if (branch.city) {
-            cityId = branch.city.id;
-            cityName = branch.city.name;
+          // Trouver la branche qui correspond à la ville de l'utilisateur
+          const matchingBranch = firstSubOrder.company.branches.find(
+            b => b.city?.id === userCityId
+          );
+
+          if (matchingBranch) {
+            branchId = matchingBranch.id;
+            branchName = matchingBranch.name;
+            if (matchingBranch.city) {
+              cityId = matchingBranch.city.id;
+              cityName = matchingBranch.city.name;
+            }
+          } else {
+            // Si pas de branche correspondante, prendre la première
+            const branch = firstSubOrder.company.branches[0];
+            if (branch.city) {
+              cityId = branch.city.id;
+              cityName = branch.city.name;
+            }
+            branchId = branch.id;
+            branchName = branch.name;
           }
         }
 
+        // Fallback sur la ville de l'entreprise
         if (!cityId && firstSubOrder.company?.city) {
           cityId = firstSubOrder.company.city.id;
           cityName = firstSubOrder.company.city.name;
@@ -1247,15 +1285,29 @@ export class OrderService {
         ...order,
         cityId,
         cityName,
+        branchId,
+        branchName,
       };
     });
 
     const paginatedData = new PaginatedResponseDto(enrichedOrders, total, page, limit);
 
-    // 🔥 Construire le message de retour avec la ville
+    // 🔥 Construire le message de retour avec la ville et la branche
     let message: string;
     if (hasManagePermission || isSuperAdmin) {
-      if (hasCityFilter && userCityName) {
+      if (hasCityFilter && userCityName && userBranchId) {
+        // Récupérer le nom de la branche
+        const branch = await this.branchRepo.findOne({
+          where: { id: userBranchId }
+        });
+        const branchName = branch?.name || 'Branche';
+
+        message = this.i18nService.translate('order.orders_fetched_manage_branch', lang, {
+          resource: targetResource,
+          city: userCityName,
+          branch: branchName
+        });
+      } else if (hasCityFilter && userCityName) {
         message = this.i18nService.translate('order.orders_fetched_manage_city', lang, {
           resource: targetResource,
           city: userCityName
@@ -1270,7 +1322,18 @@ export class OrderService {
         });
       }
     } else {
-      if (hasCityFilter && userCityName) {
+      if (hasCityFilter && userCityName && userBranchId) {
+        const branch = await this.branchRepo.findOne({
+          where: { id: userBranchId }
+        });
+        const branchName = branch?.name || 'Branche';
+
+        message = this.i18nService.translate('order.orders_fetched_company_branch', lang, {
+          companyName: company.companyName,
+          city: userCityName,
+          branch: branchName
+        });
+      } else if (hasCityFilter && userCityName) {
         message = this.i18nService.translate('order.orders_fetched_company_city', lang, {
           companyName: company.companyName,
           city: userCityName
