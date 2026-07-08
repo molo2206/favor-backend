@@ -10,6 +10,7 @@ import {
   BadRequestException,
   Req,
   Res,
+  NotFoundException,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -29,6 +30,8 @@ import { PaginatedResponseDto } from './dto/paginated-response.dto';
 import { Permissions } from 'src/users/utility/guards/permissions.guard';
 import { I18nService } from 'src/libs/common/src';
 import { CancelOrderDto } from './dto/create-cancel-order.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 @ApiBearerAuth()
 @Controller('orders')
@@ -36,6 +39,8 @@ export class OrderController {
   constructor(
     private readonly orderService: OrderService,
     private readonly i18nService: I18nService,
+    @InjectRepository(UserEntity)
+    private readonly userRepo: Repository<UserEntity>,
   ) { }
 
   private extractLanguage(req: Request): string {
@@ -206,8 +211,29 @@ export class OrderController {
     @Query('limit') limit: number = 10,
   ): Promise<{ message: string; data: PaginatedResponseDto<OrderEntity> }> {
     const lang = this.getUserLanguage(user, req);
-    return this.orderService.findByType(user, type, page, limit, lang);
+
+    // 🔥 RECHARGER l'utilisateur avec ses relations (activeBranch et city)
+    const userWithRelations = await this.userRepo.findOne({
+      where: { id: user.id },
+      relations: ['activeBranch', 'activeBranch.city']
+    });
+
+    if (!userWithRelations) {
+      throw new NotFoundException(
+        this.i18nService.translate('user.not_found', lang)
+      );
+    }
+
+    // 🔥 PASSER l'utilisateur rechargé au service
+    return this.orderService.findByType(
+      userWithRelations,
+      type,
+      page,
+      limit,
+      lang
+    );
   }
+
 
   @Patch(':orderId/status')
   @UseGuards(AuthentificationGuard)

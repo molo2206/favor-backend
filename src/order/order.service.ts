@@ -1056,7 +1056,7 @@ export class OrderService {
       throw new BadRequestException(this.i18nService.translate('order.no_active_company', lang));
     }
 
-    // Récupérer l'entreprise active (uniquement pour le type et les permissions)
+    // Récupérer l'entreprise active
     const company = await this.companyRepo.findOne({
       where: { id: user.activeCompanyId },
     });
@@ -1075,11 +1075,13 @@ export class OrderService {
     let userCityId: string | null = null;
     let userCityName: string | null = null;
 
-    // 🔥 Vérifier si l'utilisateur a une branche active
-    if (!user.activeBranchId) {
-      console.log('⚠️ L\'utilisateur n\'a pas de branche active');
-    } else if (isCityFilterable) {
-      // 🔥 Charger la branche avec sa ville si elle n'est pas déjà chargée
+    // 🔥 L'utilisateur est déjà chargé avec activeBranch et activeBranch.city
+    if (user.activeBranch?.city) {
+      userCityId = user.activeBranch.city.id;
+      userCityName = user.activeBranch.city.name;
+      console.log('✅ Branche active trouvée:', user.activeBranch.name, 'Ville:', userCityName);
+    } else if (user.activeBranchId) {
+      // 🔥 Fallback : charger la branche si elle n'est pas dans les relations
       const branch = await this.branchRepo.findOne({
         where: { id: user.activeBranchId },
         relations: ['city'],
@@ -1087,12 +1089,15 @@ export class OrderService {
       if (branch?.city) {
         userCityId = branch.city.id;
         userCityName = branch.city.name;
-        console.log('✅ Branche active trouvée:', branch.name, 'Ville:', userCityName);
+        console.log('✅ Branche active chargée:', branch.name, 'Ville:', userCityName);
       } else {
         console.log('⚠️ La branche active n\'a pas de ville associée');
       }
+    } else {
+      console.log('⚠️ L\'utilisateur n\'a pas de branche active');
     }
 
+    // 🔥 hasCityFilter = true si on a une ville ET que le type est filtrable
     const hasCityFilter = isCityFilterable && !!userCityId;
 
     // 🔥 LOGS DE DEBUG
@@ -1156,7 +1161,7 @@ export class OrderService {
 
     // 🔥 Règle métier :
     // - SUPER ADMIN voit tout (pas de filtre)
-    // - TOUS les autres utilisateurs (même avec canManage) doivent avoir une branche active
+    // - TOUS les autres utilisateurs (même avec canManage) voient UNIQUEMENT les commandes de leur ville
     if (isSuperAdmin) {
       // SUPER ADMIN voit tout, pas de filtre
       console.log('✅ SUPER ADMIN - Pas de filtre');
@@ -1170,9 +1175,8 @@ export class OrderService {
       query.andWhere('subOrderCompany.cityId = :userCityId', { userCityId });
       console.log('✅ Filtre appliqué: subOrderCompany.cityId =', userCityId);
     } else {
-      // Si le type n'est pas filtrable (SHOP, CAR, etc.) ou pas de ville
-      // On ne filtre pas par ville, on laisse la requête sans filtre
-      console.log('⚠️ Type non filtrable ou pas de ville - pas de filtre supplémentaire');
+      // Si le type n'est pas filtrable (SHOP, CAR, etc.)
+      console.log('⚠️ Type non filtrable - pas de filtre supplémentaire');
     }
 
     // 🔥 Pagination
