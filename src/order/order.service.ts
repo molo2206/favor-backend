@@ -1042,8 +1042,6 @@ export class OrderService {
 
   //   return new PaginatedResponseDto(orders, total, page, limit);
   // }
-
-
   async findByType(
     user: UserEntity,
     type?: string,
@@ -1153,7 +1151,7 @@ export class OrderService {
       .leftJoinAndSelect('subOrder.company', 'subOrderCompany')
       .orderBy('order.createdAt', 'DESC');
 
-    // 🔥 Joindre la ville UNIQUEMENT si le filtrage par ville est applicable
+    // 🔥 Joindre la ville et les branches UNIQUEMENT si le filtrage par ville est applicable
     if (isCityFilterable && !isSuperAdmin) {
       query
         .leftJoinAndSelect('subOrderCompany.city', 'subOrderCompanyCity')
@@ -1172,13 +1170,12 @@ export class OrderService {
 
       // 🔥 FILTRAGE PAR VILLE UNIQUEMENT pour RESTAURANT, GROCERY et si pas SUPER ADMIN
       if (hasCityFilter && userCityId) {
-        // 🔥 CORRECTION IMPORTANTE: Filtrer par la ville de la branche active de l'utilisateur
-        // OU par la ville de l'entreprise si la branche n'a pas de ville
+        // 🔥 CORRECTION: Utiliser le nom correct de la table 'branches' et 'company_id'
         query.andWhere(
           `(subOrderCompanyCity.id = :userCityId OR 
           subOrderCompanyBranchCity.id = :userCityId OR
           EXISTS (
-            SELECT 1 FROM branch b 
+            SELECT 1 FROM branches b 
             WHERE b.company_id = subOrderCompany.id 
             AND b.city_id = :userCityId
           ))`,
@@ -1211,12 +1208,12 @@ export class OrderService {
           .innerJoin('filterCompanyBranches.city', 'filterCompanyBranchCity');
 
         if (hasCityFilter && userCityId) {
-          // 🔥 CORRECTION: Filtrer par la ville de la branche active
+          // 🔥 CORRECTION: Utiliser le nom correct de la table 'branches' et 'company_id'
           query.andWhere(
             `(filterCompanyCity.id = :userCityId OR 
             filterCompanyBranchCity.id = :userCityId OR
             EXISTS (
-              SELECT 1 FROM branch b 
+              SELECT 1 FROM branches b 
               WHERE b.company_id = filterCompany.id 
               AND b.city_id = :userCityId
             ))`,
