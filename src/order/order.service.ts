@@ -1056,49 +1056,106 @@ export class OrderService {
       throw new BadRequestException(this.i18nService.translate('order.no_active_company', lang));
     }
 
-    // Récupérer l'entreprise active (uniquement pour le type et les permissions)
+    // Récupérer l'entreprise active avec sa ville (pour fallback)
     const company = await this.companyRepo.findOne({
       where: { id: user.activeCompanyId },
+      relations: ['city'],
     });
 
     if (!company) {
       throw new NotFoundException(this.i18nService.translate('order.company_not_found', lang));
     }
 
-    const isSuperAdmin = user.role === 'SUPER ADMIN';
+    const isSuperAdmin = user.role === UserRole.SUPER_ADMIN;
     const orderType = type || company.typeCompany;
 
     // 🔥 Filtrage par ville pour RESTAURANT et GROCERY uniquement
-    const isCityFilterable = orderType === 'RESTAURANT' || orderType === 'GROCERY';
+    const isCityFilterable = orderType === CompanyType.RESTAURANT || orderType === CompanyType.GROCERY;
 
-    // 🔥 Récupérer UNIQUEMENT la ville de la branche active de l'utilisateur
-    // Pas de fallback sur company.city
+    // 🔥 Récupérer la ville de la branche active ou fallback intelligent
     let userCityId: string | null = null;
     let userCityName: string | null = null;
+    let usedBranchId: string | null = null;
 
-    if (isCityFilterable && !isSuperAdmin && user.activeBranchId) {
-      const branch = await this.branchRepo.findOne({
-        where: { id: user.activeBranchId },
-        relations: ['city'],
-      });
-      if (branch?.city) {
-        userCityId = branch.city.id;
-        userCityName = branch.city.name;
+    if (isCityFilterable && !isSuperAdmin) {
+      // 1. PRIORITÉ 1 : Branche active de l'utilisateur
+      if (user.activeBranchId) {
+        const branch = await this.branchRepo.findOne({
+          where: { id: user.activeBranchId },
+          relations: ['city'],
+        });
+        if (branch?.city) {
+          userCityId = branch.city.id;
+          userCityName = branch.city.name;
+          usedBranchId = branch.id;
+        }
+      }
+
+      // 2. PRIORITÉ 2 : Prendre la première branche de l'entreprise (la plus ancienne)
+      if (!userCityId && user.activeCompanyId) {
+        const firstBranch = await this.branchRepo.findOne({
+          where: {
+            company_id: user.activeCompanyId,
+            deleted: false,
+            status: true,
+          },
+          relations: ['city'],
+          order: { createdAt: 'ASC' }, // Prend la plus ancienne comme branche principale
+        });
+        if (firstBranch?.city) {
+          userCityId = firstBranch.city.id;
+          userCityName = firstBranch.city.name;
+          usedBranchId = firstBranch.id;
+
+          // 🔥 Mettre à jour l'utilisateur avec cette branche pour les prochaines requêtes
+          if (!user.activeBranchId) {
+            user.activeBranchId = firstBranch.id;
+            await this.userRepository.save(user);
+          }
+        }
+      }
+
+      // 3. PRIORITÉ 3 : N'importe quelle branche active de l'entreprise
+      if (!userCityId && user.activeCompanyId) {
+        const anyBranch = await this.branchRepo.findOne({
+          where: {
+            company_id: user.activeCompanyId,
+            deleted: false,
+            status: true,
+          },
+          relations: ['city'],
+        });
+        if (anyBranch?.city) {
+          userCityId = anyBranch.city.id;
+          userCityName = anyBranch.city.name;
+          usedBranchId = anyBranch.id;
+
+          // 🔥 Mettre à jour l'utilisateur avec cette branche pour les prochaines requêtes
+          if (!user.activeBranchId) {
+            user.activeBranchId = anyBranch.id;
+            await this.userRepository.save(user);
+          }
+        }
+      }
+
+      // 4. DERNIER FALLBACK : Ville de l'entreprise (si toutes les branches échouent)
+      if (!userCityId && company.city) {
+        userCityId = company.city.id;
+        userCityName = company.city.name;
       }
     }
 
     const hasCityFilter = isCityFilterable && !isSuperAdmin && !!userCityId;
 
-    // Déterminer la ressource et les permissions
+    // 🔥 Déterminer la ressource et les permissions
     let hasManagePermission = false;
     let targetResource: string;
 
     const typeToResource: Record<string, string> = {
-      RESTAURANT: 'ORDERS_RESTAURANT',
-      SHOP: 'ORDERS_SHOP',
-      CAR: 'ORDERS_CAR',
-      GROCERY: 'ORDERS_MARKET',
-      MARKET: 'ORDERS_MARKET',
+      [CompanyType.RESTAURANT]: 'ORDERS_RESTAURANT',
+      [CompanyType.SHOP]: 'ORDERS_SHOP',
+      [CompanyType.CAR]: 'ORDERS_CAR',
+      [CompanyType.GROCERY]: 'ORDERS_GROCERY',
     };
 
     if (type) {
@@ -1109,7 +1166,7 @@ export class OrderService {
 
     hasManagePermission = await this.permissionHelper.hasManageOnResource(user, targetResource);
 
-    // 🔥 Construire la requête
+    // 🔥 Construire la requête avec toutes les relations nécessaires
     const query = this.orderRepo
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.user', 'user')
@@ -1129,26 +1186,25 @@ export class OrderService {
       .leftJoinAndSelect('subOrderCompany.city', 'subOrderCompanyCity')
       .orderBy('order.createdAt', 'DESC');
 
-    // 🔥 Appliquer les filtres
+    // 🔥 Appliquer les filtres de type
     if (type) {
       query.where('order.type = :type', { type });
     } else {
       query.where('order.type = :type', { type: company.typeCompany });
     }
 
-    // 🔥 Règle métier :
-    // - SUPER ADMIN voit tout
-    // - Les autres utilisateurs voient uniquement les commandes des entreprises 
-    //   dont la ville = ville de leur branche active
+    // 🔥 RÈGLE MÉTIER PRINCIPALE : Application du filtre par ville
     if (isSuperAdmin) {
       // SUPER ADMIN voit tout, pas de filtre
-    } else if (hasCityFilter) {
+    } else if (hasCityFilter && userCityId) {
       // 🔥 FILTRE SIMPLIFIÉ : ville de l'entreprise qui vend = ville de la branche de l'utilisateur
       query.andWhere('subOrderCompany.cityId = :userCityId', { userCityId });
     } else if (!hasManagePermission) {
       // Si l'utilisateur n'a pas canManage ET pas de ville, il ne voit rien
       query.andWhere('1 = 0');
     }
+    // Si hasCityFilter est false (pas de branche trouvée) ET l'utilisateur a canManage,
+    // on affiche toutes les commandes (pas de filtre additionnel)
 
     // 🔥 Pagination
     const skip = (page - 1) * limit;
@@ -1156,7 +1212,7 @@ export class OrderService {
 
     const [orders, total] = await query.getManyAndCount();
 
-    // 🔥 Enrichir les commandes avec la ville de l'entreprise
+    // 🔥 Enrichir les commandes avec la ville de l'entreprise pour le frontend
     const enrichedOrders = orders.map(order => {
       let cityId: string | null = null;
       let cityName: string | null = null;
@@ -1178,7 +1234,7 @@ export class OrderService {
 
     const paginatedData = new PaginatedResponseDto(enrichedOrders, total, page, limit);
 
-    // 🔥 Message
+    // 🔥 Construction du message de réponse
     let message: string;
 
     if (total === 0 && hasCityFilter && userCityName) {
