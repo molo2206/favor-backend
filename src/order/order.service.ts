@@ -1071,7 +1071,7 @@ export class OrderService {
     // 🔥 Filtrage par ville pour RESTAURANT et GROCERY uniquement
     const isCityFilterable = orderType === 'RESTAURANT' || orderType === 'GROCERY';
 
-    // 🔥 Récupérer UNIQUEMENT la ville de la branche active de l'utilisateur (sans aucun fallback)
+    // 🔥 Récupérer UNIQUEMENT la ville de la branche active de l'utilisateur
     let userCityId: string | null = null;
     let userCityName: string | null = null;
 
@@ -1087,6 +1087,17 @@ export class OrderService {
     }
 
     const hasCityFilter = isCityFilterable && !isSuperAdmin && !!userCityId;
+
+    // 🔥 LOGS DE DEBUG
+    console.log('🔍 DEBUG findByType:');
+    console.log('user.id:', user.id);
+    console.log('user.activeBranchId:', user.activeBranchId);
+    console.log('userCityId:', userCityId);
+    console.log('userCityName:', userCityName);
+    console.log('hasCityFilter:', hasCityFilter);
+    console.log('isSuperAdmin:', isSuperAdmin);
+    console.log('isCityFilterable:', isCityFilterable);
+    console.log('orderType:', orderType);
 
     // Déterminer la ressource et les permissions
     let hasManagePermission = false;
@@ -1107,6 +1118,7 @@ export class OrderService {
     }
 
     hasManagePermission = await this.permissionHelper.hasManageOnResource(user, targetResource);
+    console.log('hasManagePermission:', hasManagePermission);
 
     // 🔥 Construire la requête
     const query = this.orderRepo
@@ -1128,31 +1140,47 @@ export class OrderService {
       .leftJoinAndSelect('subOrderCompany.city', 'subOrderCompanyCity')
       .orderBy('order.createdAt', 'DESC');
 
-    // 🔥 Appliquer les filtres de type
+    // 🔥 Appliquer les filtres
     if (type) {
       query.where('order.type = :type', { type });
     } else {
       query.where('order.type = :type', { type: company.typeCompany });
     }
 
-    // 🔥 Application de la nouvelle règle métier
+    // 🔥 Règle métier :
+    // - SUPER ADMIN voit tout (pas de filtre)
+    // - Les autres utilisateurs voient uniquement les commandes des entreprises 
+    //   dont la ville = ville de leur branche active
     if (isSuperAdmin) {
-      // SUPER ADMIN voit tout, pas de filtre sur la ville
+      // SUPER ADMIN voit tout, pas de filtre
+      console.log('✅ SUPER ADMIN - Pas de filtre');
     } else if (hasCityFilter) {
-      // 🔥 FILTRE DIRECT SIMPLIFIÉ : la ville de l'entreprise qui vend = la ville de la branche active de l'utilisateur
+      // 🔥 FILTRE STRICT : ville de l'entreprise qui vend = ville de la branche de l'utilisateur
       query.andWhere('subOrderCompany.cityId = :userCityId', { userCityId });
-    } else if (!hasManagePermission) {
-      // Si l'utilisateur n'a pas la permission de gestion ET pas de filtre de ville valide, il ne voit rien
-      query.andWhere('1 = 0');
+      console.log('✅ Filtre appliqué: subOrderCompany.cityId =', userCityId);
+    } else {
+      // Si l'utilisateur n'a pas de ville (pas de branche active), 
+      // il ne voit aucune commande (sauf s'il a canManage)
+      if (!hasManagePermission) {
+        query.andWhere('1 = 0');
+        console.log('⚠️ Aucune ville trouvée et pas de permission - 0 résultat');
+      } else {
+        console.log('⚠️ Aucune ville trouvée mais canManage = true - voir toutes les commandes');
+      }
     }
 
     // 🔥 Pagination
     const skip = (page - 1) * limit;
     query.skip(skip).take(limit);
 
-    const [orders, total] = await query.getManyAndCount();
+    // 🔥 Afficher la requête SQL pour debug
+    const sql = query.getSql();
+    console.log('📝 SQL:', sql);
 
-    // 🔥 Enrichir les commandes avec la ville de l'entreprise vendeuse
+    const [orders, total] = await query.getManyAndCount();
+    console.log('📊 Nombre de commandes trouvées:', total);
+
+    // 🔥 Enrichir les commandes avec la ville de l'entreprise
     const enrichedOrders = orders.map(order => {
       let cityId: string | null = null;
       let cityName: string | null = null;
@@ -1174,7 +1202,7 @@ export class OrderService {
 
     const paginatedData = new PaginatedResponseDto(enrichedOrders, total, page, limit);
 
-    // 🔥 Formatage du message de retour (I18n)
+    // 🔥 Message
     let message: string;
 
     if (total === 0 && hasCityFilter && userCityName) {
