@@ -358,7 +358,6 @@ export class OrderService {
         else if (firstItem.product?.image) imageUrl = firstItem.product.image;
       }
 
-      // Construire l'objet de traduction pour le template d'email
       const emailTranslations = {
         invoice: this.i18nService.translate('order.email.invoice', lang),
         billed_to: this.i18nService.translate('order.email.billed_to', lang),
@@ -435,7 +434,7 @@ export class OrderService {
             pin: order.pin,
           });
         }
-      } else if (order.paymentStatus === PaymentStatus.PENDING) {
+      } else {
         notificationOptions.pushTitle = this.i18nService.translate('order.push_order_pending_title', lang);
         notificationOptions.pushBody = this.i18nService.translate('order.push_order_pending_body', lang, {
           invoiceNumber: order.invoiceNumber,
@@ -476,141 +475,81 @@ export class OrderService {
         finalOrder.id,
       );
 
-      // 🔥 RÉCUPÉRER LA RESSOURCE NÉCESSAIRE POUR LES PERMISSIONS
+      // 🔥🔥🔥 ENVOYER À TOUS LES ADMINISTRATEURS AVEC canManage 🔥🔥🔥
       const resourceName = this.permissionHelper.getOrderResourceByCompanyType(finalOrder.type);
       console.log(`🔍 Resource name: ${resourceName}`);
 
-      // 🔥 RÉCUPÉRER LES BRANCHES CONCERNÉES PAR LA COMMANDE
-      const orderBranchIds = new Set<string>();
-      for (const subOrder of subOrders) {
-        const company = await this.companyRepo.findOne({
-          where: { id: subOrder.company.id },
-          relations: ['branches']
-        });
-        if (company?.branches) {
-          for (const branch of company.branches) {
-            orderBranchIds.add(branch.id);
-          }
-        }
-      }
+      // 🔥 Récupérer tous les ADMINISTRATEURS qui ont la permission canManage sur cette ressource
+      // Peu importe leur branche
+      const adminUsers = await this.userRepository
+        .createQueryBuilder('u')
+        .innerJoin('user_has_company', 'uhc', 'uhc.userId = u.id')
+        .innerJoin('company_has_user_resource', 'chur', 'chur.userCompanyId = uhc.id')
+        .innerJoin('resource', 'r', 'r.id = chur.resourceId')
+        .where('u.role = :role', { role: 'ADMIN' })
+        .andWhere('r.name = :resourceName', { resourceName })
+        .andWhere('chur.canManage = :canManage', { canManage: true })
+        .getMany();
 
-      // Si pas de branches trouvées, on utilise les branches de l'entreprise active
-      if (orderBranchIds.size === 0) {
-        const company = await this.companyRepo.findOne({
-          where: { id: user.activeCompanyId },
-          relations: ['branches']
-        });
-        if (company?.branches) {
-          for (const branch of company.branches) {
-            orderBranchIds.add(branch.id);
-          }
-        }
+      console.log(`👥 Admins avec canManage sur ${resourceName}: ${adminUsers.length}`);
+      if (adminUsers.length > 0) {
+        console.log(`👥 Admins: ${adminUsers.map(a => a.fullName).join(', ')}`);
       }
-
-      console.log(`🏢 Branches concernées par la commande: ${Array.from(orderBranchIds).join(', ')}`);
 
       const processedRecipients = new Set<string>([user.id]);
 
-      // 🔥 POUR CHAQUE BRANCHE CONCERNÉE, RÉCUPÉRER LES UTILISATEURS AYANT LA PERMISSION
-      for (const branchId of orderBranchIds) {
-        console.log(`🔍 Recherche des utilisateurs pour la branche: ${branchId}`);
+      // 🔥 Envoyer les notifications à tous les admins
+      for (const admin of adminUsers) {
+        if (processedRecipients.has(admin.id)) continue;
+        processedRecipients.add(admin.id);
 
-        // Récupérer tous les user_has_company pour les entreprises concernées
-        const companyIds = Array.from(groupedByCompany.keys());
+        console.log(`📨 Envoi notification à l'admin: ${admin.fullName} (${admin.id})`);
 
-        for (const companyId of companyIds) {
-          // 🔥 Récupérer les utilisateurs de cette entreprise avec cette branche
-          const userCompanies = await this.userHasCompanyRepo.find({
-            where: {
-              company: { id: companyId },
-              branchId: branchId
-            },
-            relations: ['user']
-          });
-
-          console.log(`  👥 Utilisateurs trouvés pour entreprise ${companyId}, branche ${branchId}: ${userCompanies.length}`);
-
-          for (const uc of userCompanies) {
-            const recipient = uc.user;
-            if (!recipient || processedRecipients.has(recipient.id)) continue;
-
-            // 🔥 VÉRIFIER LA PERMISSION SUR CETTE BRANCHE
-            const permission = await this.companyHasUserResourceRepo.findOne({
-              where: {
-                userCompanyId: uc.id,
-                branchId: branchId,
-              },
-              relations: ['resource']
-            });
-
-            if (!permission) {
-              console.log(`  ❌ Pas de permission pour l'utilisateur ${recipient.id} sur la branche ${branchId}`);
-              continue;
-            }
-
-            // Vérifier si le resource correspond
-            if (permission.resource?.name !== resourceName) {
-              console.log(`  ❌ Resource mismatch pour l'utilisateur ${recipient.id}: ${permission.resource?.name} !== ${resourceName}`);
-              continue;
-            }
-
-            // 🔥 Vérifier si l'utilisateur a canRead OU canManage
-            if (!permission.canRead && !permission.canManage) {
-              console.log(`  ❌ Pas de permission canRead/canManage pour l'utilisateur ${recipient.id}`);
-              continue;
-            }
-
-            processedRecipients.add(recipient.id);
-
-            console.log(`✅ Envoi notification à ${recipient.fullName} (${recipient.id}) pour la branche ${branchId}`);
-
-            // 🔥 Envoyer la notification WebSocket
-            await this.notificationsService.sendNotificationToUser(
-              recipient.id,
-              this.i18nService.translate('notification.order_created_title', lang),
-              this.i18nService.translate('notification.order_created_content', lang, {
-                invoiceNumber: finalOrder.invoiceNumber,
-                totalAmount: finalOrder.totalAmount,
-                currency: finalOrder.currency,
-              }),
-              finalOrder.type as any,
-              {
-                orderId: finalOrder.id,
-                invoiceNumber: finalOrder.invoiceNumber,
-                totalAmount: finalOrder.totalAmount,
-                currency: finalOrder.currency,
-                type: finalOrder.type,
-                branchId: branchId,
-              }
-            );
-
-            // 🔥 Sauvegarder en base
-            await this.notificationsService.sendAndSaveNotification(
-              recipient.id,
-              this.i18nService.translate('notification.order_created_title', lang),
-              this.i18nService.translate('notification.order_created_content', lang, {
-                invoiceNumber: finalOrder.invoiceNumber,
-                totalAmount: finalOrder.totalAmount,
-                currency: finalOrder.currency,
-              }),
-              finalOrder.type as any,
-              {
-                orderId: finalOrder.id,
-                invoiceNumber: finalOrder.invoiceNumber,
-                totalAmount: finalOrder.totalAmount,
-                currency: finalOrder.currency,
-                type: finalOrder.type,
-                branchId: branchId,
-              }
-            );
+        // Envoyer via WebSocket si connecté
+        await this.notificationsService.sendNotificationToUser(
+          admin.id,
+          this.i18nService.translate('notification.order_created_title', lang),
+          this.i18nService.translate('notification.order_created_content', lang, {
+            invoiceNumber: finalOrder.invoiceNumber,
+            totalAmount: finalOrder.totalAmount,
+            currency: finalOrder.currency,
+          }),
+          finalOrder.type as any,
+          {
+            orderId: finalOrder.id,
+            invoiceNumber: finalOrder.invoiceNumber,
+            totalAmount: finalOrder.totalAmount,
+            currency: finalOrder.currency,
+            type: finalOrder.type,
           }
-        }
+        );
+
+        // Sauvegarder en base
+        await this.notificationsService.sendAndSaveNotification(
+          admin.id,
+          this.i18nService.translate('notification.order_created_title', lang),
+          this.i18nService.translate('notification.order_created_content', lang, {
+            invoiceNumber: finalOrder.invoiceNumber,
+            totalAmount: finalOrder.totalAmount,
+            currency: finalOrder.currency,
+          }),
+          finalOrder.type as any,
+          {
+            orderId: finalOrder.id,
+            invoiceNumber: finalOrder.invoiceNumber,
+            totalAmount: finalOrder.totalAmount,
+            currency: finalOrder.currency,
+            type: finalOrder.type,
+          }
+        );
       }
 
-      // 🔥 SUPER ADMIN (toujours notifiés, sans filtre de branche)
-      const superAdmins = await this.userRepository.find({ where: { role: UserRole.SUPER_ADMIN } });
+      // 🔥 SUPER ADMIN (toujours notifiés)
+      const superAdmins = await this.userRepository.find({ where: { role: 'SUPER_ADMIN' } });
       for (const admin of superAdmins) {
         if (processedRecipients.has(admin.id)) continue;
+
+        console.log(`📨 Envoi notification au SUPER ADMIN: ${admin.fullName} (${admin.id})`);
 
         await this.notificationsService.sendNotificationToUser(
           admin.id,
