@@ -545,7 +545,7 @@ export class OrderService {
       }
 
       // 🔥 SUPER ADMIN (toujours notifiés)
-      const superAdmins = await this.userRepository.find({ where: { role: 'SUPER_ADMIN' } });
+      const superAdmins = await this.userRepository.find({ where: { role: UserRole.SUPER_ADMIN } });
       for (const admin of superAdmins) {
         if (processedRecipients.has(admin.id)) continue;
 
