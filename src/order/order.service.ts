@@ -1056,7 +1056,7 @@ export class OrderService {
       throw new BadRequestException(this.i18nService.translate('order.no_active_company', lang));
     }
 
-    // Récupérer l'entreprise active
+    // Récupérer l'entreprise active avec ses relations
     const company = await this.companyRepo.findOne({
       where: { id: user.activeCompanyId },
       relations: ['city', 'branches', 'branches.city']
@@ -1075,6 +1075,7 @@ export class OrderService {
     let userCityName: string | null = null;
 
     if (isCityFilterable && !isSuperAdmin) {
+      // 🔥 PRIORITÉ 1: Utiliser la branche active de l'utilisateur
       if (user.activeBranchId) {
         const branch = await this.branchRepo.findOne({
           where: { id: user.activeBranchId },
@@ -1083,17 +1084,44 @@ export class OrderService {
         if (branch?.city) {
           userCityId = branch.city.id;
           userCityName = branch.city.name;
+          console.log('✅ Branche active trouvée:', branch.name, 'Ville:', userCityName);
+        } else {
+          console.log('⚠️ Branche active trouvée mais sans ville associée');
         }
+      } else {
+        console.log('⚠️ Aucune branche active pour l\'utilisateur');
       }
 
-      // Fallback sur la ville de l'entreprise
+      // 🔥 PRIORITÉ 2: Fallback sur la ville de l'entreprise
       if (!userCityId && company.city) {
         userCityId = company.city.id;
         userCityName = company.city.name;
+        console.log('⚠️ Fallback: utilisation de la ville de l\'entreprise:', userCityName);
+      }
+
+      // 🔥 PRIORITÉ 3: Fallback sur la première branche de l'entreprise
+      if (!userCityId && company.branches && company.branches.length > 0) {
+        for (const branch of company.branches) {
+          if (branch.city) {
+            userCityId = branch.city.id;
+            userCityName = branch.city.name;
+            console.log('⚠️ Fallback: utilisation de la première branche:', branch.name, 'Ville:', userCityName);
+            break;
+          }
+        }
       }
     }
 
+    // 🔥 hasCityFilter = true si on a une ville ET que le type est filtrable ET que l'utilisateur n'est pas super admin
     const hasCityFilter = isCityFilterable && !isSuperAdmin && !!userCityId;
+
+    console.log('🔍 DEBUG findByType:');
+    console.log('user.activeBranchId:', user.activeBranchId);
+    console.log('userCityId:', userCityId);
+    console.log('userCityName:', userCityName);
+    console.log('hasCityFilter:', hasCityFilter);
+    console.log('isCityFilterable:', isCityFilterable);
+    console.log('isSuperAdmin:', isSuperAdmin);
 
     // Déterminer la ressource et les permissions
     let hasManagePermission = false;
@@ -1146,7 +1174,7 @@ export class OrderService {
         query.where('order.type = :type', { type: company.typeCompany });
       }
 
-      // 🔥 FILTRE PAR VILLE STRICT
+      // 🔥 FILTRE PAR VILLE
       if (hasCityFilter && userCityId) {
         query.andWhere(
           `(subOrderCompany.cityId = :userCityId OR 
@@ -1157,6 +1185,9 @@ export class OrderService {
           ))`,
           { userCityId }
         );
+        console.log('✅ Filtre par ville appliqué:', userCityId);
+      } else {
+        console.log('⚠️ Filtre par ville NON appliqué');
       }
     } else {
       const hasReadPermission = await this.permissionHelper.hasOrderReadPermission(user, company.typeCompany);
@@ -1178,6 +1209,7 @@ export class OrderService {
         .leftJoinAndSelect('filterCompanyBranches.city', 'filterCompanyBranchCity')
         .andWhere('filterCompany.id = :activeCompanyId', { activeCompanyId: user.activeCompanyId });
 
+      // 🔥 FILTRE PAR VILLE
       if (hasCityFilter && userCityId) {
         query.andWhere(
           `(filterCompany.cityId = :userCityId OR 
@@ -1188,6 +1220,7 @@ export class OrderService {
           ))`,
           { userCityId }
         );
+        console.log('✅ Filtre par ville appliqué (read):', userCityId);
       }
 
       if (type) {
@@ -1203,7 +1236,9 @@ export class OrderService {
 
     const [orders, total] = await query.getManyAndCount();
 
-    // 🔥 Enrichir les commandes
+    console.log('📊 Résultats: total commandes trouvées:', total);
+
+    // 🔥 Enrichir les commandes avec les informations de ville et branche
     const enrichedOrders = orders.map(order => {
       let cityId: string | null = null;
       let cityName: string | null = null;
@@ -1248,6 +1283,7 @@ export class OrderService {
 
     // 🔥 Message
     let message: string;
+
     if (total === 0 && hasCityFilter && userCityName) {
       // 🔥 Message spécifique quand aucune commande trouvée
       message = this.i18nService.translate('order.no_orders_for_city', lang, {
