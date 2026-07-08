@@ -1075,7 +1075,10 @@ export class OrderService {
     let userCityId: string | null = null;
     let userCityName: string | null = null;
 
-    if (isCityFilterable && user.activeBranchId) {
+    // 🔥 Vérifier si l'utilisateur a une branche active
+    if (!user.activeBranchId) {
+      console.log('⚠️ L\'utilisateur n\'a pas de branche active');
+    } else if (isCityFilterable) {
       const branch = await this.branchRepo.findOne({
         where: { id: user.activeBranchId },
         relations: ['city'],
@@ -1083,11 +1086,12 @@ export class OrderService {
       if (branch?.city) {
         userCityId = branch.city.id;
         userCityName = branch.city.name;
+        console.log('✅ Branche active trouvée:', branch.name, 'Ville:', userCityName);
+      } else {
+        console.log('⚠️ La branche active n\'a pas de ville associée');
       }
     }
 
-    // 🔥 hasCityFilter = true si on a une ville ET que le type est filtrable
-    // 🔥 On n'utilise PAS isSuperAdmin ici car on veut filtrer tout le monde sauf SUPER ADMIN
     const hasCityFilter = isCityFilterable && !!userCityId;
 
     // 🔥 LOGS DE DEBUG
@@ -1151,20 +1155,23 @@ export class OrderService {
 
     // 🔥 Règle métier CORRIGÉE :
     // - SUPER ADMIN voit tout (pas de filtre)
-    // - TOUS les autres utilisateurs (même avec canManage) voient UNIQUEMENT les commandes de leur ville
+    // - TOUS les autres utilisateurs (même avec canManage) doivent avoir une branche active
     if (isSuperAdmin) {
       // SUPER ADMIN voit tout, pas de filtre
       console.log('✅ SUPER ADMIN - Pas de filtre');
+    } else if (!user.activeBranchId) {
+      // 🔥 L'utilisateur n'a pas de branche active → message d'erreur
+      throw new BadRequestException(
+        this.i18nService.translate('order.no_active_branch', lang)
+      );
     } else if (hasCityFilter) {
       // 🔥 FILTRE STRICT : ville de l'entreprise qui vend = ville de la branche de l'utilisateur
-      // 🔥 MÊME pour les utilisateurs avec canManage
       query.andWhere('subOrderCompany.cityId = :userCityId', { userCityId });
       console.log('✅ Filtre appliqué: subOrderCompany.cityId =', userCityId);
     } else {
-      // Si l'utilisateur n'a pas de ville (pas de branche active ou type non filtrable)
-      // Il ne voit AUCUNE commande (sauf SUPER ADMIN)
-      query.andWhere('1 = 0');
-      console.log('⚠️ Aucune ville trouvée ou type non filtrable - 0 résultat');
+      // Si le type n'est pas filtrable (SHOP, CAR, etc.) ou pas de ville
+      // On ne filtre pas par ville, on laisse la requête sans filtre
+      console.log('⚠️ Type non filtrable ou pas de ville - pas de filtre supplémentaire');
     }
 
     // 🔥 Pagination
