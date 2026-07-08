@@ -1056,7 +1056,7 @@ export class OrderService {
       throw new BadRequestException(this.i18nService.translate('order.no_active_company', lang));
     }
 
-    // Récupérer l'entreprise active (uniquement pour le type et les permissions)
+    // Récupérer l'entreprise active
     const company = await this.companyRepo.findOne({
       where: { id: user.activeCompanyId },
       relations: ['city', 'branches', 'branches.city']
@@ -1077,7 +1077,6 @@ export class OrderService {
     let userCityName: string | null = null;
 
     if (isCityFilterable && !isSuperAdmin) {
-      // 🔥 UNIQUEMENT la branche active de l'utilisateur
       if (user.activeBranchId) {
         const branch = await this.branchRepo.findOne({
           where: { id: user.activeBranchId },
@@ -1087,11 +1086,6 @@ export class OrderService {
           userCityId = branch.city.id;
           userCityName = branch.city.name;
         }
-      }
-
-      // 🔥 Si l'utilisateur n'a pas de branche active, on ne filtre pas
-      if (!userCityId) {
-        console.log('⚠️ Utilisateur sans branche active, pas de filtrage par ville');
       }
     }
 
@@ -1139,65 +1133,33 @@ export class OrderService {
       .leftJoinAndSelect('subOrderCompanyBranches.city', 'subOrderCompanyBranchCity')
       .orderBy('order.createdAt', 'DESC');
 
-    // Appliquer les filtres
-    if (hasManagePermission || isSuperAdmin) {
-      // 🔥 Filtrer par type
-      if (type) {
-        query.where('order.type = :type', { type });
-      } else {
-        query.where('order.type = :type', { type: company.typeCompany });
-      }
-
-      // 🔥 FILTRE PAR VILLE : ville de l'entreprise qui vend = ville de la branche de l'utilisateur
-      if (hasCityFilter && userCityId) {
-        query.andWhere(
-          `(subOrderCompany.cityId = :userCityId OR 
-          EXISTS (
-            SELECT 1 FROM branches b 
-            WHERE b.company_id = subOrderCompany.id 
-            AND b.cityId = :userCityId
-          ))`,
-          { userCityId }
-        );
-      }
+    // 🔥 Appliquer les filtres
+    if (type) {
+      query.where('order.type = :type', { type });
     } else {
-      const hasReadPermission = await this.permissionHelper.hasOrderReadPermission(user, company.typeCompany);
+      query.where('order.type = :type', { type: company.typeCompany });
+    }
 
-      if (!hasReadPermission) {
-        const requiredResource = this.permissionHelper.getOrderResourceByCompanyType(company.typeCompany);
-        throw new ForbiddenException(
-          this.i18nService.translate('order.no_permission_to_view_orders', lang, {
-            resource: requiredResource,
-          }),
-        );
-      }
-
-      query
-        .innerJoin('order.subOrders', 'filterSubOrder')
-        .innerJoin('filterSubOrder.company', 'filterCompany')
-        .leftJoinAndSelect('filterCompany.city', 'filterCompanyCity')
-        .leftJoinAndSelect('filterCompany.branches', 'filterCompanyBranches')
-        .leftJoinAndSelect('filterCompanyBranches.city', 'filterCompanyBranchCity')
-        .andWhere('filterCompany.id = :activeCompanyId', { activeCompanyId: user.activeCompanyId });
-
+    // 🔥 Si l'utilisateur a canManage ET n'est pas SUPER ADMIN, il voit les commandes de sa ville UNIQUEMENT
+    // 🔥 Si l'utilisateur n'a pas canManage, il voit les commandes de sa ville UNIQUEMENT
+    // 🔥 Si l'utilisateur est SUPER ADMIN, il voit TOUTES les commandes
+    if (isSuperAdmin) {
+      // SUPER ADMIN voit tout, pas de filtre
+    } else if (hasCityFilter) {
       // 🔥 FILTRE PAR VILLE : ville de l'entreprise qui vend = ville de la branche de l'utilisateur
-      if (hasCityFilter && userCityId) {
-        query.andWhere(
-          `(filterCompany.cityId = :userCityId OR 
-          EXISTS (
-            SELECT 1 FROM branches b 
-            WHERE b.company_id = filterCompany.id 
-            AND b.cityId = :userCityId
-          ))`,
-          { userCityId }
-        );
-      }
-
-      if (type) {
-        query.andWhere('order.type = :type', { type });
-      } else {
-        query.andWhere('order.type = :type', { type: company.typeCompany });
-      }
+      query.andWhere(
+        `(subOrderCompany.cityId = :userCityId OR 
+        EXISTS (
+          SELECT 1 FROM branches b 
+          WHERE b.company_id = subOrderCompany.id 
+          AND b.cityId = :userCityId
+        ))`,
+        { userCityId }
+      );
+    } else if (!hasManagePermission) {
+      // 🔥 Si l'utilisateur n'a pas canManage ET pas de ville, il ne voit rien
+      // (cas normalement géré par les permissions)
+      query.andWhere('1 = 0');
     }
 
     // 🔥 Pagination
@@ -1206,7 +1168,7 @@ export class OrderService {
 
     const [orders, total] = await query.getManyAndCount();
 
-    // 🔥 Enrichir les commandes avec les informations de ville de l'entreprise
+    // 🔥 Enrichir les commandes
     const enrichedOrders = orders.map(order => {
       let cityId: string | null = null;
       let cityName: string | null = null;
@@ -1216,13 +1178,11 @@ export class OrderService {
       if (order.subOrders && order.subOrders.length > 0) {
         const firstSubOrder = order.subOrders[0];
 
-        // Ville de l'entreprise qui vend le produit
         if (firstSubOrder.company?.city) {
           cityId = firstSubOrder.company.city.id;
           cityName = firstSubOrder.company.city.name;
         }
 
-        // Branche correspondante
         if (firstSubOrder.company?.branches && firstSubOrder.company.branches.length > 0) {
           const matchingBranch = firstSubOrder.company.branches.find(
             b => b.city?.id === userCityId
@@ -1240,10 +1200,10 @@ export class OrderService {
 
       return {
         ...order,
-        cityId,      // Ville de l'entreprise qui vend
-        cityName,    // Nom de la ville de l'entreprise
-        branchId,    // Branche correspondante (si trouvée)
-        branchName,  // Nom de la branche
+        cityId,
+        cityName,
+        branchId,
+        branchName,
       };
     });
 
@@ -1257,15 +1217,15 @@ export class OrderService {
         city: userCityName,
         resource: targetResource
       });
-    } else if (hasManagePermission || isSuperAdmin) {
+    } else if (isSuperAdmin) {
+      message = this.i18nService.translate('order.orders_fetched_manage', lang, {
+        resource: 'TOUTES LES COMMANDES'
+      });
+    } else if (hasManagePermission) {
       if (hasCityFilter && userCityName) {
         message = this.i18nService.translate('order.orders_fetched_manage_city', lang, {
           resource: targetResource,
           city: userCityName
-        });
-      } else if (isSuperAdmin) {
-        message = this.i18nService.translate('order.orders_fetched_manage', lang, {
-          resource: 'TOUTES LES COMMANDES'
         });
       } else {
         message = this.i18nService.translate('order.orders_fetched_manage', lang, {
