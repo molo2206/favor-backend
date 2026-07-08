@@ -1073,7 +1073,6 @@ export class OrderService {
     // 🔥 Récupérer la ville de la branche active de l'utilisateur
     let userCityId: string | null = null;
     let userCityName: string | null = null;
-    let userBranchId: string | null = null;
 
     if (isCityFilterable && !isSuperAdmin) {
       if (user.activeBranchId) {
@@ -1084,7 +1083,6 @@ export class OrderService {
         if (branch?.city) {
           userCityId = branch.city.id;
           userCityName = branch.city.name;
-          userBranchId = branch.id;
         }
       }
 
@@ -1117,7 +1115,7 @@ export class OrderService {
 
     hasManagePermission = await this.permissionHelper.hasManageOnResource(user, targetResource);
 
-    // Construire la requête
+    // 🔥 Construire la requête avec les jointures nécessaires
     const query = this.orderRepo
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.user', 'user')
@@ -1141,13 +1139,14 @@ export class OrderService {
 
     // Appliquer les filtres
     if (hasManagePermission || isSuperAdmin) {
+      // 🔥 Filtrer par type
       if (type) {
         query.where('order.type = :type', { type });
       } else {
         query.where('order.type = :type', { type: company.typeCompany });
       }
 
-      // 🔥 FILTRE PAR VILLE : Soit la ville de l'entreprise, soit une branche de l'entreprise
+      // 🔥 FILTRE PAR VILLE STRICT
       if (hasCityFilter && userCityId) {
         query.andWhere(
           `(subOrderCompany.cityId = :userCityId OR 
@@ -1174,9 +1173,9 @@ export class OrderService {
       query
         .innerJoin('order.subOrders', 'filterSubOrder')
         .innerJoin('filterSubOrder.company', 'filterCompany')
-        .leftJoin('filterCompany.city', 'filterCompanyCity')
-        .leftJoin('filterCompany.branches', 'filterCompanyBranches')
-        .leftJoin('filterCompanyBranches.city', 'filterCompanyBranchCity')
+        .leftJoinAndSelect('filterCompany.city', 'filterCompanyCity')
+        .leftJoinAndSelect('filterCompany.branches', 'filterCompanyBranches')
+        .leftJoinAndSelect('filterCompanyBranches.city', 'filterCompanyBranchCity')
         .andWhere('filterCompany.id = :activeCompanyId', { activeCompanyId: user.activeCompanyId });
 
       if (hasCityFilter && userCityId) {
@@ -1198,13 +1197,13 @@ export class OrderService {
       }
     }
 
-    // Pagination
+    // 🔥 Pagination
     const skip = (page - 1) * limit;
     query.skip(skip).take(limit);
 
     const [orders, total] = await query.getManyAndCount();
 
-    // Enrichir les commandes avec les informations de ville et branche
+    // 🔥 Enrichir les commandes
     const enrichedOrders = orders.map(order => {
       let cityId: string | null = null;
       let cityName: string | null = null;
@@ -1220,7 +1219,7 @@ export class OrderService {
           cityName = firstSubOrder.company.city.name;
         }
 
-        // Chercher une branche qui correspond à la ville de l'utilisateur
+        // Branche correspondante
         if (firstSubOrder.company?.branches && firstSubOrder.company.branches.length > 0) {
           const matchingBranch = firstSubOrder.company.branches.find(
             b => b.city?.id === userCityId
@@ -1247,9 +1246,15 @@ export class OrderService {
 
     const paginatedData = new PaginatedResponseDto(enrichedOrders, total, page, limit);
 
-    // Message
+    // 🔥 Message
     let message: string;
-    if (hasManagePermission || isSuperAdmin) {
+    if (total === 0 && hasCityFilter && userCityName) {
+      // 🔥 Message spécifique quand aucune commande trouvée
+      message = this.i18nService.translate('order.no_orders_for_city', lang, {
+        city: userCityName,
+        resource: targetResource
+      });
+    } else if (hasManagePermission || isSuperAdmin) {
       if (hasCityFilter && userCityName) {
         message = this.i18nService.translate('order.orders_fetched_manage_city', lang, {
           resource: targetResource,
@@ -1282,6 +1287,7 @@ export class OrderService {
       data: paginatedData,
     };
   }
+
   async findOne(orderId: string): Promise<{ data: OrderEntity }> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },

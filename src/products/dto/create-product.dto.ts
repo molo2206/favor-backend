@@ -85,7 +85,6 @@ export class CreateProductDto {
   @IsString()
   name: string;
 
-
   @IsOptional()
   @IsString()
   slug?: string;
