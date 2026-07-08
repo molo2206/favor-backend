@@ -1056,16 +1056,30 @@ export class OrderService {
       throw new BadRequestException(this.i18nService.translate('order.no_active_company', lang));
     }
 
+    // 🔥 FORCER le rechargement de l'utilisateur avec ses relations
+    // Même si le contrôleur l'a déjà fait, on le refait pour être sûr
+    const userWithRelations = await this.userRepo.findOne({
+      where: { id: user.id },
+      relations: ['activeBranch', 'activeBranch.city']
+    });
+
+    if (!userWithRelations) {
+      throw new NotFoundException(this.i18nService.translate('user.not_found', lang));
+    }
+
+    // 🔥 Utiliser l'utilisateur rechargé
+    const fullUser = userWithRelations;
+
     // Récupérer l'entreprise active
     const company = await this.companyRepo.findOne({
-      where: { id: user.activeCompanyId },
+      where: { id: fullUser.activeCompanyId },
     });
 
     if (!company) {
       throw new NotFoundException(this.i18nService.translate('order.company_not_found', lang));
     }
 
-    const isSuperAdmin = user.role === 'SUPER ADMIN';
+    const isSuperAdmin = fullUser.role === 'SUPER ADMIN';
     const orderType = type || company.typeCompany;
 
     // 🔥 Filtrage par ville pour RESTAURANT et GROCERY uniquement
@@ -1075,15 +1089,15 @@ export class OrderService {
     let userCityId: string | null = null;
     let userCityName: string | null = null;
 
-    // 🔥 L'utilisateur est déjà chargé avec activeBranch et activeBranch.city
-    if (user.activeBranch?.city) {
-      userCityId = user.activeBranch.city.id;
-      userCityName = user.activeBranch.city.name;
-      console.log('✅ Branche active trouvée:', user.activeBranch.name, 'Ville:', userCityName);
-    } else if (user.activeBranchId) {
+    // 🔥 L'utilisateur est rechargé avec activeBranch et activeBranch.city
+    if (fullUser.activeBranch?.city) {
+      userCityId = fullUser.activeBranch.city.id;
+      userCityName = fullUser.activeBranch.city.name;
+      console.log('✅ Branche active trouvée:', fullUser.activeBranch.name, 'Ville:', userCityName);
+    } else if (fullUser.activeBranchId) {
       // 🔥 Fallback : charger la branche si elle n'est pas dans les relations
       const branch = await this.branchRepo.findOne({
-        where: { id: user.activeBranchId },
+        where: { id: fullUser.activeBranchId },
         relations: ['city'],
       });
       if (branch?.city) {
@@ -1102,8 +1116,8 @@ export class OrderService {
 
     // 🔥 LOGS DE DEBUG
     console.log('🔍 DEBUG findByType:');
-    console.log('user.id:', user.id);
-    console.log('user.activeBranchId:', user.activeBranchId);
+    console.log('user.id:', fullUser.id);
+    console.log('user.activeBranchId:', fullUser.activeBranchId);
     console.log('userCityId:', userCityId);
     console.log('userCityName:', userCityName);
     console.log('hasCityFilter:', hasCityFilter);
@@ -1129,7 +1143,7 @@ export class OrderService {
       targetResource = this.permissionHelper.getOrderResourceByCompanyType(company.typeCompany);
     }
 
-    hasManagePermission = await this.permissionHelper.hasManageOnResource(user, targetResource);
+    hasManagePermission = await this.permissionHelper.hasManageOnResource(fullUser, targetResource);
     console.log('hasManagePermission:', hasManagePermission);
 
     // 🔥 Construire la requête
@@ -1165,7 +1179,7 @@ export class OrderService {
     if (isSuperAdmin) {
       // SUPER ADMIN voit tout, pas de filtre
       console.log('✅ SUPER ADMIN - Pas de filtre');
-    } else if (!user.activeBranchId) {
+    } else if (!fullUser.activeBranchId) {
       // 🔥 L'utilisateur n'a pas de branche active → message d'erreur
       throw new BadRequestException(
         this.i18nService.translate('order.no_active_branch', lang)
@@ -1175,7 +1189,6 @@ export class OrderService {
       query.andWhere('subOrderCompany.cityId = :userCityId', { userCityId });
       console.log('✅ Filtre appliqué: subOrderCompany.cityId =', userCityId);
     } else {
-      // Si le type n'est pas filtrable (SHOP, CAR, etc.)
       console.log('⚠️ Type non filtrable - pas de filtre supplémentaire');
     }
 
