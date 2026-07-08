@@ -479,11 +479,9 @@ export class OrderService {
       const resourceName = this.permissionHelper.getOrderResourceByCompanyType(finalOrder.type);
 
       // 🔥 RÉCUPÉRER LA BRANCHE DE LA COMMANDE (via la sous-commande)
-      // Pour chaque sous-commande, on récupère la branche associée
       const orderBranchIds = new Set<string>();
 
       for (const subOrder of subOrders) {
-        // Récupérer les branches de l'entreprise via la relation
         const company = await this.companyRepo.findOne({
           where: { id: subOrder.company.id },
           relations: ['branches']
@@ -513,8 +511,71 @@ export class OrderService {
       const companyIds = Array.from(groupedByCompany.keys());
       const processedRecipients = new Set<string>();
 
+      // 🔥 1. RÉCUPÉRER TOUS LES ADMINISTRATEURS AVEC canManage SUR LA RESSOURCE
+      // Ces administrateurs reçoivent les notifications PEU IMPORTE leur branche active
+      const allAdminsWithManage = await this.userHasCompanyRepo
+        .createQueryBuilder('uhc')
+        .innerJoin('uhc.user', 'user')
+        .innerJoin('company_has_user_resource', 'chur', 'chur.userCompanyId = uhc.id')
+        .innerJoin('resource', 'r', 'r.id = chur.resourceId')
+        .where('r.name = :resourceName', { resourceName })
+        .andWhere('chur.canManage = :canManage', { canManage: true })
+        .andWhere('uhc.companyId IN (:...companyIds)', { companyIds })
+        .getMany();
+
+      // 🔥 Envoyer les notifications aux administrateurs avec canManage
+      for (const uhc of allAdminsWithManage) {
+        const recipient = uhc.user;
+        if (!recipient || recipient.id === user.id) continue;
+        if (processedRecipients.has(recipient.id)) continue;
+
+        processedRecipients.add(recipient.id);
+
+        // Envoyer la notification
+        await this.notificationsService.sendNotificationToUser(
+          recipient.id,
+          this.i18nService.translate('notification.order_created_title', lang),
+          this.i18nService.translate('notification.order_created_content', lang, {
+            invoiceNumber: finalOrder.invoiceNumber,
+            totalAmount: finalOrder.totalAmount,
+            currency: finalOrder.currency,
+          }),
+          finalOrder.type as any,
+          {
+            orderId: finalOrder.id,
+            invoiceNumber: finalOrder.invoiceNumber,
+            totalAmount: finalOrder.totalAmount,
+            currency: finalOrder.currency,
+            type: finalOrder.type,
+            branchId: recipient.activeBranchId || null,
+          }
+        );
+
+        // Sauvegarder en base
+        await this.notificationsService.sendAndSaveNotification(
+          recipient.id,
+          this.i18nService.translate('notification.order_created_title', lang),
+          this.i18nService.translate('notification.order_created_content', lang, {
+            invoiceNumber: finalOrder.invoiceNumber,
+            totalAmount: finalOrder.totalAmount,
+            currency: finalOrder.currency,
+          }),
+          finalOrder.type as any,
+          {
+            orderId: finalOrder.id,
+            invoiceNumber: finalOrder.invoiceNumber,
+            totalAmount: finalOrder.totalAmount,
+            currency: finalOrder.currency,
+            type: finalOrder.type,
+            branchId: recipient.activeBranchId || null,
+          }
+        );
+
+        console.log(`✅ Notification envoyée à l'administrateur ${recipient.fullName} (${recipient.id}) - canManage sur ${resourceName}`);
+      }
+
+      // 🔥 2. ENVOYER AUX UTILISATEURS AVEC canRead SUR LA BRANCHE CONCERNÉE
       for (const companyId of companyIds) {
-        // Récupérer tous les user_has_company pour cette entreprise
         const userCompanies = await this.userHasCompanyRepo.find({
           where: { company: { id: companyId } },
           relations: ['user']
@@ -522,21 +583,22 @@ export class OrderService {
 
         for (const uc of userCompanies) {
           const recipient = uc.user;
-          if (!recipient || recipient.id === user.id) continue; // Ne pas notifier le créateur
+          if (!recipient || recipient.id === user.id) continue;
+          if (processedRecipients.has(recipient.id)) continue;
 
-          // 🔥 VÉRIFICATION 1: L'utilisateur doit avoir une branche active
+          // Vérifier que l'utilisateur a une branche active
           if (!recipient.activeBranchId) {
             console.log(`❌ Utilisateur ${recipient.id} n'a pas de branche active`);
             continue;
           }
 
-          // 🔥 VÉRIFICATION 2: La branche active de l'utilisateur doit être dans les branches de la commande
+          // Vérifier que la branche active est dans les branches de la commande
           if (!orderBranchIds.has(recipient.activeBranchId)) {
             console.log(`❌ Utilisateur ${recipient.id} est sur la branche ${recipient.activeBranchId} qui n'est pas concernée par la commande`);
             continue;
           }
 
-          // 🔥 VÉRIFICATION 3: Vérifier la permission dans company_has_user_resource
+          // Vérifier la permission sur cette branche
           const permission = await this.companyHasUserResourceRepo.findOne({
             where: {
               userCompanyId: uc.id,
@@ -550,25 +612,21 @@ export class OrderService {
             continue;
           }
 
-          // Vérifier si le resource correspond
           const hasResource = permission.resource?.name === resourceName;
           if (!hasResource) {
             console.log(`❌ Utilisateur ${recipient.id} n'a pas la ressource ${resourceName}`);
             continue;
           }
 
-          // Vérifier si l'utilisateur a canRead ou canManage
-          const hasPermission = permission.canRead || permission.canManage;
-          if (!hasPermission) {
-            console.log(`❌ Utilisateur ${recipient.id} n'a pas la permission canRead ou canManage`);
+          const hasReadPermission = permission.canRead === true;
+          if (!hasReadPermission) {
+            console.log(`❌ Utilisateur ${recipient.id} n'a pas la permission canRead`);
             continue;
           }
 
-          // Empêcher les doublons
-          if (processedRecipients.has(recipient.id)) continue;
           processedRecipients.add(recipient.id);
 
-          // 🔥 ENVOYER LA NOTIFICATION
+          // Envoyer la notification
           await this.notificationsService.sendNotificationToUser(
             recipient.id,
             this.i18nService.translate('notification.order_created_title', lang),
@@ -588,7 +646,6 @@ export class OrderService {
             }
           );
 
-          // Sauvegarder en base
           await this.notificationsService.sendAndSaveNotification(
             recipient.id,
             this.i18nService.translate('notification.order_created_title', lang),
@@ -608,14 +665,15 @@ export class OrderService {
             }
           );
 
-          console.log(`✅ Notification envoyée à l'utilisateur ${recipient.id} (branche: ${recipient.activeBranchId})`);
+          console.log(`✅ Notification envoyée à l'utilisateur ${recipient.fullName} (${recipient.id}) - branche: ${recipient.activeBranchId}`);
         }
       }
 
-      // 🔥 NOTIFICATION POUR LES SUPER ADMINS (sans filtre de branche)
+      // 🔥 3. NOTIFICATION POUR LES SUPER ADMINS (sans filtre)
       const superAdmins = await this.userRepository.find({ where: { role: UserRole.SUPER_ADMIN } });
       for (const admin of superAdmins) {
-        if (admin.id === user.id) continue; // Ne pas notifier le créateur
+        if (admin.id === user.id) continue;
+        if (processedRecipients.has(admin.id)) continue;
 
         await this.notificationsService.sendNotificationToUser(
           admin.id,
@@ -636,7 +694,7 @@ export class OrderService {
         );
       }
 
-      console.log('[processOrderNotifications] Notifications envoyées avec succès par branche');
+      console.log('[processOrderNotifications] Notifications envoyées avec succès');
     } catch (error) {
       console.error('Erreur dans processOrderNotifications:', error);
     }
