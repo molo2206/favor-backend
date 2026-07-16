@@ -192,17 +192,20 @@ export class OrderService {
         try {
           const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
           console.log('[Order] Réponse Pawapay :', pawapayResponse);
-          const depositStatus = pawapayResponse.finalStatus?.data?.status;
-          switch (depositStatus) {
-            case 'COMPLETED':
-              console.log('[Order] Dépôt Pawapay confirmé : COMPLETED');
-              paymentStatus = PaymentStatus.PAID;
-              orderStatus = OrderStatus.VALIDATED;
-              isPaidByMobileMoney = true;
-              break;
-            default:
-              throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
+
+          // 🔥 Récupérer le statut
+          const depositStatus = pawapayResponse.finalStatus?.data?.status || pawapayResponse.status;
+
+          // 🔥 Si différent de COMPLETED, on ne crée PAS la commande
+          if (depositStatus !== 'COMPLETED') {
+            console.log(`[Order] Paiement échoué: statut ${depositStatus}`);
+            throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
           }
+
+          console.log('[Order] Dépôt Pawapay confirmé : COMPLETED');
+          paymentStatus = PaymentStatus.PAID;
+          orderStatus = OrderStatus.VALIDATED;
+          isPaidByMobileMoney = true;
         } catch (error: any) {
           if (error.name === 'AbortError') {
             throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
