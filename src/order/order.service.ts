@@ -1044,7 +1044,6 @@ export class OrderService {
     }
 
     // 🔥 FORCER le rechargement de l'utilisateur avec ses relations
-    // Même si le contrôleur l'a déjà fait, on le refait pour être sûr
     const userWithRelations = await this.userRepository.findOne({
       where: { id: user.id },
       relations: ['activeBranch', 'activeBranch.city']
@@ -1054,7 +1053,6 @@ export class OrderService {
       throw new NotFoundException(this.i18nService.translate('user.not_found', lang));
     }
 
-    // 🔥 Utiliser l'utilisateur rechargé
     const fullUser = userWithRelations;
 
     // Récupérer l'entreprise active
@@ -1072,17 +1070,15 @@ export class OrderService {
     // 🔥 Filtrage par ville pour RESTAURANT et GROCERY uniquement
     const isCityFilterable = orderType === 'RESTAURANT' || orderType === 'GROCERY';
 
-    // 🔥 Récupérer UNIQUEMENT la ville de la branche active de l'utilisateur
+    // 🔥 Récupérer la ville de la branche active de l'utilisateur
     let userCityId: string | null = null;
     let userCityName: string | null = null;
 
-    // 🔥 L'utilisateur est rechargé avec activeBranch et activeBranch.city
     if (fullUser.activeBranch?.city) {
       userCityId = fullUser.activeBranch.city.id;
       userCityName = fullUser.activeBranch.city.name;
       console.log('✅ Branche active trouvée:', fullUser.activeBranch.name, 'Ville:', userCityName);
     } else if (fullUser.activeBranchId) {
-      // 🔥 Fallback : charger la branche si elle n'est pas dans les relations
       const branch = await this.branchRepo.findOne({
         where: { id: fullUser.activeBranchId },
         relations: ['city'],
@@ -1098,7 +1094,6 @@ export class OrderService {
       console.log('⚠️ L\'utilisateur n\'a pas de branche active');
     }
 
-    // 🔥 hasCityFilter = true si on a une ville ET que le type est filtrable
     const hasCityFilter = isCityFilterable && !!userCityId;
 
     // 🔥 LOGS DE DEBUG
@@ -1162,17 +1157,19 @@ export class OrderService {
 
     // 🔥 Règle métier :
     // - SUPER ADMIN voit tout (pas de filtre)
-    // - TOUS les autres utilisateurs (même avec canManage) voient UNIQUEMENT les commandes de leur ville
+    // - UTILISATEUR avec canManage voit tout (pas de filtre) 🔥 NOUVEAU
+    // - AUTRES utilisateurs voient UNIQUEMENT les commandes de leur ville
     if (isSuperAdmin) {
-      // SUPER ADMIN voit tout, pas de filtre
       console.log('✅ SUPER ADMIN - Pas de filtre');
+    } else if (hasManagePermission) {
+      // 🔥 NOUVEAU: Les utilisateurs avec canManage voient toutes les commandes
+      console.log('✅ canManage - Pas de filtre');
     } else if (!fullUser.activeBranchId) {
-      // 🔥 L'utilisateur n'a pas de branche active → message d'erreur
       throw new BadRequestException(
         this.i18nService.translate('order.no_active_branch', lang)
       );
     } else if (hasCityFilter) {
-      // 🔥 FILTRE STRICT : ville de l'entreprise qui vend = ville de la branche de l'utilisateur
+      // 🔥 FILTRE STRICT pour les utilisateurs sans canManage
       query.andWhere('subOrderCompany.cityId = :userCityId', { userCityId });
       console.log('✅ Filtre appliqué: subOrderCompany.cityId =', userCityId);
     } else {
@@ -1183,7 +1180,6 @@ export class OrderService {
     const skip = (page - 1) * limit;
     query.skip(skip).take(limit);
 
-    // 🔥 Afficher la requête SQL pour debug
     const sql = query.getSql();
     console.log('📝 SQL:', sql);
 
@@ -1215,7 +1211,7 @@ export class OrderService {
     // 🔥 Message
     let message: string;
 
-    if (total === 0 && hasCityFilter && userCityName) {
+    if (total === 0 && hasCityFilter && userCityName && !hasManagePermission) {
       message = this.i18nService.translate('order.no_orders_for_city', lang, {
         city: userCityName,
         resource: targetResource
@@ -1225,27 +1221,19 @@ export class OrderService {
         resource: 'TOUTES LES COMMANDES'
       });
     } else if (hasManagePermission) {
-      if (hasCityFilter && userCityName) {
-        message = this.i18nService.translate('order.orders_fetched_manage_city', lang, {
-          resource: targetResource,
-          city: userCityName
-        });
-      } else {
-        message = this.i18nService.translate('order.orders_fetched_manage', lang, {
-          resource: targetResource
-        });
-      }
+      // 🔥 Message pour les utilisateurs avec canManage
+      message = this.i18nService.translate('order.orders_fetched_manage_all', lang, {
+        resource: targetResource
+      });
+    } else if (hasCityFilter && userCityName) {
+      message = this.i18nService.translate('order.orders_fetched_company_city', lang, {
+        companyName: company.companyName,
+        city: userCityName
+      });
     } else {
-      if (hasCityFilter && userCityName) {
-        message = this.i18nService.translate('order.orders_fetched_company_city', lang, {
-          companyName: company.companyName,
-          city: userCityName
-        });
-      } else {
-        message = this.i18nService.translate('order.orders_fetched_company', lang, {
-          companyName: company.companyName
-        });
-      }
+      message = this.i18nService.translate('order.orders_fetched_company', lang, {
+        companyName: company.companyName
+      });
     }
 
     return {
