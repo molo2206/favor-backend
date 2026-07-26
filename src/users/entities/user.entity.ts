@@ -32,6 +32,7 @@ import { DeviceToken } from 'src/firebase/entities/device-token.entity';
 import { UserNotification } from 'src/firebase/entities/user-notification.entity';
 import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { UserSettingsEntity } from './user-settings.entity';
+import { UserLoyaltyEntity } from './user-loyalty.entity';
 // import { DriverVehicle } from 'src/Course/Traitment/Entity/DriverVehicle.entity';
 // import { Ride } from 'src/Course/Traitment/Entity/Ride.entity';
 
@@ -204,4 +205,11 @@ export class UserEntity {
     cascade: true,
   })
   settings: UserSettingsEntity;
+
+
+  @Column({ type: 'char', length: 36, nullable: true, unique: true })
+  userIdFpay?: string;
+
+  @OneToMany(() => UserLoyaltyEntity, (loyalty) => loyalty.user)
+  loyalty: UserLoyaltyEntity[];
 }

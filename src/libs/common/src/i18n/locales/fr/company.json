@@ -32,12 +32,10 @@
   "company_city_updated": "Ville mise à jour avec succès.",
   "company_city_exists": "La ville \"{{name}}\" existe déjà pour ce pays.",
   "company_dashboard_loaded": "Dashboard chargé avec succès.",
-
   "company_status_approved": "Approuvée",
   "company_status_rejected": "Rejetée",
   "company_status_pending": "En attente",
   "company_status_suspended": "Suspendue",
-
   "company_email_status_title": "Statut entreprise",
   "company_email_header_title": "Entreprise créée avec succès",
   "company_email_description": "Le statut de votre entreprise",
@@ -45,6 +43,10 @@
   "company_email_contact_us": "Contactez-nous :",
   "company_email_footer_copyright": "FavorHelp. Tous droits réservés.",
   "company_email_legal_note": "Favor Help — Écosystème digital par Favor Group | RCCM: 21-A-770 | N° IMPÔT: A2156062L | National ID: 19-G4701-N74976H",
-
-  "company_status_update_title": "Changement de statut de l'entreprise"
+  "company_status_update_title": "Changement de statut de l'entreprise",
+  "company_settings_created": "Paramètres de la société créés avec succès.",
+  "company_settings_updated": "Paramètres de la société mis à jour avec succès.",
+  "company_settings_retrieved": "Paramètres de la société récupérés avec succès.",
+  "company_settings_not_found": "Paramètres de la société non trouvés.",
+  "company_settings_already_exists": "Les paramètres de cette société existent déjà."
 }

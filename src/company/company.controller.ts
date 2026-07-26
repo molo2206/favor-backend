@@ -52,6 +52,7 @@ import { CompanyPermissionsGuard } from 'src/users/utility/guards/company-permis
 import { CreatePartnerDto } from './dto/create-partner.dto';
 import { I18nService } from 'src/libs/common/src';
 import { Request } from 'express';
+import { CreateCompanySettingsDto, UpdateCompanySettingsDto } from './dto/create-company-settings.dto';
 
 @Controller('company')
 export class CompanyController {
@@ -582,5 +583,158 @@ export class CompanyController {
   ) {
     const lang = this.extractLanguage(req);
     return this.companyService.getPartners(user, lang);
+  }
+
+  @Post('settings')
+  @UseGuards(AuthentificationGuard, CompanyPermissionsGuard)
+  @AuditAction(ActionType.CREATE, 'company_settings')
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async createCompanySettings(
+    @Req() req: Request,
+    @Body() dto: CreateCompanySettingsDto,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    // Vérifier que l'utilisateur a accès à cette entreprise
+    const userHasCompany = await this.userHasCompanyRepository.findOne({
+      where: {
+        user: { id: user.id },
+        company: { id: dto.companyId }
+      },
+    });
+
+    if (!userHasCompany && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException(
+        await this.i18n.translate('company_not_authorized', lang),
+      );
+    }
+
+    return this.companyService.createCompanySettings(dto, lang);
+  }
+
+  @Patch('settings/:companyId')
+  @UseGuards(AuthentificationGuard, CompanyPermissionsGuard)
+  @AuditAction(ActionType.UPDATE, 'company_settings')
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async updateCompanySettings(
+    @Req() req: Request,
+    @Param('companyId') companyId: string,
+    @Body() dto: UpdateCompanySettingsDto,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    // Vérifier que l'utilisateur a accès à cette entreprise
+    const userHasCompany = await this.userHasCompanyRepository.findOne({
+      where: {
+        user: { id: user.id },
+        company: { id: companyId }
+      },
+    });
+
+    if (!userHasCompany && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException(
+        await this.i18n.translate('company_not_authorized', lang),
+      );
+    }
+
+    return this.companyService.updateCompanySettings(companyId, dto, lang);
+  }
+
+  @Get('settings/:companyId')
+  @UseGuards(AuthentificationGuard)
+  @AuditAction(ActionType.VIEW, 'company_settings')
+  async getCompanySettings(
+    @Req() req: Request,
+    @Param('companyId') companyId: string,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    // Vérifier que l'utilisateur a accès à cette entreprise
+    const userHasCompany = await this.userHasCompanyRepository.findOne({
+      where: {
+        user: { id: user.id },
+        company: { id: companyId }
+      },
+    });
+
+    if (!userHasCompany && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException(
+        await this.i18n.translate('company_not_authorized', lang),
+      );
+    }
+
+    return this.companyService.getCompanySettings(companyId, lang);
+  }
+
+  @Get('settings/one/:id')
+  @UseGuards(AuthentificationGuard)
+  @AuditAction(ActionType.VIEW, 'company_settings')
+  async getOneCompanySettings(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    // Récupérer les paramètres pour vérifier l'accès
+    const settings = await this.companyService.getOneCompanySettings(id, lang);
+
+    // Vérifier que l'utilisateur a accès à cette entreprise
+    const userHasCompany = await this.userHasCompanyRepository.findOne({
+      where: {
+        user: { id: user.id },
+        company: { id: settings.data.companyId }
+      },
+    });
+
+    if (!userHasCompany && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException(
+        await this.i18n.translate('company_not_authorized', lang),
+      );
+    }
+
+    return settings;
+  }
+
+  @Get('settings/me')
+  @UseGuards(AuthentificationGuard)
+  @AuditAction(ActionType.VIEW, 'company_settings')
+  async getMyCompanySettings(
+    @Req() req: Request,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    if (!user.activeCompanyId) {
+      throw new BadRequestException(
+        await this.i18n.translate('company_no_active', lang),
+      );
+    }
+
+    return this.companyService.getCompanySettings(user.activeCompanyId, lang);
+  }
+
+  @Patch('settings/me')
+  @UseGuards(AuthentificationGuard, CompanyPermissionsGuard)
+  @Permissions({ resource: 'COMPANY', action: 'canUpdate' })
+  @AuditAction(ActionType.UPDATE, 'company_settings')
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async updateMyCompanySettings(
+    @Req() req: Request,
+    @Body() dto: UpdateCompanySettingsDto,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    if (!user.activeCompanyId) {
+      throw new BadRequestException(
+        await this.i18n.translate('company_no_active', lang),
+      );
+    }
+
+    return this.companyService.updateCompanySettings(user.activeCompanyId, dto, lang);
   }
 }

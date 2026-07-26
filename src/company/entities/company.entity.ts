@@ -11,6 +11,7 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Service } from 'src/service/entities/service.entity';
@@ -27,6 +28,7 @@ import { CompanyHasResourceEntity } from 'src/company_has_usrResource/entities/c
 import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { CompanyHasPartnerEntity } from './company_has_partner.entity';
 import { Meal } from 'src/voyage/meal/entity/meal.entity';
+import { CompanySettingsEntity } from './company-settings.entity';
 // Correction : importer CompanyHasResource (sans Entity)
 export enum FeeType {
   FIXED = 'FIXED',
@@ -212,5 +214,10 @@ export class CompanyEntity {
 
   @OneToMany(() => Meal, (meal) => meal.company)
   meals: Meal[];
+
+  @OneToOne(() => CompanySettingsEntity, (settings) => settings.company, {
+    cascade: true,
+  })
+  settings: CompanySettingsEntity;
 
 }

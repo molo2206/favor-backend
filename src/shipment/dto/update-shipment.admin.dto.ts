@@ -204,4 +204,8 @@ export class UpdateShipmentAdminDto {
   @IsNumber()
   @Min(0)
   totalPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  loyaltyCode?: string;
 }

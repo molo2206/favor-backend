@@ -38,6 +38,7 @@ import { FilesService } from 'src/files/files.service';
 import { UserSettingsEntity } from './entities/user-settings.entity';
 import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { I18nService } from 'src/libs/common/src';
+import { LoyaltyTier, UserLoyaltyEntity } from './entities/user-loyalty.entity';
 
 @Injectable()
 export class UsersService {
@@ -68,6 +69,13 @@ export class UsersService {
 
     @InjectRepository(UserSettingsEntity)
     private readonly settingsRepo: Repository<UserSettingsEntity>,
+
+
+
+    @InjectRepository(UserLoyaltyEntity)
+    private readonly loyaltyRepository: Repository<UserLoyaltyEntity>,
+
+
 
     private readonly i18n: I18nService,
   ) { }
@@ -165,7 +173,6 @@ export class UsersService {
           },
         );
       } else if (validator.isMobilePhone(destination, 'any')) {
-        // ✅ Envoi SMS via le service de traduction (double accolades)
         const smsMessage = await this.i18n.translate('user.otp_sms_body', lang, {
           otpCode: generatedOtpCode,
         });
@@ -212,6 +219,43 @@ export class UsersService {
     });
 
     const savedUser = await this.usersRepository.save(newUser);
+
+    const generateUniqueLoyaltyCode = async (): Promise<string> => {
+      let code: string;
+      let exists: UserLoyaltyEntity | null = null;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      do {
+        code = Math.floor(10000000 + Math.random() * 90000000).toString();
+        exists = await this.loyaltyRepository.findOne({
+          where: { loyaltyCode: code },
+        });
+        attempts++;
+      } while (exists && attempts < maxAttempts);
+
+      if (exists) {
+        // Fallback avec timestamp si jamais collision après 10 tentatives
+        const timestamp = Date.now().toString().slice(-8);
+        code = timestamp;
+      }
+
+      return code;
+    };
+
+    const loyaltyCode = await generateUniqueLoyaltyCode();
+
+    const loyalty = this.loyaltyRepository.create({
+      userId: savedUser.id,
+      loyaltyCode: loyaltyCode,
+      pointsBalance: 0,
+      pointsTotalEarned: 0,
+      pointsTotalSpent: 0,
+      currentTier: LoyaltyTier.BRONZE,
+      isActive: true,
+    });
+    await this.loyaltyRepository.save(loyalty);
+
     let savedFcmToken: string | undefined;
     if (clientFcmToken && platform) {
       const existingToken = await this.deviceTokenRepo.findOne({
@@ -254,6 +298,7 @@ export class UsersService {
         'userPlatformRoles',
         'userPlatformRoles.platform',
         'userPlatformRoles.role',
+        'loyalty',
       ],
     });
     if (!userFull)
@@ -265,12 +310,12 @@ export class UsersService {
 
     // 6️⃣ Envoyer email de bienvenue si c'est un email
     if (email && email !== '' && validator.isEmail(email)) {
-      // Préparer les données pour le template
       const userData = {
         fullName: userWithoutPassword.fullName || userWithoutPassword.email || 'Utilisateur',
         email: userWithoutPassword.email || 'Non renseigné',
         phone: userWithoutPassword.phone || 'Non renseigné',
         role: userWithoutPassword.role || 'Client',
+        loyaltyCode: loyaltyCode,
         createdAt: userWithoutPassword.createdAt
           ? new Date(
             typeof userWithoutPassword.createdAt === 'string'
@@ -284,7 +329,6 @@ export class UsersService {
           : "Aujourd'hui",
       };
 
-      // Traductions pour l'email (si besoin dans le template)
       const emailTranslations = {
         welcome_title: await this.i18n.translate('user.welcome_title', lang),
         welcome_subtitle: await this.i18n.translate('user.welcome_subtitle', lang),
@@ -365,7 +409,7 @@ export class UsersService {
     console.log('🔍 Langue reçue dans signin :', lang);
     const { fcmToken, platform } = userSignInDto;
 
-    const user = await this.usersRepository
+    let user = await this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
       .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
@@ -377,6 +421,7 @@ export class UsersService {
       .leftJoinAndSelect('company.category', 'category')
       .leftJoinAndSelect('company.companyResources', 'companyResources')
       .leftJoinAndSelect('companyResources.resource', 'resource')
+      .leftJoinAndSelect('company.branches', 'branches')
       .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
       .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
       .leftJoinAndSelect('userPlatformRoles.role', 'role')
@@ -389,6 +434,7 @@ export class UsersService {
       .leftJoinAndSelect('users.activeBranch', 'activeBranch')
       .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
       .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+      .leftJoinAndSelect('users.loyalty', 'loyalty')
       .where('users.email = :login OR users.phone = :login', {
         login: userSignInDto.email,
       })
@@ -415,6 +461,74 @@ export class UsersService {
       throw new BadRequestException(
         await this.i18n.translate('user.password_incorrect', lang),
       );
+    }
+
+    // ✅ Vérifier si l'utilisateur a un compte de fidélité, sinon le créer
+    if (!user.loyalty || user.loyalty.length === 0) {
+      const generateUniqueLoyaltyCode = async (): Promise<string> => {
+        let code: string;
+        let exists: UserLoyaltyEntity | null = null;
+        let attempts = 0;
+        const maxAttempts = 10;
+        do {
+          code = Math.floor(10000000 + Math.random() * 90000000).toString();
+          exists = await this.loyaltyRepository.findOne({
+            where: { loyaltyCode: code },
+          });
+          attempts++;
+        } while (exists && attempts < maxAttempts);
+        if (exists) {
+          const timestamp = Date.now().toString().slice(-8);
+          code = timestamp;
+        }
+        return code;
+      };
+
+      const loyaltyCode = await generateUniqueLoyaltyCode();
+
+      const loyalty = this.loyaltyRepository.create({
+        userId: user.id,
+        loyaltyCode: loyaltyCode,
+        pointsBalance: 0,
+        pointsTotalEarned: 0,
+        pointsTotalSpent: 0,
+        currentTier: LoyaltyTier.BRONZE,
+        isActive: true,
+      });
+      await this.loyaltyRepository.save(loyalty);
+
+      const reloadedUser = await this.usersRepository
+        .createQueryBuilder('users')
+        .addSelect('users.password')
+        .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+        .leftJoinAndSelect('userHasCompany.company', 'company')
+        .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
+        .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+        .leftJoinAndSelect('company.country', 'country')
+        .leftJoinAndSelect('company.city', 'city')
+        .leftJoinAndSelect('company.category', 'category')
+        .leftJoinAndSelect('company.companyResources', 'companyResources')
+        .leftJoinAndSelect('companyResources.resource', 'resource')
+        .leftJoinAndSelect('company.branches', 'branches')
+        .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
+        .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
+        .leftJoinAndSelect('userPlatformRoles.role', 'role')
+        .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+        .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
+        .leftJoinAndSelect(
+          'userCompanyResources.resource',
+          'userCompanyResourceDetail',
+        )
+        .leftJoinAndSelect('users.activeBranch', 'activeBranch')
+        .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
+        .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+        .leftJoinAndSelect('users.loyalty', 'loyalty')
+        .where('users.id = :id', { id: user.id })
+        .getOne();
+
+      if (reloadedUser) {
+        user = reloadedUser;
+      }
     }
 
     const access_token = await this.accessToken(user);
@@ -446,6 +560,10 @@ export class UsersService {
         );
       }
     }
+
+    const loyaltyPoints = user.loyalty?.[0]?.pointsBalance ?? 0;
+    const loyaltyTier = user.loyalty?.[0]?.currentTier ?? null;
+    const loyaltyCode = user.loyalty?.[0]?.loyaltyCode ?? null;
 
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
@@ -591,13 +709,17 @@ export class UsersService {
         userHasCompany,
         activeCompany,
         userPlatformRoles,
+        loyalty: {
+          points: loyaltyPoints,
+          tier: loyaltyTier,
+          code: loyaltyCode,
+        },
       }),
       access_token,
       refresh_token,
       fcmToken,
     };
   }
-
   // ==================== GOOGLE LOGIN ====================
   async googleLoginByClientData(
     dto: GoogleLoginDto,
@@ -640,6 +762,7 @@ export class UsersService {
       .leftJoinAndSelect('users.activeBranch', 'activeBranch')
       .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
       .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+      .leftJoinAndSelect('users.loyalty', 'loyalty')
       .where('users.email = :email', { email: email.toLowerCase() })
       .getOne();
 
@@ -667,12 +790,47 @@ export class UsersService {
       });
       user = await this.usersRepository.save(newUser);
       isNewUser = true;
+
+      // ✅ Création du compte fidélité
+      const generateUniqueLoyaltyCode = async (): Promise<string> => {
+        let code: string;
+        let exists: UserLoyaltyEntity | null = null;
+        let attempts = 0;
+        const maxAttempts = 10;
+        do {
+          code = Math.floor(10000000 + Math.random() * 90000000).toString();
+          exists = await this.loyaltyRepository.findOne({
+            where: { loyaltyCode: code },
+          });
+          attempts++;
+        } while (exists && attempts < maxAttempts);
+        if (exists) {
+          const timestamp = Date.now().toString().slice(-8);
+          code = timestamp;
+        }
+        return code;
+      };
+
+      const loyaltyCode = await generateUniqueLoyaltyCode();
+
+      const loyalty = this.loyaltyRepository.create({
+        userId: user.id,
+        loyaltyCode: loyaltyCode,
+        pointsBalance: 0,
+        pointsTotalEarned: 0,
+        pointsTotalSpent: 0,
+        currentTier: LoyaltyTier.BRONZE,
+        isActive: true,
+      });
+      await this.loyaltyRepository.save(loyalty);
+
       await this.mailService.sendHtmlEmail(
         email,
         await this.i18n.translate('user.welcome_subject', lang),
         'createCount.html',
         { userWithoutPassword: user, year: new Date().getFullYear() },
       );
+
       user = await this.usersRepository
         .createQueryBuilder('users')
         .addSelect('users.password')
@@ -698,6 +856,7 @@ export class UsersService {
         .leftJoinAndSelect('users.activeBranch', 'activeBranch')
         .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
         .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+        .leftJoinAndSelect('users.loyalty', 'loyalty')
         .where('users.id = :id', { id: user.id })
         .getOne();
     }
@@ -745,6 +904,7 @@ export class UsersService {
           .leftJoinAndSelect('users.activeBranch', 'activeBranch')
           .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
           .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+          .leftJoinAndSelect('users.loyalty', 'loyalty')
           .where('users.id = :id', { id: user.id })
           .getOne();
         if (reloaded) user = reloaded;
@@ -956,6 +1116,11 @@ export class UsersService {
         activeCompany,
         userPlatformRoles,
         activeBranch,
+        loyalty: {
+          points: user.loyalty?.[0]?.pointsBalance ?? 0,
+          tier: user.loyalty?.[0]?.currentTier ?? null,
+          code: user.loyalty?.[0]?.loyaltyCode ?? null,
+        },
       }),
       access_token,
       refresh_token,
@@ -1019,6 +1184,7 @@ export class UsersService {
       .leftJoinAndSelect('users.activeBranch', 'activeBranch')
       .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
       .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+      .leftJoinAndSelect('users.loyalty', 'loyalty')
       .where('users.appleUserId = :appleUserId', { appleUserId })
       .getOne();
 
@@ -1047,6 +1213,39 @@ export class UsersService {
       });
       user = await this.usersRepository.save(newUser);
       isNewUser = true;
+
+      // ✅ Création du compte fidélité
+      const generateUniqueLoyaltyCode = async (): Promise<string> => {
+        let code: string;
+        let exists: UserLoyaltyEntity | null = null;
+        let attempts = 0;
+        const maxAttempts = 10;
+        do {
+          code = Math.floor(10000000 + Math.random() * 90000000).toString();
+          exists = await this.loyaltyRepository.findOne({
+            where: { loyaltyCode: code },
+          });
+          attempts++;
+        } while (exists && attempts < maxAttempts);
+        if (exists) {
+          const timestamp = Date.now().toString().slice(-8);
+          code = timestamp;
+        }
+        return code;
+      };
+
+      const loyaltyCode = await generateUniqueLoyaltyCode();
+
+      const loyalty = this.loyaltyRepository.create({
+        userId: user.id,
+        loyaltyCode: loyaltyCode,
+        pointsBalance: 0,
+        pointsTotalEarned: 0,
+        pointsTotalSpent: 0,
+        currentTier: LoyaltyTier.BRONZE,
+        isActive: true,
+      });
+      await this.loyaltyRepository.save(loyalty);
 
       if (user.email) {
         await this.mailService.sendHtmlEmail(
@@ -1082,6 +1281,7 @@ export class UsersService {
         .leftJoinAndSelect('users.activeBranch', 'activeBranch')
         .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
         .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+        .leftJoinAndSelect('users.loyalty', 'loyalty')
         .where('users.id = :id', { id: user.id })
         .getOne();
     } else {
@@ -1135,6 +1335,7 @@ export class UsersService {
           .leftJoinAndSelect('users.activeBranch', 'activeBranch')
           .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
           .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+          .leftJoinAndSelect('users.loyalty', 'loyalty')
           .where('users.id = :id', { id: user.id })
           .getOne();
       }
@@ -1170,7 +1371,6 @@ export class UsersService {
 
     const { password, ...userWithoutPassword } = user;
 
-    // Mapping userHasCompany avec branch (identique à google)
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
         id: uhc.id,
@@ -1351,6 +1551,11 @@ export class UsersService {
         activeCompany,
         userPlatformRoles,
         activeBranch,
+        loyalty: {
+          points: user.loyalty?.[0]?.pointsBalance ?? 0,
+          tier: user.loyalty?.[0]?.currentTier ?? null,
+          code: user.loyalty?.[0]?.loyaltyCode ?? null,
+        },
       }),
       access_token,
       refresh_token,
@@ -2099,7 +2304,7 @@ export class UsersService {
   }
 
   async getFullProfile(userId: string, lang: string = 'fr'): Promise<Record<string, any>> {
-    const user = await this.usersRepository
+    let user = await this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
       .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
@@ -2124,14 +2329,83 @@ export class UsersService {
       .leftJoinAndSelect('users.activeBranch', 'activeBranch')
       .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
       .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+      .leftJoinAndSelect('users.loyalty', 'loyalty')
       .where('users.id = :id', { id: userId })
       .getOne();
 
     if (!user) throw new NotFoundException(await this.i18n.translate('user.user_not_found', lang));
 
+    // ✅ Vérifier si l'utilisateur a un compte de fidélité, sinon le créer
+    if (!user.loyalty || user.loyalty.length === 0) {
+      const generateUniqueLoyaltyCode = async (): Promise<string> => {
+        let code: string;
+        let exists: UserLoyaltyEntity | null = null;
+        let attempts = 0;
+        const maxAttempts = 10;
+        do {
+          code = Math.floor(10000000 + Math.random() * 90000000).toString();
+          exists = await this.loyaltyRepository.findOne({
+            where: { loyaltyCode: code },
+          });
+          attempts++;
+        } while (exists && attempts < maxAttempts);
+        if (exists) {
+          const timestamp = Date.now().toString().slice(-8);
+          code = timestamp;
+        }
+        return code;
+      };
+
+      const loyaltyCode = await generateUniqueLoyaltyCode();
+
+      const loyalty = this.loyaltyRepository.create({
+        userId: user.id,
+        loyaltyCode: loyaltyCode,
+        pointsBalance: 0,
+        pointsTotalEarned: 0,
+        pointsTotalSpent: 0,
+        currentTier: LoyaltyTier.BRONZE,
+        isActive: true,
+      });
+      await this.loyaltyRepository.save(loyalty);
+
+      // Recharger l'utilisateur avec la relation loyalty
+      const reloadedUser = await this.usersRepository
+        .createQueryBuilder('users')
+        .addSelect('users.password')
+        .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+        .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
+        .leftJoinAndSelect('userHasCompany.company', 'company')
+        .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+        .leftJoinAndSelect('company.country', 'country')
+        .leftJoinAndSelect('company.city', 'city')
+        .leftJoinAndSelect('company.category', 'category')
+        .leftJoinAndSelect('company.companyResources', 'companyResources')
+        .leftJoinAndSelect('companyResources.resource', 'resource')
+        .leftJoinAndSelect('company.branches', 'branches')
+        .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
+        .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
+        .leftJoinAndSelect('userPlatformRoles.role', 'role')
+        .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+        .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
+        .leftJoinAndSelect(
+          'userCompanyResources.resource',
+          'userCompanyResourceDetail',
+        )
+        .leftJoinAndSelect('users.activeBranch', 'activeBranch')
+        .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
+        .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+        .leftJoinAndSelect('users.loyalty', 'loyalty')
+        .where('users.id = :id', { id: userId })
+        .getOne();
+
+      if (reloadedUser) {
+        user = reloadedUser;
+      }
+    }
+
     const { password, ...userWithoutPassword } = user;
 
-    // Mapping userHasCompany avec branch
     const userHasCompany = (userWithoutPassword.userHasCompany || []).map(
       (uhc) => ({
         id: uhc.id,
@@ -2180,7 +2454,6 @@ export class UsersService {
       }),
     );
 
-    // Recharger la compagnie active (avec sa branche)
     const activeCompanyRaw = await this.usersRepository
       .createQueryBuilder('users')
       .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
@@ -2329,6 +2602,11 @@ export class UsersService {
       userPlatformRoles,
       defaultAddress,
       activeBranch,
+      loyalty: {
+        points: user.loyalty?.[0]?.pointsBalance ?? 0,
+        tier: user.loyalty?.[0]?.currentTier ?? null,
+        code: user.loyalty?.[0]?.loyaltyCode ?? null,
+      },
     });
   }
 
@@ -2349,6 +2627,7 @@ export class UsersService {
       secret: secretKey,
     });
   }
+
   async refreshToken(user: UserEntity): Promise<string> {
     const payload = {
       id: user.id,
@@ -2481,6 +2760,7 @@ export class UsersService {
         'userCompanyResources.resource',
         'userCompanyResourceDetail',
       )
+      .leftJoinAndSelect('users.loyalty', 'loyalty')
       .orderBy('users.createdAt', 'DESC');
 
     if (role && roles.includes(role as UserRole)) {
@@ -2640,6 +2920,11 @@ export class UsersService {
         activeCompany,
         userPlatformRoles,
         defaultAddress,
+        loyalty: {
+          points: user.loyalty?.[0]?.pointsBalance ?? 0,
+          tier: user.loyalty?.[0]?.currentTier ?? null,
+          code: user.loyalty?.[0]?.loyaltyCode ?? null,
+        },
       });
     });
 

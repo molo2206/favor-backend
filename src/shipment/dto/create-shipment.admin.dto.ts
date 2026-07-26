@@ -208,4 +208,8 @@ export class CreateShipmentAdminDto {
   @IsOptional()
   @IsString()
   deliveryAddressId?: string;
+
+  @IsOptional()
+  @IsString()
+  loyaltyCode?: string;
 }

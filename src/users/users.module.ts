@@ -18,6 +18,7 @@ import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { FilesService } from 'src/files/files.service';
 import { UserSettingsEntity } from './entities/user-settings.entity';
 import { CommonModule } from 'src/libs/common/src/common.module';
+import { UserLoyaltyEntity } from './entities/user-loyalty.entity';
 
 
 @Module({
@@ -30,7 +31,8 @@ import { CommonModule } from 'src/libs/common/src/common.module';
       Resource,
       CompanyEntity,
       BranchEntity,
-      UserSettingsEntity
+      UserSettingsEntity,
+      UserLoyaltyEntity
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

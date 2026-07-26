@@ -32,6 +32,7 @@ import { Shipment } from 'src/shipment/entity/shipment.entity';
 import { LtaEntity } from 'src/shipment/Lta/entity/lta.entity';
 import { CompanyHasPartnerEntity } from './entities/company_has_partner.entity';
 import { TripsModule } from '../voyage/trips/trips.module'; // ✅ Import du module qui exporte PushNotificationHelper
+import { CompanySettingsEntity } from './entities/company-settings.entity';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { TripsModule } from '../voyage/trips/trips.module'; // ✅ Import du mod
       Shipment,
       LtaEntity,
       CompanyHasPartnerEntity,
+      CompanySettingsEntity
     ]),
     TauxCompanyModule,
     CloudinaryModule,

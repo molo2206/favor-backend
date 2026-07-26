@@ -211,4 +211,7 @@ export class Shipment {
   @ManyToOne(() => CompanyEntity, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'deliveryCompanyId' })
   deliveryCompany?: CompanyEntity;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  loyaltyCode?: string;
 }

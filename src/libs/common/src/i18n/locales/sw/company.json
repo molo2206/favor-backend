@@ -32,12 +32,10 @@
   "company_city_updated": "Mji umesasishwa kwa mafanikio.",
   "company_city_exists": "Mji \"{{name}}\" tayari upo kwa nchi hii.",
   "company_dashboard_loaded": "Dashboradi imepakiwa kwa mafanikio.",
-
   "company_status_approved": "Imekubaliwa",
   "company_status_rejected": "Imekataliwa",
   "company_status_pending": "Inasubiri",
   "company_status_suspended": "Imesimamishwa",
-
   "company_email_status_title": "Hali ya Kampuni",
   "company_email_header_title": "Kampuni imeundwa kwa mafanikio",
   "company_email_description": "Hali ya kampuni yako",
@@ -45,6 +43,10 @@
   "company_email_contact_us": "Wasiliana nasi:",
   "company_email_footer_copyright": "FavorHelp. Haki zote zimehifadhiwa.",
   "company_email_legal_note": "Favor Help — Mfumo wa kidijitali wa Favor Group | RCCM: 21-A-770 | NAMBA YA KODI: A2156062L | Kitambulisho cha Taifa: 19-G4701-N74976H",
-
-  "company_status_update_title": "Mabadiliko ya hali ya kampuni"
+  "company_status_update_title": "Mabadiliko ya hali ya kampuni",
+  "company_settings_created": "Mipangilio ya kampuni imeundwa kikamilifu.",
+  "company_settings_updated": "Mipangilio ya kampuni imesasishwa kikamilifu.",
+  "company_settings_retrieved": "Mipangilio ya kampuni imepatikana kikamilifu.",
+  "company_settings_not_found": "Mipangilio ya kampuni haikupatikana.",
+  "company_settings_already_exists": "Mipangilio ya kampuni hii tayari ipo."
 }

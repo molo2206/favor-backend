@@ -84,6 +84,7 @@ import { CronModule } from './cron/cron.module';
 import { MealsModule } from './voyage/meal/meals.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { I18nModule } from './libs/common/src';
+import { FpayModule } from './fpay/fpay.module';
 // import { WhatsAppModule } from './users/utility/helpers/whatsapp.module';
 
 @Module({
@@ -200,6 +201,7 @@ import { I18nModule } from './libs/common/src';
     MealsModule,
     I18nModule,
     CommonModule,
+    FpayModule,
     // WhatsAppModule
   ],
   controllers: [AppController],

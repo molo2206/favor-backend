@@ -58,6 +58,8 @@ import { CreatePartnerDto } from './dto/create-partner.dto';
 import { CompanyActivity } from './enum/activity.company.enum';
 import { I18nService } from 'src/libs/common/src';
 import { PushNotificationHelper } from 'src/users/utility/helpers/push-notification.helper';
+import { CompanySettingsEntity } from './entities/company-settings.entity';
+import { CreateCompanySettingsDto, UpdateCompanySettingsDto } from './dto/create-company-settings.dto';
 
 @Injectable()
 export class CompanyService {
@@ -111,6 +113,8 @@ export class CompanyService {
     @InjectDataSource()
     private dataSource: DataSource,
     private readonly i18n: I18nService,
+    @InjectRepository(CompanySettingsEntity)
+    private readonly companySettingsRepository: Repository<CompanySettingsEntity>,
 
     private pushNotificationHelper: PushNotificationHelper,
     private smsService: SmsHelper,
@@ -1171,6 +1175,7 @@ export class CompanyService {
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('company.category', 'category')
       .leftJoinAndSelect('company.branches', 'branches')
+      .leftJoinAndSelect('company.settings', 'settings') // ✅ Ajouter la relation settings
       .orderBy('company.createdAt', 'DESC');
 
     if (type) query.where('company.typeCompany = :type', { type });
@@ -1182,7 +1187,6 @@ export class CompanyService {
     }
     return { message: await this.i18n.translate('company_created', lang), data: companies };
   }
-
   // ======================== GET COMPANY BY ID ========================
   async getCompanyById(id: string, lang: string = 'fr'): Promise<{ data: any }> {
     const company = await this.companyRepository.findOne({
@@ -1197,6 +1201,7 @@ export class CompanyService {
         'city',
         'category',
         'branches',
+        'settings', // ✅ Ajouter la relation settings
       ],
     });
     if (!company) {
@@ -1280,18 +1285,21 @@ export class CompanyService {
       status: cr.status,
     }));
 
+    // ✅ Ajouter les settings (paramètres de la société)
+    const settings = company.settings || null;
+
     const result = {
       ...company,
       companyResources,
       userHasCompany,
       resources,
+      settings, // ✅ Ajouter settings dans la réponse
     };
 
     delete (result as any).companyResourcesOriginal;
 
     return { data: result };
   }
-
   // ======================== FIND BY COMPANY ========================
   async findByCompany(companyId: string, lang: string = 'fr'): Promise<{ data: any }> {
     const company = await this.companyRepository.findOne({
@@ -1308,6 +1316,7 @@ export class CompanyService {
         'branches',
         'branches.country',
         'branches.city',
+        'settings', // ✅ Ajouter la relation settings
       ],
     });
 
@@ -1397,6 +1406,9 @@ export class CompanyService {
       relations: ['category', 'images'],
     });
 
+    // ✅ Ajouter les settings (paramètres de la société)
+    const settings = company.settings || null;
+
     return {
       data: {
         ...company,
@@ -1404,6 +1416,7 @@ export class CompanyService {
         userHasCompany,
         resources,
         products,
+        settings, // ✅ Ajouter settings dans la réponse
       },
     };
   }
@@ -1532,11 +1545,13 @@ export class CompanyService {
         'activeCompany.country',
         'activeCompany.city',
         'activeCompany.branches',
+        'activeCompany.settings', // ✅ Ajouter settings pour activeCompany
         'userHasCompany.company',
         'userHasCompany.company.country',
         'userHasCompany.company.city',
         'userHasCompany.company.category',
         'userHasCompany.company.branches',
+        'userHasCompany.company.settings', // ✅ Ajouter settings pour les autres companies
       ],
     });
 
@@ -1550,6 +1565,7 @@ export class CompanyService {
         category: uhc.company.category,
         role: uhc.role,
         isOwner: uhc.isOwner,
+        settings: uhc.company.settings || null, // ✅ Ajouter settings
         branches: (uhc.company.branches ?? []).map((b) => ({
           id: b.id,
           name: b.name,
@@ -1564,6 +1580,12 @@ export class CompanyService {
           city: b.city ? { id: b.city.id, name: b.city.name } : null,
         })),
       })) || [];
+
+    // ✅ Ajouter settings à activeCompany
+    const activeCompany = user.activeCompany;
+    if (activeCompany) {
+      (activeCompany as any).settings = activeCompany.settings || null;
+    }
 
     const sanitizedUser = instanceToPlain(user);
     delete sanitizedUser.userHasCompany;
@@ -1591,6 +1613,7 @@ export class CompanyService {
         products: any[];
         categories: any[];
         companyResources: any[];
+        settings: any; // ✅ Ajouter settings dans le type
       })[];
       total: number;
       page: number;
@@ -1606,6 +1629,7 @@ export class CompanyService {
       .leftJoinAndSelect('company.branches', 'branches')
       .leftJoinAndSelect('company.companyResources', 'companyResources')
       .leftJoinAndSelect('companyResources.resource', 'resource')
+      .leftJoinAndSelect('company.settings', 'settings') // ✅ Ajouter la relation settings
       .where('company.status = :status', { status: 'VALIDATED' });
 
     if (type) {
@@ -1672,11 +1696,15 @@ export class CompanyService {
 
         const { companyResources, ...companyWithoutResources } = company;
 
+        // ✅ Ajouter settings
+        const settings = company.settings || null;
+
         return {
           ...companyWithoutResources,
           products,
           categories,
           companyResources: transformedResources,
+          settings, // ✅ Ajouter settings dans la réponse
           start: { totalProduct, totalCategory, totalCommande },
         };
       }),
@@ -1695,7 +1723,6 @@ export class CompanyService {
       data: { data: enrichedCompanies, total, page: page, limit: limit },
     };
   }
-
   // ======================== GET COMPANY DASHBOARD ========================
   async getCompanyDashboard(
     user: UserEntity,
@@ -2330,6 +2357,7 @@ export class CompanyService {
         'resources.resource',
         'company',
         'company.branches',
+        'company.settings',
         'branch',
       ],
     });
@@ -2397,6 +2425,7 @@ export class CompanyService {
         'resources.resource',
         'company',
         'company.branches',
+        'company.settings',
         'branch',
       ],
     });
@@ -2438,6 +2467,9 @@ export class CompanyService {
       status: perm.status,
     }));
 
+    // ✅ Récupérer les settings de la company
+    const settings = userHasCompany.company?.settings || null;
+
     return {
       id: userHasCompany.id,
       createdAt: userHasCompany.createdAt,
@@ -2446,6 +2478,7 @@ export class CompanyService {
       isOwner: userHasCompany.isOwner,
       branch: mainBranch,
       permissions,
+      settings, // ✅ Ajouter settings
     };
   }
 
@@ -2670,6 +2703,154 @@ export class CompanyService {
           ? await this.i18n.translate('company_partner_created', lang)
           : await this.i18n.translate('company_partner_not_found', lang),
       data: partners,
+    };
+  }
+
+  async createCompanySettings(
+    dto: CreateCompanySettingsDto,
+    lang: string = 'fr',
+  ): Promise<{ message: string; data: CompanySettingsEntity }> {
+    // Vérifier que la société existe
+    const company = await this.companyRepository.findOne({
+      where: { id: dto.companyId },
+    });
+    if (!company) {
+      throw new NotFoundException(
+        await this.i18n.translate('company_not_found', lang),
+      );
+    }
+
+    // Vérifier si les paramètres existent déjà
+    const existing = await this.companySettingsRepository.findOne({
+      where: { companyId: dto.companyId },
+    });
+    if (existing) {
+      throw new ConflictException(
+        await this.i18n.translate('company_settings_already_exists', lang),
+      );
+    }
+
+    // Créer les paramètres
+    const settings = this.companySettingsRepository.create({
+      companyId: dto.companyId,
+      enableLoyaltyFees: dto.enableLoyaltyFees ?? false,
+      loyaltyFeeFixed: dto.loyaltyFeeFixed ?? 0,
+    });
+
+    const saved = await this.companySettingsRepository.save(settings);
+
+    return {
+      message: await this.i18n.translate('company_settings_created', lang),
+      data: saved,
+    };
+  }
+
+  async updateCompanySettings(
+    companyId: string,
+    dto: UpdateCompanySettingsDto,
+    lang: string = 'fr',
+  ): Promise<{ message: string; data: CompanySettingsEntity }> {
+    // Vérifier que la société existe
+    const company = await this.companyRepository.findOne({
+      where: { id: companyId },
+    });
+    if (!company) {
+      throw new NotFoundException(
+        await this.i18n.translate('company_not_found', lang),
+      );
+    }
+
+    // Récupérer les paramètres existants
+    let settings = await this.companySettingsRepository.findOne({
+      where: { companyId },
+    });
+
+    // Si les paramètres n'existent pas, les créer avec les valeurs par défaut
+    if (!settings) {
+      settings = this.companySettingsRepository.create({
+        companyId,
+        enableLoyaltyFees: dto.enableLoyaltyFees ?? false,
+        loyaltyFeeFixed: dto.loyaltyFeeFixed ?? 0,
+      });
+      const saved = await this.companySettingsRepository.save(settings);
+      return {
+        message: await this.i18n.translate('company_settings_created', lang),
+        data: saved,
+      };
+    }
+
+    // Mettre à jour les champs
+    if (dto.enableLoyaltyFees !== undefined) {
+      settings.enableLoyaltyFees = dto.enableLoyaltyFees;
+    }
+    if (dto.loyaltyFeeFixed !== undefined) {
+      settings.loyaltyFeeFixed = dto.loyaltyFeeFixed;
+    }
+
+    const updated = await this.companySettingsRepository.save(settings);
+
+    return {
+      message: await this.i18n.translate('company_settings_updated', lang),
+      data: updated,
+    };
+  }
+
+  async getCompanySettings(
+    companyId: string,
+    lang: string = 'fr',
+  ): Promise<{ message: string; data: CompanySettingsEntity }> {
+    // Vérifier que la société existe
+    const company = await this.companyRepository.findOne({
+      where: { id: companyId },
+    });
+    if (!company) {
+      throw new NotFoundException(
+        await this.i18n.translate('company_not_found', lang),
+      );
+    }
+
+    // Récupérer les paramètres
+    let settings = await this.companySettingsRepository.findOne({
+      where: { companyId },
+    });
+
+    // Si les paramètres n'existent pas, les créer avec les valeurs par défaut
+    if (!settings) {
+      settings = this.companySettingsRepository.create({
+        companyId,
+        enableLoyaltyFees: false,
+        loyaltyFeeFixed: 0,
+      });
+      settings = await this.companySettingsRepository.save(settings);
+    }
+
+    return {
+      message: await this.i18n.translate('company_settings_retrieved', lang),
+      data: settings,
+    };
+  }
+
+  // ============================================
+  // 4. RÉCUPÉRER UN SEUL PARAMÈTRE (PAR ID)
+  // ============================================
+  async getOneCompanySettings(
+    id: string,
+    lang: string = 'fr',
+  ): Promise<{ message: string; data: CompanySettingsEntity }> {
+    const settings = await this.companySettingsRepository.findOne({
+      where: { id },
+      relations: ['company'],
+    });
+
+    if (!settings) {
+      throw new NotFoundException(
+        await this.i18n.translate('company_settings_not_found', lang),
+      );
+    }
+
+    return {
+      message: await this.i18n.translate('company_settings_retrieved', lang),
+      data: settings,
     };
   }
 }

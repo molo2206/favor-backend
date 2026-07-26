@@ -32,12 +32,10 @@
   "company_city_updated": "Ciudad actualizada con éxito.",
   "company_city_exists": "La ciudad \"{{name}}\" ya existe para este país.",
   "company_dashboard_loaded": "Panel de control cargado con éxito.",
-
   "company_status_approved": "Aprobada",
   "company_status_rejected": "Rechazada",
   "company_status_pending": "Pendiente",
   "company_status_suspended": "Suspendida",
-
   "company_email_status_title": "Estado de la empresa",
   "company_email_header_title": "Empresa creada con éxito",
   "company_email_description": "El estado de su empresa",
@@ -45,6 +43,10 @@
   "company_email_contact_us": "Contáctenos:",
   "company_email_footer_copyright": "FavorHelp. Todos los derechos reservados.",
   "company_email_legal_note": "Favor Help — Ecosistema digital de Favor Group | RCCM: 21-A-770 | NIF: A2156062L | ID Nacional: 19-G4701-N74976H",
-
-  "company_status_update_title": "Cambio de estado de la empresa"
+  "company_status_update_title": "Cambio de estado de la empresa",
+  "company_settings_created": "Configuración de la empresa creada con éxito.",
+  "company_settings_updated": "Configuración de la empresa actualizada con éxito.",
+  "company_settings_retrieved": "Configuración de la empresa recuperada con éxito.",
+  "company_settings_not_found": "Configuración de la empresa no encontrada.",
+  "company_settings_already_exists": "La configuración de esta empresa ya existe."
 }

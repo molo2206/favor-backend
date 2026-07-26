@@ -8,6 +8,8 @@ import {
   IsString,
   ValidateNested,
   Min,
+  Length,
+  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateOrderItemDto } from 'src/order-item/dto/create-order-item.dto';
@@ -39,6 +41,12 @@ export class CreateOrderDto {
   @IsString()
   @IsNotEmpty()
   currency: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(4, 4, { message: 'Le PIN doit contenir exactement 4 chiffres' })
+  @Matches(/^\d+$/, { message: 'Le PIN doit contenir uniquement des chiffres' })
+  pin?: string;
 
   @IsOptional()
   @IsString()

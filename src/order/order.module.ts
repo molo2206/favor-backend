@@ -33,6 +33,7 @@ import { I18nService } from 'src/libs/common/src';
 import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/company_has_userResource.entity';
 import { City } from 'src/company/entities/city.entity';
+import { FpayModule } from 'src/fpay/fpay.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { City } from 'src/company/entities/city.entity';
     PdfModule,
     TransactionModule,
     NotificationsModule,
+    FpayModule
   ],
   providers: [
     OrderService,
@@ -70,7 +72,7 @@ import { City } from 'src/company/entities/city.entity';
     FcmService, // ✅ ajout
     PushNotificationHelper, // ✅ ajout
     PermissionHelper,
-    I18nService
+    I18nService,
   ],
   controllers: [OrderController],
   exports: [PushNotificationHelper],

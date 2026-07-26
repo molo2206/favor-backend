@@ -49,6 +49,7 @@ import { CancelOrderDto } from './dto/create-cancel-order.dto';
 import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/company_has_userResource.entity';
 import { City } from 'src/company/entities/city.entity';
+import { FpayService } from 'src/fpay/fpay.service';
 
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -91,6 +92,7 @@ export class OrderService {
     private readonly pushNotificationHelper: PushNotificationHelper,
     private readonly permissionHelper: PermissionHelper,
     private readonly i18nService: I18nService,
+    private readonly fpayService: FpayService,
     @InjectRepository(CompanyHasUserResource) private readonly companyHasUserResourceRepo: Repository<CompanyHasUserResource>,
   ) { }
 
@@ -108,7 +110,7 @@ export class OrderService {
     langHeader?: string,
   ): Promise<OrderEntity> {
     const {
-      totalAmount,
+      totalAmount: frontTotalAmount,
       currency,
       orderItems,
       addressUserId,
@@ -119,9 +121,8 @@ export class OrderService {
       phone,
       paymentMethod,
       appliedFeeRate,
-      grandTotal,
       transactionFee,
-      shippingCost,
+      shippingCost: frontShippingCost,
     } = createOrderDto;
 
     const lang = langHeader || this.getUserLanguage(user);
@@ -141,6 +142,52 @@ export class OrderService {
       throw new NotFoundException(this.i18nService.translate('order.address_not_found', lang));
     }
 
+    // ============================================
+    // 🆕 CALCUL DU TOTAL À PARTIR DES ORDER ITEMS
+    // ============================================
+
+    // Calculer le sous-total à partir des orderItems
+    let calculatedSubTotal = 0;
+
+    // Récupérer tous les produits en une seule requête pour optimiser
+    const productIds = orderItems.map(item => item.productId);
+    const products = await this.productRepo.findByIds(productIds);
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    for (const item of orderItems) {
+      const product = productMap.get(item.productId);
+      if (!product) {
+        throw new NotFoundException(
+          this.i18nService.translate('order.product_not_found', lang, { productId: item.productId }),
+        );
+      }
+      // Utiliser le prix du produit si le prix envoyé est 0 ou différent
+      const priceToUse = (item.price && item.price > 0) ? item.price : product.price;
+      calculatedSubTotal += priceToUse * item.quantity;
+    }
+
+    // Shipping cost
+    const shippingCost = frontShippingCost || 0;
+
+    // ✅ Total calculé automatiquement
+    const calculatedTotalAmount = calculatedSubTotal + shippingCost;
+
+    // ✅ Utiliser le total calculé
+    const totalAmount = calculatedTotalAmount;
+
+    console.log('[Order] Calcul du total:', {
+      frontTotalAmount,
+      calculatedSubTotal,
+      shippingCost,
+      calculatedTotalAmount,
+      totalAmountUsed: totalAmount,
+    });
+
+    // ============================================
+    // FIN DU CALCUL
+    // ============================================
+
+    // ✅ Vérification des produits et min_quantity pour WHOLESALER
     if (shopType === CompanyActivity.WHOLESALER || shopType === CompanyActivity.WHOLESALER_RETAILER) {
       for (const item of orderItems) {
         const product = await this.productRepo.findOne({ where: { id: item.productId } });
@@ -172,70 +219,144 @@ export class OrderService {
     let orderStatus = OrderStatus.PENDING;
     let isPaidByMobileMoney = false;
     let selectedMethod: PaymentMethod = PaymentMethod.MANUAL;
+    let fpayTransactionId: string | null = null;
+    let fpayReference: string | null = null;
 
-    if (type === CompanyType.RESTAURANT) {
-      selectedMethod = paymentMethod || PaymentMethod.MANUAL;
-      if (selectedMethod === PaymentMethod.MOBILE_MONEY) {
-        if (!provider || !phone) {
-          throw new BadRequestException(this.i18nService.translate('order.mobile_money_provider_phone_required', lang));
-        }
-        const phon = phone.trim();
-        if (!phon) {
-          throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
-        }
-        if (!grandTotal) {
-          throw new BadRequestException(this.i18nService.translate('order.mobile_money_grandtotal_required', lang));
-        }
-        const amount = grandTotal.toString();
-        const pawapayData = { amount, currency, provider, phone: phon };
-        console.log('[Order] Création dépôt Pawapay :', pawapayData);
-        try {
-          const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
-          console.log('[Order] Réponse Pawapay :', pawapayResponse);
+    // ✅ Montant à payer = totalAmount (déjà calculé)
+    const amountToPay = totalAmount;
 
-          // 🔥 Récupérer le statut
-          const depositStatus = pawapayResponse.finalStatus?.data?.status || pawapayResponse.status;
+    // ✅ Gérer le paiement FPAY
+    if (paymentMethod === PaymentMethod.FPAY) {
+      selectedMethod = PaymentMethod.FPAY;
 
-          // 🔥 Si différent de COMPLETED, on ne crée PAS la commande
-          if (depositStatus !== 'COMPLETED') {
-            console.log(`[Order] Paiement échoué: statut ${depositStatus}`);
-            throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
-          }
+      if (!user.userIdFpay) {
+        throw new BadRequestException(
+          this.i18nService.translate('order.fpay_account_not_linked', lang)
+        );
+      }
 
-          console.log('[Order] Dépôt Pawapay confirmé : COMPLETED');
+      if (!createOrderDto.pin) {
+        throw new BadRequestException(
+          this.i18nService.translate('order.fpay_pin_required', lang)
+        );
+      }
+
+      if (!createOrderDto.phone) {
+        throw new BadRequestException(
+          this.i18nService.translate('order.phone_required', lang)
+        );
+      }
+
+      const fpayData = {
+        phone: createOrderDto.phone,
+        pin: createOrderDto.pin,
+        toPhoneOrCode: user.phone || user.id,
+        amount: amountToPay,
+        currency: currency || 'USD',
+        description: `Paiement de commande #${invoiceNumb}`,
+      };
+
+      console.log('[Order] Tentative de paiement FPAY :', {
+        phone: fpayData.phone,
+        amount: fpayData.amount,
+        currency: fpayData.currency,
+        invoiceNumb,
+      });
+
+      try {
+        const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+
+        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
           paymentStatus = PaymentStatus.PAID;
           orderStatus = OrderStatus.VALIDATED;
           isPaidByMobileMoney = true;
-        } catch (error: any) {
-          if (error.name === 'AbortError') {
-            throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
-          }
+          fpayTransactionId = fpayResponse.data.transaction.id;
+          fpayReference = fpayResponse.data.transaction.reference;
+
+          console.log('[Order] ✅ Paiement FPAY réussi:', {
+            transactionId: fpayTransactionId,
+            reference: fpayReference,
+            amount: fpayResponse.data.transaction.amount,
+          });
+        } else {
+          throw new BadRequestException(
+            this.i18nService.translate('order.fpay_payment_failed', lang)
+          );
+        }
+      } catch (error: any) {
+        console.error('[Order] ❌ Erreur paiement FPAY:', error.message);
+
+        if (error.name === 'AbortError') {
+          throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
+        }
+
+        throw new BadRequestException(
+          error.message || this.i18nService.translate('order.fpay_payment_failed', lang)
+        );
+      }
+    }
+    else if (paymentMethod === PaymentMethod.MOBILE_MONEY) {
+      selectedMethod = PaymentMethod.MOBILE_MONEY;
+
+      if (!provider || !phone) {
+        throw new BadRequestException(this.i18nService.translate('order.mobile_money_provider_phone_required', lang));
+      }
+      const phon = phone.trim();
+      if (!phon) {
+        throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
+      }
+
+      const amount = amountToPay.toString();
+      const pawapayData = { amount, currency, provider, phone: phon };
+
+      console.log('[Order] Création dépôt Pawapay :', pawapayData);
+      try {
+        const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
+        console.log('[Order] Réponse Pawapay :', pawapayResponse);
+
+        const depositStatus = pawapayResponse.finalStatus?.data?.status || pawapayResponse.status;
+
+        if (depositStatus !== 'COMPLETED') {
+          console.log(`[Order] Paiement échoué: statut ${depositStatus}`);
           throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
         }
-      } else if (selectedMethod === PaymentMethod.CASH) {
-        paymentStatus = PaymentStatus.PENDING;
-        orderStatus = OrderStatus.PENDING;
-        isPaidByMobileMoney = false;
-        console.log(`[Order] Commande restaurant avec paiement CASH`);
-      } else {
-        paymentStatus = PaymentStatus.PENDING;
-        orderStatus = OrderStatus.PENDING;
-        console.log(`[Order] Commande restaurant avec paiement ${selectedMethod} – en attente`);
+
+        console.log('[Order] Dépôt Pawapay confirmé : COMPLETED');
+        paymentStatus = PaymentStatus.PAID;
+        orderStatus = OrderStatus.VALIDATED;
+        isPaidByMobileMoney = true;
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
+        }
+        throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
       }
-    } else {
+    }
+    else if (paymentMethod === PaymentMethod.CASH) {
+      selectedMethod = PaymentMethod.CASH;
+      paymentStatus = PaymentStatus.PENDING;
+      orderStatus = OrderStatus.PENDING;
+      isPaidByMobileMoney = false;
+      console.log(`[Order] Commande avec paiement CASH`);
+    }
+    else {
       selectedMethod = paymentMethod || PaymentMethod.MANUAL;
       paymentStatus = PaymentStatus.PENDING;
       orderStatus = OrderStatus.PENDING;
-      console.log(`[Order] Commande ${type} avec paiement ${selectedMethod} – en attente`);
+      console.log(`[Order] Commande avec paiement ${selectedMethod} – en attente`);
     }
 
-    const isRestaurantAutoPaid = type === CompanyType.RESTAURANT && (selectedMethod === PaymentMethod.MOBILE_MONEY || selectedMethod === PaymentMethod.CASH);
+    const isRestaurantAutoPaid = type === CompanyType.RESTAURANT &&
+      (selectedMethod === PaymentMethod.MOBILE_MONEY ||
+        selectedMethod === PaymentMethod.CASH ||
+        selectedMethod === PaymentMethod.FPAY);
 
+    // ✅ Utilisation de totalAmount (calculé)
     const order = this.orderRepo.create({
       user,
       totalAmount,
       currency,
-      grandTotal: isRestaurantAutoPaid ? (grandTotal ?? Number(totalAmount) + (shippingCost ?? 0)) : Number(totalAmount),
+      grandTotal: isRestaurantAutoPaid ? amountToPay : totalAmount,
       addressUser,
       type,
       invoiceNumber: invoiceNumb,
@@ -243,13 +364,16 @@ export class OrderService {
       status: orderStatus,
       whatsapp_number: whatsapp_number!,
       paymentMethod: selectedMethod,
-      shippingCost: isRestaurantAutoPaid ? (shippingCost ?? 0) : 0,
+      shippingCost: shippingCost,
       appliedFeeRate: isRestaurantAutoPaid ? (appliedFeeRate ?? 0) : 0,
       transactionFee: isRestaurantAutoPaid ? (transactionFee ?? 0) : 0,
       paid: paymentStatus === PaymentStatus.PAID,
     });
     await this.orderRepo.save(order);
 
+    // ============================================
+    // CRÉATION DES ORDER ITEMS
+    // ============================================
     const orderItemEntities: OrderItemEntity[] = [];
     const groupedByCompany = new Map<string, { companyId: string; items: SubOrderItemEntity[]; total: number }>();
 
@@ -273,6 +397,9 @@ export class OrderService {
     }
     await this.orderItemRepo.save(orderItemEntities);
 
+    // ============================================
+    // CRÉATION DES SUB ORDERS
+    // ============================================
     for (const [, group] of groupedByCompany) {
       const subOrder = this.subOrderRepo.create({
         order,
@@ -289,6 +416,9 @@ export class OrderService {
       await this.subOrderItemRepo.save(group.items);
     }
 
+    // ============================================
+    // RÉCUPÉRATION DE LA COMMANDE COMPLÈTE
+    // ============================================
     const finalOrder = await this.orderRepo.findOne({
       where: { id: order.id },
       relations: [
@@ -313,12 +443,16 @@ export class OrderService {
       relations: ['company', 'items', 'items.product', 'order'],
     });
 
+    // ============================================
+    // ENREGISTREMENT DE L'OPÉRATION SI PAYÉ
+    // ============================================
     if (paymentStatus === PaymentStatus.PAID && type === CompanyType.RESTAURANT) {
-      const operationAmount = isRestaurantAutoPaid ? (grandTotal ?? Number(totalAmount) + (shippingCost ?? 0)) : Number(totalAmount);
+      const operationAmount = isRestaurantAutoPaid ? amountToPay : totalAmount;
       const designation = this.i18nService.translate('order.payment_designation', lang, {
         invoiceNumber: order.invoiceNumber,
         method: selectedMethod,
       });
+
       const operationData: Partial<OperationEntity> = {
         debit: 0,
         credit: operationAmount,
@@ -329,19 +463,31 @@ export class OrderService {
         paymentMethod: selectedMethod,
         reference: order.invoiceNumber,
       };
-      if (selectedMethod === PaymentMethod.MOBILE_MONEY && provider) operationData.provider = provider;
+
+      if (selectedMethod === PaymentMethod.FPAY) {
+        operationData.fpayTransactionId = fpayTransactionId || '';
+        operationData.fpayReference = fpayReference || '';
+      }
+
+      if (selectedMethod === PaymentMethod.MOBILE_MONEY && provider) {
+        operationData.provider = provider;
+      }
+
       const operation = this.operationRepo.create(operationData as any);
       await this.operationRepo.save(operation);
       console.log(`[Order] Opération ${selectedMethod} enregistrée pour la commande ${order.invoiceNumber}`);
     }
 
+    // ============================================
+    // NOTIFICATIONS
+    // ============================================
     const paymentQrCode = await QRCode.toDataURL(finalOrder.invoiceNumber);
     this.processOrderNotifications(finalOrder, subOrders, user, order, paymentQrCode, groupedByCompany, provider, lang).catch((err) =>
       console.error('Erreur notifications:', err),
     );
+
     return finalOrder;
   }
-
   // ======================== NOTIFICATIONS APRÈS CRÉATION ========================
   private async processOrderNotifications(
     finalOrder: OrderEntity,
@@ -533,16 +679,21 @@ export class OrderService {
         .innerJoin('user_has_company', 'uhc', 'uhc.userId = u.id')
         .innerJoin('company_has_user_resource', 'chur', 'chur.userCompanyId = uhc.id')
         .innerJoin('resources', 'r', 'r.id = chur.resourceId')
-        .innerJoin('branches', 'b', 'b.id = uhc.branchId') // 🔥 Jointure sur la branche de l'utilisateur
+        .innerJoin('branches', 'b', 'b.id = chur.branchId')
         .where('u.role = :role', { role: 'ADMIN' })
         .andWhere('r.name = :resourceName', { resourceName })
-        .andWhere('chur.can_manage = :canManage', { canManage: true })
-        .andWhere('b.cityId = :orderCityId', { orderCityId }) // 🔥 Filtrer par ville
+        .andWhere('chur.canManage = :canManage', { canManage: true })
+        .andWhere('b.cityId = :orderCityId', { orderCityId })
         .getMany();
 
-      console.log(`👥 Admins avec canManage sur ${resourceName} dans la ville ${orderCityName}: ${adminUsers.length}`);
-      if (adminUsers.length > 0) {
-        console.log(`👥 Admins: ${adminUsers.map(a => a.fullName).join(', ')}`);
+      // ✅ AJOUTEZ CE LOG
+      console.log(`🔍 Admins trouvés: ${adminUsers.length}`);
+      if (adminUsers.length === 0) {
+        console.log('⚠️ AUCUN admin trouvé avec les conditions suivantes:');
+        console.log('   - role: ADMIN');
+        console.log(`   - resourceName: ${resourceName}`);
+        console.log(`   - cityId: ${orderCityId}`);
+        console.log(`   - canManage: true`);
       }
 
       const processedRecipients = new Set<string>([user.id]);

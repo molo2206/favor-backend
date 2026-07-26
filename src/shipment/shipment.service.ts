@@ -45,6 +45,10 @@ import { UserHasCompanyEntity } from 'src/user_has_company/entities/user_has_com
 import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/company_has_userResource.entity';
 import { CompanyEntity } from 'src/company/entities/company.entity';
 import { I18nService } from 'src/libs/common/src';
+import { FpayService } from 'src/fpay/fpay.service';
+import { LoyaltySourceType, LoyaltyTransactionType, UserLoyaltyEntity } from 'src/users/entities/user-loyalty.entity';
+import { CompanySettingsEntity } from 'src/company/entities/company-settings.entity';
+import { UserLoyaltyHistoryEntity } from 'src/users/entities/user-loyalty-history.entity';
 
 @Injectable()
 export class ShipmentService {
@@ -80,7 +84,21 @@ export class ShipmentService {
     private readonly userHasCompanyRepo: Repository<UserHasCompanyEntity>,
     @InjectRepository(CompanyHasUserResource)
     private readonly companyHasUserResourceRepo: Repository<CompanyHasUserResource>,
+
+    @InjectRepository(UserLoyaltyEntity)
+    private readonly userLoyaltyRepo: Repository<UserLoyaltyEntity>,
+
+    @InjectRepository(CompanySettingsEntity)
+    private readonly companySettingsRepo: Repository<CompanySettingsEntity>,
+
+    @InjectRepository(UserLoyaltyHistoryEntity)
+    private readonly loyaltyHistoryRepo: Repository<UserLoyaltyHistoryEntity>,
+
+    @InjectRepository(CompanyEntity)
+    private readonly companyRepo: Repository<CompanyEntity>,
+
     private readonly i18n: I18nService,
+    private readonly fpayService: FpayService,
   ) { }
 
   // ----------------------------------------------------------------------
@@ -420,6 +438,7 @@ export class ShipmentService {
     };
   }
 
+
   async createByAdmin(
     dto: CreateShipmentAdminDto,
     file: Express.Multer.File | undefined,
@@ -459,6 +478,7 @@ export class ShipmentService {
       pickupCompanyId,
       shippingCompanyId,
       deliveryCompanyId,
+      loyaltyCode, // ✅ Ajout
     } = dto;
 
     if (!currentUser.activeCompanyId) {
@@ -467,7 +487,6 @@ export class ShipmentService {
       );
     }
 
-    // --- NOUVEAUTÉS : clientName obligatoire, clientPhone obligatoire si pas de userId ---
     if (!clientName || clientName.trim() === '') {
       throw new BadRequestException(
         await this.i18n.translate('shipment.error.client_name_required', lang),
@@ -494,6 +513,7 @@ export class ShipmentService {
     shipment.deliveryEnabled = deliveryEnabled;
     shipment.whatsapp_number = whatsapp_number;
     shipment.paymentMethod = paymentMethod;
+    shipment.loyaltyCode = loyaltyCode || undefined;
 
     if (pickupEnabled) {
       shipment.pickupCompanyId = pickupCompanyId && pickupCompanyId.trim() !== '' ? pickupCompanyId : currentUser.activeCompanyId;
@@ -512,7 +532,6 @@ export class ShipmentService {
 
     let targetUser: UserEntity | null = null;
 
-    // Gestion de l'utilisateur cible
     if (userId) {
       targetUser = await this.userRepo.findOne({ where: { id: userId } });
       if (!targetUser) {
@@ -522,7 +541,6 @@ export class ShipmentService {
       }
       shipment.userId = targetUser.id;
     } else if (clientPhone) {
-      // Tentative de lier à un utilisateur existant (optionnel, on conserve clientName saisi)
       const foundUser = await this.userRepo.findOne({ where: { phone: clientPhone } });
       if (foundUser) {
         targetUser = foundUser;
@@ -530,7 +548,6 @@ export class ShipmentService {
       }
     }
 
-    // On écrase toujours les champs client avec les valeurs saisies (pour l'affichage/notifications)
     shipment.clientName = clientName;
     shipment.clientPhone = clientPhone || undefined;
     if (pickupEnabled) {
@@ -602,7 +619,6 @@ export class ShipmentService {
       relations,
     });
 
-    // Notifications
     if (targetUser) {
       this.processShipmentNotifications(shipmentWithRelations, packageEntity, targetUser, lang).catch((err) =>
         console.error('Erreur notifications colis:', err),
@@ -661,6 +677,11 @@ export class ShipmentService {
     if (dto.pickupEnabled !== undefined) shipment.pickupEnabled = dto.pickupEnabled;
     if (dto.shippingEnabled !== undefined) shipment.shippingEnabled = dto.shippingEnabled;
     if (dto.deliveryEnabled !== undefined) shipment.deliveryEnabled = dto.deliveryEnabled;
+
+    // ✅ Correction pour update avec null
+    if (dto.loyaltyCode !== undefined) {
+      shipment.loyaltyCode = dto.loyaltyCode ?? undefined;
+    }
 
     if (shipment.pickupEnabled) {
       if (dto.pickupFrom) shipment.pickupFrom = dto.pickupFrom;
@@ -1211,11 +1232,10 @@ export class ShipmentService {
 
     const shipment = await this.shipmentRepo.findOne({
       where: { id: shipmentId },
-      relations: ['package', 'trackings'],
+      relations: ['package', 'trackings', 'shippingCompany', 'user', 'pickupCompany', 'deliveryCompany'],
     });
     if (!shipment) throw new NotFoundException(await this.i18n.translate('shipment.error.not_found', lang, { id: shipmentId }));
     if (shipment.paid) throw new BadRequestException(await this.i18n.translate('shipment.error.already_paid', lang));
-    // if (!shipment.clientPhone) throw new BadRequestException(await this.i18n.translate('shipment.error.client_phone_missing', lang));
     if (shipment.shippingPrice === null || shipment.shippingPrice === undefined) {
       throw new BadRequestException(await this.i18n.translate('shipment.error.no_price', lang));
     }
@@ -1223,6 +1243,144 @@ export class ShipmentService {
       throw new BadRequestException(await this.i18n.translate('shipment.error.amount_mismatch', lang, { amount, expected: shipment.shippingPrice }));
     }
 
+    // ============================================
+    // 🆕 RÉCUPÉRATION DU FRAIS DE FIDÉLITÉ
+    // ============================================
+    let loyaltyFee = 0;
+    let loyaltyCode: string | undefined;
+
+    // 1️⃣ Récupérer le code de fidélité depuis le shipment
+    loyaltyCode = shipment.loyaltyCode || undefined;
+
+    console.log('[Fidelity] 🔍 Code de fidélité du shipment:', loyaltyCode);
+
+    if (loyaltyCode) {
+      // 2️⃣ Récupérer le compte de fidélité par loyaltyCode
+      const userLoyalty = await this.userLoyaltyRepo.findOne({
+        where: { loyaltyCode: loyaltyCode, isActive: true },
+        relations: ['user'],
+      });
+
+      console.log('[Fidelity] 🔍 Compte de fidélité trouvé:', userLoyalty ? 'Oui' : 'Non');
+
+      if (userLoyalty) {
+        // 3️⃣ Récupérer la company de livraison (shippingCompany)
+        let shippingCompany: CompanyEntity | null = shipment.shippingCompany || null;
+
+        if (!shippingCompany && shipment.pickupCompany) {
+          shippingCompany = shipment.pickupCompany;
+          console.log('[Fidelity] 🔍 Utilisation de pickupCompany comme fallback');
+        } else if (!shippingCompany && shipment.deliveryCompany) {
+          shippingCompany = shipment.deliveryCompany;
+          console.log('[Fidelity] 🔍 Utilisation de deliveryCompany comme fallback');
+        }
+
+        if (!shippingCompany && shipment.user?.activeCompanyId) {
+          shippingCompany = await this.companyRepo.findOne({
+            where: { id: shipment.user.activeCompanyId },
+          });
+          console.log('[Fidelity] 🔍 Utilisation de activeCompany de l\'utilisateur:', shippingCompany?.id);
+        }
+
+        console.log('[Fidelity] 🔍 Company trouvée:', shippingCompany?.id || 'Non trouvée');
+
+        if (shippingCompany) {
+          let companySettings = await this.companySettingsRepo.findOne({
+            where: { companyId: shippingCompany.id },
+          });
+
+          if (!companySettings) {
+            console.log('[Fidelity] ℹ️ Création des paramètres de fidélité par défaut');
+            companySettings = await this.companySettingsRepo.create({
+              companyId: shippingCompany.id,
+              enableLoyaltyFees: true,
+              loyaltyFeeFixed: 5.00,
+            });
+            await this.companySettingsRepo.save(companySettings);
+          }
+
+          console.log('[Fidelity] 🔍 Paramètres de fidélité:', {
+            enableLoyaltyFees: companySettings?.enableLoyaltyFees,
+            loyaltyFeeFixed: companySettings?.loyaltyFeeFixed,
+          });
+
+          if (companySettings && companySettings.enableLoyaltyFees) {
+            const feePercentage = companySettings.loyaltyFeeFixed || 0;
+            loyaltyFee = (amount * feePercentage) / 100;
+            loyaltyFee = Math.round(loyaltyFee * 100) / 100;
+
+            console.log('[Fidelity] 🔍 Calcul des frais de fidélité:', {
+              montantTotal: amount,
+              pourcentage: feePercentage,
+              fraisFidelite: loyaltyFee,
+            });
+
+            if (loyaltyFee > 0) {
+              const recipientUser = userLoyalty.user;
+
+              console.log('[Fidelity] 🔍 Destinataire (Client):', {
+                id: recipientUser?.id,
+                fullName: recipientUser?.fullName,
+                phone: recipientUser?.phone,
+                userIdFpay: recipientUser?.userIdFpay,
+              });
+
+              if (recipientUser?.userIdFpay) {
+                const fpayData = {
+                  userId: recipientUser.userIdFpay,
+                  amount: loyaltyFee,
+                  description: `Frais de fidélité pour le colis ${shipment.trackingNumber}`,
+                  currency: 'USD',
+                  countryCode: 'CD',
+                };
+
+                console.log('[Fidelity] 📤 Envoi FPAY:', fpayData);
+
+                const fpayResponse = await this.fpayService.makeSend(fpayData, userActive);
+
+                console.log('[Fidelity] 📥 Réponse FPAY:', fpayResponse?.data?.transaction?.status);
+
+                if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+                  const loyaltyHistory = this.loyaltyHistoryRepo.create({
+                    userId: recipientUser.id,
+                    loyaltyId: userLoyalty.id,
+                    points: Math.round(loyaltyFee * 100),
+                    pointsBefore: userLoyalty.pointsBalance,
+                    pointsAfter: userLoyalty.pointsBalance + Math.round(loyaltyFee * 100),
+                    transactionType: LoyaltyTransactionType.EARN,
+                    sourceType: LoyaltySourceType.SHIPMENT,
+                    sourceId: shipment.id,
+                    description: `Frais de fidélité pour l'expédition ${shipment.trackingNumber}`,
+                    expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+                    isExpired: false,
+                  });
+                  await this.loyaltyHistoryRepo.save(loyaltyHistory);
+
+                  console.log(`[Fidelity] ✅ ${loyaltyFee} USD envoyé en fidélité pour le client ${recipientUser.id}`);
+                  console.log(`[Fidelity] ✅ Points ajoutés: ${Math.round(loyaltyFee * 100)} points`);
+                }
+              } else {
+                console.warn('[Fidelity] ⚠️ Destinataire sans userIdFpay');
+              }
+            } else {
+              console.log('[Fidelity] ℹ️ Frais de fidélité = 0, pas d\'envoi');
+            }
+          } else {
+            console.log('[Fidelity] ℹ️ Fidélité désactivée pour cette company');
+          }
+        } else {
+          console.warn('[Fidelity] ⚠️ Aucune company trouvée');
+        }
+      } else {
+        console.warn('[Fidelity] ⚠️ Aucun compte de fidélité trouvé pour le code:', loyaltyCode);
+      }
+    } else {
+      console.log('[Fidelity] ℹ️ Aucun code de fidélité dans le shipment');
+    }
+
+    // ============================================
+    // SUITE DE LA COLLECTE ADMIN
+    // ============================================
     const now = new Date();
     shipment.paid = true;
     shipment.pin = GeneratePin.generate();

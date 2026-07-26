@@ -136,4 +136,20 @@ export class OperationEntity {
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   reference?: string;
+
+  @Column({
+    nullable: true,
+    type: 'varchar',
+    length: 36,
+    comment: 'ID de la transaction FPAY'
+  })
+  fpayTransactionId: string;
+
+  @Column({
+    nullable: true,
+    type: 'varchar',
+    length: 255,
+    comment: 'Référence de la transaction FPAY'
+  })
+  fpayReference: string;
 }

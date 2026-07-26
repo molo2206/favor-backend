@@ -32,12 +32,10 @@
   "company_city_updated": "تم تحديث المدينة بنجاح.",
   "company_city_exists": "المدينة \"{{name}}\" موجودة بالفعل لهذه الدولة.",
   "company_dashboard_loaded": "تم تحميل لوحة التحكم بنجاح.",
-
   "company_status_approved": "موافقة",
   "company_status_rejected": "مرفوضة",
   "company_status_pending": "قيد الانتظار",
   "company_status_suspended": "معلقة",
-
   "company_email_status_title": "حالة الشركة",
   "company_email_header_title": "تم إنشاء الشركة بنجاح",
   "company_email_description": "حالة شركتك",
@@ -45,6 +43,10 @@
   "company_email_contact_us": "اتصل بنا:",
   "company_email_footer_copyright": "FavorHelp. جميع الحقوق محفوظة.",
   "company_email_legal_note": "Favor Help — النظام البيئي الرقمي لمجموعة Favor | RCCM: 21-A-770 | الرقم الضريبي: A2156062L | الهوية الوطنية: 19-G4701-N74976H",
-
-  "company_status_update_title": "تغيير حالة الشركة"
+  "company_status_update_title": "تغيير حالة الشركة",
+  "company_settings_created": "تم إنشاء إعدادات الشركة بنجاح.",
+  "company_settings_updated": "تم تحديث إعدادات الشركة بنجاح.",
+  "company_settings_retrieved": "تم استرجاع إعدادات الشركة بنجاح.",
+  "company_settings_not_found": "لم يتم العثور على إعدادات الشركة.",
+  "company_settings_already_exists": "إعدادات هذه الشركة موجودة بالفعل."
 }

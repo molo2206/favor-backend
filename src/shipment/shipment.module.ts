@@ -1,6 +1,8 @@
 // shipment.module.ts
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { HttpModule } from '@nestjs/axios'; // ✅ Ajouter
+import { ConfigModule } from '@nestjs/config'; // ✅ Ajouter
 import { ShipmentService } from './shipment.service';
 import { ShipmentController } from './shipment.controller';
 import { TypeTransportService } from './type-transport.service';
@@ -31,9 +33,20 @@ import { PushNotificationHelper } from 'src/users/utility/helpers/push-notificat
 import { FcmService } from 'src/notification/fcm.service';
 import { DeviceToken } from 'src/firebase/entities/device-token.entity';
 import { UserSettingsEntity } from 'src/users/entities/user-settings.entity';
+import { UserLoyaltyEntity } from 'src/users/entities/user-loyalty.entity';
+import { UserLoyaltyHistoryEntity } from 'src/users/entities/user-loyalty-history.entity';
+import { CompanySettingsEntity } from 'src/company/entities/company-settings.entity';
+import { FpayService } from 'src/fpay/fpay.service';
+import { CompanyEntity } from 'src/company/entities/company.entity';
 
 @Module({
   imports: [
+    // ✅ Ajouter HttpModule et ConfigModule pour FpayService
+    HttpModule.register({
+      timeout: 30000,
+      maxRedirects: 5,
+    }),
+    ConfigModule,
     TypeOrmModule.forFeature([
       Shipment,
       PackageDetails,
@@ -47,8 +60,12 @@ import { UserSettingsEntity } from 'src/users/entities/user-settings.entity';
       CompanyHasUserResource,
       Resource,
       BranchEntity,
-      DeviceToken, // ✅ ajout pour FcmService
+      DeviceToken,
       UserSettingsEntity,
+      UserLoyaltyEntity,
+      UserLoyaltyHistoryEntity,
+      CompanySettingsEntity,
+      CompanyEntity
     ]),
     forwardRef(() => MailModule),
     PawapayModule,
@@ -68,9 +85,10 @@ import { UserSettingsEntity } from 'src/users/entities/user-settings.entity';
     InvoiceService,
     FilesService,
     PermissionHelper,
-    FcmService, // ✅ ajouté
-    PushNotificationHelper, // ✅ ajouté
+    FcmService,
+    PushNotificationHelper,
+    FpayService,
   ],
   exports: [ShipmentService, TypeTransportService, ShipmentTrackingService],
 })
-export class ShipmentModule {}
+export class ShipmentModule { }

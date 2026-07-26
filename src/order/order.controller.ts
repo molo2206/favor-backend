@@ -60,6 +60,7 @@ export class OrderController {
     return headerLang;
   }
 
+
   @Post()
   @UseGuards(AuthentificationGuard)
   @AuditAction(ActionType.CREATE, 'Order')
@@ -75,9 +76,21 @@ export class OrderController {
     });
 
     const lang = this.getUserLanguage(user, req);
+
+    // ✅ RECHARGER L'UTILISATEUR POUR AVOIR userIdFpay
+    const fullUser = await this.userRepo.findOne({
+      where: { id: user.id },
+    });
+
+    if (!fullUser) {
+      throw new NotFoundException(
+        this.i18nService.translate('order.user_not_found', lang)
+      );
+    }
+
     const order = await this.orderService.createOrder(
       createOrderDto,
-      user,
+      fullUser,
       abortController.signal,
       lang,
     );

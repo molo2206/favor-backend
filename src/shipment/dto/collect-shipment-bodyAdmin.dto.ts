@@ -1,5 +1,5 @@
 // src/shipments/dto/collect-shipment-body-admin.dto.ts
-import { IsNumber, IsNotEmpty } from 'class-validator';
+import { IsNumber, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CollectShipmentBodyAdminDto {
@@ -10,4 +10,8 @@ export class CollectShipmentBodyAdminDto {
 
   @IsNotEmpty({ message: 'Le mot de passe admin est requis.' })
   password: string;
+
+  @IsOptional()
+  @IsString()
+  loyaltyCode?: string; // 🆕 Ajout du champ optionnel
 }
