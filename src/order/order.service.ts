@@ -682,18 +682,16 @@ export class OrderService {
         .innerJoin('branches', 'b', 'b.id = chur.branchId')
         .where('u.role = :role', { role: 'ADMIN' })
         .andWhere('r.name = :resourceName', { resourceName })
-        .andWhere('chur.canManage = :canManage', { canManage: true })
-        .andWhere('b.cityId = :orderCityId', { orderCityId })
+        .andWhere(
+          // ✅ canManage = true (voit tout) OU (canRead = true ET dans la même ville)
+          '(chur.canManage = :canManage OR (chur.canRead = :canRead AND b.cityId = :orderCityId))',
+          { canManage: true, canRead: true, orderCityId }
+        )
         .getMany();
 
-      // ✅ AJOUTEZ CE LOG
-      console.log(`🔍 Admins trouvés: ${adminUsers.length}`);
-      if (adminUsers.length === 0) {
-        console.log('⚠️ AUCUN admin trouvé avec les conditions suivantes:');
-        console.log('   - role: ADMIN');
-        console.log(`   - resourceName: ${resourceName}`);
-        console.log(`   - cityId: ${orderCityId}`);
-        console.log(`   - canManage: true`);
+      console.log(`👥 Admins trouvés: ${adminUsers.length}`);
+      if (adminUsers.length > 0) {
+        console.log(`👥 Admins: ${adminUsers.map(a => a.fullName).join(', ')}`);
       }
 
       const processedRecipients = new Set<string>([user.id]);
