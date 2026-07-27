@@ -1,14 +1,9 @@
-// invoice.module.ts
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { InvoiceService } from './invoice.util';
-import { OrderEntity } from '../entities/order.entity';
+import { Module } from "@nestjs/common";
+import { InvoiceService } from "./invoice.util";
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([OrderEntity]), // ✅ Ajouter cette ligne
-  ],
-  providers: [InvoiceService],
-  exports: [InvoiceService],
-})
-export class InvoiceModule { }
+    providers: [InvoiceService],
+    exports: [InvoiceService], // ← essentiel pour qu’il soit accessible ailleurs
+  })
+  export class InvoiceModule {}
+  
