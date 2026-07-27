@@ -110,7 +110,7 @@ export class OrderService {
     langHeader?: string,
   ): Promise<OrderEntity> {
     const {
-      totalAmount: frontTotalAmount,
+      totalAmount,
       currency,
       orderItems,
       addressUserId,
@@ -121,8 +121,10 @@ export class OrderService {
       phone,
       paymentMethod,
       appliedFeeRate,
+      grandTotal,
       transactionFee,
-      shippingCost: frontShippingCost,
+      shippingCost,
+      pin, // ✅ Ajouté pour FPAY
     } = createOrderDto;
 
     const lang = langHeader || this.getUserLanguage(user);
@@ -142,28 +144,6 @@ export class OrderService {
       throw new NotFoundException(this.i18nService.translate('order.address_not_found', lang));
     }
 
-    // ============================================
-    // ✅ UTILISER UNIQUEMENT LES VALEURS DU FRONT
-    // ============================================
-
-    // ✅ Total = ce que le front envoie
-    const totalAmount = frontTotalAmount || 0;
-
-    // ✅ Shipping cost = ce que le front envoie
-    const shippingCost = frontShippingCost || 0;
-
-    console.log('[Order] 📦 Utilisation des valeurs du front:', {
-      frontTotalAmount,
-      frontShippingCost,
-      totalAmount,
-      shippingCost,
-    });
-
-    // ============================================
-    // FIN - PAS DE CALCUL BACKEND
-    // ============================================
-
-    // ✅ Vérification WHOLESALER (seulement la validation)
     if (shopType === CompanyActivity.WHOLESALER || shopType === CompanyActivity.WHOLESALER_RETAILER) {
       for (const item of orderItems) {
         const product = await this.productRepo.findOne({ where: { id: item.productId } });
@@ -195,12 +175,10 @@ export class OrderService {
     let orderStatus = OrderStatus.PENDING;
     let isPaidByMobileMoney = false;
     let selectedMethod: PaymentMethod = PaymentMethod.MANUAL;
-    let fpayTransactionId: string | null = null;
-    let fpayReference: string | null = null;
+    let fpayTransactionId: string | null = null; // ✅ Ajouté pour FPAY
+    let fpayReference: string | null = null; // ✅ Ajouté pour FPAY
 
-    const amountToPay = totalAmount;
-
-    // ✅ Gérer le paiement FPAY
+    // ✅ AJOUT FPAY
     if (paymentMethod === PaymentMethod.FPAY) {
       selectedMethod = PaymentMethod.FPAY;
 
@@ -210,21 +188,23 @@ export class OrderService {
         );
       }
 
-      if (!createOrderDto.pin) {
+      if (!pin) {
         throw new BadRequestException(
           this.i18nService.translate('order.fpay_pin_required', lang)
         );
       }
 
-      if (!createOrderDto.phone) {
+      if (!phone) {
         throw new BadRequestException(
           this.i18nService.translate('order.phone_required', lang)
         );
       }
 
+      const amountToPay = grandTotal || totalAmount || 0;
+
       const fpayData = {
-        phone: createOrderDto.phone,
-        pin: createOrderDto.pin,
+        phone: phone,
+        pin: pin,
         toPhoneOrCode: user.phone || user.id,
         amount: amountToPay,
         currency: currency || 'USD',
@@ -270,68 +250,71 @@ export class OrderService {
         );
       }
     }
-    else if (paymentMethod === PaymentMethod.MOBILE_MONEY) {
-      selectedMethod = PaymentMethod.MOBILE_MONEY;
+    // ✅ FIN AJOUT FPAY
 
-      if (!provider || !phone) {
-        throw new BadRequestException(this.i18nService.translate('order.mobile_money_provider_phone_required', lang));
-      }
-      const phon = phone.trim();
-      if (!phon) {
-        throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
-      }
-
-      const amount = amountToPay.toString();
-      const pawapayData = { amount, currency, provider, phone: phon };
-
-      console.log('[Order] Création dépôt Pawapay :', pawapayData);
-      try {
-        const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
-        console.log('[Order] Réponse Pawapay :', pawapayResponse);
-
-        const depositStatus = pawapayResponse.finalStatus?.data?.status || pawapayResponse.status;
-
-        if (depositStatus !== 'COMPLETED') {
-          console.log(`[Order] Paiement échoué: statut ${depositStatus}`);
+    else if (type === CompanyType.RESTAURANT) {
+      selectedMethod = paymentMethod || PaymentMethod.MANUAL;
+      if (selectedMethod === PaymentMethod.MOBILE_MONEY) {
+        if (!provider || !phone) {
+          throw new BadRequestException(this.i18nService.translate('order.mobile_money_provider_phone_required', lang));
+        }
+        const phon = phone.trim();
+        if (!phon) {
+          throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
+        }
+        if (!grandTotal) {
+          throw new BadRequestException(this.i18nService.translate('order.mobile_money_grandtotal_required', lang));
+        }
+        const amount = grandTotal.toString();
+        const pawapayData = { amount, currency, provider, phone: phon };
+        console.log('[Order] Création dépôt Pawapay :', pawapayData);
+        try {
+          const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
+          console.log('[Order] Réponse Pawapay :', pawapayResponse);
+          const depositStatus = pawapayResponse.finalStatus?.data?.status;
+          switch (depositStatus) {
+            case 'COMPLETED':
+              console.log('[Order] Dépôt Pawapay confirmé : COMPLETED');
+              paymentStatus = PaymentStatus.PAID;
+              orderStatus = OrderStatus.VALIDATED;
+              isPaidByMobileMoney = true;
+              break;
+            default:
+              throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
+          }
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
+          }
           throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
         }
-
-        console.log('[Order] Dépôt Pawapay confirmé : COMPLETED');
-        paymentStatus = PaymentStatus.PAID;
-        orderStatus = OrderStatus.VALIDATED;
-        isPaidByMobileMoney = true;
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
-        }
-        throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
+      } else if (selectedMethod === PaymentMethod.CASH) {
+        paymentStatus = PaymentStatus.PENDING;
+        orderStatus = OrderStatus.PENDING;
+        isPaidByMobileMoney = false;
+        console.log(`[Order] Commande restaurant avec paiement CASH`);
+      } else {
+        paymentStatus = PaymentStatus.PENDING;
+        orderStatus = OrderStatus.PENDING;
+        console.log(`[Order] Commande restaurant avec paiement ${selectedMethod} – en attente`);
       }
-    }
-    else if (paymentMethod === PaymentMethod.CASH) {
-      selectedMethod = PaymentMethod.CASH;
-      paymentStatus = PaymentStatus.PENDING;
-      orderStatus = OrderStatus.PENDING;
-      isPaidByMobileMoney = false;
-      console.log(`[Order] Commande avec paiement CASH`);
-    }
-    else {
+    } else {
       selectedMethod = paymentMethod || PaymentMethod.MANUAL;
       paymentStatus = PaymentStatus.PENDING;
       orderStatus = OrderStatus.PENDING;
-      console.log(`[Order] Commande avec paiement ${selectedMethod} – en attente`);
+      console.log(`[Order] Commande ${type} avec paiement ${selectedMethod} – en attente`);
     }
 
     const isRestaurantAutoPaid = type === CompanyType.RESTAURANT &&
       (selectedMethod === PaymentMethod.MOBILE_MONEY ||
         selectedMethod === PaymentMethod.CASH ||
-        selectedMethod === PaymentMethod.FPAY);
+        selectedMethod === PaymentMethod.FPAY); // ✅ Ajout FPAY
 
-    // ✅ Création de la commande avec les valeurs du front
     const order = this.orderRepo.create({
       user,
-      totalAmount: totalAmount,           // ✅ Valeur du front
+      totalAmount,
       currency,
-      grandTotal: isRestaurantAutoPaid ? amountToPay : totalAmount,
+      grandTotal: isRestaurantAutoPaid ? (grandTotal ?? Number(totalAmount) + (shippingCost ?? 0)) : Number(totalAmount),
       addressUser,
       type,
       invoiceNumber: invoiceNumb,
@@ -339,59 +322,36 @@ export class OrderService {
       status: orderStatus,
       whatsapp_number: whatsapp_number!,
       paymentMethod: selectedMethod,
-      shippingCost: shippingCost,         // ✅ Valeur du front
+      shippingCost: isRestaurantAutoPaid ? (shippingCost ?? 0) : 0,
       appliedFeeRate: isRestaurantAutoPaid ? (appliedFeeRate ?? 0) : 0,
       transactionFee: isRestaurantAutoPaid ? (transactionFee ?? 0) : 0,
       paid: paymentStatus === PaymentStatus.PAID,
     });
     await this.orderRepo.save(order);
 
-    // ============================================
-    // CRÉATION DES ORDER ITEMS (avec prix du front)
-    // ============================================
     const orderItemEntities: OrderItemEntity[] = [];
     const groupedByCompany = new Map<string, { companyId: string; items: SubOrderItemEntity[]; total: number }>();
 
     for (const item of orderItems) {
-      const product = await this.productRepo.findOne({
-        where: { id: item.productId },
-        relations: ['company']
-      });
+      const product = await this.productRepo.findOne({ where: { id: item.productId }, relations: ['company'] });
       if (!product) {
         throw new NotFoundException(
           this.i18nService.translate('order.product_not_found', lang, { productId: item.productId }),
         );
       }
-
-      // ✅ Utiliser le prix du front
-      const priceToUse = item.price || 0;
-
-      const orderItem = this.orderItemRepo.create({
-        order,
-        product,
-        quantity: item.quantity,
-        price: priceToUse
-      });
+      const orderItem = this.orderItemRepo.create({ order, product, quantity: item.quantity, price: item.price });
       orderItemEntities.push(orderItem);
-
       const companyId = product.company.id;
       if (!groupedByCompany.has(companyId)) {
         groupedByCompany.set(companyId, { companyId, items: [], total: 0 });
       }
       const group = groupedByCompany.get(companyId)!;
-      const subOrderItem = this.subOrderItemRepo.create({
-        product,
-        quantity: item.quantity,
-        price: priceToUse
-      });
+      const subOrderItem = this.subOrderItemRepo.create({ product, quantity: item.quantity, price: item.price });
       group.items.push(subOrderItem);
-      group.total += priceToUse * item.quantity;
+      group.total += item.price * item.quantity;
     }
     await this.orderItemRepo.save(orderItemEntities);
 
-    // ============================================
-    // CRÉATION DES SUB ORDERS
-    // ============================================
     for (const [, group] of groupedByCompany) {
       const subOrder = this.subOrderRepo.create({
         order,
@@ -408,9 +368,6 @@ export class OrderService {
       await this.subOrderItemRepo.save(group.items);
     }
 
-    // ============================================
-    // RÉCUPÉRATION DE LA COMMANDE COMPLÈTE
-    // ============================================
     const finalOrder = await this.orderRepo.findOne({
       where: { id: order.id },
       relations: [
@@ -435,16 +392,12 @@ export class OrderService {
       relations: ['company', 'items', 'items.product', 'order'],
     });
 
-    // ============================================
-    // ENREGISTREMENT DE L'OPÉRATION SI PAYÉ
-    // ============================================
     if (paymentStatus === PaymentStatus.PAID && type === CompanyType.RESTAURANT) {
-      const operationAmount = isRestaurantAutoPaid ? amountToPay : totalAmount;
+      const operationAmount = isRestaurantAutoPaid ? (grandTotal ?? Number(totalAmount) + (shippingCost ?? 0)) : Number(totalAmount);
       const designation = this.i18nService.translate('order.payment_designation', lang, {
         invoiceNumber: order.invoiceNumber,
         method: selectedMethod,
       });
-
       const operationData: Partial<OperationEntity> = {
         debit: 0,
         credit: operationAmount,
@@ -456,28 +409,22 @@ export class OrderService {
         reference: order.invoiceNumber,
       };
 
+      // ✅ Ajout FPAY
       if (selectedMethod === PaymentMethod.FPAY) {
         operationData.fpayTransactionId = fpayTransactionId || '';
         operationData.fpayReference = fpayReference || '';
       }
 
-      if (selectedMethod === PaymentMethod.MOBILE_MONEY && provider) {
-        operationData.provider = provider;
-      }
-
+      if (selectedMethod === PaymentMethod.MOBILE_MONEY && provider) operationData.provider = provider;
       const operation = this.operationRepo.create(operationData as any);
       await this.operationRepo.save(operation);
       console.log(`[Order] Opération ${selectedMethod} enregistrée pour la commande ${order.invoiceNumber}`);
     }
 
-    // ============================================
-    // NOTIFICATIONS
-    // ============================================
     const paymentQrCode = await QRCode.toDataURL(finalOrder.invoiceNumber);
     this.processOrderNotifications(finalOrder, subOrders, user, order, paymentQrCode, groupedByCompany, provider, lang).catch((err) =>
       console.error('Erreur notifications:', err),
     );
-
     return finalOrder;
   }
   // ======================== NOTIFICATIONS APRÈS CRÉATION ========================
