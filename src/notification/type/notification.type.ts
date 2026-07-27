@@ -12,7 +12,7 @@ export enum NotificationType {
   RIDE_CANCELLED = 'ride_cancelled',
   LOGISTIC = 'LOGISTIC',
   ORDER_CREATED = 'order_created',
-  ORDER_UPDATED = 'order_updated',
+  ORDER_UPDATED = 'order_created',//order_updated
   SHIPMENT_CREATED = 'shipment_created',
   RESERVATION_CREATED = 'reservation_created',
 
