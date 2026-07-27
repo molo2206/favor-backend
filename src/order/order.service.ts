@@ -183,9 +183,9 @@ export class OrderService {
     console.log('[Order] 🔥 Calcul du total:', {
       type,
       frontTotalAmount,
-      calculatedSubTotal,   // 14.54 (produits uniquement)
+      calculatedSubTotal,   // 0.45
       shippingCost,         // 1.00
-      totalAmount,          // 15.54 (sous-total + livraison) ✅
+      totalAmount,          // 1.45 ✅
     });
 
     // ============================================
@@ -358,17 +358,17 @@ export class OrderService {
     // ✅ Création de la commande
     const order = this.orderRepo.create({
       user,
-      totalAmount,
+      totalAmount: totalAmount,           // ✅ 1.45 (sous-total + frais)
       currency,
       grandTotal: isRestaurantAutoPaid ? amountToPay : totalAmount,
       addressUser,
       type,
-      invoiceNumber: invoiceNumb,
+      invoiceNumber: await this.invoiceService.generateInvoiceNumber(),
       paymentStatus,
       status: orderStatus,
       whatsapp_number: whatsapp_number!,
       paymentMethod: selectedMethod,
-      shippingCost: shippingCost,
+      shippingCost: shippingCost,         // ✅ 1.00
       appliedFeeRate: isRestaurantAutoPaid ? (appliedFeeRate ?? 0) : 0,
       transactionFee: isRestaurantAutoPaid ? (transactionFee ?? 0) : 0,
       paid: paymentStatus === PaymentStatus.PAID,
@@ -437,7 +437,7 @@ export class OrderService {
         status: orderStatus,
       });
       await this.subOrderRepo.save(subOrder);
-      subOrder.invoiceNumber = invoiceNumb;
+      subOrder.invoiceNumber = await this.invoiceService.generateInvoiceNumber()
       await this.subOrderRepo.save(subOrder);
       for (const item of group.items) {
         item.subOrder = subOrder;
