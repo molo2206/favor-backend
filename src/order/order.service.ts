@@ -110,7 +110,7 @@ export class OrderService {
     langHeader?: string,
   ): Promise<OrderEntity> {
     const {
-      totalAmount: frontTotalAmount,
+      totalAmount: frontTotalAmount, // ⚠️ IGNORÉ - Calculé par le backend
       currency,
       orderItems,
       addressUserId,
@@ -143,13 +143,13 @@ export class OrderService {
     }
 
     // ============================================
-    // 🆕 CALCUL DU TOTAL À PARTIR DES ORDER ITEMS
+    // ✅ CALCUL DU TOTAL 100% BACKEND
     // ============================================
 
-    // Calculer le sous-total à partir des orderItems
+    // 1️⃣ Calcul du sous-total à partir des produits en base
     let calculatedSubTotal = 0;
 
-    // Récupérer tous les produits en une seule requête pour optimiser
+    // Récupérer tous les produits en une seule requête
     const productIds = orderItems.map(item => item.productId);
     const products = await this.productRepo.findByIds(productIds);
     const productMap = new Map(products.map(p => [p.id, p]));
@@ -161,30 +161,30 @@ export class OrderService {
           this.i18nService.translate('order.product_not_found', lang, { productId: item.productId }),
         );
       }
-      // Utiliser le prix du produit si le prix envoyé est 0 ou différent
-      const priceToUse = (item.price && item.price > 0) ? item.price : product.price;
+      // ✅ Utiliser le prix du produit en base (ignorer le prix envoyé par le front)
+      const priceToUse = product.price;
       calculatedSubTotal += priceToUse * item.quantity;
     }
 
-    // Shipping cost
+    // 2️⃣ Récupérer le shipping cost (envoyé par le front)
     const shippingCost = frontShippingCost || 0;
 
-    // ✅ Total calculé automatiquement
+    // 3️⃣ Calculer le total
     const calculatedTotalAmount = calculatedSubTotal + shippingCost;
 
-    // ✅ Utiliser le total calculé
+    // 4️⃣ Utiliser le total calculé (100% backend)
     const totalAmount = calculatedTotalAmount;
 
-    console.log('[Order] Calcul du total:', {
-      frontTotalAmount,
-      calculatedSubTotal,
-      shippingCost,
-      calculatedTotalAmount,
+    console.log('[Order] 🔥 Calcul 100% backend:', {
+      frontTotalAmount,        // Ignoré
+      calculatedSubTotal,      // Calculé depuis la base
+      shippingCost,            // Depuis le front
+      calculatedTotalAmount,   // ✅ Total final
       totalAmountUsed: totalAmount,
     });
 
     // ============================================
-    // FIN DU CALCUL
+    // FIN DU CALCUL BACKEND
     // ============================================
 
     // ✅ Vérification des produits et min_quantity pour WHOLESALER
@@ -222,7 +222,7 @@ export class OrderService {
     let fpayTransactionId: string | null = null;
     let fpayReference: string | null = null;
 
-    // ✅ Montant à payer = totalAmount (déjà calculé)
+    // ✅ Montant à payer = totalAmount (calculé par le backend)
     const amountToPay = totalAmount;
 
     // ✅ Gérer le paiement FPAY
@@ -251,7 +251,7 @@ export class OrderService {
         phone: createOrderDto.phone,
         pin: createOrderDto.pin,
         toPhoneOrCode: user.phone || user.id,
-        amount: amountToPay,
+        amount: amountToPay, // ✅ Montant calculé par le backend
         currency: currency || 'USD',
         description: `Paiement de commande #${invoiceNumb}`,
       };
@@ -306,7 +306,7 @@ export class OrderService {
         throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
       }
 
-      const amount = amountToPay.toString();
+      const amount = amountToPay.toString(); // ✅ Montant calculé par le backend
       const pawapayData = { amount, currency, provider, phone: phon };
 
       console.log('[Order] Création dépôt Pawapay :', pawapayData);
@@ -351,10 +351,10 @@ export class OrderService {
         selectedMethod === PaymentMethod.CASH ||
         selectedMethod === PaymentMethod.FPAY);
 
-    // ✅ Utilisation de totalAmount (calculé)
+    // ✅ Création de la commande avec le total calculé par le backend
     const order = this.orderRepo.create({
       user,
-      totalAmount,
+      totalAmount, // ✅ Total calculé par le backend
       currency,
       grandTotal: isRestaurantAutoPaid ? amountToPay : totalAmount,
       addressUser,
@@ -384,16 +384,16 @@ export class OrderService {
           this.i18nService.translate('order.product_not_found', lang, { productId: item.productId }),
         );
       }
-      const orderItem = this.orderItemRepo.create({ order, product, quantity: item.quantity, price: item.price });
+      const orderItem = this.orderItemRepo.create({ order, product, quantity: item.quantity, price: product.price });
       orderItemEntities.push(orderItem);
       const companyId = product.company.id;
       if (!groupedByCompany.has(companyId)) {
         groupedByCompany.set(companyId, { companyId, items: [], total: 0 });
       }
       const group = groupedByCompany.get(companyId)!;
-      const subOrderItem = this.subOrderItemRepo.create({ product, quantity: item.quantity, price: item.price });
+      const subOrderItem = this.subOrderItemRepo.create({ product, quantity: item.quantity, price: product.price });
       group.items.push(subOrderItem);
-      group.total += item.price * item.quantity;
+      group.total += product.price * item.quantity;
     }
     await this.orderItemRepo.save(orderItemEntities);
 
