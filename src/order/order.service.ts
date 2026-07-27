@@ -143,7 +143,7 @@ export class OrderService {
     }
 
     // ============================================
-    // ✅ CALCUL DU SOUS-TOTAL
+    // ✅ CALCUL DU SOUS-TOTAL (PRODUITS UNIQUEMENT)
     // ============================================
 
     let calculatedSubTotal = 0;
@@ -174,17 +174,18 @@ export class OrderService {
       calculatedSubTotal += priceToUse * item.quantity;
     }
 
+    // ✅ Frais de livraison
     const shippingCost = frontShippingCost || 0;
-    const calculatedTotalAmount = calculatedSubTotal + shippingCost;
-    const totalAmount = calculatedTotalAmount;
+
+    // ✅ Total = sous-total + frais de livraison
+    const totalAmount = calculatedSubTotal + shippingCost;
 
     console.log('[Order] 🔥 Calcul du total:', {
       type,
       frontTotalAmount,
-      calculatedSubTotal,
-      shippingCost,
-      calculatedTotalAmount,
-      totalAmountUsed: totalAmount,
+      calculatedSubTotal,   // 14.54 (produits uniquement)
+      shippingCost,         // 1.00
+      totalAmount,          // 15.54 (sous-total + livraison) ✅
     });
 
     // ============================================
@@ -354,6 +355,7 @@ export class OrderService {
         selectedMethod === PaymentMethod.CASH ||
         selectedMethod === PaymentMethod.FPAY);
 
+    // ✅ Création de la commande
     const order = this.orderRepo.create({
       user,
       totalAmount,
@@ -374,7 +376,7 @@ export class OrderService {
     await this.orderRepo.save(order);
 
     // ============================================
-    // CRÉATION DES ORDER ITEMS (MÊME LOGIQUE)
+    // CRÉATION DES ORDER ITEMS
     // ============================================
     const orderItemEntities: OrderItemEntity[] = [];
     const groupedByCompany = new Map<string, { companyId: string; items: SubOrderItemEntity[]; total: number }>();
