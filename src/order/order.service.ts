@@ -110,7 +110,7 @@ export class OrderService {
     langHeader?: string,
   ): Promise<OrderEntity> {
     const {
-      totalAmount: frontTotalAmount, // ⚠️ IGNORÉ - Calculé par le backend
+      totalAmount: frontTotalAmount,
       currency,
       orderItems,
       addressUserId,
@@ -143,13 +143,11 @@ export class OrderService {
     }
 
     // ============================================
-    // ✅ CALCUL DU TOTAL 100% BACKEND
+    // ✅ CALCUL DU SOUS-TOTAL
     // ============================================
 
-    // 1️⃣ Calcul du sous-total à partir des produits en base
     let calculatedSubTotal = 0;
 
-    // Récupérer tous les produits en une seule requête
     const productIds = orderItems.map(item => item.productId);
     const products = await this.productRepo.findByIds(productIds);
     const productMap = new Map(products.map(p => [p.id, p]));
@@ -161,33 +159,39 @@ export class OrderService {
           this.i18nService.translate('order.product_not_found', lang, { productId: item.productId }),
         );
       }
-      // ✅ Utiliser le prix du produit en base (ignorer le prix envoyé par le front)
-      const priceToUse = product.price;
+
+      let priceToUse = 0;
+
+      // 🔥 RESTAURANT et GROCERY → Utiliser detail de la base
+      if (type === CompanyType.RESTAURANT || type === CompanyType.GROCERY) {
+        priceToUse = product.detail || 0;
+      }
+      // 🔥 Autres types → Utiliser le prix du front
+      else {
+        priceToUse = item.price || 0;
+      }
+
       calculatedSubTotal += priceToUse * item.quantity;
     }
 
-    // 2️⃣ Récupérer le shipping cost (envoyé par le front)
     const shippingCost = frontShippingCost || 0;
-
-    // 3️⃣ Calculer le total
     const calculatedTotalAmount = calculatedSubTotal + shippingCost;
-
-    // 4️⃣ Utiliser le total calculé (100% backend)
     const totalAmount = calculatedTotalAmount;
 
-    console.log('[Order] 🔥 Calcul 100% backend:', {
-      frontTotalAmount,        // Ignoré
-      calculatedSubTotal,      // Calculé depuis la base
-      shippingCost,            // Depuis le front
-      calculatedTotalAmount,   // ✅ Total final
+    console.log('[Order] 🔥 Calcul du total:', {
+      type,
+      frontTotalAmount,
+      calculatedSubTotal,
+      shippingCost,
+      calculatedTotalAmount,
       totalAmountUsed: totalAmount,
     });
 
     // ============================================
-    // FIN DU CALCUL BACKEND
+    // FIN DU CALCUL
     // ============================================
 
-    // ✅ Vérification des produits et min_quantity pour WHOLESALER
+    // ✅ Vérification WHOLESALER
     if (shopType === CompanyActivity.WHOLESALER || shopType === CompanyActivity.WHOLESALER_RETAILER) {
       for (const item of orderItems) {
         const product = await this.productRepo.findOne({ where: { id: item.productId } });
@@ -222,7 +226,6 @@ export class OrderService {
     let fpayTransactionId: string | null = null;
     let fpayReference: string | null = null;
 
-    // ✅ Montant à payer = totalAmount (calculé par le backend)
     const amountToPay = totalAmount;
 
     // ✅ Gérer le paiement FPAY
@@ -251,7 +254,7 @@ export class OrderService {
         phone: createOrderDto.phone,
         pin: createOrderDto.pin,
         toPhoneOrCode: user.phone || user.id,
-        amount: amountToPay, // ✅ Montant calculé par le backend
+        amount: amountToPay,
         currency: currency || 'USD',
         description: `Paiement de commande #${invoiceNumb}`,
       };
@@ -306,7 +309,7 @@ export class OrderService {
         throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
       }
 
-      const amount = amountToPay.toString(); // ✅ Montant calculé par le backend
+      const amount = amountToPay.toString();
       const pawapayData = { amount, currency, provider, phone: phon };
 
       console.log('[Order] Création dépôt Pawapay :', pawapayData);
@@ -351,10 +354,9 @@ export class OrderService {
         selectedMethod === PaymentMethod.CASH ||
         selectedMethod === PaymentMethod.FPAY);
 
-    // ✅ Création de la commande avec le total calculé par le backend
     const order = this.orderRepo.create({
       user,
-      totalAmount, // ✅ Total calculé par le backend
+      totalAmount,
       currency,
       grandTotal: isRestaurantAutoPaid ? amountToPay : totalAmount,
       addressUser,
@@ -372,28 +374,53 @@ export class OrderService {
     await this.orderRepo.save(order);
 
     // ============================================
-    // CRÉATION DES ORDER ITEMS
+    // CRÉATION DES ORDER ITEMS (MÊME LOGIQUE)
     // ============================================
     const orderItemEntities: OrderItemEntity[] = [];
     const groupedByCompany = new Map<string, { companyId: string; items: SubOrderItemEntity[]; total: number }>();
 
     for (const item of orderItems) {
-      const product = await this.productRepo.findOne({ where: { id: item.productId }, relations: ['company'] });
+      const product = await this.productRepo.findOne({
+        where: { id: item.productId },
+        relations: ['company']
+      });
       if (!product) {
         throw new NotFoundException(
           this.i18nService.translate('order.product_not_found', lang, { productId: item.productId }),
         );
       }
-      const orderItem = this.orderItemRepo.create({ order, product, quantity: item.quantity, price: product.price });
+
+      let priceToUse = 0;
+
+      // 🔥 RESTAURANT et GROCERY → Utiliser detail de la base
+      if (type === CompanyType.RESTAURANT || type === CompanyType.GROCERY) {
+        priceToUse = product.detail || 0;
+      }
+      // 🔥 Autres types → Utiliser le prix du front
+      else {
+        priceToUse = item.price || 0;
+      }
+
+      const orderItem = this.orderItemRepo.create({
+        order,
+        product,
+        quantity: item.quantity,
+        price: priceToUse
+      });
       orderItemEntities.push(orderItem);
+
       const companyId = product.company.id;
       if (!groupedByCompany.has(companyId)) {
         groupedByCompany.set(companyId, { companyId, items: [], total: 0 });
       }
       const group = groupedByCompany.get(companyId)!;
-      const subOrderItem = this.subOrderItemRepo.create({ product, quantity: item.quantity, price: product.price });
+      const subOrderItem = this.subOrderItemRepo.create({
+        product,
+        quantity: item.quantity,
+        price: priceToUse
+      });
       group.items.push(subOrderItem);
-      group.total += product.price * item.quantity;
+      group.total += priceToUse * item.quantity;
     }
     await this.orderItemRepo.save(orderItemEntities);
 
