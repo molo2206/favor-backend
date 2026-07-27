@@ -143,56 +143,27 @@ export class OrderService {
     }
 
     // ============================================
-    // ✅ CALCUL DU SOUS-TOTAL (PRODUITS UNIQUEMENT)
+    // ✅ UTILISER UNIQUEMENT LES VALEURS DU FRONT
     // ============================================
 
-    let calculatedSubTotal = 0;
+    // ✅ Total = ce que le front envoie
+    const totalAmount = frontTotalAmount || 0;
 
-    const productIds = orderItems.map(item => item.productId);
-    const products = await this.productRepo.findByIds(productIds);
-    const productMap = new Map(products.map(p => [p.id, p]));
-
-    for (const item of orderItems) {
-      const product = productMap.get(item.productId);
-      if (!product) {
-        throw new NotFoundException(
-          this.i18nService.translate('order.product_not_found', lang, { productId: item.productId }),
-        );
-      }
-
-      let priceToUse = 0;
-
-      // 🔥 RESTAURANT et GROCERY → Utiliser detail de la base
-      if (type === CompanyType.RESTAURANT || type === CompanyType.GROCERY) {
-        priceToUse = product.detail || 0;
-      }
-      // 🔥 Autres types → Utiliser le prix du front
-      else {
-        priceToUse = item.price || 0;
-      }
-
-      calculatedSubTotal += priceToUse * item.quantity;
-    }
-
-    // ✅ Frais de livraison
+    // ✅ Shipping cost = ce que le front envoie
     const shippingCost = frontShippingCost || 0;
 
-    // ✅ Total = sous-total + frais de livraison
-    const totalAmount = calculatedSubTotal + shippingCost;
-
-    console.log('[Order] 🔥 Calcul du total:', {
-      type,
+    console.log('[Order] 📦 Utilisation des valeurs du front:', {
       frontTotalAmount,
-      calculatedSubTotal,   // 0.45
-      shippingCost,         // 1.00
-      totalAmount,          // 1.45 ✅
+      frontShippingCost,
+      totalAmount,
+      shippingCost,
     });
 
     // ============================================
-    // FIN DU CALCUL
+    // FIN - PAS DE CALCUL BACKEND
     // ============================================
 
-    // ✅ Vérification WHOLESALER
+    // ✅ Vérification WHOLESALER (seulement la validation)
     if (shopType === CompanyActivity.WHOLESALER || shopType === CompanyActivity.WHOLESALER_RETAILER) {
       for (const item of orderItems) {
         const product = await this.productRepo.findOne({ where: { id: item.productId } });
@@ -355,20 +326,20 @@ export class OrderService {
         selectedMethod === PaymentMethod.CASH ||
         selectedMethod === PaymentMethod.FPAY);
 
-    // ✅ Création de la commande
+    // ✅ Création de la commande avec les valeurs du front
     const order = this.orderRepo.create({
       user,
-      totalAmount: totalAmount,           // ✅ 1.45 (sous-total + frais)
+      totalAmount: totalAmount,           // ✅ Valeur du front
       currency,
       grandTotal: isRestaurantAutoPaid ? amountToPay : totalAmount,
       addressUser,
       type,
-      invoiceNumber: await this.invoiceService.generateInvoiceNumber(),
+      invoiceNumber: invoiceNumb,
       paymentStatus,
       status: orderStatus,
       whatsapp_number: whatsapp_number!,
       paymentMethod: selectedMethod,
-      shippingCost: shippingCost,         // ✅ 1.00
+      shippingCost: shippingCost,         // ✅ Valeur du front
       appliedFeeRate: isRestaurantAutoPaid ? (appliedFeeRate ?? 0) : 0,
       transactionFee: isRestaurantAutoPaid ? (transactionFee ?? 0) : 0,
       paid: paymentStatus === PaymentStatus.PAID,
@@ -376,7 +347,7 @@ export class OrderService {
     await this.orderRepo.save(order);
 
     // ============================================
-    // CRÉATION DES ORDER ITEMS
+    // CRÉATION DES ORDER ITEMS (avec prix du front)
     // ============================================
     const orderItemEntities: OrderItemEntity[] = [];
     const groupedByCompany = new Map<string, { companyId: string; items: SubOrderItemEntity[]; total: number }>();
@@ -392,16 +363,8 @@ export class OrderService {
         );
       }
 
-      let priceToUse = 0;
-
-      // 🔥 RESTAURANT et GROCERY → Utiliser detail de la base
-      if (type === CompanyType.RESTAURANT || type === CompanyType.GROCERY) {
-        priceToUse = product.detail || 0;
-      }
-      // 🔥 Autres types → Utiliser le prix du front
-      else {
-        priceToUse = item.price || 0;
-      }
+      // ✅ Utiliser le prix du front
+      const priceToUse = item.price || 0;
 
       const orderItem = this.orderItemRepo.create({
         order,
@@ -437,7 +400,7 @@ export class OrderService {
         status: orderStatus,
       });
       await this.subOrderRepo.save(subOrder);
-      subOrder.invoiceNumber = await this.invoiceService.generateInvoiceNumber()
+      subOrder.invoiceNumber = invoiceNumb;
       await this.subOrderRepo.save(subOrder);
       for (const item of group.items) {
         item.subOrder = subOrder;
