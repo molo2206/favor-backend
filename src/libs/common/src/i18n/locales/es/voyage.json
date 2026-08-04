@@ -33,7 +33,6 @@
   "reservation.error.unauthenticated": "Usuario no autenticado",
   "reservation.error.ticket_not_found": "Billete no encontrado para este segmento",
   "reservation.error.ticket_already_scanned": "Este billete ({from} → {to}) ya ha sido escaneado",
-
   "reservation.push.expired_title": "Reserva cancelada",
   "reservation.push.expired_body": "Su reserva {ref} ({departureCity} → {arrivalCity}) ha sido cancelada porque el plazo de pago ha expirado.",
   "reservation.push.confirmed_title": "Reserva confirmada",
@@ -46,21 +45,17 @@
   "reservation.push.completed_body": "Su viaje {departureCity} → {arrivalCity} ha finalizado. ¡Gracias por viajar con FavorHelp!",
   "reservation.push.updated_title": "Estado actualizado",
   "reservation.push.updated_body": "El estado de su reserva {departureCity} → {arrivalCity} ha cambiado a {status}.",
-
   "reservation.sms.expired_body": "Reserva {ref} ({departureCity} → {arrivalCity}) cancelada. Plazo de pago expirado. - FavorHelp",
   "reservation.sms.confirmed_body": "Reserva {ref} confirmada. Importe: {total} {currency}. ¡Buen viaje! - FavorHelp",
   "reservation.sms.pending_body": "Reserva {ref} creada. Importe: {total} {currency}. Pago pendiente. - FavorHelp",
   "reservation.sms.cancelled_body": "Reserva {departureCity} → {arrivalCity} cancelada. Ref: {ref}. Contáctenos. - FavorHelp",
   "reservation.sms.completed_body": "Su viaje {departureCity} → {arrivalCity} ha finalizado. ¡Gracias! - FavorHelp",
   "reservation.sms.updated_body": "Estado de su reserva {departureCity} → {arrivalCity}: {status}. Ref: {ref}. - FavorHelp",
-
   "reservation.email.expired_subject": "Reserva {ref} cancelada - FavorHelp",
   "reservation.email.ticket_subject": "Billete de viaje {ref} - FavorHelp",
   "reservation.email.reservation_sheet_subject": "Ficha de reserva {ref} - FavorHelp",
-
   "reservation.operation.payment_designation": "Pago de reserva {ref}",
   "reservation.operation.admin_payment_designation": "Pago de reserva {ref} (admin)",
-
   "reservation.status.confirmed": "confirmada",
   "reservation.status.confirmed_title": "Reserva confirmada",
   "reservation.status.cancelled": "cancelada",
@@ -69,13 +64,10 @@
   "reservation.status.completed_title": "Reserva completada",
   "reservation.status.updated": "actualizada",
   "reservation.status.updated_title": "Estado actualizado",
-
   "reservation.notification.company_cancelled_title": "Cancelación de reserva",
   "reservation.notification.company_cancelled_body": "La reserva de {fullName} ({departureCity} → {arrivalCity}) ha sido cancelada.",
-
   "reservation.scan.ticket_scanned": "Billete escaneado con éxito para el viaje {from} → {to}",
   "reservation.scan.all_tickets_scanned": "¡Viaje completado! Todos los {total} billetes han sido escaneados. ¡Buen viaje!",
-
   "reservation.create_success": "Reserva creada con éxito",
   "reservation.payment_confirmed": "Reserva confirmada con éxito",
   "reservation.my_reservations": "Mis reservas",
@@ -83,7 +75,6 @@
   "reservation.found": "Reserva encontrada",
   "reservation.status_updated": "Estado actualizado",
   "reservation.available_seats": "Asientos disponibles",
-
   "reservation.ticket.title": "BILLETE",
   "reservation.ticket.boarding": "BILLETE",
   "reservation.ticket.passenger": "PASAJERO",
@@ -101,7 +92,6 @@
   "reservation.ticket.meals_title": "🍽️ COMIDAS PEDIDAS",
   "reservation.ticket.meals_total_prefix": "Total comidas: + ",
   "reservation.ticket.meals_total_suffix": " USD",
-
   "reservation.sheet.title": "FORMULARIO DE RESERVA",
   "reservation.sheet.booked_by": "Reservado por",
   "reservation.sheet.status_pending": "PAGO PENDIENTE",
@@ -133,7 +123,6 @@
   "reservation.sheet.payment_reminder": "Por favor, complete el pago dentro del plazo indicado. Una vez confirmado el pago, recibirá su billete electrónico por correo electrónico.",
   "reservation.sheet.contact": "FavorHelp – +243 991 225 122 | www.favorhelp.com",
   "reservation.sheet.legal": "RCCM: 21-A-770 | NIF: A2156062L",
-
   "reservation.email.invoice_title": "FACTURA DE RESERVA",
   "reservation.email.confirmation": "CONFIRMACIÓN",
   "reservation.email.reference": "Ref",
@@ -147,10 +136,8 @@
   "reservation.email.name_display": "Nombre: Kavira Naomi",
   "reservation.email.confirmation_body": "Su reserva está confirmada. Le esperamos.",
   "reservation.email.invoice_body": "<p>Hola {fullName},</p><p>Su {documentType} se adjunta.</p><p>Referencia: {ref}<br/>Total: {total} {currency}</p><p>Gracias por su confianza.<br/>El equipo de FavorHelp</p>",
-
   "reservation.email.document_type_ticket": "billete",
   "reservation.email.document_type_sheet": "formulario de reserva",
-
   "trip.notification.in_progress.title": "Viaje en curso",
   "trip.notification.in_progress.body": "El viaje {departureCity} → {arrivalCity} ha comenzado. ¡Buen viaje!",
   "trip.notification.in_progress.sms": "Su viaje {departureCity} → {arrivalCity} ha comenzado. ¡Buen viaje! - FavorHelp",
@@ -163,7 +150,6 @@
   "trip.notification.delayed.title": "Viaje retrasado",
   "trip.notification.delayed.body": "El viaje {departureCity} → {arrivalCity} está retrasado.",
   "trip.notification.delayed.sms": "Viaje {departureCity} → {arrivalCity} retrasado. - FavorHelp",
-
   "trips.validation.vehicle_required_segment": "Se requiere vehicle_id para el segmento {order}",
   "trips.validation.vehicle_not_found": "Vehículo {vehicleId} no encontrado para esta empresa",
   "trips.validation.departure_before_previous_arrival": "La fecha de salida del segmento {order} es anterior a la llegada del segmento anterior",
@@ -178,23 +164,17 @@
   "trips.validation.trip_not_found": "Viaje con ID {id} no encontrado",
   "trips.validation.segment_not_found": "Segmento con ID {id} no encontrado",
   "trips.validation.vehicle_already_booked": "Este vehículo ya tiene un viaje programado a esta hora",
-
   "trips.update.forbidden": "No puede modificar este viaje",
   "trips.update.vehicle_not_belong": "Este vehículo no pertenece a su empresa",
   "trips.update.cannot_delete_segment": "No se puede eliminar el segmento {order} porque tiene reservas",
-
   "trips.delete.forbidden": "No puede eliminar este viaje",
   "trips.delete.has_reservations": "No se puede eliminar este viaje porque tiene reservas",
-
   "trips.reset.no_reservations": "No hay reservas que liberar para el viaje {tripId}",
   "trips.reset.reservations_cancelled": "{count} reserva(s) cancelada(s) para el viaje {tripId}",
   "trips.reset.error": "Error al liberar los asientos del viaje {tripId}:",
-
   "trips.notify.status_ignored": "Estado {status} ignorado para el envío de notificaciones",
   "trips.notify.clients_notified": "{count} cliente(s) notificado(s) para el viaje {tripId} (estado: {status})",
-
   "trips.error.cannot_retrieve": "No se pueden recuperar los viajes",
-
   "trips.create_success": "Viaje creado con éxito",
   "trips.list_retrieved": "Lista de viajes",
   "trips.list_segments_retrieved": "Lista de viajes con segmentos",
@@ -214,5 +194,12 @@
   "trips.validation.one_of_required": "Debe proporcionar schedule_id y vehicle_id (viaje simple) o segmentos (viaje con escalas)",
   "trips.validation.cannot_both": "No puede proporcionar segmentos Y schedule_id/vehicle_id a la vez",
   "trips.validation.date_range_required": "Por favor, proporcione startDate o endDate para filtrar",
-  "trips.validation.departure_arrival_required": "Por favor, proporcione salida y llegada"
+  "trips.validation.departure_arrival_required": "Por favor, proporcione salida y llegada",
+  "reservation.fpay_account_not_linked": "Su cuenta no está vinculada a FPAY. Primero vincule su cuenta.",
+  "reservation.fpay_pin_required": "Se requiere el PIN de FPAY para realizar esta operación.",
+  "reservation.fpay_phone_required": "El número de teléfono es obligatorio.",
+  "reservation.fpay_payment_failed": "El pago FPAY falló. Verifique su saldo, PIN e intente nuevamente.",
+  "reservation.fpay_details_required": "Los detalles de FPAY (PIN y teléfono) son obligatorios.",
+  "reservation.user_id_required": "El ID de usuario es obligatorio para el pago FPAY.",
+  "reservation.user_not_found": "Usuario no encontrado."
 }

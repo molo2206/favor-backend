@@ -61,7 +61,6 @@
   "lta.fee_month": "Monthly subscription fee - {{ltaNumber}} (billed separately)",
   "lta.fee_shipment_multi": "Fee for {{count}} parcels in LTA {{ltaNumber}}",
   "lta.fee_default": "LTA shipping fee {{ltaNumber}}",
-
   "shipment.error.no_section_enabled": "At least one section must be enabled (pickupEnabled, shippingEnabled or deliveryEnabled).",
   "shipment.error.shipping_field_required": "{{field}} is required when shippingEnabled is true.",
   "shipment.error.delivery_address_required": "deliveryAddressId is required when deliveryEnabled is true.",
@@ -87,7 +86,6 @@
   "shipment.error.pin_not_found": "No parcel found for this PIN.",
   "shipment.error.already_collected": "This parcel has already been collected.",
   "shipment.error.cannot_update_price_no_service": "Cannot update prices: enable at least one service (pickup, shipping or delivery).",
-
   "shipment.push.created_title": "Parcel created",
   "shipment.push.created_body": "Your parcel {{trackingNumber}} has been successfully created. You will be notified of its progress.",
   "shipment.email.created_subject": "Parcel creation confirmation - FavorHelp",
@@ -99,7 +97,6 @@
   "shipment.notification.collected_body": "Parcel {{trackingNumber}} of {{clientName}} ({{clientPhone}}) has been collected.",
   "shipment.operation.payment_designation": "Payment for parcel {{trackingNumber}}",
   "shipment.operation.admin_payment_designation": "CASH payment for parcel {{trackingNumber}}",
-
   "shipment.create_success": "Parcel created successfully",
   "shipment.create_admin_success": "Parcel created successfully (admin)",
   "shipment.update_admin_success": "Parcel modified successfully (admin)",
@@ -110,7 +107,6 @@
   "shipment.list_success": "{{count}} parcel(s) successfully retrieved",
   "shipment.list_empty": "No parcels found",
   "shipment.list_filtered": "{{count}} parcel(s) found{{filter}}",
-
   "shipment.controller.my_shipments_success": "Your shipments retrieved successfully",
   "shipment.controller.without_lta_success": "Shipments list retrieved successfully",
   "shipment.controller.find_one_success": "Shipment found successfully",
@@ -119,4 +115,20 @@
   "shipment.controller.by_agent_success": "Your shipments retrieved successfully",
   "shipment.error.client_name_required": "Client name is required.",
   "shipment.error.client_phone_required": "Client phone number is required (if no user ID is provided).",
+  "shipment.fpay.account_not_linked": "Your account is not linked to FPAY. Please link your account first.",
+  "shipment.fpay.pin_required": "FPAY PIN is required to perform this operation.",
+  "shipment.fpay.phone_required": "Phone number is required.",
+  "shipment.fpay.payment_failed": "FPAY payment failed. Please check your balance, PIN and try again.",
+  "shipment.fpay.payment_success": "FPAY payment successfully completed for parcel {{trackingNumber}}.",
+  "shipment.fpay.payment_processing": "FPAY payment is being processed for parcel {{trackingNumber}}...",
+  "shipment.fpay.insufficient_balance": "Insufficient FPAY balance.",
+  "shipment.fpay.invalid_pin": "Invalid FPAY PIN.",
+  "shipment.fpay.transaction_not_found": "FPAY transaction not found.",
+  "shipment.fpay.transaction_cancelled": "FPAY transaction cancelled.",
+  "shipment.fpay.account_not_found": "FPAY account not found.",
+  "shipment.fpay.description": "Payment for parcel {{trackingNumber}}",
+  "shipment.fpay.loyalty_fee_sent": "Loyalty fees successfully sent via FPAY for parcel {{trackingNumber}}.",
+  "shipment.fpay.loyalty_fee_failed": "Failed to send loyalty fees via FPAY for parcel {{trackingNumber}}.",
+  "shipment.fpay.loyalty_fee_processing": "Sending loyalty fees via FPAY for parcel {{trackingNumber}}...",
+  "shipment.fpay.loyalty_description": "Loyalty fees for parcel {{trackingNumber}}"
 }

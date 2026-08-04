@@ -48,5 +48,6 @@
   "company_settings_updated": "Configuración de la empresa actualizada con éxito.",
   "company_settings_retrieved": "Configuración de la empresa recuperada con éxito.",
   "company_settings_not_found": "Configuración de la empresa no encontrada.",
-  "company_settings_already_exists": "La configuración de esta empresa ya existe."
+  "company_settings_already_exists": "La configuración de esta empresa ya existe.",
+  "company.status_pending": "Pendiente"
 }

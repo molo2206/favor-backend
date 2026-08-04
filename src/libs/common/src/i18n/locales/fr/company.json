@@ -48,5 +48,6 @@
   "company_settings_updated": "Paramètres de la société mis à jour avec succès.",
   "company_settings_retrieved": "Paramètres de la société récupérés avec succès.",
   "company_settings_not_found": "Paramètres de la société non trouvés.",
-  "company_settings_already_exists": "Les paramètres de cette société existent déjà."
+  "company_settings_already_exists": "Les paramètres de cette société existent déjà.",
+  "company.status_pending": "En attente"
 }

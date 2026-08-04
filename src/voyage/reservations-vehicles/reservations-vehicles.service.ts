@@ -43,6 +43,7 @@ import { PayReservationDto } from './dto/pay-reservation.dto';
 import { CreateReservationAdminDto } from './dto/create-reservation-admin.dto';
 import { PayReservationAdminDto } from './dto/pay-reservation-admin.dto';
 import { I18nService } from 'src/libs/common/src';
+import { FpayService } from 'src/fpay/fpay.service';
 
 @Injectable()
 export class ReservationsVehiclesService {
@@ -80,6 +81,7 @@ export class ReservationsVehiclesService {
     @InjectRepository(ReservationMeal)
     private reservationMealRepository: Repository<ReservationMeal>,
     private readonly i18n: I18nService,
+    private readonly fpayService: FpayService,
   ) { }
 
   @Cron('0 */5 * * * *')
@@ -365,7 +367,78 @@ export class ReservationsVehiclesService {
       }
 
       let isPaid = false;
-      if (createDto.paymentMethod === PaymentMethod.MOBILE_MONEY && createDto.mobileMoneyDetails) {
+      let fpayTransactionId: string | null = null;
+      let fpayReference: string | null = null;
+
+      // ✅ AJOUT FPAY - directement avec pin et phone du body
+      if (createDto.paymentMethod === PaymentMethod.FPAY) {
+        const { pin, phone } = createDto;
+
+        if (!pin) {
+          throw new BadRequestException(await this.i18n.translate('reservation.fpay_pin_required', lang));
+        }
+
+        if (!phone) {
+          throw new BadRequestException(await this.i18n.translate('reservation.fpay_phone_required', lang));
+        }
+
+        if (!userId) {
+          throw new BadRequestException(await this.i18n.translate('reservation.user_id_required', lang));
+        }
+
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) {
+          throw new BadRequestException(await this.i18n.translate('reservation.user_not_found', lang));
+        }
+
+        if (!user.userIdFpay) {
+          throw new BadRequestException(await this.i18n.translate('reservation.fpay_account_not_linked', lang));
+        }
+
+        const fpayData = {
+          phone: phone,
+          pin: pin,
+          toPhoneOrCode: user.phone || user.id,
+          amount: realTotal,
+          currency: 'USD',
+          description: `Paiement de réservation #${savedReservation.id.slice(0, 8)}`,
+        };
+
+        console.log('[Reservation] Tentative de paiement FPAY :', {
+          phone: fpayData.phone,
+          amount: fpayData.amount,
+          currency: fpayData.currency,
+          reservationId: savedReservation.id,
+        });
+
+        try {
+          const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+
+          if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+            savedReservation.status = ReservationStatus.CONFIRMED;
+            isPaid = true;
+            fpayTransactionId = fpayResponse.data.transaction.id;
+            fpayReference = fpayResponse.data.transaction.reference;
+            await queryRunner.manager.save(savedReservation);
+
+            console.log('[Reservation] ✅ Paiement FPAY réussi:', {
+              transactionId: fpayTransactionId,
+              reference: fpayReference,
+              amount: fpayResponse.data.transaction.amount,
+            });
+          } else {
+            throw new BadRequestException(await this.i18n.translate('reservation.fpay_payment_failed', lang));
+          }
+        } catch (error: any) {
+          console.error('[Reservation] ❌ Erreur paiement FPAY:', error.message);
+          throw new BadRequestException(
+            error.message || await this.i18n.translate('reservation.fpay_payment_failed', lang)
+          );
+        }
+      }
+      // ✅ FIN AJOUT FPAY
+
+      else if (createDto.paymentMethod === PaymentMethod.MOBILE_MONEY && createDto.mobileMoneyDetails) {
         const { providerId, phone } = createDto.mobileMoneyDetails;
         const amount = realTotal.toString();
         const pawapayData = { amount, currency: 'USD', provider: providerId, phone: phone.trim() };
@@ -393,7 +466,7 @@ export class ReservationsVehiclesService {
       }
 
       if (isPaid) {
-        const operationData = {
+        const operationData: any = {
           debit: 0,
           credit: realTotal,
           designation: await this.i18n.translate('reservation.operation.payment_designation', lang, { ref: savedReservation.id.slice(0, 8) }),
@@ -402,8 +475,18 @@ export class ReservationsVehiclesService {
           userId: userId ?? undefined,
           paymentMethod: createDto.paymentMethod,
           reference: savedReservation.id,
-          provider: createDto.mobileMoneyDetails?.providerId,
         };
+
+        // ✅ Ajout FPAY
+        if (createDto.paymentMethod === PaymentMethod.FPAY) {
+          operationData.fpayTransactionId = fpayTransactionId || '';
+          operationData.fpayReference = fpayReference || '';
+        }
+
+        if (createDto.paymentMethod === PaymentMethod.MOBILE_MONEY && createDto.mobileMoneyDetails?.providerId) {
+          operationData.provider = createDto.mobileMoneyDetails.providerId;
+        }
+
         const operation = this.operationRepo.create(operationData);
         await queryRunner.manager.save(operation);
       }
@@ -439,7 +522,6 @@ export class ReservationsVehiclesService {
       await queryRunner.release();
     }
   }
-
   // ==================== NOTIFICATIONS APRÈS CRÉATION ====================
   private async processReservationNotifications(
     reservation: ReservationVehicule,
@@ -750,7 +832,6 @@ export class ReservationsVehiclesService {
       console.error('❌ Erreur générale dans processReservationNotifications:', error);
     }
   }
-
   // ==================== CRÉATION PAR ADMIN ====================
   async createByAdmin(
     createDto: CreateReservationAdminDto,

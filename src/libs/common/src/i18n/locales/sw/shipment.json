@@ -61,7 +61,6 @@
   "lta.fee_month": "Ada ya usajili wa mwezi - {{ltaNumber}} (inatozwa kando)",
   "lta.fee_shipment_multi": "Ada kwa {{count}} mifuko katika LTA {{ltaNumber}}",
   "lta.fee_default": "Ada ya usafirishaji LTA {{ltaNumber}}",
-
   "shipment.error.no_section_enabled": "Angalau sehemu moja lazima iwe imewashwa (pickupEnabled, shippingEnabled au deliveryEnabled).",
   "shipment.error.shipping_field_required": "{{field}} inahitajika wakati shippingEnabled ni kweli.",
   "shipment.error.delivery_address_required": "deliveryAddressId inahitajika wakati deliveryEnabled ni kweli.",
@@ -87,7 +86,6 @@
   "shipment.error.pin_not_found": "Hakuna mfuko uliopatikana kwa PIN hii.",
   "shipment.error.already_collected": "Mfuko huu tayari umekusanywa.",
   "shipment.error.cannot_update_price_no_service": "Haiwezi kusasisha bei: wezesha angalau huduma moja (pickup, shipping au delivery).",
-
   "shipment.push.created_title": "Mfuko umeundwa",
   "shipment.push.created_body": "Mfuko wako {{trackingNumber}} umeundwa kwa mafanikio. Utajulishwa kuhusu maendeleo yake.",
   "shipment.email.created_subject": "Uthibitisho wa uundaji wa mfuko - FavorHelp",
@@ -99,7 +97,6 @@
   "shipment.notification.collected_body": "Mfuko {{trackingNumber}} wa {{clientName}} ({{clientPhone}}) umekusanywa.",
   "shipment.operation.payment_designation": "Malipo ya mfuko {{trackingNumber}}",
   "shipment.operation.admin_payment_designation": "Malipo ya CASH ya mfuko {{trackingNumber}}",
-
   "shipment.create_success": "Mfuko umeundwa kwa mafanikio",
   "shipment.create_admin_success": "Mfuko umeundwa kwa mafanikio (msimamizi)",
   "shipment.update_admin_success": "Mfuko umerekebishwa kwa mafanikio (msimamizi)",
@@ -110,7 +107,6 @@
   "shipment.list_success": "{{count}} mifuko imepatikana kwa mafanikio",
   "shipment.list_empty": "Hakuna mifuko iliyopatikana",
   "shipment.list_filtered": "{{count}} mifuko imepatikana{{filter}}",
-
   "shipment.controller.my_shipments_success": "Usafirishaji wako umepatikana kwa mafanikio",
   "shipment.controller.without_lta_success": "Orodha ya usafirishaji imepatikana kwa mafanikio",
   "shipment.controller.find_one_success": "Usafirishaji umepatikana kwa mafanikio",
@@ -118,5 +114,21 @@
   "shipment.controller.collect_success": "Mfuko umekusanywa kwa mafanikio",
   "shipment.controller.by_agent_success": "Usafirishaji wako umepatikana kwa mafanikio",
   "shipment.error.client_name_required": "Jina la mteja linahitajika.",
-  "shipment.error.client_phone_required": "Nambari ya simu ya mteja inahitajika (ikiwa hakuna kitambulisho cha mtumiaji kilichotolewa)."
+  "shipment.error.client_phone_required": "Nambari ya simu ya mteja inahitajika (ikiwa hakuna kitambulisho cha mtumiaji kilichotolewa).",
+  "shipment.fpay.account_not_linked": "Akaunti yako haijaunganishwa na FPAY. Tafadhali unganisha akaunti yako kwanza.",
+  "shipment.fpay.pin_required": "Nambari ya PIN ya FPAY inahitajika ili kufanya operesheni hii.",
+  "shipment.fpay.phone_required": "Nambari ya simu inahitajika.",
+  "shipment.fpay.payment_failed": "Malipo ya FPAY yameshindwa. Tafadhali angalia salio lako, PIN na ujaribu tena.",
+  "shipment.fpay.payment_success": "Malipo ya FPAY yamekamilika kwa mafanikio kwa mfuko {{trackingNumber}}.",
+  "shipment.fpay.payment_processing": "Malipo ya FPAY yanachakatwa kwa mfuko {{trackingNumber}}...",
+  "shipment.fpay.insufficient_balance": "Salio la FPAY halitoshi.",
+  "shipment.fpay.invalid_pin": "Nambari ya PIN ya FPAY si sahihi.",
+  "shipment.fpay.transaction_not_found": "Muamala wa FPAY haupatikani.",
+  "shipment.fpay.transaction_cancelled": "Muamala wa FPAY umeghairiwa.",
+  "shipment.fpay.account_not_found": "Akaunti ya FPAY haipatikani.",
+  "shipment.fpay.description": "Malipo ya mfuko {{trackingNumber}}",
+  "shipment.fpay.loyalty_fee_sent": "Ada za uaminifu zimetumwa kwa mafanikio kupitia FPAY kwa mfuko {{trackingNumber}}.",
+  "shipment.fpay.loyalty_fee_failed": "Imeshindwa kutuma ada za uaminifu kupitia FPAY kwa mfuko {{trackingNumber}}.",
+  "shipment.fpay.loyalty_fee_processing": "Inatuma ada za uaminifu kupitia FPAY kwa mfuko {{trackingNumber}}...",
+  "shipment.fpay.loyalty_description": "Ada za uaminifu kwa mfuko {{trackingNumber}}"
 }

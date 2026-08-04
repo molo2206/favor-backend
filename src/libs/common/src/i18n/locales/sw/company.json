@@ -48,5 +48,6 @@
   "company_settings_updated": "Mipangilio ya kampuni imesasishwa kikamilifu.",
   "company_settings_retrieved": "Mipangilio ya kampuni imepatikana kikamilifu.",
   "company_settings_not_found": "Mipangilio ya kampuni haikupatikana.",
-  "company_settings_already_exists": "Mipangilio ya kampuni hii tayari ipo."
+  "company_settings_already_exists": "Mipangilio ya kampuni hii tayari ipo.",
+  "company.status_pending": "Inasubiri"
 }

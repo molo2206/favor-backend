@@ -1139,6 +1139,8 @@ export class ShipmentService {
       provider,
       phone,
       amount,
+      paymentMethod, // ✅ Ajouté pour FPAY
+      pin, // ✅ Ajouté pour FPAY
     } = body;
 
     const shipment = await this.shipmentRepo.findOne({ where: { id: shipmentId } });
@@ -1152,22 +1154,98 @@ export class ShipmentService {
       throw new BadRequestException(await this.i18n.translate('shipment.error.user_not_recognized', lang));
     }
 
-    if (!provider || !phone) {
-      throw new BadRequestException(await this.i18n.translate('shipment.error.pawapay_required', lang));
-    }
-    const phon = phone.trim();
-    if (!phon) throw new BadRequestException(await this.i18n.translate('shipment.error.invalid_phone', lang));
+    let selectedMethod: PaymentMethod = PaymentMethod.MOBILE_MONEY;
+    let fpayTransactionId: string | null = null;
+    let fpayReference: string | null = null;
 
-    const pawapayData = { amount: totalAmount.toString(), currency, provider, phone: phon };
-    try {
-      const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData);
-      const depositStatus = pawapayResponse.finalStatus?.data?.status;
-      if (depositStatus !== 'COMPLETED') {
+    // ✅ PAIEMENT FPAY
+    if (paymentMethod === PaymentMethod.FPAY) {
+      selectedMethod = PaymentMethod.FPAY;
+
+      if (!user.userIdFpay) {
+        throw new BadRequestException(
+          await this.i18n.translate('order.fpay_account_not_linked', lang)
+        );
+      }
+
+      if (!pin) {
+        throw new BadRequestException(
+          await this.i18n.translate('order.fpay_pin_required', lang)
+        );
+      }
+
+      if (!phone) {
+        throw new BadRequestException(
+          await this.i18n.translate('order.phone_required', lang)
+        );
+      }
+
+      const fpayData = {
+        phone: phone,
+        pin: pin,
+        toPhoneOrCode: user.phone || user.id,
+        amount: totalAmount,
+        currency: currency || 'USD',
+        description: `Paiement du colis ${shipment.trackingNumber}`,
+      };
+
+      console.log('[Shipment] Tentative de paiement FPAY :', {
+        phone: fpayData.phone,
+        amount: fpayData.amount,
+        currency: fpayData.currency,
+        trackingNumber: shipment.trackingNumber,
+      });
+
+      try {
+        const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+
+        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+          fpayTransactionId = fpayResponse.data.transaction.id;
+          fpayReference = fpayResponse.data.transaction.reference;
+
+          console.log('[Shipment] ✅ Paiement FPAY réussi:', {
+            transactionId: fpayTransactionId,
+            reference: fpayReference,
+            amount: fpayResponse.data.transaction.amount,
+          });
+        } else {
+          throw new BadRequestException(
+            await this.i18n.translate('order.fpay_payment_failed', lang)
+          );
+        }
+      } catch (error: any) {
+        console.error('[Shipment] ❌ Erreur paiement FPAY:', error.message);
+
+        throw new BadRequestException(
+          error.message || await this.i18n.translate('order.fpay_payment_failed', lang)
+        );
+      }
+    }
+    // ✅ PAIEMENT MOBILE_MONEY (Pawapay)
+    else {
+      selectedMethod = PaymentMethod.MOBILE_MONEY;
+
+      if (!provider || !phone) {
+        throw new BadRequestException(await this.i18n.translate('shipment.error.pawapay_required', lang));
+      }
+      const phon = phone.trim();
+      if (!phon) throw new BadRequestException(await this.i18n.translate('shipment.error.invalid_phone', lang));
+
+      const pawapayData = { amount: totalAmount.toString(), currency, provider, phone: phon };
+      try {
+        const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData);
+        const depositStatus = pawapayResponse.finalStatus?.data?.status;
+        if (depositStatus !== 'COMPLETED') {
+          throw new BadRequestException(await this.i18n.translate('shipment.error.pawapay_failed', lang));
+        }
+      } catch (error: any) {
         throw new BadRequestException(await this.i18n.translate('shipment.error.pawapay_failed', lang));
       }
-    } catch (error: any) {
-      throw new BadRequestException(await this.i18n.translate('shipment.error.pawapay_failed', lang));
     }
+
+    // ============================================
+    // SUITE DE LA COLLECTE
+    // ============================================
 
     if (deliveryFrom !== undefined) shipment.deliveryFrom = deliveryFrom;
     if (deliveryTo !== undefined) shipment.deliveryTo = deliveryTo;
@@ -1180,17 +1258,28 @@ export class ShipmentService {
     const operationReference = this.generateOperationReference();
     await this.shipmentRepo.save(shipment);
 
-    await this.operation.save({
+    // ✅ Enregistrement de l'opération avec la bonne méthode
+    const operationData: Partial<OperationEntity> = {
       debit: amount,
       credit: 0,
       shipmentId: shipment.id,
       designation: await this.i18n.translate('shipment.operation.payment_designation', lang, { trackingNumber: shipment.trackingNumber }),
       status: OperationStatus.ACCEPTED,
       userId: user_active.id,
-      provider: provider,
-      paymentMethod: PaymentMethod.MOBILE_MONEY,
+      paymentMethod: selectedMethod,
       reference: operationReference,
-    });
+    };
+
+    if (selectedMethod === PaymentMethod.FPAY) {
+      operationData.fpayTransactionId = fpayTransactionId || '';
+      operationData.fpayReference = fpayReference || '';
+    }
+
+    if (selectedMethod === PaymentMethod.MOBILE_MONEY && provider) {
+      operationData.provider = provider;
+    }
+
+    await this.operation.save(operationData);
 
     const clientPhone = shipment.clientPhone;
     if (clientPhone) {

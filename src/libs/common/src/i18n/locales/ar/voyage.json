@@ -33,7 +33,6 @@
   "reservation.error.unauthenticated": "المستخدم غير مصدق",
   "reservation.error.ticket_not_found": "لم يتم العثور على تذكرة لهذا الجزء",
   "reservation.error.ticket_already_scanned": "هذه التذكرة ({from} → {to}) تم مسحها بالفعل",
-
   "reservation.push.expired_title": "تم إلغاء الحجز",
   "reservation.push.expired_body": "تم إلغاء حجزك {ref} ({departureCity} → {arrivalCity}) لأن مهلة الدفع انتهت.",
   "reservation.push.confirmed_title": "تم تأكيد الحجز",
@@ -46,21 +45,17 @@
   "reservation.push.completed_body": "اكتملت رحلتك {departureCity} → {arrivalCity}. شكراً لسفرك مع FavorHelp!",
   "reservation.push.updated_title": "تم تحديث الحالة",
   "reservation.push.updated_body": "تغيرت حالة حجزك {departureCity} → {arrivalCity} إلى {status}.",
-
   "reservation.sms.expired_body": "تم إلغاء الحجز {ref} ({departureCity} → {arrivalCity}). انتهت مهلة الدفع. - FavorHelp",
   "reservation.sms.confirmed_body": "تم تأكيد الحجز {ref}. المبلغ: {total} {currency}. رحلة سعيدة! - FavorHelp",
   "reservation.sms.pending_body": "تم إنشاء الحجز {ref}. المبلغ: {total} {currency}. يجب الدفع. - FavorHelp",
   "reservation.sms.cancelled_body": "تم إلغاء الحجز {departureCity} → {arrivalCity}. المرجع: {ref}. اتصل بنا. - FavorHelp",
   "reservation.sms.completed_body": "اكتملت رحلتك {departureCity} → {arrivalCity}. شكراً! - FavorHelp",
   "reservation.sms.updated_body": "حالة حجزك {departureCity} → {arrivalCity}: {status}. المرجع: {ref}. - FavorHelp",
-
   "reservation.email.expired_subject": "تم إلغاء الحجز {ref} - FavorHelp",
   "reservation.email.ticket_subject": "تذكرة السفر {ref} - FavorHelp",
   "reservation.email.reservation_sheet_subject": "نموذج الحجز {ref} - FavorHelp",
-
   "reservation.operation.payment_designation": "دفع الحجز {ref}",
   "reservation.operation.admin_payment_designation": "دفع الحجز {ref} (مدير)",
-
   "reservation.status.confirmed": "مؤكد",
   "reservation.status.confirmed_title": "تم تأكيد الحجز",
   "reservation.status.cancelled": "ملغى",
@@ -69,13 +64,10 @@
   "reservation.status.completed_title": "اكتمل الحجز",
   "reservation.status.updated": "تم التحديث",
   "reservation.status.updated_title": "تم تحديث الحالة",
-
   "reservation.notification.company_cancelled_title": "إلغاء الحجز",
   "reservation.notification.company_cancelled_body": "تم إلغاء حجز {fullName} ({departureCity} → {arrivalCity}).",
-
   "reservation.scan.ticket_scanned": "تم مسح التذكرة بنجاح للرحلة {from} → {to}",
   "reservation.scan.all_tickets_scanned": "اكتملت الرحلة! تم مسح جميع التذاكر الـ {total}. رحلة سعيدة!",
-
   "reservation.create_success": "تم إنشاء الحجز بنجاح",
   "reservation.payment_confirmed": "تم تأكيد الحجز بنجاح",
   "reservation.my_reservations": "حجوزاتي",
@@ -83,7 +75,6 @@
   "reservation.found": "تم العثور على الحجز",
   "reservation.status_updated": "تم تحديث الحالة",
   "reservation.available_seats": "المقاعد المتاحة",
-
   "reservation.ticket.title": "تذكرة",
   "reservation.ticket.boarding": "تذكرة",
   "reservation.ticket.passenger": "راكب",
@@ -101,7 +92,6 @@
   "reservation.ticket.meals_title": "🍽️ وجبات مُطلبة",
   "reservation.ticket.meals_total_prefix": "إجمالي الوجبات: + ",
   "reservation.ticket.meals_total_suffix": " USD",
-
   "reservation.sheet.title": "نموذج الحجز",
   "reservation.sheet.booked_by": "تم الحجز بواسطة",
   "reservation.sheet.status_pending": "بانتظار الدفع",
@@ -133,7 +123,6 @@
   "reservation.sheet.payment_reminder": "يرجى إكمال الدفع خلال المهلة المحددة. بعد تأكيد الدفع، ستتلقى تذكرتك الإلكترونية عبر البريد الإلكتروني.",
   "reservation.sheet.contact": "FavorHelp – +243 991 225 122 | www.favorhelp.com",
   "reservation.sheet.legal": "RCCM: 21-A-770 | الرقم الضريبي: A2156062L",
-
   "reservation.email.invoice_title": "فاتورة الحجز",
   "reservation.email.confirmation": "تأكيد",
   "reservation.email.reference": "مرجع",
@@ -147,10 +136,8 @@
   "reservation.email.name_display": "الاسم: كافيرا نعومي",
   "reservation.email.confirmation_body": "تم تأكيد حجزك. نحن نتطلع لرؤيتك.",
   "reservation.email.invoice_body": "<p>مرحباً {fullName}،</p><p>مرفق {documentType} الخاص بك.</p><p>المرجع: {ref}<br/>الإجمالي: {total} {currency}</p><p>شكراً لثقتك.<br/>فريق FavorHelp</p>",
-
   "reservation.email.document_type_ticket": "تذكرة",
   "reservation.email.document_type_sheet": "نموذج الحجز",
-
   "trip.notification.in_progress.title": "الرحلة قيد التنفيذ",
   "trip.notification.in_progress.body": "بدأت الرحلة من {departureCity} إلى {arrivalCity}. رحلة سعيدة!",
   "trip.notification.in_progress.sms": "بدأت رحلتك من {departureCity} إلى {arrivalCity}. رحلة سعيدة! - FavorHelp",
@@ -163,7 +150,6 @@
   "trip.notification.delayed.title": "تأخرت الرحلة",
   "trip.notification.delayed.body": "تأخرت الرحلة من {departureCity} إلى {arrivalCity}.",
   "trip.notification.delayed.sms": "تأخرت الرحلة من {departureCity} إلى {arrivalCity}. - FavorHelp",
-
   "trips.validation.vehicle_required_segment": "معرف المركبة مطلوب للجزء {order}",
   "trips.validation.vehicle_not_found": "المركبة {vehicleId} غير موجودة لهذه الشركة",
   "trips.validation.departure_before_previous_arrival": "تاريخ مغادرة الجزء {order} يسبق وصول الجزء السابق",
@@ -178,23 +164,17 @@
   "trips.validation.trip_not_found": "الرحلة ذات المعرف {id} غير موجودة",
   "trips.validation.segment_not_found": "الجزء ذو المعرف {id} غير موجود",
   "trips.validation.vehicle_already_booked": "هذه المركبة لديها رحلة مجدولة في هذا الوقت بالفعل",
-
   "trips.update.forbidden": "لا يمكنك تعديل هذه الرحلة",
   "trips.update.vehicle_not_belong": "هذه المركبة لا تنتمي لشركتك",
   "trips.update.cannot_delete_segment": "لا يمكن حذف الجزء {order} لأنه يحتوي على حجوزات",
-
   "trips.delete.forbidden": "لا يمكنك حذف هذه الرحلة",
   "trips.delete.has_reservations": "لا يمكن حذف هذه الرحلة لأنها تحتوي على حجوزات",
-
   "trips.reset.no_reservations": "لا توجد حجوزات لتحريرها للرحلة {tripId}",
   "trips.reset.reservations_cancelled": "تم إلغاء {count} حجز للرحلة {tripId}",
   "trips.reset.error": "خطأ أثناء تحرير مقاعد الرحلة {tripId}:",
-
   "trips.notify.status_ignored": "تم تجاهل الحالة {status} لإرسال الإشعارات",
   "trips.notify.clients_notified": "تم إخطار {count} عميل للرحلة {tripId} (الحالة: {status})",
-
   "trips.error.cannot_retrieve": "تعذر استرجاع الرحلات",
-
   "trips.create_success": "تم إنشاء الرحلة بنجاح",
   "trips.list_retrieved": "قائمة الرحلات",
   "trips.list_segments_retrieved": "قائمة الرحلات مع الأجزاء",
@@ -214,5 +194,12 @@
   "trips.validation.one_of_required": "يجب عليك تقديم إما schedule_id و vehicle_id (رحلة بسيطة) أو أجزاء (رحلة مع توقفات)",
   "trips.validation.cannot_both": "لا يمكنك تقديم الأجزاء و schedule_id/vehicle_id معاً",
   "trips.validation.date_range_required": "يرجى تقديم startDate أو endDate للتصفية",
-  "trips.validation.departure_arrival_required": "يرجى تقديم المغادرة والوصول"
+  "trips.validation.departure_arrival_required": "يرجى تقديم المغادرة والوصول",
+  "reservation.fpay_account_not_linked": "حسابك غير مرتبط بـ FPAY. يرجى ربط حسابك أولاً.",
+  "reservation.fpay_pin_required": "PIN FPAY مطلوب لإجراء هذه العملية.",
+  "reservation.fpay_phone_required": "رقم الهاتف مطلوب.",
+  "reservation.fpay_payment_failed": "فشل الدفع عبر FPAY. يرجى التحقق من رصيدك و PIN والمحاولة مرة أخرى.",
+  "reservation.fpay_details_required": "تفاصيل FPAY (PIN والهاتف) مطلوبة.",
+  "reservation.user_id_required": "معرف المستخدم مطلوب للدفع عبر FPAY.",
+  "reservation.user_not_found": "المستخدم غير موجود."
 }

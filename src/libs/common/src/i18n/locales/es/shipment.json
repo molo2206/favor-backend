@@ -61,7 +61,6 @@
   "lta.fee_month": "Cuota de suscripción mensual - {{ltaNumber}} (facturada por separado)",
   "lta.fee_shipment_multi": "Tarifa por {{count}} paquetes en LTA {{ltaNumber}}",
   "lta.fee_default": "Gastos de envío LTA {{ltaNumber}}",
-
   "shipment.error.no_section_enabled": "Al menos una sección debe estar habilitada (pickupEnabled, shippingEnabled o deliveryEnabled).",
   "shipment.error.shipping_field_required": "{{field}} es obligatorio cuando shippingEnabled es verdadero.",
   "shipment.error.delivery_address_required": "deliveryAddressId es obligatorio cuando deliveryEnabled es verdadero.",
@@ -87,7 +86,6 @@
   "shipment.error.pin_not_found": "No se encontró ningún paquete con este PIN.",
   "shipment.error.already_collected": "Este paquete ya ha sido retirado.",
   "shipment.error.cannot_update_price_no_service": "No se pueden actualizar los precios: active al menos un servicio (pickup, shipping o delivery).",
-
   "shipment.push.created_title": "Paquete creado",
   "shipment.push.created_body": "Su paquete {{trackingNumber}} ha sido creado con éxito. Se le notificará su evolución.",
   "shipment.email.created_subject": "Confirmación de creación de paquete - FavorHelp",
@@ -99,7 +97,6 @@
   "shipment.notification.collected_body": "El paquete {{trackingNumber}} de {{clientName}} ({{clientPhone}}) ha sido retirado.",
   "shipment.operation.payment_designation": "Pago del paquete {{trackingNumber}}",
   "shipment.operation.admin_payment_designation": "Pago en EFECTIVO del paquete {{trackingNumber}}",
-
   "shipment.create_success": "Paquete creado con éxito",
   "shipment.create_admin_success": "Paquete creado con éxito (admin)",
   "shipment.update_admin_success": "Paquete modificado con éxito (admin)",
@@ -110,7 +107,6 @@
   "shipment.list_success": "{{count}} paquete(s) recuperado(s) con éxito",
   "shipment.list_empty": "No se encontraron paquetes",
   "shipment.list_filtered": "{{count}} paquete(s) encontrado(s){{filter}}",
-
   "shipment.controller.my_shipments_success": "Sus envíos recuperados con éxito",
   "shipment.controller.without_lta_success": "Lista de envíos recuperada con éxito",
   "shipment.controller.find_one_success": "Envío encontrado con éxito",
@@ -118,5 +114,21 @@
   "shipment.controller.collect_success": "Paquete retirado con éxito",
   "shipment.controller.by_agent_success": "Sus envíos recuperados con éxito",
   "shipment.error.client_name_required": "El nombre del cliente es obligatorio.",
-  "shipment.error.client_phone_required": "El número de teléfono del cliente es obligatorio (si no se proporciona un ID de usuario)."
+  "shipment.error.client_phone_required": "El número de teléfono del cliente es obligatorio (si no se proporciona un ID de usuario).",
+  "shipment.fpay.account_not_linked": "Su cuenta no está vinculada a FPAY. Primero vincule su cuenta.",
+  "shipment.fpay.pin_required": "Se requiere el PIN de FPAY para realizar esta operación.",
+  "shipment.fpay.phone_required": "El número de teléfono es obligatorio.",
+  "shipment.fpay.payment_failed": "El pago FPAY falló. Verifique su saldo, PIN e intente nuevamente.",
+  "shipment.fpay.payment_success": "Pago FPAY completado con éxito para el paquete {{trackingNumber}}.",
+  "shipment.fpay.payment_processing": "El pago FPAY está siendo procesado para el paquete {{trackingNumber}}...",
+  "shipment.fpay.insufficient_balance": "Saldo FPAY insuficiente.",
+  "shipment.fpay.invalid_pin": "PIN FPAY inválido.",
+  "shipment.fpay.transaction_not_found": "Transacción FPAY no encontrada.",
+  "shipment.fpay.transaction_cancelled": "Transacción FPAY cancelada.",
+  "shipment.fpay.account_not_found": "Cuenta FPAY no encontrada.",
+  "shipment.fpay.description": "Pago del paquete {{trackingNumber}}",
+  "shipment.fpay.loyalty_fee_sent": "Tarifas de fidelidad enviadas con éxito a través de FPAY para el paquete {{trackingNumber}}.",
+  "shipment.fpay.loyalty_fee_failed": "Error al enviar las tarifas de fidelidad a través de FPAY para el paquete {{trackingNumber}}.",
+  "shipment.fpay.loyalty_fee_processing": "Enviando tarifas de fidelidad a través de FPAY para el paquete {{trackingNumber}}...",
+  "shipment.fpay.loyalty_description": "Tarifas de fidelidad para el paquete {{trackingNumber}}"
 }

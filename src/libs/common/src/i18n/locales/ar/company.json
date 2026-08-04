@@ -48,5 +48,6 @@
   "company_settings_updated": "تم تحديث إعدادات الشركة بنجاح.",
   "company_settings_retrieved": "تم استرجاع إعدادات الشركة بنجاح.",
   "company_settings_not_found": "لم يتم العثور على إعدادات الشركة.",
-  "company_settings_already_exists": "إعدادات هذه الشركة موجودة بالفعل."
+  "company_settings_already_exists": "إعدادات هذه الشركة موجودة بالفعل.",
+  "company.status_pending": "قيد الانتظار"
 }

@@ -48,5 +48,6 @@
   "company_settings_updated": "Company settings updated successfully.",
   "company_settings_retrieved": "Company settings retrieved successfully.",
   "company_settings_not_found": "Company settings not found.",
-  "company_settings_already_exists": "Settings for this company already exist."
+  "company_settings_already_exists": "Settings for this company already exist.",
+  "company.status_pending": "Pending"
 }

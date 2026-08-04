@@ -121,5 +121,17 @@
   "orders_fetched_manage_city": "Commandes {resource} récupérées avec succès pour la ville {city}",
   "orders_fetched_company_city": "Commandes de {companyName} récupérées avec succès pour la ville {city}",
   "orders_fetched_manage_no_city": "Commandes {resource} récupérées avec succès",
-  "orders_fetched_company_no_city": "Commandes de {companyName} récupérées avec succès"
+  "orders_fetched_company_no_city": "Commandes de {companyName} récupérées avec succès",
+  "order.fpay.account_not_linked": "Votre compte n'est pas lié à FPAY. Veuillez d'abord lier votre compte.",
+  "order.fpay.pin_required": "Le PIN FPAY est requis pour effectuer cette opération.",
+  "order.fpay.phone_required": "Le numéro de téléphone est requis.",
+  "order.fpay.payment_failed": "Le paiement FPAY a échoué. Veuillez vérifier votre solde, votre PIN et réessayer.",
+  "order.fpay.payment_success": "Paiement FPAY effectué avec succès pour la commande #{{invoiceNumber}}.",
+  "order.fpay.payment_processing": "Traitement du paiement FPAY en cours pour la commande #{{invoiceNumber}}...",
+  "order.fpay.insufficient_balance": "Solde FPAY insuffisant.",
+  "order.fpay.invalid_pin": "PIN FPAY invalide.",
+  "order.fpay.transaction_not_found": "Transaction FPAY non trouvée.",
+  "order.fpay.transaction_cancelled": "Transaction FPAY annulée.",
+  "order.fpay.account_not_found": "Compte FPAY non trouvé.",
+  "order.fpay.description": "Paiement de commande #{{invoiceNumber}}"
 }

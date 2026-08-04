@@ -8,6 +8,7 @@ import {
   IsNumber,
   Min,
   IsEnum,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaymentMethod } from 'src/operation/enum/payment-method.enum';
@@ -65,7 +66,7 @@ export class MobileMoneyDetailsDto {
   phone: string;
 }
 
-// DTO pour un bagage (inchangé)
+// DTO pour un bagage
 export class CreateBaggageDto {
   @IsEnum(BaggageType)
   baggageType: BaggageType;
@@ -108,6 +109,15 @@ export class CreateReservationDto {
   @ValidateNested()
   @Type(() => MobileMoneyDetailsDto)
   mobileMoneyDetails?: MobileMoneyDetailsDto;
+
+  // ✅ FPAY - directement dans le body
+  @ValidateIf((o) => o.paymentMethod === PaymentMethod.FPAY)
+  @IsString()
+  pin?: string;
+
+  @ValidateIf((o) => o.paymentMethod === PaymentMethod.FPAY)
+  @IsString()
+  phone?: string;
 
   @IsNumber()
   @Min(0)

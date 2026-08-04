@@ -121,5 +121,17 @@
   "orders_fetched_manage_city": "Maagizo ya {resource} yamepatikana kwa mafanikio kwa mji wa {city}",
   "orders_fetched_company_city": "Maagizo kutoka {companyName} yamepatikana kwa mafanikio kwa mji wa {city}",
   "orders_fetched_manage_no_city": "Maagizo ya {resource} yamepatikana kwa mafanikio",
-  "orders_fetched_company_no_city": "Maagizo kutoka {companyName} yamepatikana kwa mafanikio"
+  "orders_fetched_company_no_city": "Maagizo kutoka {companyName} yamepatikana kwa mafanikio",
+  "order.fpay.account_not_linked": "Akaunti yako haijaunganishwa na FPAY. Tafadhali unganisha akaunti yako kwanza.",
+  "order.fpay.pin_required": "Nambari ya PIN ya FPAY inahitajika ili kufanya operesheni hii.",
+  "order.fpay.phone_required": "Nambari ya simu inahitajika.",
+  "order.fpay.payment_failed": "Malipo ya FPAY yameshindwa. Tafadhali angalia salio lako, PIN na ujaribu tena.",
+  "order.fpay.payment_success": "Malipo ya FPAY yamekamilika kwa mafanikio kwa agizo #{{invoiceNumber}}.",
+  "order.fpay.payment_processing": "Malipo ya FPAY yanachakatwa kwa agizo #{{invoiceNumber}}...",
+  "order.fpay.insufficient_balance": "Salio la FPAY halitoshi.",
+  "order.fpay.invalid_pin": "Nambari ya PIN ya FPAY si sahihi.",
+  "order.fpay.transaction_not_found": "Muamala wa FPAY haupatikani.",
+  "order.fpay.transaction_cancelled": "Muamala wa FPAY umeghairiwa.",
+  "order.fpay.account_not_found": "Akaunti ya FPAY haipatikani.",
+  "order.fpay.description": "Malipo ya agizo #{{invoiceNumber}}"
 }

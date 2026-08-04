@@ -120,5 +120,17 @@
   "order.no_reason_provided": "لم يتم تقديم سبب",
   "orders_fetched_manage_city": "تم استرجاع طلبات {resource} بنجاح لمدينة {city}",
   "orders_fetched_company_city": "تم استرجاع طلبات {companyName} بنجاح لمدينة {city}",
-  "orders_fetched_manage_no_city": "تم استرجاع طلبات {resource} بنجاح"
+  "orders_fetched_manage_no_city": "تم استرجاع طلبات {resource} بنجاح",
+  "order.fpay.account_not_linked": "حسابك غير مرتبط بـ FPAY. يرجى ربط حسابك أولاً.",
+  "order.fpay.pin_required": "PIN FPAY مطلوب لإجراء هذه العملية.",
+  "order.fpay.phone_required": "رقم الهاتف مطلوب.",
+  "order.fpay.payment_failed": "فشل الدفع عبر FPAY. يرجى التحقق من رصيدك و PIN والمحاولة مرة أخرى.",
+  "order.fpay.payment_success": "تم الدفع عبر FPAY بنجاح للطلب #{{invoiceNumber}}.",
+  "order.fpay.payment_processing": "يتم معالجة الدفع عبر FPAY للطلب #{{invoiceNumber}}...",
+  "order.fpay.insufficient_balance": "رصيد FPAY غير كافٍ.",
+  "order.fpay.invalid_pin": "PIN FPAY غير صحيح.",
+  "order.fpay.transaction_not_found": "معاملة FPAY غير موجودة.",
+  "order.fpay.transaction_cancelled": "تم إلغاء معاملة FPAY.",
+  "order.fpay.account_not_found": "حساب FPAY غير موجود.",
+  "order.fpay.description": "دفع الطلب #{{invoiceNumber}}"
 }

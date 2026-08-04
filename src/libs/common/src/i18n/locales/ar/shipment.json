@@ -61,7 +61,6 @@
   "lta.fee_month": "رسوم الاشتراك الشهري - {{ltaNumber}} (تُفرض بشكل منفصل)",
   "lta.fee_shipment_multi": "رسوم {{count}} طرد في LTA {{ltaNumber}}",
   "lta.fee_default": "رسوم شحن LTA {{ltaNumber}}",
-
   "shipment.error.no_section_enabled": "يجب تمكين قسم واحد على الأقل (pickupEnabled, shippingEnabled أو deliveryEnabled).",
   "shipment.error.shipping_field_required": "حقل {{field}} مطلوب عندما يكون shippingEnabled صحيحاً.",
   "shipment.error.delivery_address_required": "deliveryAddressId مطلوب عندما يكون deliveryEnabled صحيحاً.",
@@ -87,7 +86,6 @@
   "shipment.error.pin_not_found": "لم يتم العثور على طرد لهذا PIN.",
   "shipment.error.already_collected": "تم استلام هذا الطرد بالفعل.",
   "shipment.error.cannot_update_price_no_service": "لا يمكن تحديث الأسعار: قم بتمكين خدمة واحدة على الأقل (pickup, shipping أو delivery).",
-
   "shipment.push.created_title": "تم إنشاء الطرد",
   "shipment.push.created_body": "تم إنشاء طردك {{trackingNumber}} بنجاح. سيتم إعلامك بتقدمه.",
   "shipment.email.created_subject": "تأكيد إنشاء الطرد - FavorHelp",
@@ -99,7 +97,6 @@
   "shipment.notification.collected_body": "تم استلام الطرد {{trackingNumber}} الخاص بـ {{clientName}} ({{clientPhone}}).",
   "shipment.operation.payment_designation": "دفع الطرد {{trackingNumber}}",
   "shipment.operation.admin_payment_designation": "دفع نقدي للطرد {{trackingNumber}}",
-
   "shipment.create_success": "تم إنشاء الطرد بنجاح",
   "shipment.create_admin_success": "تم إنشاء الطرد بنجاح (مدير)",
   "shipment.update_admin_success": "تم تعديل الطرد بنجاح (مدير)",
@@ -110,7 +107,6 @@
   "shipment.list_success": "تم استرداد {{count}} طرد(طرود) بنجاح",
   "shipment.list_empty": "لم يتم العثور على طرود",
   "shipment.list_filtered": "تم العثور على {{count}} طرد(طرود){{filter}}",
-
   "shipment.controller.my_shipments_success": "تم استرداد شحناتك بنجاح",
   "shipment.controller.without_lta_success": "تم استرداد قائمة الشحنات بنجاح",
   "shipment.controller.find_one_success": "تم العثور على الشحنة بنجاح",
@@ -118,5 +114,21 @@
   "shipment.controller.collect_success": "تم استلام الطرد بنجاح",
   "shipment.controller.by_agent_success": "تم استرداد شحناتك بنجاح",
   "shipment.error.client_name_required": "اسم العميل مطلوب.",
-  "shipment.error.client_phone_required": "رقم هاتف العميل مطلوب (إذا لم يتم تقديم معرف المستخدم)."
+  "shipment.error.client_phone_required": "رقم هاتف العميل مطلوب (إذا لم يتم تقديم معرف المستخدم).",
+  "shipment.fpay.account_not_linked": "حسابك غير مرتبط بـ FPAY. يرجى ربط حسابك أولاً.",
+  "shipment.fpay.pin_required": "PIN FPAY مطلوب لإجراء هذه العملية.",
+  "shipment.fpay.phone_required": "رقم الهاتف مطلوب.",
+  "shipment.fpay.payment_failed": "فشل الدفع عبر FPAY. يرجى التحقق من رصيدك و PIN والمحاولة مرة أخرى.",
+  "shipment.fpay.payment_success": "تم الدفع عبر FPAY بنجاح للطرد {{trackingNumber}}.",
+  "shipment.fpay.payment_processing": "يتم معالجة الدفع عبر FPAY للطرد {{trackingNumber}}...",
+  "shipment.fpay.insufficient_balance": "رصيد FPAY غير كافٍ.",
+  "shipment.fpay.invalid_pin": "PIN FPAY غير صحيح.",
+  "shipment.fpay.transaction_not_found": "معاملة FPAY غير موجودة.",
+  "shipment.fpay.transaction_cancelled": "تم إلغاء معاملة FPAY.",
+  "shipment.fpay.account_not_found": "حساب FPAY غير موجود.",
+  "shipment.fpay.description": "دفع الطرد {{trackingNumber}}",
+  "shipment.fpay.loyalty_fee_sent": "تم إرسال رسوم الولاء بنجاح عبر FPAY للطرد {{trackingNumber}}.",
+  "shipment.fpay.loyalty_fee_failed": "فشل إرسال رسوم الولاء عبر FPAY للطرد {{trackingNumber}}.",
+  "shipment.fpay.loyalty_fee_processing": "جاري إرسال رسوم الولاء عبر FPAY للطرد {{trackingNumber}}...",
+  "shipment.fpay.loyalty_description": "رسوم الولاء للطرد {{trackingNumber}}"
 }

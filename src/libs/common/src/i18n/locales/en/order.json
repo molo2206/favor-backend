@@ -121,5 +121,17 @@
   "orders_fetched_manage_city": "{resource} orders retrieved successfully for the city {city}",
   "orders_fetched_company_city": "Orders from {companyName} retrieved successfully for the city {city}",
   "orders_fetched_manage_no_city": "{resource} orders retrieved successfully",
-  "orders_fetched_company_no_city": "Orders from {companyName} retrieved successfully"
+  "orders_fetched_company_no_city": "Orders from {companyName} retrieved successfully",
+  "order.fpay.account_not_linked": "Your account is not linked to FPAY. Please link your account first.",
+  "order.fpay.pin_required": "FPAY PIN is required to perform this operation.",
+  "order.fpay.phone_required": "Phone number is required.",
+  "order.fpay.payment_failed": "FPAY payment failed. Please check your balance, PIN and try again.",
+  "order.fpay.payment_success": "FPAY payment successfully completed for order #{{invoiceNumber}}.",
+  "order.fpay.payment_processing": "FPAY payment is being processed for order #{{invoiceNumber}}...",
+  "order.fpay.insufficient_balance": "Insufficient FPAY balance.",
+  "order.fpay.invalid_pin": "Invalid FPAY PIN.",
+  "order.fpay.transaction_not_found": "FPAY transaction not found.",
+  "order.fpay.transaction_cancelled": "FPAY transaction cancelled.",
+  "order.fpay.account_not_found": "FPAY account not found.",
+  "order.fpay.description": "Payment for order #{{invoiceNumber}}"
 }

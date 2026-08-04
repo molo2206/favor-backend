@@ -1,5 +1,6 @@
 // src/shipments/dto/collect-shipment-body.dto.ts
-import { IsOptional, IsString, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsEnum } from 'class-validator';
+import { PaymentMethod } from 'src/operation/enum/payment-method.enum';
 
 export class CollectShipmentBodyDto {
   @IsOptional()
@@ -19,20 +20,29 @@ export class CollectShipmentBodyDto {
   deliveryPrice?: number;
 
   @IsNumber()
-  totalAmount: number; // montant envoyé à Pawapay
+  totalAmount: number;
 
   @IsNumber()
   amount: number;
 
   @IsOptional()
   @IsString()
-  currency: string; // ex: "USD"
+  currency: string;
 
   @IsOptional()
   @IsString()
-  provider: string; // ex: "AIRTEL_COD"
+  provider: string;
 
   @IsOptional()
   @IsString()
-  phone: string; // numéro pour paiement Pawapay
+  phone: string;
+
+  // ✅ Ajout pour FPAY
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
+
+  @IsOptional()
+  @IsString()
+  pin?: string;
 }

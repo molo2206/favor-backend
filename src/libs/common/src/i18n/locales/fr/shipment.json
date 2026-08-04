@@ -61,7 +61,6 @@
   "lta.fee_month": "Frais mensuels d'abonnement - {{ltaNumber}} (facturation séparée)",
   "lta.fee_shipment_multi": "Frais pour {{count}} colis dans le LTA {{ltaNumber}}",
   "lta.fee_default": "Frais d'expédition LTA {{ltaNumber}}",
-
   "shipment.error.no_section_enabled": "Au moins une section doit être activée (pickupEnabled, shippingEnabled ou deliveryEnabled).",
   "shipment.error.shipping_field_required": "{{field}} est requis quand shippingEnabled est true.",
   "shipment.error.delivery_address_required": "deliveryAddressId est requis quand deliveryEnabled est true.",
@@ -87,7 +86,6 @@
   "shipment.error.pin_not_found": "Colis non trouvé pour ce PIN.",
   "shipment.error.already_collected": "Ce colis a déjà été récupéré.",
   "shipment.error.cannot_update_price_no_service": "Impossible de modifier les prix : activez au moins un service (pickup, shipping ou delivery).",
-
   "shipment.push.created_title": "Colis créé",
   "shipment.push.created_body": "Votre colis {{trackingNumber}} a été créé avec succès. Vous serez notifié de son évolution.",
   "shipment.email.created_subject": "Confirmation de création de colis - FavorHelp",
@@ -99,7 +97,6 @@
   "shipment.notification.collected_body": "Le colis {{trackingNumber}} de {{clientName}} ({{clientPhone}}) a été récupéré.",
   "shipment.operation.payment_designation": "Paiement du colis {{trackingNumber}}",
   "shipment.operation.admin_payment_designation": "Paiement CASH du colis {{trackingNumber}}",
-
   "shipment.create_success": "Colis créé avec succès",
   "shipment.create_admin_success": "Colis créé avec succès (admin)",
   "shipment.update_admin_success": "Colis modifié avec succès (admin)",
@@ -110,7 +107,6 @@
   "shipment.list_success": "{{count}} colis récupéré(s) avec succès",
   "shipment.list_empty": "Aucun colis trouvé",
   "shipment.list_filtered": "{{count}} colis trouvé(s){{filter}}",
-
   "shipment.controller.my_shipments_success": "Vos shipments récupérés avec succès",
   "shipment.controller.without_lta_success": "Liste des shipments récupérée avec succès",
   "shipment.controller.find_one_success": "Shipment retrouvé avec succès",
@@ -118,5 +114,21 @@
   "shipment.controller.collect_success": "Colis collecté avec succès",
   "shipment.controller.by_agent_success": "Vos shipments récupérés avec succès",
   "shipment.error.client_name_required": "Le nom du client est obligatoire.",
-  "shipment.error.client_phone_required": "Le numéro de téléphone du client est obligatoire (si aucun identifiant utilisateur n'est fourni)."
+  "shipment.error.client_phone_required": "Le numéro de téléphone du client est obligatoire (si aucun identifiant utilisateur n'est fourni).",
+  "shipment.fpay.account_not_linked": "Votre compte n'est pas lié à FPAY. Veuillez d'abord lier votre compte.",
+  "shipment.fpay.pin_required": "Le PIN FPAY est requis pour effectuer cette opération.",
+  "shipment.fpay.phone_required": "Le numéro de téléphone est requis.",
+  "shipment.fpay.payment_failed": "Le paiement FPAY a échoué. Veuillez vérifier votre solde, votre PIN et réessayer.",
+  "shipment.fpay.payment_success": "Paiement FPAY effectué avec succès pour le colis {{trackingNumber}}.",
+  "shipment.fpay.payment_processing": "Traitement du paiement FPAY en cours pour le colis {{trackingNumber}}...",
+  "shipment.fpay.insufficient_balance": "Solde FPAY insuffisant.",
+  "shipment.fpay.invalid_pin": "PIN FPAY invalide.",
+  "shipment.fpay.transaction_not_found": "Transaction FPAY non trouvée.",
+  "shipment.fpay.transaction_cancelled": "Transaction FPAY annulée.",
+  "shipment.fpay.account_not_found": "Compte FPAY non trouvé.",
+  "shipment.fpay.description": "Paiement du colis {{trackingNumber}}",
+  "shipment.fpay.loyalty_fee_sent": "Frais de fidélité envoyés avec succès via FPAY pour le colis {{trackingNumber}}.",
+  "shipment.fpay.loyalty_fee_failed": "Échec de l'envoi des frais de fidélité via FPAY pour le colis {{trackingNumber}}.",
+  "shipment.fpay.loyalty_fee_processing": "Envoi des frais de fidélité en cours pour le colis {{trackingNumber}}...",
+  "shipment.fpay.loyalty_description": "Frais de fidélité pour le colis {{trackingNumber}}"
 }

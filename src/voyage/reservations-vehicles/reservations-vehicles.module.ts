@@ -33,8 +33,9 @@ import { RideModule } from 'src/Course/Ride/ride.module';
 import { DriverLocationModule } from 'src/Course/DriverLocation/driver-location.module';
 import { MailOrderService } from 'src/email/emailorder.service';
 import { TransactionModule } from 'src/transaction/transaction.module';
-import { Meal } from '../meal/entity/meal.entity';                 // ✅ import de Meal
-import { ReservationMeal } from '../meal/entity/reservation-meal.entity'; // ✅ déjà importé
+import { Meal } from '../meal/entity/meal.entity';
+import { ReservationMeal } from '../meal/entity/reservation-meal.entity';
+import { FpayModule } from 'src/fpay/fpay.module'; // ✅ Importer FpayModule
 
 @Module({
   imports: [
@@ -55,8 +56,9 @@ import { ReservationMeal } from '../meal/entity/reservation-meal.entity'; // ✅
       UserSettingsEntity,
       UserPlatformRoleEntity,
       CompanyHasUserResource,
-      Meal,                // ✅ ajout de Meal
-      ReservationMeal,     // ✅ déjà présent
+      Meal,
+      ReservationMeal,
+      // ✅ SUPPRIMER FpayModule d'ici - ce n'est pas une entité !
     ]),
     forwardRef(() => NotificationsModule),
     forwardRef(() => MailModule),
@@ -64,6 +66,7 @@ import { ReservationMeal } from '../meal/entity/reservation-meal.entity'; // ✅
     forwardRef(() => TransactionModule),
     forwardRef(() => RideModule),
     forwardRef(() => DriverLocationModule),
+    FpayModule, // ✅ AJOUTER FpayModule ici (dans imports, pas dans TypeOrmModule)
   ],
   providers: [
     ReservationsVehiclesService,
