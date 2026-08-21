@@ -128,75 +128,38 @@ export class GoogleService {
       maxprice?: number;
       opennow?: boolean;
       type?: string;
-      types?: string;
+      types?: string; // ✅ compatibilité Google : types=(cities)
       pagetoken?: string;
       fields?: string;
       saveToDatabase?: boolean;
       clientIp?: string;
     },
   ) {
-    this.logger.log(
-      `🔍 Searching places for query: "${query}"`,
-    );
+    this.logger.log(`Searching places for query: "${query}"`);
 
-    // =====================================================
-    // 1. VALIDATION
-    // =====================================================
-
-    if (!query || !query.trim()) {
-      return this.wrapGoogleResponse(
-        [],
-        [],
-        'INVALID_REQUEST',
-      );
-    }
-
-    query = query.trim();
-
-    // =====================================================
-    // 2. DÉTECTION DE LA LOCALISATION
-    // =====================================================
-
+    // 📍 Détection de la localisation
     let locationToUse = options?.location;
 
     if (!locationToUse && options?.clientIp) {
-      try {
-        const ipLocation =
-          await this.getLocationFromIp(
-            options.clientIp,
-          );
+      const ipLocation = await this.getLocationFromIp(options.clientIp);
 
-        if (ipLocation) {
-          locationToUse =
-            `${ipLocation.lat},${ipLocation.lng}`;
+      if (ipLocation) {
+        locationToUse = `${ipLocation.lat},${ipLocation.lng}`;
 
-          this.logger.log(
-            `📍 Location detected from IP: ${locationToUse}`,
-          );
-
-          if (
-            !options?.region &&
-            ipLocation.country
-          ) {
-            options = {
-              ...options,
-              region:
-                ipLocation.country.toLowerCase(),
-            };
-          }
-        }
-      } catch (error) {
-        this.logger.warn(
-          `⚠️ Unable to detect location from IP: ${error?.message || error
-          }`,
+        this.logger.log(
+          `📍 Location detected from IP: ${locationToUse}`,
         );
+
+        if (!options?.region && ipLocation.country) {
+          options = {
+            ...options,
+            region: ipLocation.country.toLowerCase(),
+          };
+        }
       }
     }
 
-    // =====================================================
-    // 3. LOCALISATION PAR DÉFAUT : GOMA
-    // =====================================================
-
+    // 📍 Position par défaut : Goma
     if (!locationToUse) {
       locationToUse = '-1.6586,29.2204';
 
@@ -205,158 +168,115 @@ export class GoogleService {
       );
     }
 
-    // =====================================================
-    // 4. NORMALISATION DU TYPE
-    // =====================================================
+    // ✅ Normalisation du type
+    // Supporte :
+    // - type=cities
+    // - types=(cities)
+    // - type=locality
+    // - types=locality
 
     const rawType =
       options?.type ||
       options?.types ||
       '';
 
-    const normalizedType =
-      rawType
-        .replace(/[()]/g, '')
-        .trim()
-        .toLowerCase();
+    const normalizedType = rawType
+      .replace(/[()]/g, '')
+      .trim()
+      .toLowerCase();
 
+    // 🏙️ Détection recherche villes
     const isCitySearch =
       normalizedType === 'cities' ||
       normalizedType === 'locality';
 
     this.logger.log(
-      `🔍 Raw type: "${rawType}"`,
+      `🔍 Search type: ${normalizedType || 'default'} | City Search: ${isCitySearch}`,
     );
 
-    this.logger.log(
-      `🔍 Normalized type: "${normalizedType}"`,
-    );
-
-    this.logger.log(
-      `🏙️ City search: ${isCitySearch}`,
-    );
-
-    // =====================================================
-    // 5. RECHERCHE LOCALE DB
-    // =====================================================
-    //
-    // Pour les villes, on ne cherche PAS dans la DB.
-    // On utilise directement Google Autocomplete.
-    //
-
+    // 🔍 Étape 1 : Recherche locale DB
+    // ❌ Skip pour les villes
     if (!isCitySearch) {
-      try {
-        const dbResults =
-          await this.addressService.searchAddressesByQuery(
-            query,
-            {
-              location: locationToUse,
-              radius: options?.radius
-                ? options.radius / 1000
-                : 10,
-              type: normalizedType,
-              limit: 20,
-            },
-          );
-
-        if (
-          dbResults &&
-          dbResults.length > 0
-        ) {
-          this.logger.log(
-            `✅ Found ${dbResults.length} results in database for "${query}"`,
-          );
-
-          for (const address of dbResults) {
-            try {
-              await this.addressService.incrementRequestCount(
-                address.id,
-              );
-            } catch (error) {
-              this.logger.warn(
-                `⚠️ Unable to increment request count for address ${address.id}`,
-              );
-            }
-          }
-
-          const formattedResults =
-            dbResults.map(
-              (address: any) => ({
-                formatted_address:
-                  address.formatted_address,
-
-                geometry:
-                  address.geometry,
-
-                icon:
-                  address.icon,
-
-                icon_background_color:
-                  address.icon_background_color,
-
-                icon_mask_base_uri:
-                  address.icon_mask_base_uri,
-
-                name:
-                  address.name,
-
-                photos:
-                  address.photos || [],
-
-                place_id:
-                  address.place_id,
-
-                reference:
-                  address.reference,
-
-                types:
-                  address.types,
-
-                opening_hours:
-                  address.opening_hours,
-
-                price_level:
-                  address.price_level,
-
-                rating:
-                  address.rating,
-
-                user_ratings_total:
-                  address.user_ratings_total,
-
-                vicinity:
-                  address.vicinity,
-
-                plus_code:
-                  address.plus_code,
-
-                business_status:
-                  address.business_status,
-
-                fromDatabase: true,
-              }),
-            );
-
-          return this.wrapGoogleResponse(
-            formattedResults,
-            [],
-            'OK',
-          );
-        }
-      } catch (error) {
-        this.logger.warn(
-          `⚠️ Database search failed: ${error?.message || error
-          }`,
+      const dbResults =
+        await this.addressService.searchAddressesByQuery(
+          query,
+          {
+            location: locationToUse,
+            radius: options?.radius
+              ? options.radius / 1000
+              : 10,
+            type: normalizedType,
+            limit: 20,
+          },
         );
 
-        // On continue avec Google
+      if (dbResults && dbResults.length > 0) {
+        this.logger.log(
+          `✅ Found ${dbResults.length} results in database for "${query}"`,
+        );
+
+        for (const address of dbResults) {
+          await this.addressService.incrementRequestCount(
+            address.id,
+          );
+        }
+
+        const formattedResults = dbResults.map(
+          (address: any) => ({
+            formatted_address:
+              address.formatted_address,
+
+            geometry: address.geometry,
+
+            icon: address.icon,
+
+            icon_background_color:
+              address.icon_background_color,
+
+            icon_mask_base_uri:
+              address.icon_mask_base_uri,
+
+            name: address.name,
+
+            photos: address.photos || [],
+
+            place_id: address.place_id,
+
+            reference: address.reference,
+
+            types: address.types,
+
+            opening_hours:
+              address.opening_hours,
+
+            price_level:
+              address.price_level,
+
+            rating: address.rating,
+
+            user_ratings_total:
+              address.user_ratings_total,
+
+            vicinity: address.vicinity,
+
+            plus_code: address.plus_code,
+
+            business_status:
+              address.business_status,
+
+            fromDatabase: true,
+          }),
+        );
+
+        return this.wrapGoogleResponse(
+          formattedResults,
+          [],
+          'OK',
+        );
       }
     }
 
-    // =====================================================
-    // 6. VARIABLES GOOGLE
-    // =====================================================
-
+    // 🌐 Étape 2 : Google API
     let results: any[] = [];
 
     let htmlAttributions: string[] = [];
@@ -364,586 +284,228 @@ export class GoogleService {
     let status = 'OK';
 
     // =====================================================
-    // 7. RECHERCHE DES VILLES
+    // 🏙️ RECHERCHE VILLES
     // =====================================================
 
     if (isCitySearch) {
       this.logger.log(
-        `🏙️ Using Google Autocomplete API for city search: "${query}"`,
+        `🏙️ Using Autocomplete API for city search: "${query}"`,
       );
 
-      try {
-        // -------------------------------------------------
-        // Construction propre de l'URL
-        // -------------------------------------------------
+      let autocompleteUrl =
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
+        `?input=${encodeURIComponent(query)}` +
+        `&key=${this.apiKey}` +
+        `&types=(cities)` +
+        `&language=${options?.language || 'fr'}`;
 
-        const params =
-          new URLSearchParams();
+      // 📍 Priorité localisation
+      if (locationToUse) {
+        autocompleteUrl +=
+          `&location=${encodeURIComponent(locationToUse)}`;
 
-        params.set(
-          'input',
-          query,
+        autocompleteUrl +=
+          `&radius=${options?.radius || 50000}`;
+      }
+
+      // 🌍 Région
+      if (options?.region) {
+        autocompleteUrl +=
+          `&region=${options.region}`;
+      }
+
+      const cacheKey = this.normalizeKey(
+        'autocomplete',
+        query,
+        locationToUse,
+      );
+
+      const autocompleteData =
+        await this.getCached<any>(
+          autocompleteUrl,
+          cacheKey,
+          this.TTLs.short,
         );
 
-        params.set(
-          'key',
-          this.apiKey,
-        );
+      if (autocompleteData.status === 'OK') {
+        results =
+          autocompleteData.predictions.map(
+            (prediction: any) => ({
+              formatted_address:
+                prediction.description,
 
-        params.set(
-          'types',
-          '(cities)',
-        );
+              place_id:
+                prediction.place_id,
 
-        params.set(
-          'language',
-          options?.language || 'fr',
-        );
+              reference:
+                prediction.place_id,
 
-        // -------------------------------------------------
-        // Location
-        // -------------------------------------------------
+              name:
+                prediction
+                  .structured_formatting
+                  ?.main_text ||
+                prediction.description,
 
-        if (locationToUse) {
-          params.set(
-            'location',
-            locationToUse,
+              types: [
+                'locality',
+                'geocode',
+              ],
+
+              geometry: null,
+
+              icon: null,
+
+              icon_background_color:
+                null,
+
+              icon_mask_base_uri:
+                null,
+
+              photos: [],
+
+              opening_hours: null,
+
+              price_level: null,
+
+              rating: null,
+
+              user_ratings_total: null,
+
+              vicinity: null,
+
+              plus_code: null,
+
+              business_status:
+                'OPERATIONAL',
+
+              fromDatabase: false,
+            }),
           );
 
-          params.set(
-            'radius',
-            String(
-              options?.radius || 50000,
-            ),
-          );
-        }
+        htmlAttributions =
+          autocompleteData.html_attributions ||
+          [];
 
-        // -------------------------------------------------
-        // Region
-        // -------------------------------------------------
+        status = 'OK';
+      } else {
+        status = autocompleteData.status;
 
-        if (options?.region) {
-          params.set(
-            'region',
-            options.region,
-          );
-        }
-
-        const autocompleteUrl =
-          `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params.toString()}`;
-
-        this.logger.log(
-          `🌐 Google Autocomplete URL: ${this.maskApiKey(
-            autocompleteUrl,
-          )}`,
-        );
-
-        // -------------------------------------------------
-        // Cache
-        // -------------------------------------------------
-
-        const cacheKey =
-          this.normalizeKey(
-            'autocomplete',
-            query,
-            locationToUse,
-          );
-
-        // -------------------------------------------------
-        // Appel Google
-        // -------------------------------------------------
-
-        let autocompleteData: any;
-
-        try {
-          autocompleteData =
-            await this.getCached<any>(
-              autocompleteUrl,
-              cacheKey,
-              this.TTLs.short,
-            );
-        } catch (error) {
-          this.logger.error(
-            `❌ Google Autocomplete HTTP error: ${error?.response?.data
-              ? JSON.stringify(
-                error.response.data,
-              )
-              : error?.message || error
-            }`,
-          );
-
-          return this.wrapGoogleResponse(
-            [],
-            [],
-            'UNKNOWN_ERROR',
-          );
-        }
-
-        // -------------------------------------------------
-        // LOG réponse Google
-        // -------------------------------------------------
-
-        this.logger.log(
-          `📡 Google Autocomplete response: ${JSON.stringify(
-            autocompleteData,
-            null,
-            2,
-          )}`,
-        );
-
-        // -------------------------------------------------
-        // Vérification réponse
-        // -------------------------------------------------
-
-        if (!autocompleteData) {
-          this.logger.error(
-            `❌ Google returned an empty response`,
-          );
-
-          return this.wrapGoogleResponse(
-            [],
-            [],
-            'UNKNOWN_ERROR',
-          );
-        }
-
-        status =
-          autocompleteData.status ||
-          'UNKNOWN_ERROR';
-
-        // -------------------------------------------------
-        // Google OK
-        // -------------------------------------------------
-
-        if (status === 'OK') {
-          const predictions =
-            autocompleteData.predictions ||
-            [];
-
-          results =
-            predictions.map(
-              (prediction: any) => ({
-                formatted_address:
-                  prediction.description,
-
-                place_id:
-                  prediction.place_id,
-
-                reference:
-                  prediction.place_id,
-
-                name:
-                  prediction
-                    .structured_formatting
-                    ?.main_text ||
-                  prediction.description,
-
-                types: [
-                  'locality',
-                  'geocode',
-                ],
-
-                geometry: null,
-
-                icon: null,
-
-                icon_background_color:
-                  null,
-
-                icon_mask_base_uri:
-                  null,
-
-                photos: [],
-
-                opening_hours: null,
-
-                price_level: null,
-
-                rating: null,
-
-                user_ratings_total:
-                  null,
-
-                vicinity: null,
-
-                plus_code: null,
-
-                business_status:
-                  'OPERATIONAL',
-
-                fromDatabase: false,
-              }),
-            );
-
-          htmlAttributions =
-            autocompleteData
-              .html_attributions ||
-            [];
-
-          this.logger.log(
-            `✅ Google found ${results.length} cities for "${query}"`,
-          );
-        }
-
-        // -------------------------------------------------
-        // ZERO_RESULTS
-        // -------------------------------------------------
-
-        else if (
-          status === 'ZERO_RESULTS'
-        ) {
-          results = [];
-
-          this.logger.log(
-            `ℹ️ No cities found for "${query}"`,
-          );
-        }
-
-        // -------------------------------------------------
-        // REQUEST_DENIED
-        // -------------------------------------------------
-
-        else if (
-          status === 'REQUEST_DENIED'
-        ) {
-          results = [];
-
-          this.logger.error(
-            `❌ Google REQUEST_DENIED: ${autocompleteData.error_message ||
-            'API key or API configuration problem'
-            }`,
-          );
-        }
-
-        // -------------------------------------------------
-        // INVALID_REQUEST
-        // -------------------------------------------------
-
-        else if (
-          status === 'INVALID_REQUEST'
-        ) {
-          results = [];
-
-          this.logger.error(
-            `❌ Google INVALID_REQUEST: ${autocompleteData.error_message ||
-            'Invalid Google Places request'
-            }`,
-          );
-        }
-
-        // -------------------------------------------------
-        // Autres erreurs Google
-        // -------------------------------------------------
-
-        else {
-          results = [];
-
-          this.logger.error(
-            `❌ Google Autocomplete error: ${status} - ${autocompleteData.error_message ||
-            'Unknown Google error'
-            }`,
-          );
-        }
-      } catch (error) {
-        this.logger.error(
-          `❌ Unexpected city search error: ${error?.message || error
-          }`,
-          error?.stack,
-        );
-
-        return this.wrapGoogleResponse(
-          [],
-          [],
-          'UNKNOWN_ERROR',
+        this.logger.warn(
+          `⚠️ Autocomplete API returned ${status}`,
         );
       }
     }
 
     // =====================================================
-    // 8. RECHERCHE POI / BUSINESSES
+    // 📍 RECHERCHE POI
     // =====================================================
 
     else {
       this.logger.log(
-        `📍 Using Google Text Search API for POI search: "${query}"`,
+        `📍 Using TextSearch API for POI search: "${query}"`,
       );
 
-      try {
-        const params =
-          new URLSearchParams();
+      let url =
+        `https://maps.googleapis.com/maps/api/place/textsearch/json` +
+        `?query=${encodeURIComponent(query)}` +
+        `&key=${this.apiKey}`;
 
-        params.set(
-          'query',
-          query,
+      // 📍 Location
+      url +=
+        `&location=${encodeURIComponent(locationToUse)}`;
+
+      // 📏 Radius
+      const radius =
+        options?.radius || 10000;
+
+      url += `&radius=${radius}`;
+
+      // 🌍 Region
+      if (options?.region) {
+        url += `&region=${options.region}`;
+      }
+
+      // 🌐 Language
+      if (options?.language) {
+        url += `&language=${options.language}`;
+      }
+
+      // 💰 Pricing
+      if (options?.minprice !== undefined) {
+        url += `&minprice=${options.minprice}`;
+      }
+
+      if (options?.maxprice !== undefined) {
+        url += `&maxprice=${options.maxprice}`;
+      }
+
+      // 🕐 Open now
+      if (options?.opennow) {
+        url += `&opennow=true`;
+      }
+
+      // 🧩 Type
+      if (
+        normalizedType &&
+        normalizedType !== 'cities' &&
+        normalizedType !== 'locality'
+      ) {
+        url += `&type=${normalizedType}`;
+      }
+
+      // 📄 Pagination
+      if (options?.pagetoken) {
+        url +=
+          `&pagetoken=${options.pagetoken}`;
+      }
+
+      // 🧾 Fields
+      if (options?.fields) {
+        url += `&fields=${options.fields}`;
+      }
+
+      const cacheKey = this.normalizeKey(
+        'searchPlaces',
+        query,
+        locationToUse,
+      );
+
+      const data =
+        await this.getCached<any>(
+          url,
+          cacheKey,
+          this.TTLs.short,
         );
 
-        params.set(
-          'key',
-          this.apiKey,
+      if (data.status === 'OK') {
+        results = data.results.map(
+          (r: any) => ({
+            ...r,
+            fromDatabase: false,
+          }),
         );
 
-        // -------------------------------------------------
-        // Location
-        // -------------------------------------------------
+        htmlAttributions =
+          data.html_attributions || [];
 
-        if (locationToUse) {
-          params.set(
-            'location',
-            locationToUse,
-          );
-        }
+        status = data.status;
+      } else {
+        status = data.status;
 
-        // -------------------------------------------------
-        // Radius
-        // -------------------------------------------------
-
-        params.set(
-          'radius',
-          String(
-            options?.radius || 10000,
-          ),
-        );
-
-        // -------------------------------------------------
-        // Region
-        // -------------------------------------------------
-
-        if (options?.region) {
-          params.set(
-            'region',
-            options.region,
-          );
-        }
-
-        // -------------------------------------------------
-        // Language
-        // -------------------------------------------------
-
-        if (options?.language) {
-          params.set(
-            'language',
-            options.language,
-          );
-        }
-
-        // -------------------------------------------------
-        // Price
-        // -------------------------------------------------
-
-        if (
-          options?.minprice !==
-          undefined
-        ) {
-          params.set(
-            'minprice',
-            String(
-              options.minprice,
-            ),
-          );
-        }
-
-        if (
-          options?.maxprice !==
-          undefined
-        ) {
-          params.set(
-            'maxprice',
-            String(
-              options.maxprice,
-            ),
-          );
-        }
-
-        // -------------------------------------------------
-        // Open now
-        // -------------------------------------------------
-
-        if (options?.opennow) {
-          params.set(
-            'opennow',
-            'true',
-          );
-        }
-
-        // -------------------------------------------------
-        // Type
-        // -------------------------------------------------
-
-        if (
-          normalizedType &&
-          normalizedType !== 'cities' &&
-          normalizedType !== 'locality'
-        ) {
-          params.set(
-            'type',
-            normalizedType,
-          );
-        }
-
-        // -------------------------------------------------
-        // Pagination
-        // -------------------------------------------------
-
-        if (options?.pagetoken) {
-          params.set(
-            'pagetoken',
-            options.pagetoken,
-          );
-        }
-
-        // -------------------------------------------------
-        // Fields
-        // -------------------------------------------------
-
-        if (options?.fields) {
-          params.set(
-            'fields',
-            options.fields,
-          );
-        }
-
-        const url =
-          `https://maps.googleapis.com/maps/api/place/textsearch/json?${params.toString()}`;
-
-        this.logger.log(
-          `🌐 Google TextSearch URL: ${this.maskApiKey(
-            url,
-          )}`,
-        );
-
-        // -------------------------------------------------
-        // Cache
-        // -------------------------------------------------
-
-        const cacheKey =
-          this.normalizeKey(
-            'searchPlaces',
-            query,
-            locationToUse,
-          );
-
-        let data: any;
-
-        try {
-          data =
-            await this.getCached<any>(
-              url,
-              cacheKey,
-              this.TTLs.short,
-            );
-        } catch (error) {
-          this.logger.error(
-            `❌ Google TextSearch HTTP error: ${error?.response?.data
-              ? JSON.stringify(
-                error.response.data,
-              )
-              : error?.message || error
-            }`,
-          );
-
-          return this.wrapGoogleResponse(
-            [],
-            [],
-            'UNKNOWN_ERROR',
-          );
-        }
-
-        // -------------------------------------------------
-        // LOG réponse
-        // -------------------------------------------------
-
-        this.logger.log(
-          `📡 Google TextSearch response: ${JSON.stringify(
-            data,
-            null,
-            2,
-          )}`,
-        );
-
-        if (!data) {
-          return this.wrapGoogleResponse(
-            [],
-            [],
-            'UNKNOWN_ERROR',
-          );
-        }
-
-        status =
-          data.status ||
-          'UNKNOWN_ERROR';
-
-        // -------------------------------------------------
-        // OK
-        // -------------------------------------------------
-
-        if (status === 'OK') {
-          results =
-            (data.results || []).map(
-              (r: any) => ({
-                ...r,
-                fromDatabase: false,
-              }),
-            );
-
-          htmlAttributions =
-            data.html_attributions ||
-            [];
-
-          this.logger.log(
-            `✅ Google found ${results.length} POIs for "${query}"`,
-          );
-        }
-
-        // -------------------------------------------------
-        // ZERO_RESULTS
-        // -------------------------------------------------
-
-        else if (
-          status === 'ZERO_RESULTS'
-        ) {
-          results = [];
-
-          this.logger.log(
-            `ℹ️ No POI found for "${query}"`,
-          );
-        }
-
-        // -------------------------------------------------
-        // GOOGLE ERROR
-        // -------------------------------------------------
-
-        else {
-          results = [];
-
-          this.logger.error(
-            `❌ Google TextSearch error: ${status} - ${data.error_message ||
-            'Unknown Google error'
-            }`,
-          );
-        }
-      } catch (error) {
-        this.logger.error(
-          `❌ Unexpected POI search error: ${error?.message || error
-          }`,
-          error?.stack,
-        );
-
-        return this.wrapGoogleResponse(
-          [],
-          [],
-          'UNKNOWN_ERROR',
+        this.logger.warn(
+          `⚠️ TextSearch API returned ${status}`,
         );
       }
     }
 
     // =====================================================
-    // 9. SAUVEGARDE EN DB
+    // 💾 Sauvegarde DB
     // =====================================================
 
     const shouldSave =
       options?.saveToDatabase !== false;
 
-    // Ne jamais sauvegarder les villes
+    // ❌ Ne pas sauvegarder les villes
     if (
       shouldSave &&
       results.length > 0 &&
@@ -954,41 +516,19 @@ export class GoogleService {
         results,
       ).catch((error) => {
         this.logger.error(
-          `❌ Background save failed: ${error?.message || error
-          }`,
+          `❌ Background save failed: ${error.message}`,
         );
       });
     }
 
-    // =====================================================
-    // 10. LOG FINAL
-    // =====================================================
-
     this.logger.log(
-      `✅ Search completed | query="${query}" | type="${normalizedType || 'default'
-      }" | citySearch=${isCitySearch} | results=${results.length
-      } | status=${status}`,
+      `✅ Found ${results.length} results from Google API for query: "${query}"`,
     );
-
-    // =====================================================
-    // 11. RESPONSE
-    // =====================================================
 
     return this.wrapGoogleResponse(
       results,
       htmlAttributions,
       status,
-    );
-  }
-
-  private maskApiKey(url: string): string {
-    if (!url) {
-      return url;
-    }
-
-    return url.replace(
-      /([?&]key=)[^&]+/i,
-      '$1***',
     );
   }
   // =====================================
