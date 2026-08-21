@@ -1,4 +1,4 @@
-import { Controller, Post, Patch, Body, Param, UseGuards, Get } from '@nestjs/common';
+import { Controller, Post, Patch, Body, Param, UseGuards, Get, Delete } from '@nestjs/common';
 import { AddressUserService } from './address-user.service';
 import { CreateAddressUserDto } from './dto/create-address-user.dto';
 import { UpdateAddressUserDto } from './dto/update-address-user.dto';
@@ -16,7 +16,7 @@ export class AddressUserController {
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   async create(
     @Body() createDto: CreateAddressUserDto,
-    @CurrentUser() user: UserEntity, 
+    @CurrentUser() user: UserEntity,
   ) {
     const result = await this.addressUserService.create(createDto, user);
     return result;
@@ -28,7 +28,7 @@ export class AddressUserController {
   async updateDefaultAddress(
     @Param('addressId') addressId: string,
     @Body() updateDto: UpdateAddressUserDto,
-    @CurrentUser() user: UserEntity, 
+    @CurrentUser() user: UserEntity,
   ) {
     const updatedAddress = await this.addressUserService.updateDefaultAddress(
       user,
@@ -37,13 +37,28 @@ export class AddressUserController {
     return { message: 'Adresse mise à jour avec succès', data: updatedAddress };
   }
 
+
+  @Delete(':addressId')
+  @UseGuards(AuthentificationGuard)
+  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
+  async updateRemovedAddress(
+    @Param('addressId') addressId: string,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const updatedAddress = await this.addressUserService.remove(
+      addressId,
+      user
+    );
+    return { message: 'Adresse supprimée avec succès', data: updatedAddress };
+  }
+
   @Patch(':addressId')
   @UseGuards(AuthentificationGuard)
   @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
   async updateDefaultAddressWithData(
     @Param('addressId') addressId: string,
     @Body() updateDto: UpdateAddressUserDto,
-    @CurrentUser() user: UserEntity, 
+    @CurrentUser() user: UserEntity,
   ) {
     const updatedAddress = await this.addressUserService.updateDefaultAddressWithData(
       user,

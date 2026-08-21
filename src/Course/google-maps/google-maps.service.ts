@@ -537,7 +537,8 @@ export class GoogleService {
   /**
    * Sauvegarde asynchrone des résultats de recherche en base de données
    */
-  private async saveSearchResultsToDatabase(query: string, results: any[]) {
+  private async saveSearchResultsToDatabase(query: string, results: any[]) 
+  {
     try {
       this.logger.log(
         `Saving ${results.length} search results for "${query}" to database...`,
@@ -590,6 +591,7 @@ export class GoogleService {
           undefined,
         );
       }
+      
     } catch (error) {
       this.logger.error(
         `Failed to save search results: ${error.message}`,
