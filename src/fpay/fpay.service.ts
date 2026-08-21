@@ -136,7 +136,10 @@ export class FpayService {
         try {
             await this.userRepository.update(
                 { id: systemUserId },
-                { userIdFpay: fpayUserId }
+                {
+                    userIdFpay: fpayUserId,
+                    isLink: true  
+                }
             );
             this.logger.log(`✅ userIdFpay ${fpayUserId} saved for user ${systemUserId}`);
         } catch (error) {

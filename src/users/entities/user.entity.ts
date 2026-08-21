@@ -210,6 +210,9 @@ export class UserEntity {
   @Column({ type: 'char', length: 36, nullable: true, unique: true })
   userIdFpay?: string;
 
+  @Column({ type: 'boolean', default: false })
+  isLink: boolean;
+
   @OneToMany(() => UserLoyaltyEntity, (loyalty) => loyalty.user)
   loyalty: UserLoyaltyEntity[];
 }
