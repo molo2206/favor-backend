@@ -1,0 +1,459 @@
+// src/modules/fpay/fpay.service.ts
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
+import { firstValueFrom } from 'rxjs';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { UserEntity } from 'src/users/entities/user.entity';
+import { FpayPaymentDto } from './dto/payment.dto';
+import { FpaySendDto } from './dto/send.dto';
+import { FpayResponse, PaymentResponseDto } from './dto/response.dto';
+import * as crypto from 'crypto';
+import { AuthLoginDto } from './dto/link-user.dto';
+
+// ✅ Interface pour la réponse de link-user
+interface LinkUserResponse {
+    accessToken: string;
+    refreshToken: string;
+    message: string;
+    sessionId?: string;
+    oauthRedirectUrl?: string;
+    requiresOtp?: boolean;
+    data: {
+        id: string;
+        email: string | null;
+        phone: string | null;
+        full_name: string | null;
+        role: string;
+        status: string;
+        profileImage: string | null;
+        kycStatus: string;
+        countryCode: string | null;
+        accessToken: string;
+        refreshToken: string;
+        tokenType: string;
+        expiresIn: number;
+        [key: string]: any;
+    };
+}
+
+@Injectable()
+export class FpayService {
+    private readonly logger = new Logger(FpayService.name);
+    private readonly fpayApiUrl: string;
+    private readonly apiKey: string;
+    private readonly logisticApiKey: string;
+    private readonly appUrl: string;
+
+    constructor(
+        private readonly httpService: HttpService,
+        private readonly configService: ConfigService,
+        @InjectRepository(UserEntity)
+        private readonly userRepository: Repository<UserEntity>,
+    ) {
+        const fpayApiUrl = this.configService.get<string>('FPAY_API_URL');
+        const apiKey = this.configService.get<string>('FPAY_API_KEY_HELP');
+        const logisticApiKey = this.configService.get<string>('FPAY_API_KEY_LOGISTIC');
+        const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+
+        if (!fpayApiUrl) {
+            throw new Error('FPAY_API_URL is not defined in environment variables');
+        }
+        if (!apiKey) {
+            throw new Error('FPAY_API_KEY_HELP is not defined in environment variables');
+        }
+        if (!logisticApiKey) {
+            throw new Error('FPAY_API_KEY_LOGISTIC is not defined in environment variables');
+        }
+
+        this.fpayApiUrl = fpayApiUrl;
+        this.apiKey = apiKey;
+        this.logisticApiKey = logisticApiKey;
+        this.appUrl = appUrl;
+    }
+
+    private getHeaders() {
+        return {
+            'Authorization': this.apiKey,
+            'Content-Type': 'application/json',
+        };
+    }
+
+    private getLogisticHeaders() {
+        return {
+            'Authorization': this.logisticApiKey,
+            'Content-Type': 'application/json',
+        };
+    }
+
+    // ============================================================
+    // 1. AUTHENTIFICATION EN 2 ÉTAPES (AVEC OTP)
+    // ============================================================
+
+    async login(
+        authDto: AuthLoginDto,
+        systemUserId?: string
+    ): Promise<any> {
+        try {
+            const url = `${this.fpayApiUrl}/auth/link-user`;
+            const hasOtp = authDto.otpCode && authDto.otpCode.trim() !== '';
+
+            this.logger.log(`🔐 Authentification: ${authDto.phone}, hasOtp: ${hasOtp}`);
+
+            // ============================================================
+            // ÉTAPE 1 : Vérifier les identifiants et envoyer OTP
+            // ============================================================
+            if (!hasOtp) {
+                this.logger.log(`📱 ÉTAPE 1 - Vérification des identifiants pour ${authDto.phone}`);
+
+                // ✅ Appel pour vérifier les identifiants
+                const authResponse = await firstValueFrom(
+                    this.httpService.post<any>(
+                        url,
+                        {
+                            phone: authDto.phone,
+                            password: authDto.password,
+                        },
+                        { headers: this.getHeaders() }
+                    )
+                );
+
+                this.logger.log(`✅ Identifiants valides pour ${authDto.phone}`);
+
+                // ✅ Retourner que l'OTP a été envoyé
+                return {
+                    success: true,
+                    requiresOtp: true,
+                    message: authResponse.data.message || 'Code OTP envoyé avec succès',
+                    data: null
+                };
+            }
+
+            // ============================================================
+            // ÉTAPE 2 : Vérifier l'OTP et générer les tokens
+            // ============================================================
+            this.logger.log(`🔐 ÉTAPE 2 - Vérification OTP pour ${authDto.phone}`);
+
+            const response = await firstValueFrom(
+                this.httpService.post<any>(
+                    url,
+                    authDto,  // ✅ Contient phone, password, otpCode
+                    { headers: this.getHeaders() }
+                )
+            );
+
+            this.logger.log(`✅ OTP vérifié avec succès pour ${authDto.phone}`);
+
+            // ✅ Sauvegarde du userIdFpay (LE LIEN)
+            if (systemUserId && response.data?.data?.id) {
+                await this.saveFpayUserId(systemUserId, response.data.data.id);
+                this.logger.log(`🔗 Compte FPay lié à l'utilisateur ${systemUserId}`);
+            }
+
+            return {
+                success: true,
+                message: response.data.message || 'Connexion réussie',
+                data: response.data.data,
+                accessToken: response.data.accessToken,
+                refreshToken: response.data.refreshToken,
+                requiresOtp: false,
+                isLinked: true,
+            };
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur d'authentification: ${error.message}`);
+
+            return {
+                success: false,
+                message: error.response?.data?.message || error.message || 'Erreur d\'authentification',
+                error: error.response?.data || null
+            };
+        }
+    }
+
+    // ============================================================
+    // 2. SAUVEGARDE DU userIdFpay (LE LIEN)
+    // ============================================================
+
+    async saveFpayUserId(systemUserId: string, fpayUserId: string): Promise<void> {
+        try {
+            await this.userRepository.update(
+                { id: systemUserId },
+                {
+                    userIdFpay: fpayUserId,
+                    isLink: true,
+                }
+            );
+            this.logger.log(`✅ userIdFpay ${fpayUserId} sauvegardé pour l'utilisateur ${systemUserId}`);
+        } catch (error) {
+            this.logger.error(`❌ Erreur lors de la sauvegarde: ${error.message}`);
+        }
+    }
+
+    // ============================================================
+    // 3. PAIEMENT
+    // ============================================================
+
+    async makePayment(
+        paymentDto: FpayPaymentDto,
+        currentUser: UserEntity,
+    ): Promise<FpayResponse<PaymentResponseDto>> {
+        try {
+            if (!currentUser) {
+                throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+            }
+
+            let user = currentUser;
+
+            if (!user.userIdFpay) {
+                this.logger.warn(`⚠️ userIdFpay manquant pour ${user.id}, tentative de rechargement...`);
+
+                const fullUser = await this.userRepository.findOne({
+                    where: { id: user.id },
+                });
+
+                if (fullUser?.userIdFpay) {
+                    user = fullUser;
+                    this.logger.log(`✅ userIdFpay récupéré: ${user.userIdFpay}`);
+                } else {
+                    this.logger.error(`❌ Payeur ${user.id} n'a pas de compte FPAY lié`);
+
+                    throw new HttpException(
+                        'Vous devez d\'abord lier votre compte FPAY. Utilisez /fpay/auth/link-user avec un OTP.',
+                        HttpStatus.BAD_REQUEST,
+                    );
+                }
+            }
+
+            // ✅ Extraire le destinataire de l'API Key
+            let cleanApiKey = this.apiKey;
+            if (cleanApiKey.startsWith('Bearer ')) {
+                cleanApiKey = cleanApiKey.substring(7);
+            }
+
+            let recipientPhoneOrCode: string | null = null;
+
+            try {
+                const apiKeyParts = cleanApiKey.split('.');
+                if (apiKeyParts.length === 3) {
+                    const payloadJson = Buffer.from(apiKeyParts[1], 'base64').toString('utf-8');
+                    const payload = JSON.parse(payloadJson);
+                    recipientPhoneOrCode = payload.phone || payload.merchantCode || payload.sub;
+                }
+            } catch (error) {
+                this.logger.error(`❌ Erreur lors du décodage de l'API Key: ${error.message}`);
+            }
+
+            if (!recipientPhoneOrCode) {
+                throw new HttpException(
+                    'Impossible d\'extraire le destinataire de l\'API Key',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            if (user.phone === recipientPhoneOrCode) {
+                throw new HttpException(
+                    'Vous ne pouvez pas vous payer vous-même',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            this.logger.log(`💰 Paiement: ${user.phone} → ${recipientPhoneOrCode}`);
+
+            const url = `${this.fpayApiUrl}/api/external/pay`;
+            const paymentData = {
+                phone: paymentDto.phone,
+                pin: paymentDto.pin,
+                toPhoneOrCode: recipientPhoneOrCode,
+                amount: paymentDto.amount,
+                currency: paymentDto.currency || 'USD',
+                description: paymentDto.description || `Paiement vers ${recipientPhoneOrCode}`,
+            };
+
+            const response = await firstValueFrom(
+                this.httpService.post<FpayResponse<PaymentResponseDto>>(
+                    url,
+                    paymentData,
+                    { headers: this.getHeaders() }
+                )
+            );
+
+            this.logger.log(`✅ Paiement réussi: ${response.data.data.transaction.reference}`);
+            return response.data;
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur de paiement: ${error.message}`);
+            throw this.handleError(error);
+        }
+    }
+
+    // ============================================================
+    // 4. ENVOI (LOGISTIC)
+    // ============================================================
+
+    async makeSend(
+        sendDto: FpaySendDto,
+        currentUser: UserEntity,
+    ): Promise<FpayResponse<PaymentResponseDto>> {
+        try {
+            if (!currentUser) {
+                throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+            }
+
+            let cleanApiKey = this.logisticApiKey;
+            if (cleanApiKey.startsWith('Bearer ')) {
+                cleanApiKey = cleanApiKey.substring(7);
+            }
+
+            let recipientPhoneOrCode: string | null = null;
+
+            try {
+                const apiKeyParts = cleanApiKey.split('.');
+                if (apiKeyParts.length === 3) {
+                    const payloadJson = Buffer.from(apiKeyParts[1], 'base64').toString('utf-8');
+                    const payload = JSON.parse(payloadJson);
+                    recipientPhoneOrCode = payload.phone || payload.sub;
+                }
+            } catch (error) {
+                this.logger.error(`❌ Erreur lors du décodage de l'API Key LOGISTIC: ${error.message}`);
+            }
+
+            if (!recipientPhoneOrCode) {
+                throw new HttpException(
+                    'Impossible d\'extraire le destinataire de l\'API Key LOGISTIC',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            const client = await this.userRepository.findOne({
+                where: { userIdFpay: sendDto.userId },
+            });
+
+            if (!client) {
+                throw new HttpException(
+                    `Client avec l'ID ${sendDto.userId} non trouvé`,
+                    HttpStatus.NOT_FOUND,
+                );
+            }
+
+            if (!client.userIdFpay) {
+                throw new HttpException(
+                    'Le client n\'a pas de compte FPay lié',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            if (client.phone === recipientPhoneOrCode) {
+                throw new HttpException(
+                    'Vous ne pouvez pas vous envoyer d\'argent à vous-même',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            this.logger.log(`📤 Envoi LOGISTIC: ${client.phone} → ${recipientPhoneOrCode}`);
+
+            const url = `${this.fpayApiUrl}/api/external/send`;
+            const sendData = {
+                userId: sendDto.userId,
+                amount: sendDto.amount,
+                description: sendDto.description || `Envoi vers ${recipientPhoneOrCode}`,
+                currency: sendDto.currency || 'USD',
+                countryCode: sendDto.countryCode || 'CD',
+            };
+
+            const response = await firstValueFrom(
+                this.httpService.post<FpayResponse<PaymentResponseDto>>(
+                    url,
+                    sendData,
+                    { headers: this.getLogisticHeaders() }
+                )
+            );
+
+            this.logger.log(`✅ Envoi LOGISTIC réussi: ${response.data.data.transaction.reference}`);
+            return response.data;
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur d'envoi LOGISTIC: ${error.message}`);
+            throw this.handleError(error);
+        }
+    }
+
+    // ============================================================
+    // 5. PROCESSUS COMPLET
+    // ============================================================
+
+    async processFullPayment(
+        authDto: AuthLoginDto,
+        paymentDto: FpayPaymentDto,
+        currentUser: UserEntity
+    ): Promise<{
+        auth: any;
+        payment: FpayResponse<PaymentResponseDto>;
+    }> {
+        try {
+            const authResult = await this.login(authDto, currentUser.id);
+
+            if (!authResult.success) {
+                throw new HttpException(
+                    authResult.message || 'Authentication failed',
+                    HttpStatus.UNAUTHORIZED,
+                );
+            }
+
+            const paymentResult = await this.makePayment(paymentDto, currentUser);
+
+            return {
+                auth: authResult,
+                payment: paymentResult,
+            };
+        } catch (error) {
+            this.logger.error(`❌ Erreur lors du traitement complet: ${error.message}`);
+            throw error;
+        }
+    }
+
+    // ============================================================
+    // 6. GESTION DES ERREURS
+    // ============================================================
+
+    private handleError(error: any): HttpException {
+        if (error.response) {
+            const status = error.response.status || HttpStatus.INTERNAL_SERVER_ERROR;
+            const message = error.response.data?.message || 'FPAY API error';
+
+            this.logger.error(`❌ FPAY API Error: ${status} - ${message}`);
+
+            return new HttpException(
+                {
+                    statusCode: status,
+                    message: message,
+                    error: error.response.data,
+                    timestamp: new Date().toISOString(),
+                },
+                status,
+            );
+        }
+
+        if (error.request) {
+            this.logger.error('❌ Service FPay indisponible');
+            return new HttpException(
+                {
+                    statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+                    message: 'Service FPay indisponible',
+                    timestamp: new Date().toISOString(),
+                },
+                HttpStatus.SERVICE_UNAVAILABLE,
+            );
+        }
+
+        return new HttpException(
+            {
+                statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+                message: error.message || 'Erreur interne',
+                timestamp: new Date().toISOString(),
+            },
+            HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+    }
+}

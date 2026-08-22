@@ -1,0 +1,16 @@
+{
+  "branch_created": "Sucursal creada con éxito.",
+  "branch_updated": "Sucursal actualizada con éxito.",
+  "branch_deleted": "Sucursal eliminada con éxito.",
+  "branch_retrieved": "Sucursal recuperada con éxito.",
+  "branches_retrieved": "Sucursales recuperadas con éxito.",
+  "branch_not_found": "Sucursal con ID {{id}} no encontrada.",
+  "forbidden_edit_branch": "Solo puede editar sucursales de su empresa activa.",
+  "country_not_found": "País con ID {{id}} no encontrado.",
+  "city_not_found": "Ciudad con ID {{id}} no encontrada.",
+  "failed_retrieve_branches": "Error al recuperar las sucursales.",
+  "failed_retrieve_branch": "Error al recuperar la sucursal.",
+  "failed_create_branch": "Error al crear la sucursal.",
+  "failed_update_branch": "Error al actualizar la sucursal.",
+  "failed_delete_branch": "Error al eliminar la sucursal."
+}
