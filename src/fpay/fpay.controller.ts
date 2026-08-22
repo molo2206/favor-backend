@@ -29,31 +29,29 @@ export class FpayController {
     @Post('auth/link-user')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({
-        summary: 'Authentifier un utilisateur FPAY',
-        description: 'Sans phone/password: Retourne l\'URL OAuth FPay. Avec phone/password: Traite la connexion.'
-    })
     async login(
         @Body() authDto: AuthLoginDto,
         @CurrentUser() user: UserEntity,
         @Res() res: Response,
     ): Promise<any> {
         try {
-            // ✅ CAS 1 : PAS de phone OU PAS de password → Retourner l'URL
+            // ✅ CAS 1 : PAS de phone/password → Retourner l'URL
             if (!authDto || !authDto.phone || !authDto.password) {
-                const appUrl = process.env.APP_URL || 'http://localhost:3000';
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
                 const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = authDto?.clientId || 'web-client';
 
+                // ✅ Utiliser le callback web (pas mobile)
+                const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'http://localhost:3000/oauth/callback';
+
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
-                redirectUrl.searchParams.set('redirect_uri', `${appUrl}/oauth/callback`);
+                redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
                 this.logger.log(`🔗 URL OAuth FPay: ${redirectUrl.toString()}`);
+                this.logger.log(`📌 Callback URL: ${callbackUrl}`);
 
-                // ✅ Retourner un JSON avec l'URL (pas de redirection)
                 return res.json({
                     status: 'success',
                     message: 'Page OAuth FPay',
@@ -62,24 +60,23 @@ export class FpayController {
                 });
             }
 
-            // ✅ CAS 2 : phone ET password fournis → Traiter la connexion
+            // ✅ CAS 2 : phone ET password fournis
             const result = await this.fpayService.login(authDto, user.id);
 
-            // ✅ Si OTP requis → Retourner l'URL FPay
             if (result.requiresOtp === true) {
-                const appUrl = process.env.APP_URL || 'http://localhost:3000';
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
                 const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = authDto.clientId || 'web-client';
 
+                const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'http://localhost:3000/oauth/callback';
+
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
-                redirectUrl.searchParams.set('redirect_uri', `${appUrl}/oauth/callback`);
+                redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
                 this.logger.log(`🔗 URL OAuth FPay (OTP): ${redirectUrl.toString()}`);
 
-                // ✅ Retourner un JSON avec l'URL
                 return res.json({
                     status: 'success',
                     message: 'Code OTP envoyé avec succès. Veuillez vous connecter sur FPay.',
@@ -89,7 +86,6 @@ export class FpayController {
                 });
             }
 
-            // ✅ Connexion directe (pas d'OTP)
             return result;
 
         } catch (error) {
@@ -100,7 +96,6 @@ export class FpayController {
             });
         }
     }
-
     // ============================================================
     // 2. PAIEMENT
     // ============================================================
