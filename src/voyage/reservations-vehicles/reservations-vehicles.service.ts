@@ -44,7 +44,7 @@ import { CreateReservationAdminDto } from './dto/create-reservation-admin.dto';
 import { PayReservationAdminDto } from './dto/pay-reservation-admin.dto';
 import { I18nService } from 'src/libs/common/src';
 import { FpayService } from 'src/fpay/fpay.service';
-
+import { randomBytes } from 'crypto';
 @Injectable()
 export class ReservationsVehiclesService {
   constructor(
@@ -392,9 +392,37 @@ export class ReservationsVehiclesService {
 
         // ✅ Vérifier que l'utilisateur a un compte FPay lié
         if (!user.userIdFpay) {
-          throw new BadRequestException(
-            await this.i18n.translate('reservation.fpay_account_not_linked', lang)
-          );
+          // ✅ Option: Lancer OAuth automatiquement avec les données de paiement
+          const { randomBytes } = require('crypto');
+          const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
+          const appUrl = process.env.APP_URL || 'http://localhost:3000';
+          const authCode = randomBytes(32).toString('hex');
+          const clientId = 'web-client';
+          const callbackUrl = `${appUrl}/oauth/callback`;
+
+          const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
+          redirectUrl.searchParams.set('client_id', clientId);
+          redirectUrl.searchParams.set('code', authCode);
+          redirectUrl.searchParams.set('system_user_id', user.id);
+          redirectUrl.searchParams.set('redirect_uri', callbackUrl);
+          // ✅ AJOUTER les données de paiement dans l'URL
+          redirectUrl.searchParams.set('amount', realTotal.toString());
+          redirectUrl.searchParams.set('currency', 'USD');
+          redirectUrl.searchParams.set('description', `Paiement de réservation #${savedReservation.id.slice(0, 8)}`);
+
+          throw new BadRequestException({
+            status: 'redirect',
+            message: 'Authentification FPay requise pour la réservation.',
+            redirectUrl: redirectUrl.toString(),
+            openInBrowser: redirectUrl.toString(),
+            system_user_id: user.id,
+            reservationId: savedReservation.id,
+            paymentData: {
+              amount: realTotal,
+              currency: 'USD',
+              description: `Paiement de réservation #${savedReservation.id.slice(0, 8)}`,
+            },
+          });
         }
 
         // ✅ Vérifier que l'utilisateur est bien lié (isLink)
@@ -404,19 +432,15 @@ export class ReservationsVehiclesService {
           );
         }
 
-        // ✅ Utiliser system_user_id (l'ID de l'utilisateur)
-        const systemUserId = user.id;
-
-        // ✅ Préparer les données sans phone ni pin
+        // ✅ Préparer les données sans phone ni pin (system_user_id est récupéré automatiquement)
         const fpayData = {
-          system_user_id: systemUserId,
           amount: realTotal,
           currency: 'USD',
           description: `Paiement de réservation #${savedReservation.id.slice(0, 8)}`,
         };
 
         console.log('[Reservation] Tentative de paiement FPAY :', {
-          systemUserId: fpayData.system_user_id,
+          userId: user.id,
           amount: fpayData.amount,
           currency: fpayData.currency,
           reservationId: savedReservation.id,
@@ -438,14 +462,41 @@ export class ReservationsVehiclesService {
               amount: fpayResponse.data.transaction.amount,
             });
           } else {
-            // ✅ Si le paiement échoue car l'utilisateur n'est pas lié
-           
             throw new BadRequestException(
               await this.i18n.translate('reservation.fpay_payment_failed', lang)
             );
           }
         } catch (error: any) {
           console.error('[Reservation] ❌ Erreur paiement FPAY:', error.message);
+
+          // ✅ Si l'utilisateur n'est pas lié, rediriger vers OAuth
+          if (error.message?.includes('lié') || error.message?.includes('OAuth')) {
+            const { randomBytes } = require('crypto');
+            const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
+            const appUrl = process.env.APP_URL || 'http://localhost:3000';
+            const authCode = randomBytes(32).toString('hex');
+            const clientId = 'web-client';
+            const callbackUrl = `${appUrl}/oauth/callback`;
+
+            const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
+            redirectUrl.searchParams.set('client_id', clientId);
+            redirectUrl.searchParams.set('code', authCode);
+            redirectUrl.searchParams.set('system_user_id', user.id);
+            redirectUrl.searchParams.set('redirect_uri', callbackUrl);
+            redirectUrl.searchParams.set('amount', realTotal.toString());
+            redirectUrl.searchParams.set('currency', 'USD');
+            redirectUrl.searchParams.set('description', `Paiement de réservation #${savedReservation.id.slice(0, 8)}`);
+
+            throw new BadRequestException({
+              status: 'redirect',
+              message: 'Authentification FPay requise pour la réservation.',
+              redirectUrl: redirectUrl.toString(),
+              openInBrowser: redirectUrl.toString(),
+              system_user_id: user.id,
+              reservationId: savedReservation.id,
+            });
+          }
+
           throw new BadRequestException(
             error.message || await this.i18n.translate('reservation.fpay_payment_failed', lang)
           );

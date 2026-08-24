@@ -196,27 +196,24 @@ export class OrderService {
         );
       }
 
-      // ✅ Récupérer le system_user_id
-      const systemUserId = user.id;
-
       const amountToPay = grandTotal || totalAmount || 0;
 
-      // ✅ N'appelle plus phone et pin
+      // ✅ Le system_user_id est automatiquement l'ID de l'utilisateur
       const fpayData = {
-        system_user_id: systemUserId,
         amount: amountToPay,
         currency: currency || 'USD',
         description: `Paiement de commande #${invoiceNumb}`,
       };
 
       console.log('[Order] Tentative de paiement FPAY :', {
-        systemUserId: fpayData.system_user_id,
+        userId: user.id,
         amount: fpayData.amount,
         currency: fpayData.currency,
         invoiceNumb,
       });
 
       try {
+        // ✅ Le system_user_id est récupéré automatiquement dans le service
         const fpayResponse = await this.fpayService.makePayment(fpayData, user);
 
         if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
@@ -232,15 +229,38 @@ export class OrderService {
             amount: fpayResponse.data.transaction.amount,
           });
         } else {
-          // ✅ Si le paiement échoue car l'utilisateur n'est pas lié
-          
-
           throw new BadRequestException(
             this.i18nService.translate('order.fpay_payment_failed', lang)
           );
         }
       } catch (error: any) {
         console.error('[Order] ❌ Erreur paiement FPAY:', error.message);
+
+        // ✅ Si l'utilisateur n'est pas lié, rediriger vers OAuth
+        if (error.message?.includes('lié') || error.message?.includes('OAuth')) {
+          const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
+          const appUrl = process.env.APP_URL || 'http://localhost:3000';
+          const authCode = crypto.randomBytes(32).toString('hex');
+          const clientId = 'web-client';
+          const callbackUrl = `${appUrl}/oauth/callback`;
+
+          const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
+          redirectUrl.searchParams.set('client_id', clientId);
+          redirectUrl.searchParams.set('code', authCode);
+          redirectUrl.searchParams.set('system_user_id', user.id);
+          redirectUrl.searchParams.set('redirect_uri', callbackUrl);
+          redirectUrl.searchParams.set('amount', amountToPay.toString());
+          redirectUrl.searchParams.set('currency', currency || 'USD');
+          redirectUrl.searchParams.set('description', `Paiement de commande #${invoiceNumb}`);
+
+          throw new BadRequestException({
+            status: 'redirect',
+            message: 'Authentification FPay requise avant le paiement.',
+            redirectUrl: redirectUrl.toString(),
+            openInBrowser: redirectUrl.toString(),
+            system_user_id: user.id,
+          });
+        }
 
         if (error.name === 'AbortError') {
           throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
@@ -251,8 +271,6 @@ export class OrderService {
         );
       }
     }
-    // ✅ FIN AJOUT FPAY
-
     else if (type === CompanyType.RESTAURANT) {
       selectedMethod = paymentMethod || PaymentMethod.MANUAL;
       if (selectedMethod === PaymentMethod.MOBILE_MONEY) {

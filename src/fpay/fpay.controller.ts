@@ -297,7 +297,7 @@ export class FpayController {
             if (!userToUse.userIdFpay || !userToUse.isLink) {
                 this.logger.warn(`⚠️ Utilisateur ${userToUse.id} non lié à FPay`);
 
-                // ✅ Construire l'URL OAuth avec system_user_id
+                // ✅ Construire l'URL OAuth avec system_user_id et les données de paiement
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
                 const appUrl = process.env.APP_URL || 'http://localhost:3000';
                 const authCode = crypto.randomBytes(32).toString('hex');
@@ -309,6 +309,13 @@ export class FpayController {
                 redirectUrl.searchParams.set('code', authCode);
                 redirectUrl.searchParams.set('system_user_id', userToUse.id);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
+
+                // ✅ AJOUTER les données de paiement dans l'URL
+                redirectUrl.searchParams.set('amount', paymentDto.amount.toString());
+                redirectUrl.searchParams.set('currency', paymentDto.currency);
+                if (paymentDto.description) {
+                    redirectUrl.searchParams.set('description', paymentDto.description);
+                }
 
                 this.logger.log(`🔗 Redirection OAuth: ${redirectUrl.toString()}`);
 
@@ -330,7 +337,7 @@ export class FpayController {
             // ✅ Ajouter automatiquement system_user_id au DTO pour le service
             const paymentDataWithUser = {
                 ...paymentDto,
-                system_user_id: userToUse.id, // ✅ Ajout automatique
+                system_user_id: userToUse.id,
             };
 
             // ✅ L'utilisateur est lié, effectuer le paiement

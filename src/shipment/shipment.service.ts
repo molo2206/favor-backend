@@ -1158,7 +1158,7 @@ export class ShipmentService {
     let fpayTransactionId: string | null = null;
     let fpayReference: string | null = null;
 
-    // ✅ PAIEMENT FPAY
+    // ✅ AJOUT FPAY - SHIPMENT
     if (paymentMethod === PaymentMethod.FPAY) {
       selectedMethod = PaymentMethod.FPAY;
 
@@ -1176,19 +1176,17 @@ export class ShipmentService {
         );
       }
 
-      // ✅ Récupérer le system_user_id (l'ID de l'utilisateur)
-      const systemUserId = user.id;
+      const amountToPay = totalAmount || 0;
 
-      // ✅ Préparer les données sans phone ni pin
+      // ✅ Données de paiement (sans system_user_id)
       const fpayData = {
-        system_user_id: systemUserId,
-        amount: totalAmount,
+        amount: amountToPay,
         currency: currency || 'USD',
         description: `Paiement du colis ${shipment.trackingNumber}`,
       };
 
       console.log('[Shipment] Tentative de paiement FPAY :', {
-        systemUserId: fpayData.system_user_id,
+        userId: user.id,
         amount: fpayData.amount,
         currency: fpayData.currency,
         trackingNumber: shipment.trackingNumber,
@@ -1207,19 +1205,46 @@ export class ShipmentService {
             amount: fpayResponse.data.transaction.amount,
           });
         } else {
-
           throw new BadRequestException(
             await this.i18n.translate('order.fpay_payment_failed', lang)
           );
         }
       } catch (error: any) {
         console.error('[Shipment] ❌ Erreur paiement FPAY:', error.message);
+        const crypto = require('crypto');
+        // ✅ Si l'utilisateur n'est pas lié, rediriger vers OAuth
+        if (error.message?.includes('lié') || error.message?.includes('OAuth')) {
+          const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
+          const appUrl = process.env.APP_URL || 'http://localhost:3000';
+          const authCode = crypto.randomBytes(32).toString('hex');
+          const clientId = 'web-client';
+          const callbackUrl = `${appUrl}/oauth/callback`;
+
+          const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
+          redirectUrl.searchParams.set('client_id', clientId);
+          redirectUrl.searchParams.set('code', authCode);
+          redirectUrl.searchParams.set('system_user_id', user.id);
+          redirectUrl.searchParams.set('redirect_uri', callbackUrl);
+          redirectUrl.searchParams.set('amount', amountToPay.toString());
+          redirectUrl.searchParams.set('currency', currency || 'USD');
+          redirectUrl.searchParams.set('description', `Paiement du colis ${shipment.trackingNumber}`);
+
+          throw new BadRequestException({
+            status: 'redirect',
+            message: 'Authentification FPay requise avant le paiement du colis.',
+            redirectUrl: redirectUrl.toString(),
+            openInBrowser: redirectUrl.toString(),
+            system_user_id: user.id,
+            trackingNumber: shipment.trackingNumber,
+          });
+        }
 
         throw new BadRequestException(
           error.message || await this.i18n.translate('order.fpay_payment_failed', lang)
         );
       }
     }
+    // ✅ FIN AJOUT FPAY - SHIPMENT
     // ✅ PAIEMENT MOBILE_MONEY (Pawapay)
     else {
       selectedMethod = PaymentMethod.MOBILE_MONEY;
