@@ -72,29 +72,27 @@ export class FpayController {
         @Res() res: Response,
     ): Promise<any> {
         try {
-            // ✅ 1. Récupérer l'ID de l'utilisateur connecté
             const systemUserId = user.id;
             console.log(`[Favor Help] 🔑 Utilisateur connecté: ${systemUserId}`);
 
-            // ✅ 2. CAS 1 : PAS de phone/password → Retourner l'URL
+            // ✅ CAS 1 : PAS de phone/password → Retourner l'URL
             if (!authDto || !authDto.phone || !authDto.password) {
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
                 const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = authDto?.clientId || 'web-client';
 
-                // ✅ Utiliser OAUTH_CALLBACK_URL pour le callback
+                // ✅ Utiliser OAUTH_CALLBACK_URL du .env (qui pointe vers FPay)
                 const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'https://f-pay.favorhelp.com/oauth/callback';
 
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
-
-                // ✅ AJOUTER system_user_id dans l'URL
                 redirectUrl.searchParams.set('system_user_id', systemUserId);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
                 this.logger.log(`🔗 URL OAuth FPay: ${redirectUrl.toString()}`);
                 this.logger.log(`📌 systemUserId: ${systemUserId}`);
+                this.logger.log(`📌 Callback URL: ${callbackUrl}`);
 
                 return res.json({
                     status: 'success',
@@ -118,8 +116,6 @@ export class FpayController {
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
-
-                // ✅ AJOUTER system_user_id dans l'URL
                 redirectUrl.searchParams.set('system_user_id', systemUserId);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
@@ -145,6 +141,7 @@ export class FpayController {
             });
         }
     }
+
     // ============================================================
     // 2. PAIEMENT
     // ============================================================
