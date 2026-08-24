@@ -52,19 +52,19 @@ export class FpayController {
             }
 
             // ✅ Vérifier si l'utilisateur est déjà lié
-            const existingUser = await this.fpayService.findUserById(body.systemUserId);
+            // const existingUser = await this.fpayService.findUserById(body.systemUserId);
 
-            if (existingUser && existingUser.userIdFpay && existingUser.isLink === true) {
-                console.log(`⚠️ Utilisateur ${body.systemUserId} est déjà lié au compte FPay ${existingUser.userIdFpay}`);
-                return res.status(400).json({
-                    success: false,
-                    message: 'Ce compte Favor Help est déjà lié à un compte FPay.',
-                    data: {
-                        isLinked: true,
-                        userIdFpay: existingUser.userIdFpay,
-                    },
-                });
-            }
+            // if (existingUser && existingUser.userIdFpay && existingUser.isLink === true) {
+            //     console.log(`⚠️ Utilisateur ${body.systemUserId} est déjà lié au compte FPay ${existingUser.userIdFpay}`);
+            //     return res.status(400).json({
+            //         success: false,
+            //         message: 'Ce compte Favor Help est déjà lié à un compte FPay.',
+            //         data: {
+            //             isLinked: true,
+            //             userIdFpay: existingUser.userIdFpay,
+            //         },
+            //     });
+            // }
 
             // ✅ Sauvegarder le userIdFpay dans UserEntity
             await this.fpayService.saveFpayUserId(body.systemUserId, body.fpayUserId);
