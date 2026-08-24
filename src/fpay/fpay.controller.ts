@@ -68,7 +68,7 @@ export class FpayController {
     @HttpCode(HttpStatus.OK)
     async login(
         @Body() authDto: AuthLoginDto,
-        @CurrentUser() user: UserEntity,  // ✅ Récupère l'utilisateur connecté
+        @CurrentUser() user: UserEntity,
         @Res() res: Response,
     ): Promise<any> {
         try {
@@ -82,13 +82,14 @@ export class FpayController {
                 const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = authDto?.clientId || 'web-client';
 
-                const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'http://localhost:3000/oauth/callback';
+                // ✅ Utiliser OAUTH_CALLBACK_URL pour le callback
+                const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'https://f-pay.favorhelp.com/oauth/callback';
 
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
 
-                // ✅ 3. Passer systemUserId dans l'URL de callback
+                // ✅ AJOUTER system_user_id dans l'URL
                 redirectUrl.searchParams.set('system_user_id', systemUserId);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
@@ -100,11 +101,11 @@ export class FpayController {
                     message: 'Page OAuth FPay',
                     url: redirectUrl.toString(),
                     openInBrowser: redirectUrl.toString(),
-                    systemUserId: systemUserId,  // ✅ Retourner l'ID
+                    systemUserId: systemUserId,
                 });
             }
 
-            // ✅ CAS 2 : phone ET password fournis → Traiter la connexion
+            // ✅ CAS 2 : phone ET password fournis
             const result = await this.fpayService.login(authDto, user.id);
 
             if (result.requiresOtp === true) {
@@ -112,13 +113,13 @@ export class FpayController {
                 const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = authDto.clientId || 'web-client';
 
-                const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'http://localhost:3000/oauth/callback';
+                const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'https://f-pay.favorhelp.com/oauth/callback';
 
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
 
-                // ✅ Passer systemUserId dans l'URL de callback
+                // ✅ AJOUTER system_user_id dans l'URL
                 redirectUrl.searchParams.set('system_user_id', systemUserId);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
