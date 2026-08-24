@@ -100,7 +100,7 @@ export class FpayController {
                 const clientId = authDto?.clientId || 'web-client';
 
                 // ✅ Le callback doit pointer vers FPay
-                const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'https://f-pay.favorhelp.com/oauth/callback';
+                const callbackUrl = 'https://f-pay.favorhelp.com/oauth/callback';
 
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
@@ -162,10 +162,10 @@ export class FpayController {
             });
         }
     }
+
     // ============================================================
     // 2. PAIEMENT
     // ============================================================
-
 
     @Post('pay')
     @UseGuards(AuthentificationGuard)
