@@ -280,10 +280,8 @@ export class FpayService {
     // ============================================================
     // 3. PAIEMENT
     // ============================================================
-    // src/modules/fpay/fpay.service.ts
-
     async makePayment(
-        paymentDto: FpayPaymentDto & { system_user_id?: string }, // ✅ system_user_id optionnel
+        paymentDto: FpayPaymentDto & { system_user_id?: string },
         currentUser: UserEntity,
     ): Promise<FpayResponse<PaymentResponseDto>> {
         try {
@@ -357,18 +355,24 @@ export class FpayService {
 
             const url = `${this.fpayApiUrl}/api/external/pay`;
             const paymentData = {
-                system_user_id: user.id, // ✅ Utiliser l'ID de l'utilisateur authentifié
+                system_user_id: user.id,
                 toPhoneOrCode: recipientPhoneOrCode,
                 amount: paymentDto.amount,
                 currency: paymentDto.currency || 'USD',
                 description: paymentDto.description || `Paiement vers ${recipientPhoneOrCode}`,
             };
 
+            // ✅ Préparer les headers avec l'API Key
+            const headers = {
+                'Authorization': this.apiKey, // ✅ Ajouter l'API Key dans les headers
+                'Content-Type': 'application/json',
+            };
+
             const response = await firstValueFrom(
                 this.httpService.post<FpayResponse<PaymentResponseDto>>(
                     url,
                     paymentData,
-                    { headers: this.getHeaders() }
+                    { headers: headers } // ✅ Utiliser les headers avec l'API Key
                 )
             );
 
