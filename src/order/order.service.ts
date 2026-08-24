@@ -50,6 +50,7 @@ import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/company_has_userResource.entity';
 import { City } from 'src/company/entities/city.entity';
 import { FpayService } from 'src/fpay/fpay.service';
+import { randomBytes } from 'crypto';
 
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -240,7 +241,8 @@ export class OrderService {
         if (error.message?.includes('lié') || error.message?.includes('OAuth')) {
           const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
           const appUrl = process.env.APP_URL || 'http://localhost:3000';
-          const authCode = crypto.randomBytes(32).toString('hex');
+          // ✅ Utiliser randomBytes importé
+          const authCode = randomBytes(32).toString('hex');
           const clientId = 'web-client';
           const callbackUrl = `${appUrl}/oauth/callback`;
 
@@ -271,6 +273,7 @@ export class OrderService {
         );
       }
     }
+    // ✅ FIN AJOUT FPAY
     else if (type === CompanyType.RESTAURANT) {
       selectedMethod = paymentMethod || PaymentMethod.MANUAL;
       if (selectedMethod === PaymentMethod.MOBILE_MONEY) {
