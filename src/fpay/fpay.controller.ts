@@ -99,7 +99,7 @@ export class FpayController {
     // ============================================================
     // 2. PAIEMENT
     // ============================================================
-    @Post('fpay/link-user')
+    @Post('link-user')
     async linkUserFromFpay(
         @Body() body: {
             fpayUserId: string;
