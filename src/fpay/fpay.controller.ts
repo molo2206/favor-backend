@@ -112,9 +112,7 @@ export class FpayController {
 
                 this.logger.log(`🔗 URL OAuth FPay: ${redirectUrl.toString()}`);
                 this.logger.log(`📌 system_user_id: ${systemUserId}`);
-                this.logger.log(`📌 callback: ${callbackUrl}`);
 
-                // ✅ Retourner l'URL complète
                 return res.json({
                     status: 'success',
                     message: 'Page OAuth FPay',
@@ -164,7 +162,6 @@ export class FpayController {
             });
         }
     }
-
     // ============================================================
     // 2. PAIEMENT
     // ============================================================
