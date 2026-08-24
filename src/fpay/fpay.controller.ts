@@ -28,20 +28,20 @@ export class FpayController {
     @Post('link-user')
     async linkUserFromFpay(
         @Body() body: {
+            systemUserId: string;   // ✅ ID de l'utilisateur Favor Help
             fpayUserId: string;
             accessToken?: string;
             refreshToken?: string;
         },
-        @CurrentUser() user: UserEntity,
         @Res() res: Response,
     ) {
         try {
             console.log('[Favor Help] 📥 Requête de lien reçue de FPay');
-            console.log(`[Favor Help] Utilisateur Favor Help: ${user.id}`);
-            console.log(`[Favor Help] FPay User ID: ${body.fpayUserId}`);
+            console.log(`[Favor Help] systemUserId: ${body.systemUserId}`);
+            console.log(`[Favor Help] fpayUserId: ${body.fpayUserId}`);
 
             // ✅ Sauvegarder le userIdFpay dans UserEntity
-            await this.fpayService.saveFpayUserId(user.id, body.fpayUserId);
+            await this.fpayService.saveFpayUserId(body.systemUserId, body.fpayUserId);
 
             console.log('[Favor Help] ✅ Compte lié avec succès');
 
@@ -49,7 +49,7 @@ export class FpayController {
                 success: true,
                 message: 'Compte lié avec succès',
                 data: {
-                    userId: user.id,
+                    systemUserId: body.systemUserId,
                     fpayUserId: body.fpayUserId,
                 },
             });
@@ -68,36 +68,43 @@ export class FpayController {
     @HttpCode(HttpStatus.OK)
     async login(
         @Body() authDto: AuthLoginDto,
-        @CurrentUser() user: UserEntity,
+        @CurrentUser() user: UserEntity,  // ✅ Récupère l'utilisateur connecté
         @Res() res: Response,
     ): Promise<any> {
         try {
-            // ✅ CAS 1 : PAS de phone/password → Retourner l'URL
+            // ✅ 1. Récupérer l'ID de l'utilisateur connecté
+            const systemUserId = user.id;
+            console.log(`[Favor Help] 🔑 Utilisateur connecté: ${systemUserId}`);
+
+            // ✅ 2. CAS 1 : PAS de phone/password → Retourner l'URL
             if (!authDto || !authDto.phone || !authDto.password) {
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
                 const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = authDto?.clientId || 'web-client';
 
-                // ✅ Utiliser le callback web (pas mobile)
                 const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'http://localhost:3000/oauth/callback';
 
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
+
+                // ✅ 3. Passer systemUserId dans l'URL de callback
+                redirectUrl.searchParams.set('system_user_id', systemUserId);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
                 this.logger.log(`🔗 URL OAuth FPay: ${redirectUrl.toString()}`);
-                this.logger.log(`📌 Callback URL: ${callbackUrl}`);
+                this.logger.log(`📌 systemUserId: ${systemUserId}`);
 
                 return res.json({
                     status: 'success',
                     message: 'Page OAuth FPay',
                     url: redirectUrl.toString(),
-                    openInBrowser: redirectUrl.toString()
+                    openInBrowser: redirectUrl.toString(),
+                    systemUserId: systemUserId,  // ✅ Retourner l'ID
                 });
             }
 
-            // ✅ CAS 2 : phone ET password fournis
+            // ✅ CAS 2 : phone ET password fournis → Traiter la connexion
             const result = await this.fpayService.login(authDto, user.id);
 
             if (result.requiresOtp === true) {
@@ -110,6 +117,9 @@ export class FpayController {
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
+
+                // ✅ Passer systemUserId dans l'URL de callback
+                redirectUrl.searchParams.set('system_user_id', systemUserId);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
                 this.logger.log(`🔗 URL OAuth FPay (OTP): ${redirectUrl.toString()}`);
@@ -119,7 +129,8 @@ export class FpayController {
                     message: 'Code OTP envoyé avec succès. Veuillez vous connecter sur FPay.',
                     requiresOtp: true,
                     url: redirectUrl.toString(),
-                    openInBrowser: redirectUrl.toString()
+                    openInBrowser: redirectUrl.toString(),
+                    systemUserId: systemUserId,
                 });
             }
 
@@ -129,7 +140,7 @@ export class FpayController {
             this.logger.error(`❌ Erreur: ${error.message}`);
             return res.status(400).json({
                 status: 'error',
-                message: error.message || 'Erreur lors de l\'authentification'
+                message: error.message || 'Erreur lors de l\'authentification',
             });
         }
     }
