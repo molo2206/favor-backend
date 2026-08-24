@@ -261,6 +261,7 @@ export class FpayController {
     // ============================================================
     // 2. PAIEMENT
     // ============================================================
+    // src/modules/fpay/fpay.controller.ts
 
     @Post('pay')
     @UseGuards(AuthentificationGuard)
@@ -297,6 +298,9 @@ export class FpayController {
             if (!userToUse.userIdFpay || !userToUse.isLink) {
                 this.logger.warn(`⚠️ Utilisateur ${userToUse.id} non lié à FPay`);
 
+                // ✅ Récupérer l'API Key depuis le service
+                const apiKey = this.fpayService.getApiKey();
+
                 // ✅ Construire l'URL OAuth avec system_user_id et les données de paiement
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
                 const appUrl = process.env.APP_URL || 'http://localhost:3000';
@@ -313,6 +317,8 @@ export class FpayController {
                 // ✅ AJOUTER les données de paiement dans l'URL
                 redirectUrl.searchParams.set('amount', paymentDto.amount.toString());
                 redirectUrl.searchParams.set('currency', paymentDto.currency);
+                // ✅ AJOUTER l'API Key dans l'URL
+                redirectUrl.searchParams.set('api_key', apiKey);
                 if (paymentDto.description) {
                     redirectUrl.searchParams.set('description', paymentDto.description);
                 }

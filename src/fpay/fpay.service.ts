@@ -474,7 +474,9 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
-
+    getApiKey(): string {
+        return this.apiKey;
+    }
     // ============================================================
     // 5. PROCESSUS COMPLET
     // ============================================================

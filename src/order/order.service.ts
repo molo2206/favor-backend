@@ -241,11 +241,12 @@ export class OrderService {
         if (error.message?.includes('lié') || error.message?.includes('OAuth')) {
           const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
           const appUrl = process.env.APP_URL || 'http://localhost:3000';
-          // ✅ Utiliser randomBytes importé
           const authCode = randomBytes(32).toString('hex');
           const clientId = 'web-client';
           const callbackUrl = `${appUrl}/oauth/callback`;
 
+          // ✅ Récupérer l'API Key
+          const apiKey = process.env.FPAY_API_KEY_HELP || '';
           const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
           redirectUrl.searchParams.set('client_id', clientId);
           redirectUrl.searchParams.set('code', authCode);
@@ -254,6 +255,8 @@ export class OrderService {
           redirectUrl.searchParams.set('amount', amountToPay.toString());
           redirectUrl.searchParams.set('currency', currency || 'USD');
           redirectUrl.searchParams.set('description', `Paiement de commande #${invoiceNumb}`);
+          // ✅ AJOUTER l'API Key dans l'URL
+          redirectUrl.searchParams.set('api_key', apiKey);
 
           throw new BadRequestException({
             status: 'redirect',
