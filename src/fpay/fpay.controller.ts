@@ -28,7 +28,7 @@ export class FpayController {
     @Post('link-user')
     async linkUserFromFpay(
         @Body() body: {
-            systemUserId: string;   // ✅ ID de l'utilisateur Favor Help
+            systemUserId: string;
             fpayUserId: string;
             accessToken?: string;
             refreshToken?: string;
@@ -37,8 +37,18 @@ export class FpayController {
     ) {
         try {
             console.log('[Favor Help] 📥 Requête de lien reçue de FPay');
+            console.log('[Favor Help] Body complet:', JSON.stringify(body, null, 2));
             console.log(`[Favor Help] systemUserId: ${body.systemUserId}`);
             console.log(`[Favor Help] fpayUserId: ${body.fpayUserId}`);
+
+            // ✅ Vérifier que systemUserId est présent
+            if (!body.systemUserId) {
+                console.error('[Favor Help] ❌ systemUserId manquant !');
+                return res.status(400).json({
+                    success: false,
+                    message: 'systemUserId est requis',
+                });
+            }
 
             // ✅ Sauvegarder le userIdFpay dans UserEntity
             await this.fpayService.saveFpayUserId(body.systemUserId, body.fpayUserId);
@@ -72,8 +82,18 @@ export class FpayController {
         @Res() res: Response,
     ): Promise<any> {
         try {
-            const systemUserId = user.id;
-            console.log(`[Favor Help] 🔑 Utilisateur connecté: ${systemUserId}`);
+            // ✅ 1. Récupérer l'ID de l'utilisateur connecté
+            const systemUserId = user?.id;
+
+            if (!systemUserId) {
+                this.logger.error('❌ Utilisateur non authentifié ou ID manquant');
+                return res.status(401).json({
+                    status: 'error',
+                    message: 'Utilisateur non authentifié',
+                });
+            }
+
+            this.logger.log(`[Favor Help] 🔑 Utilisateur connecté: ${systemUserId}`);
 
             // ✅ CAS 1 : PAS de phone/password → Retourner l'URL
             if (!authDto || !authDto.phone || !authDto.password) {
@@ -87,6 +107,8 @@ export class FpayController {
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
+
+                // ✅ AJOUTER system_user_id dans l'URL
                 redirectUrl.searchParams.set('system_user_id', systemUserId);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
@@ -116,10 +138,13 @@ export class FpayController {
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
+
+                // ✅ AJOUTER system_user_id dans l'URL
                 redirectUrl.searchParams.set('system_user_id', systemUserId);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
                 this.logger.log(`🔗 URL OAuth FPay (OTP): ${redirectUrl.toString()}`);
+                this.logger.log(`📌 systemUserId: ${systemUserId}`);
 
                 return res.json({
                     status: 'success',

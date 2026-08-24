@@ -178,19 +178,29 @@ export class FpayService {
 
     async saveFpayUserId(systemUserId: string, fpayUserId: string): Promise<void> {
         try {
-            await this.userRepository.update(
+            console.log(`[saveFpayUserId] systemUserId: ${systemUserId}`);
+            console.log(`[saveFpayUserId] fpayUserId: ${fpayUserId}`);
+
+            // ✅ Vérifier que les IDs ne sont pas vides
+            if (!systemUserId || !fpayUserId) {
+                throw new Error('systemUserId ou fpayUserId est vide');
+            }
+
+            const result = await this.userRepository.update(
                 { id: systemUserId },
                 {
                     userIdFpay: fpayUserId,
                     isLink: true,
                 }
             );
-            this.logger.log(`✅ userIdFpay ${fpayUserId} sauvegardé pour l'utilisateur ${systemUserId}`);
+
+            console.log(`[saveFpayUserId] Result:`, result);
+            console.log(`✅ userIdFpay ${fpayUserId} sauvegardé pour l'utilisateur ${systemUserId}`);
         } catch (error) {
-            this.logger.error(`❌ Erreur lors de la sauvegarde: ${error.message}`);
+            console.error(`❌ Erreur lors de la sauvegarde:`, error.message);
+            throw error;  // ✅ Propager l'erreur
         }
     }
-
     // ============================================================
     // 3. PAIEMENT
     // ============================================================
