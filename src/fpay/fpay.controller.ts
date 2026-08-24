@@ -261,47 +261,27 @@ export class FpayController {
     // ============================================================
     // 2. PAIEMENT
     // ============================================================
-    // src/modules/fpay/fpay.controller.ts
-
     @Post('pay')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth()
-    @ApiOperation({
-        summary: 'Effectuer un paiement FPAY',
-        description: 'Effectue un paiement depuis le portefeuille FPAY vers l\'utilisateur connecté'
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Paiement effectué avec succès',
-        type: Object
-    })
-    @ApiResponse({ status: 400, description: 'Données invalides' })
-    @ApiResponse({ status: 401, description: 'Non autorisé' })
-    @ApiResponse({ status: 402, description: 'Fonds insuffisants' })
-    @ApiResponse({ status: 404, description: 'Bénéficiaire introuvable' })
     async makePayment(
         @Body() paymentDto: FpayPaymentDto,
         @CurrentUser() user: UserEntity,
         @Res({ passthrough: true }) res: Response,
     ): Promise<FpayResponse<PaymentResponseDto> | any> {
         try {
-            // ✅ Utiliser l'utilisateur authentifié
             let userToUse = user;
 
-            // ✅ Vérifier que l'utilisateur est authentifié
             if (!userToUse) {
                 throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
             }
 
-            // ✅ Vérifier si l'utilisateur a un userIdFpay
             if (!userToUse.userIdFpay || !userToUse.isLink) {
                 this.logger.warn(`⚠️ Utilisateur ${userToUse.id} non lié à FPay`);
 
-                // ✅ Récupérer l'API Key depuis le service
                 const apiKey = this.fpayService.getApiKey();
 
-                // ✅ Construire l'URL OAuth avec system_user_id et les données de paiement
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
                 const appUrl = process.env.APP_URL || 'http://localhost:3000';
                 const authCode = crypto.randomBytes(32).toString('hex');
@@ -313,19 +293,20 @@ export class FpayController {
                 redirectUrl.searchParams.set('code', authCode);
                 redirectUrl.searchParams.set('system_user_id', userToUse.id);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
-
-                // ✅ AJOUTER les données de paiement dans l'URL
                 redirectUrl.searchParams.set('amount', paymentDto.amount.toString());
                 redirectUrl.searchParams.set('currency', paymentDto.currency);
-                // ✅ AJOUTER l'API Key dans l'URL
+
+                // ✅ Encoder l'API Key manuellement pour préserver les caractères spéciaux
                 redirectUrl.searchParams.set('api_key', apiKey);
+                // OU utiliser encodeURIComponent si nécessaire
+                // redirectUrl.searchParams.set('api_key', encodeURIComponent(apiKey));
+
                 if (paymentDto.description) {
                     redirectUrl.searchParams.set('description', paymentDto.description);
                 }
 
                 this.logger.log(`🔗 Redirection OAuth: ${redirectUrl.toString()}`);
 
-                // ✅ Retourner l'URL OAuth
                 return {
                     status: 'redirect',
                     message: 'Authentification FPay requise. Veuillez vous connecter.',
@@ -340,22 +321,18 @@ export class FpayController {
                 };
             }
 
-            // ✅ Ajouter automatiquement system_user_id au DTO pour le service
             const paymentDataWithUser = {
                 ...paymentDto,
                 system_user_id: userToUse.id,
             };
 
-            // ✅ L'utilisateur est lié, effectuer le paiement
             return this.fpayService.makePayment(paymentDataWithUser, userToUse);
 
         } catch (error) {
             this.logger.error(`❌ Erreur paiement: ${error.message}`);
-
             if (error instanceof HttpException) {
                 throw error;
             }
-
             throw new HttpException(
                 {
                     status: 'error',
