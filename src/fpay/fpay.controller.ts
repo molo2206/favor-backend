@@ -82,11 +82,10 @@ export class FpayController {
         @Res() res: Response,
     ): Promise<any> {
         try {
-            // ✅ 1. Récupérer l'ID de l'utilisateur connecté
             const systemUserId = user?.id;
 
             if (!systemUserId) {
-                this.logger.error('❌ Utilisateur non authentifié ou ID manquant');
+                this.logger.error('❌ Utilisateur non authentifié');
                 return res.status(401).json({
                     status: 'error',
                     message: 'Utilisateur non authentifié',
@@ -95,13 +94,12 @@ export class FpayController {
 
             this.logger.log(`[Favor Help] 🔑 Utilisateur connecté: ${systemUserId}`);
 
-            // ✅ CAS 1 : PAS de phone/password → Retourner l'URL
             if (!authDto || !authDto.phone || !authDto.password) {
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
                 const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = authDto?.clientId || 'web-client';
 
-                // ✅ Utiliser OAUTH_CALLBACK_URL du .env (qui pointe vers FPay)
+                // ✅ Le callback doit pointer vers FPay
                 const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'https://f-pay.favorhelp.com/oauth/callback';
 
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
@@ -113,9 +111,10 @@ export class FpayController {
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
                 this.logger.log(`🔗 URL OAuth FPay: ${redirectUrl.toString()}`);
-                this.logger.log(`📌 systemUserId: ${systemUserId}`);
-                this.logger.log(`📌 Callback URL: ${callbackUrl}`);
+                this.logger.log(`📌 system_user_id: ${systemUserId}`);
+                this.logger.log(`📌 callback: ${callbackUrl}`);
 
+                // ✅ Retourner l'URL complète
                 return res.json({
                     status: 'success',
                     message: 'Page OAuth FPay',
@@ -144,7 +143,6 @@ export class FpayController {
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
                 this.logger.log(`🔗 URL OAuth FPay (OTP): ${redirectUrl.toString()}`);
-                this.logger.log(`📌 systemUserId: ${systemUserId}`);
 
                 return res.json({
                     status: 'success',
