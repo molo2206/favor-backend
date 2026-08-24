@@ -201,12 +201,89 @@ export class FpayService {
             throw error;  // ✅ Propager l'erreur
         }
     }
+
+    async findUserById(systemUserId: string): Promise<UserEntity | null> {
+        try {
+            return await this.userRepository.findOne({
+                where: { id: systemUserId },
+            });
+        } catch (error) {
+            this.logger.error(`❌ Erreur lors de la recherche de l'utilisateur: ${error.message}`);
+            return null;
+        }
+    }
+
+    async unlinkFpayUser(systemUserId: string): Promise<{ success: boolean; message: string }> {
+        try {
+            this.logger.log(`🔓 Tentative de déliaison pour l'utilisateur ${systemUserId}`);
+
+            // Vérifier si l'utilisateur existe
+            const user = await this.userRepository.findOne({
+                where: { id: systemUserId },
+            });
+
+            if (!user) {
+                throw new HttpException(
+                    'Utilisateur non trouvé',
+                    HttpStatus.NOT_FOUND,
+                );
+            }
+
+            // Vérifier si l'utilisateur est déjà délié
+            if (!user.userIdFpay || user.isLink === false) {
+                throw new HttpException(
+                    'Ce compte Favor Help n\'est pas lié à un compte FPay',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ Option 1: Supprimer complètement le userIdFpay
+            const result = await this.userRepository.update(
+                { id: systemUserId },
+                {
+                    userIdFpay: "",
+                    isLink: false,
+                }
+            );
+
+            if (result.affected === 0) {
+                throw new HttpException(
+                    'Impossible de mettre à jour l\'utilisateur',
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                );
+            }
+
+            this.logger.log(`✅ Compte FPay délié avec succès pour l'utilisateur ${systemUserId}`);
+
+            return {
+                success: true,
+                message: 'Compte FPay délié avec succès',
+            };
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur lors de la déliaison: ${error.message}`);
+
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            throw new HttpException(
+                {
+                    statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+                    message: error.message || 'Erreur lors de la déliaison du compte',
+                    timestamp: new Date().toISOString(),
+                },
+                HttpStatus.INTERNAL_SERVER_ERROR,
+            );
+        }
+    }
     // ============================================================
     // 3. PAIEMENT
     // ============================================================
+    // src/modules/fpay/fpay.service.ts
 
     async makePayment(
-        paymentDto: FpayPaymentDto,
+        paymentDto: FpayPaymentDto & { system_user_id?: string }, // ✅ system_user_id optionnel
         currentUser: UserEntity,
     ): Promise<FpayResponse<PaymentResponseDto>> {
         try {
@@ -216,24 +293,31 @@ export class FpayService {
 
             let user = currentUser;
 
-            if (!user.userIdFpay) {
-                this.logger.warn(`⚠️ userIdFpay manquant pour ${user.id}, tentative de rechargement...`);
-
-                const fullUser = await this.userRepository.findOne({
-                    where: { id: user.id },
+            // ✅ Si system_user_id est fourni, l'utiliser (sinon utiliser currentUser)
+            if (paymentDto.system_user_id) {
+                const systemUser = await this.userRepository.findOne({
+                    where: { id: paymentDto.system_user_id },
                 });
 
-                if (fullUser?.userIdFpay) {
-                    user = fullUser;
-                    this.logger.log(`✅ userIdFpay récupéré: ${user.userIdFpay}`);
-                } else {
-                    this.logger.error(`❌ Payeur ${user.id} n'a pas de compte FPAY lié`);
-
+                if (!systemUser) {
                     throw new HttpException(
-                        'Vous devez d\'abord lier votre compte FPAY. Utilisez /fpay/auth/link-user avec un OTP.',
-                        HttpStatus.BAD_REQUEST,
+                        `Utilisateur avec system_user_id ${paymentDto.system_user_id} non trouvé`,
+                        HttpStatus.NOT_FOUND,
                     );
                 }
+
+                user = systemUser;
+                this.logger.log(`✅ Payeur récupéré via system_user_id: ${user.id}`);
+            }
+
+            // ✅ Vérifier que l'utilisateur a un userIdFpay
+            if (!user.userIdFpay || !user.isLink) {
+                this.logger.error(`❌ Payeur ${user.id} n'a pas de compte FPAY lié`);
+
+                throw new HttpException(
+                    'Vous devez d\'abord lier votre compte FPAY. Veuillez vous connecter via OAuth.',
+                    HttpStatus.BAD_REQUEST,
+                );
             }
 
             // ✅ Extraire le destinataire de l'API Key
@@ -273,8 +357,7 @@ export class FpayService {
 
             const url = `${this.fpayApiUrl}/api/external/pay`;
             const paymentData = {
-                phone: paymentDto.phone,
-                pin: paymentDto.pin,
+                system_user_id: user.id, // ✅ Utiliser l'ID de l'utilisateur authentifié
                 toPhoneOrCode: recipientPhoneOrCode,
                 amount: paymentDto.amount,
                 currency: paymentDto.currency || 'USD',
@@ -297,7 +380,6 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
-
     // ============================================================
     // 4. ENVOI (LOGISTIC)
     // ============================================================

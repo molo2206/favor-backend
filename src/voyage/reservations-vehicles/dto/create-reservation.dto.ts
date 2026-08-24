@@ -115,6 +115,10 @@ export class CreateReservationDto {
   @IsString()
   pin?: string;
 
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
   @ValidateIf((o) => o.paymentMethod === PaymentMethod.FPAY)
   @IsString()
   phone?: string;

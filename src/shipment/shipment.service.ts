@@ -1162,35 +1162,33 @@ export class ShipmentService {
     if (paymentMethod === PaymentMethod.FPAY) {
       selectedMethod = PaymentMethod.FPAY;
 
+      // ✅ Vérifier que l'utilisateur a un compte FPay lié
       if (!user.userIdFpay) {
         throw new BadRequestException(
           await this.i18n.translate('order.fpay_account_not_linked', lang)
         );
       }
 
-      if (!pin) {
+      // ✅ Vérifier que l'utilisateur est bien lié (isLink)
+      if (!user.isLink) {
         throw new BadRequestException(
-          await this.i18n.translate('order.fpay_pin_required', lang)
+          'Votre compte FPay n\'est pas activé. Veuillez vous connecter via OAuth.'
         );
       }
 
-      if (!phone) {
-        throw new BadRequestException(
-          await this.i18n.translate('order.phone_required', lang)
-        );
-      }
+      // ✅ Récupérer le system_user_id (l'ID de l'utilisateur)
+      const systemUserId = user.id;
 
+      // ✅ Préparer les données sans phone ni pin
       const fpayData = {
-        phone: phone,
-        pin: pin,
-        toPhoneOrCode: user.phone || user.id,
+        system_user_id: systemUserId,
         amount: totalAmount,
         currency: currency || 'USD',
         description: `Paiement du colis ${shipment.trackingNumber}`,
       };
 
       console.log('[Shipment] Tentative de paiement FPAY :', {
-        phone: fpayData.phone,
+        systemUserId: fpayData.system_user_id,
         amount: fpayData.amount,
         currency: fpayData.currency,
         trackingNumber: shipment.trackingNumber,
@@ -1209,6 +1207,7 @@ export class ShipmentService {
             amount: fpayResponse.data.transaction.amount,
           });
         } else {
+
           throw new BadRequestException(
             await this.i18n.translate('order.fpay_payment_failed', lang)
           );

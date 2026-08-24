@@ -1,7 +1,8 @@
 // src/modules/fpay/fpay.controller.ts
 import {
     Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards,
-    Query, Res, Ip, Logger
+    Query, Res, Ip, Logger,
+    HttpException
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -50,6 +51,21 @@ export class FpayController {
                 });
             }
 
+            // ✅ Vérifier si l'utilisateur est déjà lié
+            const existingUser = await this.fpayService.findUserById(body.systemUserId);
+
+            if (existingUser && existingUser.userIdFpay && existingUser.isLink === true) {
+                console.log(`⚠️ Utilisateur ${body.systemUserId} est déjà lié au compte FPay ${existingUser.userIdFpay}`);
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ce compte Favor Help est déjà lié à un compte FPay.',
+                    data: {
+                        isLinked: true,
+                        userIdFpay: existingUser.userIdFpay,
+                    },
+                });
+            }
+
             // ✅ Sauvegarder le userIdFpay dans UserEntity
             await this.fpayService.saveFpayUserId(body.systemUserId, body.fpayUserId);
 
@@ -93,6 +109,20 @@ export class FpayController {
             }
 
             this.logger.log(`[Favor Help] 🔑 Utilisateur connecté: ${systemUserId}`);
+
+            // ✅ Vérifier si l'utilisateur est déjà lié
+            if (user.userIdFpay && user.isLink === true) {
+                this.logger.log(`⚠️ Utilisateur ${systemUserId} est déjà lié au compte FPay ${user.userIdFpay}`);
+
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Votre compte Favor Help est déjà lié à un compte FPay.',
+                    data: {
+                        isLinked: true,
+                        userIdFpay: user.userIdFpay,
+                    },
+                });
+            }
 
             if (!authDto || !authDto.phone || !authDto.password) {
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
@@ -163,6 +193,71 @@ export class FpayController {
         }
     }
 
+    @Post('unlink-user')
+    @UseGuards(AuthentificationGuard)
+    @HttpCode(HttpStatus.OK)
+    @ApiBearerAuth()
+    @ApiOperation({
+        summary: 'Délier le compte FPay',
+        description: 'Délie le compte FPay de l\'utilisateur connecté'
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Compte délié avec succès',
+        schema: {
+            example: {
+                success: true,
+                message: 'Compte FPay délié avec succès'
+            }
+        }
+    })
+    @ApiResponse({ status: 400, description: 'Compte déjà délié ou utilisateur non trouvé' })
+    @ApiResponse({ status: 401, description: 'Non autorisé' })
+    async unlinkUser(
+        @CurrentUser() user: UserEntity,
+        @Res() res: Response,
+    ): Promise<any> {
+        try {
+            const systemUserId = user?.id;
+
+            if (!systemUserId) {
+                this.logger.error('❌ Utilisateur non authentifié');
+                return res.status(401).json({
+                    success: false,
+                    message: 'Utilisateur non authentifié',
+                });
+            }
+
+            this.logger.log(`🔓 Utilisateur ${systemUserId} demande la déliaison`);
+
+            const result = await this.fpayService.unlinkFpayUser(systemUserId);
+
+            return res.status(200).json(result);
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur lors de la déliaison: ${error.message}`);
+
+            if (error.status === HttpStatus.NOT_FOUND) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Utilisateur non trouvé',
+                });
+            }
+
+            if (error.status === HttpStatus.BAD_REQUEST) {
+                return res.status(400).json({
+                    success: false,
+                    message: error.message,
+                });
+            }
+
+            return res.status(500).json({
+                success: false,
+                message: error.message || 'Erreur lors de la déliaison du compte',
+            });
+        }
+    }
+
     // ============================================================
     // 2. PAIEMENT
     // ============================================================
@@ -186,11 +281,77 @@ export class FpayController {
     @ApiResponse({ status: 404, description: 'Bénéficiaire introuvable' })
     async makePayment(
         @Body() paymentDto: FpayPaymentDto,
-        @CurrentUser() user: UserEntity
-    ): Promise<FpayResponse<PaymentResponseDto>> {
-        return this.fpayService.makePayment(paymentDto, user);
-    }
+        @CurrentUser() user: UserEntity,
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<FpayResponse<PaymentResponseDto> | any> {
+        try {
+            // ✅ Utiliser l'utilisateur authentifié
+            let userToUse = user;
 
+            // ✅ Vérifier que l'utilisateur est authentifié
+            if (!userToUse) {
+                throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
+            }
+
+            // ✅ Vérifier si l'utilisateur a un userIdFpay
+            if (!userToUse.userIdFpay || !userToUse.isLink) {
+                this.logger.warn(`⚠️ Utilisateur ${userToUse.id} non lié à FPay`);
+
+                // ✅ Construire l'URL OAuth avec system_user_id
+                const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
+                const appUrl = process.env.APP_URL || 'http://localhost:3000';
+                const authCode = crypto.randomBytes(32).toString('hex');
+                const clientId = 'web-client';
+                const callbackUrl = `${appUrl}/oauth/callback`;
+
+                const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
+                redirectUrl.searchParams.set('client_id', clientId);
+                redirectUrl.searchParams.set('code', authCode);
+                redirectUrl.searchParams.set('system_user_id', userToUse.id);
+                redirectUrl.searchParams.set('redirect_uri', callbackUrl);
+
+                this.logger.log(`🔗 Redirection OAuth: ${redirectUrl.toString()}`);
+
+                // ✅ Retourner l'URL OAuth
+                return {
+                    status: 'redirect',
+                    message: 'Authentification FPay requise. Veuillez vous connecter.',
+                    redirectUrl: redirectUrl.toString(),
+                    openInBrowser: redirectUrl.toString(),
+                    system_user_id: userToUse.id,
+                    paymentData: {
+                        amount: paymentDto.amount,
+                        currency: paymentDto.currency,
+                        description: paymentDto.description,
+                    }
+                };
+            }
+
+            // ✅ Ajouter automatiquement system_user_id au DTO pour le service
+            const paymentDataWithUser = {
+                ...paymentDto,
+                system_user_id: userToUse.id, // ✅ Ajout automatique
+            };
+
+            // ✅ L'utilisateur est lié, effectuer le paiement
+            return this.fpayService.makePayment(paymentDataWithUser, userToUse);
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur paiement: ${error.message}`);
+
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            throw new HttpException(
+                {
+                    status: 'error',
+                    message: error.message || 'Erreur lors du paiement',
+                },
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+    }
     // ============================================================
     // 3. ENVOI (LOGISTIC)
     // ============================================================

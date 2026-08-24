@@ -1,33 +1,17 @@
 // src/modules/fpay/dto/payment.dto.ts
-import { IsString, IsNotEmpty, IsNumber, IsOptional, Min, Max, Length, Matches, ValidateIf } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class FpayPaymentDto {
-    @ApiProperty({
-        example: '243973760641',
-        description: 'Numéro de téléphone de l\'expéditeur (client payeur)'
-    })
-    @IsString()
-    @IsNotEmpty()
-    phone: string;
-
-    @ApiProperty({
-        example: '1234',
-        description: 'Code PIN de l\'expéditeur (4 chiffres)'
-    })
-    @IsString()
-    @IsNotEmpty()
-    @Length(4, 4)
-    @Matches(/^\d+$/, { message: 'Le PIN doit contenir uniquement des chiffres' })
-    pin: string;
+    // ✅ SUPPRIMER system_user_id - il sera récupéré automatiquement
 
     @ApiProperty({
         example: 100,
         description: 'Montant du paiement'
     })
-    @IsNumber()
-    @Min(0.01)
+    @IsNumber({}, { message: 'Le montant doit être un nombre' })
+    @Min(0.01, { message: 'Le montant doit être supérieur à 0' })
     @Type(() => Number)
     amount: number;
 
@@ -35,8 +19,8 @@ export class FpayPaymentDto {
         example: 'USD',
         description: 'Devise (USD, EUR, CDF, etc.)'
     })
-    @IsString()
-    @IsNotEmpty()
+    @IsString({ message: 'La devise doit être une chaîne de caractères' })
+    @IsNotEmpty({ message: 'La devise est requise' })
     currency: string;
 
     @ApiProperty({
@@ -44,7 +28,7 @@ export class FpayPaymentDto {
         description: 'Description du paiement',
         required: false
     })
-    @IsString()
+    @IsString({ message: 'La description doit être une chaîne de caractères' })
     @IsOptional()
     description?: string;
 }

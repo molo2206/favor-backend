@@ -182,37 +182,35 @@ export class OrderService {
     if (paymentMethod === PaymentMethod.FPAY) {
       selectedMethod = PaymentMethod.FPAY;
 
+      // ✅ Vérifier que l'utilisateur a un compte FPay lié
       if (!user.userIdFpay) {
         throw new BadRequestException(
           this.i18nService.translate('order.fpay_account_not_linked', lang)
         );
       }
 
-      if (!pin) {
+      // ✅ Vérifier que l'utilisateur est bien lié (isLink)
+      if (!user.isLink) {
         throw new BadRequestException(
-          this.i18nService.translate('order.fpay_pin_required', lang)
+          'Votre compte FPay n\'est pas activé. Veuillez vous connecter via OAuth.'
         );
       }
 
-      if (!phone) {
-        throw new BadRequestException(
-          this.i18nService.translate('order.phone_required', lang)
-        );
-      }
+      // ✅ Récupérer le system_user_id
+      const systemUserId = user.id;
 
       const amountToPay = grandTotal || totalAmount || 0;
 
+      // ✅ N'appelle plus phone et pin
       const fpayData = {
-        phone: phone,
-        pin: pin,
-        toPhoneOrCode: user.phone || user.id,
+        system_user_id: systemUserId,
         amount: amountToPay,
         currency: currency || 'USD',
         description: `Paiement de commande #${invoiceNumb}`,
       };
 
       console.log('[Order] Tentative de paiement FPAY :', {
-        phone: fpayData.phone,
+        systemUserId: fpayData.system_user_id,
         amount: fpayData.amount,
         currency: fpayData.currency,
         invoiceNumb,
@@ -234,6 +232,9 @@ export class OrderService {
             amount: fpayResponse.data.transaction.amount,
           });
         } else {
+          // ✅ Si le paiement échoue car l'utilisateur n'est pas lié
+          
+
           throw new BadRequestException(
             this.i18nService.translate('order.fpay_payment_failed', lang)
           );

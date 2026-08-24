@@ -372,40 +372,51 @@ export class ReservationsVehiclesService {
 
       // ✅ AJOUT FPAY - directement avec pin et phone du body
       if (createDto.paymentMethod === PaymentMethod.FPAY) {
-        const { pin, phone } = createDto;
+        // ✅ Récupérer le userId (identifiant de l'utilisateur)
+        const { userId } = createDto;
 
-        if (!pin) {
-          throw new BadRequestException(await this.i18n.translate('reservation.fpay_pin_required', lang));
-        }
-
-        if (!phone) {
-          throw new BadRequestException(await this.i18n.translate('reservation.fpay_phone_required', lang));
-        }
-
+        // ✅ Vérifier que userId est fourni
         if (!userId) {
-          throw new BadRequestException(await this.i18n.translate('reservation.user_id_required', lang));
+          throw new BadRequestException(
+            await this.i18n.translate('reservation.user_id_required', lang)
+          );
         }
 
+        // ✅ Récupérer l'utilisateur
         const user = await this.userRepository.findOne({ where: { id: userId } });
         if (!user) {
-          throw new BadRequestException(await this.i18n.translate('reservation.user_not_found', lang));
+          throw new BadRequestException(
+            await this.i18n.translate('reservation.user_not_found', lang)
+          );
         }
 
+        // ✅ Vérifier que l'utilisateur a un compte FPay lié
         if (!user.userIdFpay) {
-          throw new BadRequestException(await this.i18n.translate('reservation.fpay_account_not_linked', lang));
+          throw new BadRequestException(
+            await this.i18n.translate('reservation.fpay_account_not_linked', lang)
+          );
         }
 
+        // ✅ Vérifier que l'utilisateur est bien lié (isLink)
+        if (!user.isLink) {
+          throw new BadRequestException(
+            'Votre compte FPay n\'est pas activé. Veuillez vous connecter via OAuth.'
+          );
+        }
+
+        // ✅ Utiliser system_user_id (l'ID de l'utilisateur)
+        const systemUserId = user.id;
+
+        // ✅ Préparer les données sans phone ni pin
         const fpayData = {
-          phone: phone,
-          pin: pin,
-          toPhoneOrCode: user.phone || user.id,
+          system_user_id: systemUserId,
           amount: realTotal,
           currency: 'USD',
           description: `Paiement de réservation #${savedReservation.id.slice(0, 8)}`,
         };
 
         console.log('[Reservation] Tentative de paiement FPAY :', {
-          phone: fpayData.phone,
+          systemUserId: fpayData.system_user_id,
           amount: fpayData.amount,
           currency: fpayData.currency,
           reservationId: savedReservation.id,
@@ -427,7 +438,11 @@ export class ReservationsVehiclesService {
               amount: fpayResponse.data.transaction.amount,
             });
           } else {
-            throw new BadRequestException(await this.i18n.translate('reservation.fpay_payment_failed', lang));
+            // ✅ Si le paiement échoue car l'utilisateur n'est pas lié
+           
+            throw new BadRequestException(
+              await this.i18n.translate('reservation.fpay_payment_failed', lang)
+            );
           }
         } catch (error: any) {
           console.error('[Reservation] ❌ Erreur paiement FPAY:', error.message);
