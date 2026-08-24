@@ -106,7 +106,7 @@ export class FpayController {
             accessToken?: string;
             refreshToken?: string;
         },
-        @CurrentUser() user: UserEntity,  // ✅ L'utilisateur Favor Help connecté
+        @CurrentUser() user: UserEntity,
         @Res() res: Response,
     ) {
         try {
@@ -114,14 +114,18 @@ export class FpayController {
             console.log(`[Favor Help] Utilisateur Favor Help: ${user.id}`);
             console.log(`[Favor Help] FPay User ID: ${body.fpayUserId}`);
 
-            // ✅ Sauvegarder le userIdFpay dans UserEntity (TypeORM)
+            // ✅ Sauvegarder le userIdFpay dans UserEntity
             await this.fpayService.saveFpayUserId(user.id, body.fpayUserId);
 
             console.log('[Favor Help] ✅ Compte lié avec succès');
 
-            return res.json({
+            return res.status(200).json({
                 success: true,
                 message: 'Compte lié avec succès',
+                data: {
+                    userId: user.id,
+                    fpayUserId: body.fpayUserId,
+                },
             });
 
         } catch (error) {
@@ -132,6 +136,7 @@ export class FpayController {
             });
         }
     }
+
     @Post('pay')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
