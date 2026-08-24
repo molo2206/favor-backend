@@ -112,7 +112,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const HOST = '0.0.0.0';
-  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 7000;
 
   const UPLOAD_PATH: string =
     process.env.NODE_ENV === 'production'
