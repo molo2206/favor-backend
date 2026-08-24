@@ -25,6 +25,43 @@ export class FpayController {
     // ============================================================
     // 1. AUTHENTIFICATION - REDIRIGE VERS FPAY
     // ============================================================
+    @Post('link-user')
+    async linkUserFromFpay(
+        @Body() body: {
+            fpayUserId: string;
+            accessToken?: string;
+            refreshToken?: string;
+        },
+        @CurrentUser() user: UserEntity,
+        @Res() res: Response,
+    ) {
+        try {
+            console.log('[Favor Help] 📥 Requête de lien reçue de FPay');
+            console.log(`[Favor Help] Utilisateur Favor Help: ${user.id}`);
+            console.log(`[Favor Help] FPay User ID: ${body.fpayUserId}`);
+
+            // ✅ Sauvegarder le userIdFpay dans UserEntity
+            await this.fpayService.saveFpayUserId(user.id, body.fpayUserId);
+
+            console.log('[Favor Help] ✅ Compte lié avec succès');
+
+            return res.status(200).json({
+                success: true,
+                message: 'Compte lié avec succès',
+                data: {
+                    userId: user.id,
+                    fpayUserId: body.fpayUserId,
+                },
+            });
+
+        } catch (error) {
+            console.error('[Favor Help] ❌ Erreur:', error.message);
+            return res.status(400).json({
+                success: false,
+                message: error.message || 'Erreur lors de la liaison',
+            });
+        }
+    }
 
     @Post('auth/link-user')
     @UseGuards(AuthentificationGuard)
@@ -99,43 +136,7 @@ export class FpayController {
     // ============================================================
     // 2. PAIEMENT
     // ============================================================
-    @Post('link-user')
-    async linkUserFromFpay(
-        @Body() body: {
-            fpayUserId: string;
-            accessToken?: string;
-            refreshToken?: string;
-        },
-        @CurrentUser() user: UserEntity,
-        @Res() res: Response,
-    ) {
-        try {
-            console.log('[Favor Help] 📥 Requête de lien reçue de FPay');
-            console.log(`[Favor Help] Utilisateur Favor Help: ${user.id}`);
-            console.log(`[Favor Help] FPay User ID: ${body.fpayUserId}`);
 
-            // ✅ Sauvegarder le userIdFpay dans UserEntity
-            await this.fpayService.saveFpayUserId(user.id, body.fpayUserId);
-
-            console.log('[Favor Help] ✅ Compte lié avec succès');
-
-            return res.status(200).json({
-                success: true,
-                message: 'Compte lié avec succès',
-                data: {
-                    userId: user.id,
-                    fpayUserId: body.fpayUserId,
-                },
-            });
-
-        } catch (error) {
-            console.error('[Favor Help] ❌ Erreur:', error.message);
-            return res.status(400).json({
-                success: false,
-                message: error.message || 'Erreur lors de la liaison',
-            });
-        }
-    }
 
     @Post('pay')
     @UseGuards(AuthentificationGuard)
