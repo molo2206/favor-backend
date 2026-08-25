@@ -512,12 +512,10 @@ export class FpayService {
         }
     }
 
-    /**
-     * Récupère la balance et les transactions d'un wallet
-     */
+    // src/modules/fpay/fpay.service.ts
     async getWalletBalanceAndTransactions(
         userId: string,  // userIdFpay
-        walletId?: string,  // ✅ Optionnel
+        walletId?: string,  // ✅ Optionnels
         page: number = 1,
         limit: number = 10,
         startDate?: string,
@@ -578,7 +576,6 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
-
     getApiKey(): string {
         return this.apiKey;
     }
@@ -615,6 +612,8 @@ export class FpayService {
             throw error;
         }
     }
+
+
 
     // ============================================================
     // 6. GESTION DES ERREURS

@@ -381,7 +381,7 @@ export class FpayController {
     })
     async getWalletBalanceAndTransactions(
         @CurrentUser() user: UserEntity,
-        @Query('walletId') walletId?: string,
+        @Query('walletId') walletId?: string,  // ✅ Optionnel
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('startDate') startDate?: string,
@@ -396,7 +396,7 @@ export class FpayController {
             throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
         }
 
-        // ✅ LOG POUR DEBUG - Afficher l'utilisateur complet
+        // ✅ LOG POUR DEBUG
         this.logger.log(`🔍 User complet: ${JSON.stringify(user)}`);
         this.logger.log(`🔍 userIdFpay: ${user.userIdFpay}`);
         this.logger.log(`🔍 isLink: ${user.isLink}`);
@@ -429,7 +429,7 @@ export class FpayController {
             );
         }
 
-        this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userIdFpay}, walletId=${walletId}`);
+        this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userIdFpay}, walletId=${walletId || 'non fourni'}`);
 
         // ✅ Convertir les paramètres
         const pageNum = page ? parseInt(page, 10) : 1;
@@ -438,7 +438,7 @@ export class FpayController {
         // ✅ Appeler le service avec userIdFpay
         return this.fpayService.getWalletBalanceAndTransactions(
             userIdFpay,  // ✅ Utiliser le userIdFpay récupéré
-            walletId,
+            walletId,    // ✅ Peut être undefined
             pageNum,
             limitNum,
             startDate,
