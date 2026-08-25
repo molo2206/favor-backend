@@ -11,6 +11,7 @@ import { FpaySendDto } from './dto/send.dto';
 import { FpayResponse, PaymentResponseDto } from './dto/response.dto';
 import * as crypto from 'crypto';
 import { AuthLoginDto } from './dto/link-user.dto';
+import * as jwt from 'jsonwebtoken';
 
 export interface WalletBalanceResponse {
     success: boolean;
@@ -223,8 +224,6 @@ export class FpayService {
     // 2. LIAISON DIRECTE AVEC ACCESS_TOKEN (NOUVEAU)
     // ============================================================
 
-    // src/modules/fpay/fpay.service.ts
-
     async linkUserWithToken(
         accessToken: string,
         systemUserId: string,
@@ -241,31 +240,29 @@ export class FpayService {
                 throw new Error('system_user_id est requis pour la liaison');
             }
 
-            // ✅ Vérifier le token FPay
-            const verifyUrl = `${this.fpayApiUrl}/auth/verify-token`;
-            const verifyResponse = await firstValueFrom(
-                this.httpService.post<any>(
-                    verifyUrl,
-                    { accessToken: accessToken },
-                    { headers: this.getHeaders() }
-                )
-            );
-
-            if (!verifyResponse.data || !verifyResponse.data.data) {
+            // ✅ Option 1: Décoder le JWT pour récupérer l'ID (sans vérification)
+            let fpayUserId: string;
+            try {
+                const decoded = jwt.decode(accessToken) as any;
+                if (decoded && decoded.id) {
+                    fpayUserId = decoded.id;
+                    this.logger.log(`✅ Token décodé, fpayUserId: ${fpayUserId}`);
+                } else {
+                    throw new Error('Impossible de décoder le token');
+                }
+            } catch (decodeError) {
+                this.logger.error(`❌ Erreur décodage: ${decodeError.message}`);
                 throw new Error('Token FPay invalide');
             }
 
-            const fpayUser = verifyResponse.data.data;
-            this.logger.log(`✅ Token valide pour l'utilisateur FPay: ${fpayUser.id}`);
-
-            // ✅ Lier les comptes
+            // ✅ Lier les comptes directement (sans vérification)
             const linkUrl = `${this.fpayApiUrl}/fpay/link-user`;
             const linkResponse = await firstValueFrom(
                 this.httpService.post<any>(
                     linkUrl,
                     {
                         systemUserId: systemUserId,
-                        fpayUserId: fpayUser.id,
+                        fpayUserId: fpayUserId,
                         accessToken: accessToken,
                         refreshToken: refreshToken || null,
                     },
@@ -274,7 +271,7 @@ export class FpayService {
             );
 
             // ✅ Sauvegarder le userIdFpay
-            await this.saveFpayUserId(systemUserId, fpayUser.id);
+            await this.saveFpayUserId(systemUserId, fpayUserId);
 
             this.logger.log(`✅ Comptes liés avec succès pour ${systemUserId}`);
 
@@ -283,7 +280,7 @@ export class FpayService {
                 message: 'Compte lié avec succès',
                 data: {
                     systemUserId: systemUserId,
-                    fpayUserId: fpayUser.id,
+                    fpayUserId: fpayUserId,
                     isLinked: true,
                 }
             };
@@ -296,7 +293,6 @@ export class FpayService {
             };
         }
     }
-
     // ============================================================
     // 3. SAUVEGARDE DU userIdFpay (LE LIEN)
     // ============================================================
