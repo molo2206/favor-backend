@@ -302,7 +302,7 @@ export class FpayController {
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth()
     async makePayment(
-        @Body() paymentDto: FpayPaymentDto,
+        @Body() paymentDto: FpayPaymentDto & { access_token?: string },
         @CurrentUser() user: UserEntity,
         @Res({ passthrough: true }) res: Response,
     ): Promise<FpayResponse<PaymentResponseDto> | any> {
@@ -317,45 +317,22 @@ export class FpayController {
             if (!userToUse.userIdFpay || !userToUse.isLink) {
                 this.logger.warn(`⚠️ Utilisateur ${userToUse.id} non lié à FPay`);
 
-                const apiKey = this.fpayService.getApiKey();
-                const fpayUrl = this.fpayService.getFpayApiUrl() || 'https://f-pay.favorhelp.com';
-                const authCode = crypto.randomBytes(32).toString('hex');
-                const clientId = 'web-client';
-                const callbackUrl = `${this.fpayService.getFpayApiUrl()}/oauth/callback`;
-
-                const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
-                redirectUrl.searchParams.set('client_id', clientId);
-                redirectUrl.searchParams.set('code', authCode);
-                redirectUrl.searchParams.set('system_user_id', userToUse.id);
-                redirectUrl.searchParams.set('redirect_uri', callbackUrl);
-                redirectUrl.searchParams.set('amount', paymentDto.amount.toString());
-                redirectUrl.searchParams.set('currency', paymentDto.currency);
-                redirectUrl.searchParams.set('api_key', apiKey);
-
-                if (paymentDto.description) {
-                    redirectUrl.searchParams.set('description', paymentDto.description);
-                }
-
-                this.logger.log(`🔗 Redirection OAuth: ${redirectUrl.toString()}`);
-
-                return {
-                    status: 'redirect',
-                    message: 'Authentification FPay requise. Veuillez vous connecter.',
-                    redirectUrl: redirectUrl.toString(),
-                    openInBrowser: redirectUrl.toString(),
-                    system_user_id: userToUse.id,
-                    paymentData: {
-                        amount: paymentDto.amount,
-                        currency: paymentDto.currency,
-                        description: paymentDto.description,
-                    }
-                };
+                throw new HttpException(
+                    'Vous devez d\'abord lier votre compte FPay avant de faire un paiement.',
+                    HttpStatus.BAD_REQUEST,
+                );
             }
 
-            const paymentDataWithUser = {
+            // ✅ Construire le payload
+            const paymentDataWithUser: any = {
                 ...paymentDto,
                 system_user_id: userToUse.id,
             };
+
+            // ✅ Ajouter l'access_token du body si présent
+            if (paymentDto.access_token) {
+                paymentDataWithUser.access_token = paymentDto.access_token;
+            }
 
             return this.fpayService.makePayment(paymentDataWithUser, userToUse);
 

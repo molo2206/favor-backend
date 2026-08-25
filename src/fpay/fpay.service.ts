@@ -384,7 +384,7 @@ export class FpayService {
     // 4. PAIEMENT
     // ============================================================
     async makePayment(
-        paymentDto: FpayPaymentDto & { system_user_id?: string },
+        paymentDto: FpayPaymentDto & { system_user_id?: string; access_token?: string },
         currentUser: UserEntity,
     ): Promise<FpayResponse<PaymentResponseDto>> {
         try {
@@ -394,6 +394,7 @@ export class FpayService {
 
             let user = currentUser;
 
+            // ✅ Si system_user_id est fourni, l'utiliser
             if (paymentDto.system_user_id) {
                 const systemUser = await this.userRepository.findOne({
                     where: { id: paymentDto.system_user_id },
@@ -410,6 +411,7 @@ export class FpayService {
                 this.logger.log(`✅ Payeur récupéré via system_user_id: ${user.id}`);
             }
 
+            // ✅ Vérifier que l'acheteur a un compte FPay lié
             if (!user.userIdFpay || !user.isLink) {
                 this.logger.error(`❌ Payeur ${user.id} n'a pas de compte FPAY lié`);
 
@@ -419,6 +421,7 @@ export class FpayService {
                 );
             }
 
+            // ✅ Récupérer le destinataire depuis l'API Key (marchand)
             let cleanApiKey = this.apiKey;
             if (cleanApiKey.startsWith('Bearer ')) {
                 cleanApiKey = cleanApiKey.substring(7);
@@ -454,13 +457,18 @@ export class FpayService {
             this.logger.log(`💰 Paiement: ${user.phone} → ${recipientPhoneOrCode}`);
 
             const url = `${this.fpayApiUrl}/api/external/pay`;
-            const paymentData = {
+            const paymentData: any = {
                 system_user_id: user.id,
                 toPhoneOrCode: recipientPhoneOrCode,
                 amount: paymentDto.amount,
                 currency: paymentDto.currency || 'USD',
                 description: paymentDto.description || `Paiement vers ${recipientPhoneOrCode}`,
             };
+
+            // ✅ Ajouter l'access_token si fourni
+            if (paymentDto.access_token) {
+                paymentData.access_token = paymentDto.access_token;
+            }
 
             const headers = {
                 'Authorization': this.apiKey,
