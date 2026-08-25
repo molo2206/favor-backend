@@ -240,33 +240,38 @@ export class FpayService {
                 throw new Error('system_user_id est requis pour la liaison');
             }
 
-            // ✅ Décoder le JWT pour récupérer fpayUserId
-            let fpayUserId: string;
-            try {
-                const decoded = jwt.decode(accessToken) as any;
-                if (decoded && decoded.id) {
-                    fpayUserId = decoded.id;
-                    this.logger.log(`✅ Token décodé, fpayUserId: ${fpayUserId}`);
-                } else {
-                    throw new Error('Impossible de décoder le token - id manquant');
-                }
-            } catch (decodeError) {
-                this.logger.error(`❌ Erreur décodage: ${decodeError.message}`);
-                throw new Error('Token FPay invalide');
+            // ✅ Appel direct à l'API FPay pour lier l'utilisateur
+            const fpayApiUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
+
+            const response = await fetch(`${fpayApiUrl}/auth/link-user`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({
+                    systemUserId: systemUserId,
+                    refreshToken: refreshToken || null,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `Erreur API: ${response.status}`);
             }
 
-            // ✅ Sauvegarder directement dans la base de données (c'est l'essentiel)
-            await this.saveFpayUserId(systemUserId, fpayUserId);
+            const data = await response.json();
 
             this.logger.log(`✅ Comptes liés avec succès pour ${systemUserId}`);
 
             return {
                 success: true,
-                message: 'Compte lié avec succès',
+                message: data.message || 'Compte lié avec succès',
                 data: {
                     systemUserId: systemUserId,
-                    fpayUserId: fpayUserId,
+                    fpayUserId: data.userId || data.data?.id,
                     isLinked: true,
+                    ...data,
                 }
             };
 
