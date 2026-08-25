@@ -383,6 +383,8 @@ export class FpayService {
     // ============================================================
     // 4. PAIEMENT
     // ============================================================
+    // src/modules/fpay/fpay.service.ts
+
     async makePayment(
         paymentDto: FpayPaymentDto & { system_user_id?: string; access_token?: string },
         currentUser: UserEntity,
@@ -409,6 +411,32 @@ export class FpayService {
 
                 user = systemUser;
                 this.logger.log(`✅ Payeur récupéré via system_user_id: ${user.id}`);
+            }
+
+            // ✅ Si access_token est fourni, décoder pour récupérer l'utilisateur
+            if (paymentDto.access_token) {
+                try {
+                    const decoded = jwt.decode(paymentDto.access_token) as any;
+                    if (decoded && decoded.id) {
+                        // Chercher l'utilisateur par userIdFpay
+                        const tokenUser = await this.userRepository.findOne({
+                            where: { userIdFpay: decoded.id },
+                            relations: ['wallets'],
+                        });
+
+                        if (tokenUser) {
+                            // Si on n'a pas déjà un system_user_id, utiliser celui du token
+                            if (!paymentDto.system_user_id) {
+                                user = tokenUser;
+                                this.logger.log(`✅ Payeur récupéré depuis le token: ${user.id}`);
+                            }
+                        } else {
+                            this.logger.warn(`⚠️ Utilisateur FPay ${decoded.id} non trouvé en base`);
+                        }
+                    }
+                } catch (error) {
+                    this.logger.error(`❌ Erreur décodage token: ${error.message}`);
+                }
             }
 
             // ✅ Vérifier que l'acheteur a un compte FPay lié
