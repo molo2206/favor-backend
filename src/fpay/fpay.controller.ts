@@ -313,16 +313,6 @@ export class FpayController {
                 throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
             }
 
-            // ✅ Vérifier si l'utilisateur est lié
-            if (!userToUse.userIdFpay || !userToUse.isLink) {
-                this.logger.warn(`⚠️ Utilisateur ${userToUse.id} non lié à FPay`);
-
-                throw new HttpException(
-                    'Vous devez d\'abord lier votre compte FPay avant de faire un paiement.',
-                    HttpStatus.BAD_REQUEST,
-                );
-            }
-
             // ✅ Construire le payload
             const paymentDataWithUser: any = {
                 ...paymentDto,
