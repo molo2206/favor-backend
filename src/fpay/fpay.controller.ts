@@ -371,6 +371,7 @@ export class FpayController {
         return this.fpayService.makeSend(sendDto, user);
     }
 
+
     @Get('wallet/balance-transactions')
     @UseGuards(AuthentificationGuard)
     @ApiBearerAuth()
@@ -395,25 +396,49 @@ export class FpayController {
             throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
         }
 
-        // ✅ Vérifier que l'utilisateur a un userIdFpay
-        if (!user.userIdFpay) {
+        // ✅ LOG POUR DEBUG - Afficher l'utilisateur complet
+        this.logger.log(`🔍 User complet: ${JSON.stringify(user)}`);
+        this.logger.log(`🔍 userIdFpay: ${user.userIdFpay}`);
+        this.logger.log(`🔍 isLink: ${user.isLink}`);
+
+        // ✅ Si l'utilisateur n'a pas de userIdFpay, essayer de le récupérer depuis la base de données
+        let userIdFpay = user.userIdFpay;
+
+        if (!userIdFpay) {
+            this.logger.warn(`⚠️ userIdFpay non trouvé dans CurrentUser, recherche en base...`);
+
+            // ✅ Récupérer l'utilisateur complet depuis la base de données
+            const fullUser = await this.fpayService.findUserById(user.id);
+
+            if (fullUser && fullUser.userIdFpay && fullUser.isLink) {
+                userIdFpay = fullUser.userIdFpay;
+                this.logger.log(`✅ userIdFpay récupéré depuis la base: ${userIdFpay}`);
+            } else {
+                throw new HttpException(
+                    'Vous devez d\'abord lier votre compte FPay',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+        }
+
+        // ✅ Vérifier à nouveau avec le userIdFpay récupéré
+        if (!userIdFpay) {
             throw new HttpException(
                 'Vous devez d\'abord lier votre compte FPay',
                 HttpStatus.BAD_REQUEST,
             );
         }
 
-        this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${user.userIdFpay}, walletId=${walletId}`);
+        this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userIdFpay}, walletId=${walletId}`);
 
         // ✅ Convertir les paramètres
         const pageNum = page ? parseInt(page, 10) : 1;
         const limitNum = limit ? parseInt(limit, 10) : 10;
 
         // ✅ Appeler le service avec userIdFpay
-        // ✅ walletId peut être undefined, le service le gérera
         return this.fpayService.getWalletBalanceAndTransactions(
-            user.userIdFpay,  // ✅ Utiliser userIdFpay
-            walletId,         // ✅ Peut être undefined
+            userIdFpay,  // ✅ Utiliser le userIdFpay récupéré
+            walletId,
             pageNum,
             limitNum,
             startDate,
