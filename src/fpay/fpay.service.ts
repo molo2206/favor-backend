@@ -240,7 +240,7 @@ export class FpayService {
                 throw new Error('system_user_id est requis pour la liaison');
             }
 
-            // ✅ Option 1: Décoder le JWT pour récupérer l'ID (sans vérification)
+            // ✅ Décoder le JWT pour récupérer fpayUserId
             let fpayUserId: string;
             try {
                 const decoded = jwt.decode(accessToken) as any;
@@ -255,38 +255,51 @@ export class FpayService {
                 throw new Error('Token FPay invalide');
             }
 
-            // ✅ Lier les comptes directement (sans vérification)
-            const linkUrl = `${this.fpayApiUrl}/auth/link-user`;
-            const linkResponse = await firstValueFrom(
+            // ✅ Appeler l'API Gateway directement (pour utiliser sendAuthMessage)
+            const apiGatewayUrl = process.env.API_GATEWAY_URL || 'http://localhost:3000';
+
+            const response = await firstValueFrom(
                 this.httpService.post<any>(
-                    linkUrl,
+                    `${apiGatewayUrl}/auth/link-user`,
                     {
-                        systemUserId: systemUserId,
-                        fpayUserId: fpayUserId,
-                        accessToken: accessToken,
-                        refreshToken: refreshToken || null,
+                        access_token: accessToken,
+                        refresh_token: refreshToken || null,
+                        system_user_id: systemUserId,
                     },
-                    { headers: this.getHeaders() }
+                    { headers: { 'Content-Type': 'application/json' } }
                 )
             );
-
-            // ✅ Sauvegarder le userIdFpay
-            await this.saveFpayUserId(systemUserId, fpayUserId);
 
             this.logger.log(`✅ Comptes liés avec succès pour ${systemUserId}`);
 
             return {
                 success: true,
-                message: 'Compte lié avec succès',
-                data: {
-                    systemUserId: systemUserId,
-                    fpayUserId: fpayUserId,
-                    isLinked: true,
-                }
+                message: response.data.message || 'Compte lié avec succès',
+                data: response.data.data,
             };
 
         } catch (error) {
             this.logger.error(`❌ Erreur de liaison: ${error.message}`);
+
+            // ✅ En cas d'erreur, sauvegarder directement en base
+            try {
+                const decoded = jwt.decode(accessToken) as any;
+                if (decoded && decoded.id) {
+                    await this.saveFpayUserId(systemUserId, decoded.id);
+                    return {
+                        success: true,
+                        message: 'Compte lié avec succès (fallback)',
+                        data: {
+                            systemUserId: systemUserId,
+                            fpayUserId: decoded.id,
+                            isLinked: true,
+                        }
+                    };
+                }
+            } catch (fallbackError) {
+                this.logger.error(`❌ Fallback échoué: ${fallbackError.message}`);
+            }
+
             return {
                 success: false,
                 message: error.message || 'Erreur lors de la liaison',
