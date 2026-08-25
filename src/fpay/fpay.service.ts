@@ -413,19 +413,17 @@ export class FpayService {
                 this.logger.log(`✅ Payeur récupéré via system_user_id: ${user.id}`);
             }
 
-            // ✅ Si access_token est fourni, décoder pour récupérer l'utilisateur
+            // ✅ Décoder le token LOCALEMENT pour récupérer l'utilisateur (comme linkUserWithToken)
             if (paymentDto.access_token) {
                 try {
                     const decoded = jwt.decode(paymentDto.access_token) as any;
                     if (decoded && decoded.id) {
-                        // Chercher l'utilisateur par userIdFpay
                         const tokenUser = await this.userRepository.findOne({
                             where: { userIdFpay: decoded.id },
                             relations: ['wallets'],
                         });
 
                         if (tokenUser) {
-                            // Si on n'a pas déjà un system_user_id, utiliser celui du token
                             if (!paymentDto.system_user_id) {
                                 user = tokenUser;
                                 this.logger.log(`✅ Payeur récupéré depuis le token: ${user.id}`);
@@ -484,6 +482,7 @@ export class FpayService {
 
             this.logger.log(`💰 Paiement: ${user.phone} → ${recipientPhoneOrCode}`);
 
+            // ✅ NE PAS envoyer access_token à FPay (comme linkUserWithToken)
             const url = `${this.fpayApiUrl}/api/external/pay`;
             const paymentData: any = {
                 system_user_id: user.id,
@@ -491,12 +490,8 @@ export class FpayService {
                 amount: paymentDto.amount,
                 currency: paymentDto.currency || 'USD',
                 description: paymentDto.description || `Paiement vers ${recipientPhoneOrCode}`,
+                // ❌ NE PAS AJOUTER access_token ici
             };
-
-            // ✅ Ajouter l'access_token si fourni
-            if (paymentDto.access_token) {
-                paymentData.access_token = paymentDto.access_token;
-            }
 
             const headers = {
                 'Authorization': this.apiKey,
