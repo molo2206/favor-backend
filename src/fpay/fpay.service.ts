@@ -256,7 +256,7 @@ export class FpayService {
             }
 
             // ✅ Lier les comptes directement (sans vérification)
-            const linkUrl = `${this.fpayApiUrl}/fpay/link-user`;
+            const linkUrl = `${this.fpayApiUrl}/auth/link-user`;
             const linkResponse = await firstValueFrom(
                 this.httpService.post<any>(
                     linkUrl,
