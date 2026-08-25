@@ -461,11 +461,11 @@ export class FpayController {
         description: 'Génère l\'URL de redirection vers la page de connexion FPay'
     })
     async openOAuthPage(
+        @Res() res: Response,  // ✅ @Res() en premier
         @CurrentUser() user: UserEntity,
         @Query('amount') amount?: string,
         @Query('currency') currency?: string,
         @Query('description') description?: string,
-        @Res() res: Response,
     ) {
         try {
             if (!user) {
@@ -511,6 +511,7 @@ export class FpayController {
             );
         }
     }
+
 
     // ============================================================
     // 7. PROCESSUS COMPLET
