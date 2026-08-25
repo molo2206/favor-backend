@@ -453,6 +453,65 @@ export class FpayController {
         );
     }
 
+    @Get('open')
+    @UseGuards(AuthentificationGuard)
+    @ApiBearerAuth()
+    @ApiOperation({
+        summary: 'Ouvrir la page OAuth FPay',
+        description: 'Génère l\'URL de redirection vers la page de connexion FPay'
+    })
+    async openOAuthPage(
+        @CurrentUser() user: UserEntity,
+        @Query('amount') amount?: string,
+        @Query('currency') currency?: string,
+        @Query('description') description?: string,
+        @Res() res: Response,
+    ) {
+        try {
+            if (!user) {
+                throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
+            }
+
+            const fpayUrl = this.fpayService.getFpayApiUrl() || 'https://f-pay.favorhelp.com';
+            const appUrl = process.env.APP_URL || 'http://localhost:3000';
+            const authCode = crypto.randomBytes(32).toString('hex');
+            const clientId = 'web-client';
+            const callbackUrl = `${appUrl}/oauth/callback`;
+
+            const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
+            redirectUrl.searchParams.set('client_id', clientId);
+            redirectUrl.searchParams.set('code', authCode);
+            redirectUrl.searchParams.set('system_user_id', user.id);
+            redirectUrl.searchParams.set('redirect_uri', callbackUrl);
+
+            if (amount) {
+                redirectUrl.searchParams.set('amount', amount);
+            }
+            if (currency) {
+                redirectUrl.searchParams.set('currency', currency);
+            }
+            if (description) {
+                redirectUrl.searchParams.set('description', description);
+            }
+
+            this.logger.log(`🔗 URL OAuth FPay: ${redirectUrl.toString()}`);
+
+            return res.json({
+                status: 'success',
+                message: 'Page OAuth FPay',
+                url: redirectUrl.toString(),
+                openInBrowser: redirectUrl.toString(),
+            });
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur: ${error.message}`);
+            throw new HttpException(
+                error.message || 'Erreur lors de l\'ouverture de la page OAuth',
+                HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
     // ============================================================
     // 7. PROCESSUS COMPLET
     // ============================================================
