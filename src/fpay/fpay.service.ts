@@ -384,20 +384,12 @@ export class FpayService {
     // 4. PAIEMENT
     // ============================================================
     async makePayment(
-        paymentDto: FpayPaymentDto & { system_user_id?: string; access_token: string },
+        paymentDto: FpayPaymentDto & { system_user_id?: string; access_token?: string },
         currentUser: UserEntity,
     ): Promise<FpayResponse<PaymentResponseDto>> {
         try {
             if (!currentUser) {
                 throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
-            }
-
-            // ✅ Vérifier que l'access_token est fourni
-            if (!paymentDto.access_token) {
-                throw new HttpException(
-                    'access_token est requis pour le paiement',
-                    HttpStatus.BAD_REQUEST,
-                );
             }
 
             let user = currentUser;
@@ -471,8 +463,12 @@ export class FpayService {
                 amount: paymentDto.amount,
                 currency: paymentDto.currency || 'USD',
                 description: paymentDto.description || `Paiement vers ${recipientPhoneOrCode}`,
-                access_token: paymentDto.access_token, // ✅ Obligatoire
             };
+
+            // ✅ Ajouter l'access_token si fourni
+            if (paymentDto.access_token) {
+                paymentData.access_token = paymentDto.access_token;
+            }
 
             const headers = {
                 'Authorization': this.apiKey,
@@ -495,7 +491,6 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
-
     // ============================================================
     // 5. ENVOI (LOGISTIC)
     // ============================================================
