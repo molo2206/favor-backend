@@ -248,58 +248,30 @@ export class FpayService {
                     fpayUserId = decoded.id;
                     this.logger.log(`✅ Token décodé, fpayUserId: ${fpayUserId}`);
                 } else {
-                    throw new Error('Impossible de décoder le token');
+                    throw new Error('Impossible de décoder le token - id manquant');
                 }
             } catch (decodeError) {
                 this.logger.error(`❌ Erreur décodage: ${decodeError.message}`);
                 throw new Error('Token FPay invalide');
             }
 
-            // ✅ Appeler l'API Gateway directement (pour utiliser sendAuthMessage)
-            const apiGatewayUrl = process.env.API_GATEWAY_URL || 'http://localhost:3000';
-
-            const response = await firstValueFrom(
-                this.httpService.post<any>(
-                    `${apiGatewayUrl}/auth/link-user`,
-                    {
-                        access_token: accessToken,
-                        refresh_token: refreshToken || null,
-                        system_user_id: systemUserId,
-                    },
-                    { headers: { 'Content-Type': 'application/json' } }
-                )
-            );
+            // ✅ Sauvegarder directement dans la base de données (c'est l'essentiel)
+            await this.saveFpayUserId(systemUserId, fpayUserId);
 
             this.logger.log(`✅ Comptes liés avec succès pour ${systemUserId}`);
 
             return {
                 success: true,
-                message: response.data.message || 'Compte lié avec succès',
-                data: response.data.data,
+                message: 'Compte lié avec succès',
+                data: {
+                    systemUserId: systemUserId,
+                    fpayUserId: fpayUserId,
+                    isLinked: true,
+                }
             };
 
         } catch (error) {
             this.logger.error(`❌ Erreur de liaison: ${error.message}`);
-
-            // ✅ En cas d'erreur, sauvegarder directement en base
-            try {
-                const decoded = jwt.decode(accessToken) as any;
-                if (decoded && decoded.id) {
-                    await this.saveFpayUserId(systemUserId, decoded.id);
-                    return {
-                        success: true,
-                        message: 'Compte lié avec succès (fallback)',
-                        data: {
-                            systemUserId: systemUserId,
-                            fpayUserId: decoded.id,
-                            isLinked: true,
-                        }
-                    };
-                }
-            } catch (fallbackError) {
-                this.logger.error(`❌ Fallback échoué: ${fallbackError.message}`);
-            }
-
             return {
                 success: false,
                 message: error.message || 'Erreur lors de la liaison',
