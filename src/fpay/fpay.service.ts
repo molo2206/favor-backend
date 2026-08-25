@@ -12,6 +12,43 @@ import { FpayResponse, PaymentResponseDto } from './dto/response.dto';
 import * as crypto from 'crypto';
 import { AuthLoginDto } from './dto/link-user.dto';
 
+export interface WalletBalanceResponse {
+    success: boolean;
+    message: string;
+    data: {
+        wallet: {
+            id: string;
+            userId: string;
+            balance: number;
+            currency: string;
+            isActive: boolean;
+            createdAt: string;
+            updatedAt: string;
+        };
+        balance: number;
+        currency: string;
+        transactions: {
+            data: any[];
+            total: number;
+            page: number;
+            limit: number;
+            analytics: {
+                totalCredit: number;
+                totalDebit: number;
+                totalTransactions: number;
+            };
+        };
+        stats: {
+            totalSent: number;
+            totalReceived: number;
+            averageTransaction: number;
+            largestTransaction: number;
+            smallestTransaction: number;
+            transactionCount: number;
+        };
+    };
+}
+
 // ✅ Interface pour la réponse de link-user
 interface LinkUserResponse {
     accessToken: string;
@@ -474,6 +511,59 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
+
+    async getWalletBalanceAndTransactions(
+        userId: string,
+        walletId?: string,
+        page: number = 1,
+        limit: number = 10,
+        startDate?: string,
+        endDate?: string,
+        type?: string,
+        status?: string,
+        movement?: string,
+        search?: string,
+    ): Promise<WalletBalanceResponse> {  // ✅ Utiliser l'interface exportée
+        try {
+            this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}, walletId=${walletId}`);
+
+            const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
+
+            const params = new URLSearchParams();
+            params.set('userId', userId);
+            params.set('walletId', walletId || '');
+            params.set('page', page.toString());
+            params.set('limit', limit.toString());
+
+            if (startDate) params.set('startDate', startDate);
+            if (endDate) params.set('endDate', endDate);
+            if (type) params.set('type', type);
+            if (status) params.set('status', status);
+            if (movement) params.set('movement', movement);
+            if (search) params.set('search', search);
+
+            const fullUrl = `${url}?${params.toString()}`;
+
+            this.logger.log(`🔗 Appel API: ${fullUrl}`);
+
+            const response = await firstValueFrom(
+                this.httpService.get<WalletBalanceResponse>(  // ✅ Type générique
+                    fullUrl,
+                    { headers: this.getHeaders() }
+                )
+            );
+
+            this.logger.log(`✅ Balance et transactions récupérées avec succès`);
+
+            return response.data;
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur: ${error.message}`);
+            throw this.handleError(error);
+        }
+    }
+
+
     getApiKey(): string {
         return this.apiKey;
     }
@@ -554,4 +644,6 @@ export class FpayService {
             HttpStatus.INTERNAL_SERVER_ERROR,
         );
     }
+
+
 }

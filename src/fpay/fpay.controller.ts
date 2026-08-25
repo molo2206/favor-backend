@@ -342,6 +342,7 @@ export class FpayController {
             );
         }
     }
+
     // ============================================================
     // 3. ENVOI (LOGISTIC)
     // ============================================================
@@ -368,6 +369,59 @@ export class FpayController {
         @CurrentUser() user: UserEntity
     ): Promise<FpayResponse<PaymentResponseDto>> {
         return this.fpayService.makeSend(sendDto, user);
+    }
+
+    @Get('wallet/balance-transactions')
+    @UseGuards(AuthentificationGuard)
+    @ApiBearerAuth()
+    @ApiOperation({
+        summary: 'Récupérer la balance et les transactions d\'un wallet',
+        description: 'Récupère la balance et les transactions d\'un wallet pour un utilisateur donné'
+    })
+    async getWalletBalanceAndTransactions(
+        @CurrentUser() user: UserEntity,
+        @Query('walletId') walletId?: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+        @Query('type') type?: string,
+        @Query('status') status?: string,
+        @Query('movement') movement?: string,
+        @Query('search') search?: string,
+    ) {
+        // ✅ Vérifier que l'utilisateur est authentifié
+        if (!user) {
+            throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
+        }
+
+        // ✅ Vérifier que l'utilisateur a un userIdFpay
+        if (!user.userIdFpay) {
+            throw new HttpException(
+                'Vous devez d\'abord lier votre compte FPay',
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
+        this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${user.userIdFpay}, walletId=${walletId}`);
+
+        // ✅ Convertir les paramètres
+        const pageNum = page ? parseInt(page, 10) : 1;
+        const limitNum = limit ? parseInt(limit, 10) : 10;
+
+        // ✅ Appeler le service avec userIdFpay
+        return this.fpayService.getWalletBalanceAndTransactions(
+            user.userIdFpay,  // ✅ Utiliser userIdFpay
+            walletId || '',
+            pageNum,
+            limitNum,
+            startDate,
+            endDate,
+            type,
+            status,
+            movement,
+            search,
+        );
     }
 
     // ============================================================
