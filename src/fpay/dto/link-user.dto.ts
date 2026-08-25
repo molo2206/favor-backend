@@ -8,17 +8,17 @@ export class AuthLoginDto {
         description: 'Numéro de téléphone au format international',
         required: false
     })
-    @IsOptional()  // ✅ AJOUT
+    @IsOptional()
     @IsString()
-    phone?: string;  // ✅ Optionnel
+    phone?: string;
 
     @ApiProperty({
         example: '12345678Pm@',
         required: false
     })
-    @IsOptional()  // ✅ AJOUT
+    @IsOptional()
     @IsString()
-    password?: string;  // ✅ Optionnel
+    password?: string;
 
     @ApiProperty({
         example: '255199',
@@ -38,6 +38,26 @@ export class AuthLoginDto {
     @IsOptional()
     @IsString()
     clientId?: string;
+
+    // ✅ AJOUTER CES PROPRIÉTÉS
+    @ApiProperty({
+        example: 'http://localhost:3000/oauth/callback',
+        description: 'URL de redirection après authentification',
+        required: false
+    })
+    @IsOptional()
+    @IsString()
+    redirectUri?: string;
+
+    @ApiProperty({
+        example: 'fr',
+        description: 'Langue (fr, en, sw, ar, es)',
+        required: false,
+        default: 'fr'
+    })
+    @IsOptional()
+    @IsString()
+    lang?: string;
 }
 
 export class AuthResponseDto {
