@@ -383,8 +383,6 @@ export class FpayService {
     // ============================================================
     // 4. PAIEMENT
     // ============================================================
-    // src/modules/fpay/fpay.service.ts
-
     async makePayment(
         paymentDto: FpayPaymentDto & { system_user_id?: string; access_token?: string },
         currentUser: UserEntity,
@@ -413,7 +411,7 @@ export class FpayService {
                 this.logger.log(`✅ Payeur récupéré via system_user_id: ${user.id}`);
             }
 
-            // ✅ Décoder le token LOCALEMENT pour récupérer l'utilisateur (comme linkUserWithToken)
+            // ✅ Décoder le token LOCALEMENT pour récupérer l'utilisateur
             if (paymentDto.access_token) {
                 try {
                     const decoded = jwt.decode(paymentDto.access_token) as any;
@@ -428,8 +426,6 @@ export class FpayService {
                                 user = tokenUser;
                                 this.logger.log(`✅ Payeur récupéré depuis le token: ${user.id}`);
                             }
-                        } else {
-                            this.logger.warn(`⚠️ Utilisateur FPay ${decoded.id} non trouvé en base`);
                         }
                     }
                 } catch (error) {
@@ -447,7 +443,7 @@ export class FpayService {
                 );
             }
 
-            // ✅ Récupérer le destinataire depuis l'API Key (marchand)
+            // ✅ Récupérer le destinataire depuis l'API Key
             let cleanApiKey = this.apiKey;
             if (cleanApiKey.startsWith('Bearer ')) {
                 cleanApiKey = cleanApiKey.substring(7);
@@ -482,7 +478,7 @@ export class FpayService {
 
             this.logger.log(`💰 Paiement: ${user.phone} → ${recipientPhoneOrCode}`);
 
-            // ✅ NE PAS envoyer access_token à FPay (comme linkUserWithToken)
+            // ✅ NE PAS envoyer access_token à FPay
             const url = `${this.fpayApiUrl}/api/external/pay`;
             const paymentData: any = {
                 system_user_id: user.id,
@@ -490,7 +486,6 @@ export class FpayService {
                 amount: paymentDto.amount,
                 currency: paymentDto.currency || 'USD',
                 description: paymentDto.description || `Paiement vers ${recipientPhoneOrCode}`,
-                // ❌ NE PAS AJOUTER access_token ici
             };
 
             const headers = {
