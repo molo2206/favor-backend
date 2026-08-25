@@ -461,11 +461,13 @@ export class FpayController {
         description: 'Génère l\'URL de redirection vers la page de connexion FPay'
     })
     async openOAuthPage(
-        @Res() res: Response,  // ✅ @Res() en premier
+        @Res() res: Response,
         @CurrentUser() user: UserEntity,
+        @Query('client_id') clientId?: string,  // ✅ AJOUT
         @Query('amount') amount?: string,
         @Query('currency') currency?: string,
         @Query('description') description?: string,
+        @Query('redirect_uri') redirectUri?: string,  // ✅ AJOUT
     ) {
         try {
             if (!user) {
@@ -475,11 +477,22 @@ export class FpayController {
             const fpayUrl = this.fpayService.getFpayApiUrl() || 'https://f-pay.favorhelp.com';
             const appUrl = process.env.APP_URL || 'http://localhost:3000';
             const authCode = crypto.randomBytes(32).toString('hex');
-            const clientId = 'web-client';
-            const callbackUrl = `${appUrl}/oauth/callback`;
+
+            // ✅ Utiliser le client_id fourni ou 'web-client' par défaut
+            const finalClientId = clientId || 'web-client';
+
+            // ✅ Utiliser le redirect_uri fourni ou construire par défaut
+            let callbackUrl = redirectUri;
+            if (!callbackUrl) {
+                if (finalClientId === 'mobile-client' || finalClientId?.includes('mobile')) {
+                    callbackUrl = process.env.MOBILE_CALLBACK_URL || 'fpay://callback';
+                } else {
+                    callbackUrl = `${appUrl}/oauth/callback`;
+                }
+            }
 
             const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
-            redirectUrl.searchParams.set('client_id', clientId);
+            redirectUrl.searchParams.set('client_id', finalClientId);
             redirectUrl.searchParams.set('code', authCode);
             redirectUrl.searchParams.set('system_user_id', user.id);
             redirectUrl.searchParams.set('redirect_uri', callbackUrl);
@@ -494,13 +507,15 @@ export class FpayController {
                 redirectUrl.searchParams.set('description', description);
             }
 
-            this.logger.log(`🔗 URL OAuth FPay: ${redirectUrl.toString()}`);
+            this.logger.log(`🔗 URL OAuth FPay (client_id: ${finalClientId}): ${redirectUrl.toString()}`);
 
             return res.json({
                 status: 'success',
                 message: 'Page OAuth FPay',
                 url: redirectUrl.toString(),
                 openInBrowser: redirectUrl.toString(),
+                client_id: finalClientId,
+                redirect_uri: callbackUrl,
             });
 
         } catch (error) {
@@ -511,8 +526,6 @@ export class FpayController {
             );
         }
     }
-
-
     // ============================================================
     // 7. PROCESSUS COMPLET
     // ============================================================
