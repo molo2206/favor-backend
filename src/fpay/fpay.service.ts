@@ -133,7 +133,7 @@ export class FpayService {
         systemUserId?: string
     ): Promise<any> {
         try {
-            const url = `${this.fpayApiUrl}/auth/link-user`;
+            const url = `${this.fpayApiUrl}/auth/login`;  // ✅ Changé de /auth/link-user à /auth/login
             const hasOtp = authDto.otpCode && authDto.otpCode.trim() !== '';
 
             this.logger.log(`🔐 Authentification: ${authDto.phone}, hasOtp: ${hasOtp}`);
@@ -151,6 +151,9 @@ export class FpayService {
                         {
                             phone: authDto.phone,
                             password: authDto.password,
+                            clientId: authDto.clientId || 'web-client',
+                            redirectUri: authDto.redirectUri || `${this.appUrl}/oauth/callback`,
+                            lang: authDto.lang || 'fr',
                         },
                         { headers: this.getHeaders() }
                     )
@@ -175,14 +178,21 @@ export class FpayService {
             const response = await firstValueFrom(
                 this.httpService.post<any>(
                     url,
-                    authDto,  // ✅ Contient phone, password, otpCode
+                    {
+                        phone: authDto.phone,
+                        password: authDto.password,
+                        otpCode: authDto.otpCode,
+                        clientId: authDto.clientId || 'web-client',
+                        redirectUri: authDto.redirectUri || `${this.appUrl}/oauth/callback`,
+                        lang: authDto.lang || 'fr',
+                    },
                     { headers: this.getHeaders() }
                 )
             );
 
             this.logger.log(`✅ OTP vérifié avec succès pour ${authDto.phone}`);
 
-            // ✅ Sauvegarde du userIdFpay (LE LIEN)
+            // ✅ Sauvegarde du userIdFpay (LE LIEN) - UNIQUEMENT si on a systemUserId
             if (systemUserId && response.data?.data?.id) {
                 await this.saveFpayUserId(systemUserId, response.data.data.id);
                 this.logger.log(`🔗 Compte FPay lié à l'utilisateur ${systemUserId}`);
@@ -210,7 +220,83 @@ export class FpayService {
     }
 
     // ============================================================
-    // 2. SAUVEGARDE DU userIdFpay (LE LIEN)
+    // 2. LIAISON DIRECTE AVEC ACCESS_TOKEN (NOUVEAU)
+    // ============================================================
+
+    async linkUserWithToken(
+        accessToken: string,
+        systemUserId: string,
+        refreshToken?: string,
+    ): Promise<{ success: boolean; message: string; data?: any }> {
+        try {
+            this.logger.log(`🔗 Liaison directe pour systemUserId: ${systemUserId}`);
+
+            if (!accessToken) {
+                throw new Error('access_token est requis pour la liaison');
+            }
+
+            if (!systemUserId) {
+                throw new Error('system_user_id est requis pour la liaison');
+            }
+
+            // ✅ Vérifier le token FPay
+            const verifyUrl = `${this.fpayApiUrl}/auth/verify-token`;
+            const verifyResponse = await firstValueFrom(
+                this.httpService.post<any>(
+                    verifyUrl,
+                    { accessToken: accessToken },
+                    { headers: this.getHeaders() }
+                )
+            );
+
+            if (!verifyResponse.data || !verifyResponse.data.data) {
+                throw new Error('Token FPay invalide');
+            }
+
+            const fpayUser = verifyResponse.data.data;
+            this.logger.log(`✅ Token valide pour l'utilisateur FPay: ${fpayUser.id}`);
+
+            // ✅ Lier les comptes
+            const linkUrl = `${this.fpayApiUrl}/fpay/link-user`;
+            const linkResponse = await firstValueFrom(
+                this.httpService.post<any>(
+                    linkUrl,
+                    {
+                        systemUserId: systemUserId,
+                        fpayUserId: fpayUser.id,
+                        accessToken: accessToken,
+                        refreshToken: refreshToken || null,
+                    },
+                    { headers: this.getHeaders() }
+                )
+            );
+
+            // ✅ Sauvegarder le userIdFpay
+            await this.saveFpayUserId(systemUserId, fpayUser.id);
+
+            this.logger.log(`✅ Comptes liés avec succès pour ${systemUserId}`);
+
+            return {
+                success: true,
+                message: 'Compte lié avec succès',
+                data: {
+                    systemUserId: systemUserId,
+                    fpayUserId: fpayUser.id,
+                    isLinked: true,
+                }
+            };
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur de liaison: ${error.message}`);
+            return {
+                success: false,
+                message: error.message || 'Erreur lors de la liaison',
+            };
+        }
+    }
+
+    // ============================================================
+    // 3. SAUVEGARDE DU userIdFpay (LE LIEN)
     // ============================================================
 
     async saveFpayUserId(systemUserId: string, fpayUserId: string): Promise<void> {
@@ -218,7 +304,6 @@ export class FpayService {
             console.log(`[saveFpayUserId] systemUserId: ${systemUserId}`);
             console.log(`[saveFpayUserId] fpayUserId: ${fpayUserId}`);
 
-            // ✅ Vérifier que les IDs ne sont pas vides
             if (!systemUserId || !fpayUserId) {
                 throw new Error('systemUserId ou fpayUserId est vide');
             }
@@ -235,7 +320,7 @@ export class FpayService {
             console.log(`✅ userIdFpay ${fpayUserId} sauvegardé pour l'utilisateur ${systemUserId}`);
         } catch (error) {
             console.error(`❌ Erreur lors de la sauvegarde:`, error.message);
-            throw error;  // ✅ Propager l'erreur
+            throw error;
         }
     }
 
@@ -254,7 +339,6 @@ export class FpayService {
         try {
             this.logger.log(`🔓 Tentative de déliaison pour l'utilisateur ${systemUserId}`);
 
-            // Vérifier si l'utilisateur existe
             const user = await this.userRepository.findOne({
                 where: { id: systemUserId },
             });
@@ -266,7 +350,6 @@ export class FpayService {
                 );
             }
 
-            // Vérifier si l'utilisateur est déjà délié
             if (!user.userIdFpay || user.isLink === false) {
                 throw new HttpException(
                     'Ce compte Favor Help n\'est pas lié à un compte FPay',
@@ -274,7 +357,6 @@ export class FpayService {
                 );
             }
 
-            // ✅ Option 1: Supprimer complètement le userIdFpay
             const result = await this.userRepository.update(
                 { id: systemUserId },
                 {
@@ -314,8 +396,9 @@ export class FpayService {
             );
         }
     }
+
     // ============================================================
-    // 3. PAIEMENT
+    // 4. PAIEMENT
     // ============================================================
     async makePayment(
         paymentDto: FpayPaymentDto & { system_user_id?: string },
@@ -328,7 +411,6 @@ export class FpayService {
 
             let user = currentUser;
 
-            // ✅ Si system_user_id est fourni, l'utiliser (sinon utiliser currentUser)
             if (paymentDto.system_user_id) {
                 const systemUser = await this.userRepository.findOne({
                     where: { id: paymentDto.system_user_id },
@@ -345,7 +427,6 @@ export class FpayService {
                 this.logger.log(`✅ Payeur récupéré via system_user_id: ${user.id}`);
             }
 
-            // ✅ Vérifier que l'utilisateur a un userIdFpay
             if (!user.userIdFpay || !user.isLink) {
                 this.logger.error(`❌ Payeur ${user.id} n'a pas de compte FPAY lié`);
 
@@ -355,7 +436,6 @@ export class FpayService {
                 );
             }
 
-            // ✅ Extraire le destinataire de l'API Key
             let cleanApiKey = this.apiKey;
             if (cleanApiKey.startsWith('Bearer ')) {
                 cleanApiKey = cleanApiKey.substring(7);
@@ -399,9 +479,8 @@ export class FpayService {
                 description: paymentDto.description || `Paiement vers ${recipientPhoneOrCode}`,
             };
 
-            // ✅ Préparer les headers avec l'API Key
             const headers = {
-                'Authorization': this.apiKey, // ✅ Ajouter l'API Key dans les headers
+                'Authorization': this.apiKey,
                 'Content-Type': 'application/json',
             };
 
@@ -409,7 +488,7 @@ export class FpayService {
                 this.httpService.post<FpayResponse<PaymentResponseDto>>(
                     url,
                     paymentData,
-                    { headers: headers } // ✅ Utiliser les headers avec l'API Key
+                    { headers: headers }
                 )
             );
 
@@ -421,8 +500,9 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
+
     // ============================================================
-    // 4. ENVOI (LOGISTIC)
+    // 5. ENVOI (LOGISTIC)
     // ============================================================
 
     async makeSend(
@@ -512,10 +592,9 @@ export class FpayService {
         }
     }
 
-    // src/modules/fpay/fpay.service.ts
     async getWalletBalanceAndTransactions(
-        userId: string,  // userIdFpay
-        walletId?: string,  // ✅ Optionnels
+        userId: string,
+        walletId?: string,
         page: number = 1,
         limit: number = 10,
         startDate?: string,
@@ -528,14 +607,11 @@ export class FpayService {
         try {
             this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}, walletId=${walletId || 'non fourni'}`);
 
-            // ✅ Construire l'URL
             const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
 
-            // ✅ Construire les paramètres de requête
             const params = new URLSearchParams();
-            params.set('userId', userId);  // userIdFpay
+            params.set('userId', userId);
 
-            // ✅ Ne pas ajouter walletId s'il est vide ou undefined
             if (walletId && walletId.trim() !== '') {
                 params.set('walletId', walletId);
             }
@@ -554,7 +630,6 @@ export class FpayService {
 
             this.logger.log(`🔗 Appel API: ${fullUrl}`);
 
-            // ✅ Appel HTTP
             const response = await firstValueFrom(
                 this.httpService.get(
                     fullUrl,
@@ -576,11 +651,17 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
+
     getApiKey(): string {
         return this.apiKey;
     }
+
+    getFpayApiUrl(): string {
+        return this.fpayApiUrl;
+    }
+
     // ============================================================
-    // 5. PROCESSUS COMPLET
+    // 6. PROCESSUS COMPLET
     // ============================================================
 
     async processFullPayment(
@@ -613,10 +694,8 @@ export class FpayService {
         }
     }
 
-
-
     // ============================================================
-    // 6. GESTION DES ERREURS
+    // 7. GESTION DES ERREURS
     // ============================================================
 
     private handleError(error: any): HttpException {
@@ -658,6 +737,4 @@ export class FpayService {
             HttpStatus.INTERNAL_SERVER_ERROR,
         );
     }
-
-
 }

@@ -42,7 +42,6 @@ export class FpayController {
             console.log(`[Favor Help] systemUserId: ${body.systemUserId}`);
             console.log(`[Favor Help] fpayUserId: ${body.fpayUserId}`);
 
-            // ✅ Vérifier que systemUserId est présent
             if (!body.systemUserId) {
                 console.error('[Favor Help] ❌ systemUserId manquant !');
                 return res.status(400).json({
@@ -51,22 +50,6 @@ export class FpayController {
                 });
             }
 
-            // ✅ Vérifier si l'utilisateur est déjà lié
-            // const existingUser = await this.fpayService.findUserById(body.systemUserId);
-
-            // if (existingUser && existingUser.userIdFpay && existingUser.isLink === true) {
-            //     console.log(`⚠️ Utilisateur ${body.systemUserId} est déjà lié au compte FPay ${existingUser.userIdFpay}`);
-            //     return res.status(400).json({
-            //         success: false,
-            //         message: 'Ce compte Favor Help est déjà lié à un compte FPay.',
-            //         data: {
-            //             isLinked: true,
-            //             userIdFpay: existingUser.userIdFpay,
-            //         },
-            //     });
-            // }
-
-            // ✅ Sauvegarder le userIdFpay dans UserEntity
             await this.fpayService.saveFpayUserId(body.systemUserId, body.fpayUserId);
 
             console.log('[Favor Help] ✅ Compte lié avec succès');
@@ -89,6 +72,66 @@ export class FpayController {
         }
     }
 
+    // ============================================================
+    // 2. LIAISON DIRECTE AVEC ACCESS_TOKEN (NOUVEAU)
+    // ============================================================
+    @Post('link-with-token')
+    @UseGuards(AuthentificationGuard)
+    @HttpCode(HttpStatus.OK)
+    @ApiBearerAuth()
+    @ApiOperation({
+        summary: 'Lier un compte FPay avec un access_token',
+        description: 'Permet de lier un compte FPay en utilisant un access_token existant'
+    })
+    async linkWithToken(
+        @Body() body: {
+            access_token: string;
+            refresh_token?: string;
+        },
+        @CurrentUser() user: UserEntity,
+        @Res() res: Response,
+    ): Promise<any> {
+        try {
+            if (!user) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Utilisateur non authentifié',
+                });
+            }
+
+            if (!body.access_token) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'access_token est requis pour la liaison',
+                });
+            }
+
+            this.logger.log(`🔗 Liaison avec token pour l'utilisateur: ${user.id}`);
+
+            const result = await this.fpayService.linkUserWithToken(
+                body.access_token,
+                user.id,
+                body.refresh_token,
+            );
+
+            if (!result.success) {
+                return res.status(400).json(result);
+            }
+
+            return res.status(200).json(result);
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur: ${error.message}`);
+            return res.status(500).json({
+                success: false,
+                message: error.message || 'Erreur lors de la liaison',
+            });
+        }
+    }
+
+    // ============================================================
+    // 3. AUTHENTIFICATION (login)
+    // ============================================================
     @Post('auth/link-user')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
@@ -124,24 +167,20 @@ export class FpayController {
                 });
             }
 
+            // ✅ Si pas de phone/password → Rediriger vers FPay
             if (!authDto || !authDto.phone || !authDto.password) {
-                const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
+                const fpayUrl = this.fpayService.getFpayApiUrl() || 'https://f-pay.favorhelp.com';
                 const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = authDto?.clientId || 'web-client';
-
-                // ✅ Le callback doit pointer vers FPay
-                const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'https://f-pay.favorhelp.com/oauth/callback';
+                const callbackUrl = process.env.OAUTH_CALLBACK_URL || `${this.fpayService.getFpayApiUrl()}/oauth/callback`;
 
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
-
-                // ✅ AJOUTER system_user_id dans l'URL
                 redirectUrl.searchParams.set('system_user_id', systemUserId);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
                 this.logger.log(`🔗 URL OAuth FPay: ${redirectUrl.toString()}`);
-                this.logger.log(`📌 system_user_id: ${systemUserId}`);
 
                 return res.json({
                     status: 'success',
@@ -156,17 +195,14 @@ export class FpayController {
             const result = await this.fpayService.login(authDto, user.id);
 
             if (result.requiresOtp === true) {
-                const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
+                const fpayUrl = this.fpayService.getFpayApiUrl() || 'https://f-pay.favorhelp.com';
                 const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = authDto.clientId || 'web-client';
-
-                const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'https://f-pay.favorhelp.com/oauth/callback';
+                const callbackUrl = process.env.OAUTH_CALLBACK_URL || `${fpayUrl}/oauth/callback`;
 
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
                 redirectUrl.searchParams.set('code', authCode);
-
-                // ✅ AJOUTER system_user_id dans l'URL
                 redirectUrl.searchParams.set('system_user_id', systemUserId);
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
 
@@ -259,7 +295,7 @@ export class FpayController {
     }
 
     // ============================================================
-    // 2. PAIEMENT
+    // 4. PAIEMENT
     // ============================================================
     @Post('pay')
     @UseGuards(AuthentificationGuard)
@@ -277,16 +313,15 @@ export class FpayController {
                 throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
             }
 
+            // ✅ Vérifier si l'utilisateur est lié
             if (!userToUse.userIdFpay || !userToUse.isLink) {
                 this.logger.warn(`⚠️ Utilisateur ${userToUse.id} non lié à FPay`);
 
                 const apiKey = this.fpayService.getApiKey();
-
-                const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
-                const appUrl = process.env.APP_URL || 'http://localhost:3000';
+                const fpayUrl = this.fpayService.getFpayApiUrl() || 'https://f-pay.favorhelp.com';
                 const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = 'web-client';
-                const callbackUrl = `${appUrl}/oauth/callback`;
+                const callbackUrl = `${this.fpayService.getFpayApiUrl()}/oauth/callback`;
 
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
                 redirectUrl.searchParams.set('client_id', clientId);
@@ -295,11 +330,7 @@ export class FpayController {
                 redirectUrl.searchParams.set('redirect_uri', callbackUrl);
                 redirectUrl.searchParams.set('amount', paymentDto.amount.toString());
                 redirectUrl.searchParams.set('currency', paymentDto.currency);
-
-                // ✅ Encoder l'API Key manuellement pour préserver les caractères spéciaux
                 redirectUrl.searchParams.set('api_key', apiKey);
-                // OU utiliser encodeURIComponent si nécessaire
-                // redirectUrl.searchParams.set('api_key', encodeURIComponent(apiKey));
 
                 if (paymentDto.description) {
                     redirectUrl.searchParams.set('description', paymentDto.description);
@@ -344,9 +375,8 @@ export class FpayController {
     }
 
     // ============================================================
-    // 3. ENVOI (LOGISTIC)
+    // 5. ENVOI (LOGISTIC)
     // ============================================================
-
     @Post('send')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
@@ -371,17 +401,19 @@ export class FpayController {
         return this.fpayService.makeSend(sendDto, user);
     }
 
-
+    // ============================================================
+    // 6. WALLET BALANCE & TRANSACTIONS
+    // ============================================================
     @Get('wallet/balance-transactions')
     @UseGuards(AuthentificationGuard)
     @ApiBearerAuth()
     @ApiOperation({
-        summary: 'Récupérer la balance et les transactions d\'un wallet',
-        description: 'Récupère la balance et les transactions d\'un wallet pour un utilisateur donné'
+        summary: 'Récupérer la balance et les transactions du wallet',
+        description: 'Récupère la balance et les transactions du wallet de l\'utilisateur connecté'
     })
     async getWalletBalanceAndTransactions(
         @CurrentUser() user: UserEntity,
-        @Query('walletId') walletId?: string,  // ✅ Optionnel
+        @Query('walletId') walletId?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('startDate') startDate?: string,
@@ -391,54 +423,25 @@ export class FpayController {
         @Query('movement') movement?: string,
         @Query('search') search?: string,
     ) {
-        // ✅ Vérifier que l'utilisateur est authentifié
         if (!user) {
             throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
         }
 
-        // ✅ LOG POUR DEBUG
-        this.logger.log(`🔍 User complet: ${JSON.stringify(user)}`);
-        this.logger.log(`🔍 userIdFpay: ${user.userIdFpay}`);
-        this.logger.log(`🔍 isLink: ${user.isLink}`);
-
-        // ✅ Si l'utilisateur n'a pas de userIdFpay, essayer de le récupérer depuis la base de données
-        let userIdFpay = user.userIdFpay;
-
-        if (!userIdFpay) {
-            this.logger.warn(`⚠️ userIdFpay non trouvé dans CurrentUser, recherche en base...`);
-
-            // ✅ Récupérer l'utilisateur complet depuis la base de données
-            const fullUser = await this.fpayService.findUserById(user.id);
-
-            if (fullUser && fullUser.userIdFpay && fullUser.isLink) {
-                userIdFpay = fullUser.userIdFpay;
-                this.logger.log(`✅ userIdFpay récupéré depuis la base: ${userIdFpay}`);
-            } else {
-                throw new HttpException(
-                    'Vous devez d\'abord lier votre compte FPay',
-                    HttpStatus.BAD_REQUEST,
-                );
-            }
-        }
-
-        // ✅ Vérifier à nouveau avec le userIdFpay récupéré
-        if (!userIdFpay) {
+        if (!user.userIdFpay) {
             throw new HttpException(
                 'Vous devez d\'abord lier votre compte FPay',
                 HttpStatus.BAD_REQUEST,
             );
         }
 
-        this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userIdFpay}, walletId=${walletId || 'non fourni'}`);
+        this.logger.log(`📊 Récupération balance/transactions pour l'utilisateur: ${user.id}`);
 
-        // ✅ Convertir les paramètres
         const pageNum = page ? parseInt(page, 10) : 1;
         const limitNum = limit ? parseInt(limit, 10) : 10;
 
-        // ✅ Appeler le service avec userIdFpay
         return this.fpayService.getWalletBalanceAndTransactions(
-            userIdFpay,  // ✅ Utiliser le userIdFpay récupéré
-            walletId,    // ✅ Peut être undefined
+            user.userIdFpay,
+            walletId,
             pageNum,
             limitNum,
             startDate,
@@ -451,9 +454,8 @@ export class FpayController {
     }
 
     // ============================================================
-    // 4. PROCESSUS COMPLET
+    // 7. PROCESSUS COMPLET
     // ============================================================
-
     @Post('process-full-payment')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
