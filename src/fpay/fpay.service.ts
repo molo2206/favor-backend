@@ -223,7 +223,6 @@ export class FpayService {
     // ============================================================
     // 2. LIAISON DIRECTE AVEC ACCESS_TOKEN (NOUVEAU)
     // ============================================================
-
     async linkUserWithToken(
         accessToken: string,
         systemUserId: string,
@@ -240,18 +239,18 @@ export class FpayService {
                 throw new Error('system_user_id est requis pour la liaison');
             }
 
-            // ✅ Appel direct à l'API FPay pour lier l'utilisateur
-            const fpayApiUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
+            // ✅ Appel à l'API Gateway (pas directement FPay)
+            const apiGatewayUrl = process.env.API_GATEWAY_URL || 'http://localhost:3000';
 
-            const response = await fetch(`${fpayApiUrl}/auth/link-user`, {
+            const response = await fetch(`${apiGatewayUrl}/auth/link-user`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
                 },
                 body: JSON.stringify({
-                    systemUserId: systemUserId,
-                    refreshToken: refreshToken || null,
+                    access_token: accessToken,      // ✅ Utiliser access_token (avec underscore)
+                    refresh_token: refreshToken || null,
+                    system_user_id: systemUserId,   // ✅ Utiliser system_user_id (avec underscore)
                 }),
             });
 
@@ -269,9 +268,9 @@ export class FpayService {
                 message: data.message || 'Compte lié avec succès',
                 data: {
                     systemUserId: systemUserId,
-                    fpayUserId: data.userId || data.data?.id,
+                    fpayUserId: data.data?.fpayUserId || data.data?.id,
                     isLinked: true,
-                    ...data,
+                    ...data.data,
                 }
             };
 
