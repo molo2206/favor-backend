@@ -24,7 +24,7 @@ export class FpayController {
     constructor(private readonly fpayService: FpayService) { }
 
     // ============================================================
-    // 1. AUTHENTIFICATION - REDIRIGE VERS FPAY
+    // 1. AUTHENTIFICATION - REDIRIGE VERS FPAY (SANS CODE NI REDIRECT_URI)
     // ============================================================
     @Post('link-user')
     async linkUserFromFpay(
@@ -42,7 +42,6 @@ export class FpayController {
             console.log(`[Favor Help] systemUserId: ${body.systemUserId}`);
             console.log(`[Favor Help] fpayUserId: ${body.fpayUserId}`);
 
-            // ✅ Vérifier que systemUserId est présent
             if (!body.systemUserId) {
                 console.error('[Favor Help] ❌ systemUserId manquant !');
                 return res.status(400).json({
@@ -51,22 +50,6 @@ export class FpayController {
                 });
             }
 
-            // ✅ Vérifier si l'utilisateur est déjà lié
-            // const existingUser = await this.fpayService.findUserById(body.systemUserId);
-
-            // if (existingUser && existingUser.userIdFpay && existingUser.isLink === true) {
-            //     console.log(`⚠️ Utilisateur ${body.systemUserId} est déjà lié au compte FPay ${existingUser.userIdFpay}`);
-            //     return res.status(400).json({
-            //         success: false,
-            //         message: 'Ce compte Favor Help est déjà lié à un compte FPay.',
-            //         data: {
-            //             isLinked: true,
-            //             userIdFpay: existingUser.userIdFpay,
-            //         },
-            //     });
-            // }
-
-            // ✅ Sauvegarder le userIdFpay dans UserEntity
             await this.fpayService.saveFpayUserId(body.systemUserId, body.fpayUserId);
 
             console.log('[Favor Help] ✅ Compte lié avec succès');
@@ -89,6 +72,9 @@ export class FpayController {
         }
     }
 
+    // ============================================================
+    // AUTH/LINK-USER - CORRIGÉ (SANS CODE NI REDIRECT_URI DANS L'URL)
+    // ============================================================
     @Post('auth/link-user')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
@@ -110,7 +96,6 @@ export class FpayController {
 
             this.logger.log(`[Favor Help] 🔑 Utilisateur connecté: ${systemUserId}`);
 
-            // ✅ Vérifier si l'utilisateur est déjà lié
             if (user.userIdFpay && user.isLink === true) {
                 this.logger.log(`⚠️ Utilisateur ${systemUserId} est déjà lié au compte FPay ${user.userIdFpay}`);
 
@@ -124,24 +109,23 @@ export class FpayController {
                 });
             }
 
+            // ✅ CAS 1 : Pas de phone/password → Rediriger vers FPay (SANS code ni redirect_uri)
             if (!authDto || !authDto.phone || !authDto.password) {
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
-                const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = authDto?.clientId || 'web-client';
 
-                // ✅ Le callback doit pointer vers FPay
-                const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'https://f-pay.favorhelp.com/oauth/callback';
-
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
+
+                // ✅ Garder UNIQUEMENT les paramètres nécessaires
                 redirectUrl.searchParams.set('client_id', clientId);
-                redirectUrl.searchParams.set('code', authCode);
+                // ✅ NE PAS ajouter 'code'
+                // redirectUrl.searchParams.set('code', authCode);
+                // ✅ NE PAS ajouter 'redirect_uri' (il sera passé dans le corps)
+                // redirectUrl.searchParams.set('redirect_uri', callbackUrl);
+                // ✅ system_user_id sera passé dans le corps de la requête
 
-                // ✅ AJOUTER system_user_id dans l'URL
-                redirectUrl.searchParams.set('system_user_id', systemUserId);
-                redirectUrl.searchParams.set('redirect_uri', callbackUrl);
-
-                this.logger.log(`🔗 URL OAuth FPay: ${redirectUrl.toString()}`);
-                this.logger.log(`📌 system_user_id: ${systemUserId}`);
+                this.logger.log(`🔗 URL OAuth FPay (sans code): ${redirectUrl.toString()}`);
+                this.logger.log(`📌 system_user_id: ${systemUserId} (passé dans le corps)`);
 
                 return res.json({
                     status: 'success',
@@ -157,20 +141,17 @@ export class FpayController {
 
             if (result.requiresOtp === true) {
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
-                const authCode = crypto.randomBytes(32).toString('hex');
                 const clientId = authDto.clientId || 'web-client';
 
-                const callbackUrl = process.env.OAUTH_CALLBACK_URL || 'https://f-pay.favorhelp.com/oauth/callback';
-
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
+
+                // ✅ Garder UNIQUEMENT les paramètres nécessaires
                 redirectUrl.searchParams.set('client_id', clientId);
-                redirectUrl.searchParams.set('code', authCode);
+                // ✅ NE PAS ajouter 'code'
+                // redirectUrl.searchParams.set('code', authCode);
+                // ✅ NE PAS ajouter 'redirect_uri'
 
-                // ✅ AJOUTER system_user_id dans l'URL
-                redirectUrl.searchParams.set('system_user_id', systemUserId);
-                redirectUrl.searchParams.set('redirect_uri', callbackUrl);
-
-                this.logger.log(`🔗 URL OAuth FPay (OTP): ${redirectUrl.toString()}`);
+                this.logger.log(`🔗 URL OAuth FPay (OTP, sans code): ${redirectUrl.toString()}`);
 
                 return res.json({
                     status: 'success',
@@ -193,6 +174,9 @@ export class FpayController {
         }
     }
 
+    // ============================================================
+    // UNLINK USER
+    // ============================================================
     @Post('unlink-user')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
@@ -281,31 +265,26 @@ export class FpayController {
                 this.logger.warn(`⚠️ Utilisateur ${userToUse.id} non lié à FPay`);
 
                 const apiKey = this.fpayService.getApiKey();
-
                 const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
-                const appUrl = process.env.APP_URL || 'http://localhost:3000';
-                const authCode = crypto.randomBytes(32).toString('hex');
-                const clientId = 'web-client';
-                const callbackUrl = `${appUrl}/oauth/callback`;
 
                 const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
-                redirectUrl.searchParams.set('client_id', clientId);
-                redirectUrl.searchParams.set('code', authCode);
+
+                // ✅ Garder UNIQUEMENT les paramètres nécessaires
+                redirectUrl.searchParams.set('client_id', 'web-client');
+                // ✅ NE PAS ajouter 'code'
+                // redirectUrl.searchParams.set('code', authCode);
+                // ✅ NE PAS ajouter 'redirect_uri'
+                // redirectUrl.searchParams.set('redirect_uri', callbackUrl);
                 redirectUrl.searchParams.set('system_user_id', userToUse.id);
-                redirectUrl.searchParams.set('redirect_uri', callbackUrl);
                 redirectUrl.searchParams.set('amount', paymentDto.amount.toString());
                 redirectUrl.searchParams.set('currency', paymentDto.currency);
-
-                // ✅ Encoder l'API Key manuellement pour préserver les caractères spéciaux
                 redirectUrl.searchParams.set('api_key', apiKey);
-                // OU utiliser encodeURIComponent si nécessaire
-                // redirectUrl.searchParams.set('api_key', encodeURIComponent(apiKey));
 
                 if (paymentDto.description) {
                     redirectUrl.searchParams.set('description', paymentDto.description);
                 }
 
-                this.logger.log(`🔗 Redirection OAuth: ${redirectUrl.toString()}`);
+                this.logger.log(`🔗 Redirection OAuth (sans code): ${redirectUrl.toString()}`);
 
                 return {
                     status: 'redirect',
@@ -342,6 +321,7 @@ export class FpayController {
             );
         }
     }
+
     // ============================================================
     // 3. ENVOI (LOGISTIC)
     // ============================================================
