@@ -223,6 +223,8 @@ export class FpayService {
     // 2. LIAISON DIRECTE AVEC ACCESS_TOKEN (NOUVEAU)
     // ============================================================
 
+    // src/modules/fpay/fpay.service.ts
+
     async linkUserWithToken(
         accessToken: string,
         systemUserId: string,
