@@ -410,9 +410,10 @@ export class FpayController {
         const limitNum = limit ? parseInt(limit, 10) : 10;
 
         // ✅ Appeler le service avec userIdFpay
+        // ✅ walletId peut être undefined, le service le gérera
         return this.fpayService.getWalletBalanceAndTransactions(
             user.userIdFpay,  // ✅ Utiliser userIdFpay
-            walletId || '',
+            walletId,         // ✅ Peut être undefined
             pageNum,
             limitNum,
             startDate,

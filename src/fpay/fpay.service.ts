@@ -512,9 +512,12 @@ export class FpayService {
         }
     }
 
+    /**
+     * Récupère la balance et les transactions d'un wallet
+     */
     async getWalletBalanceAndTransactions(
-        userId: string,
-        walletId?: string,
+        userId: string,  // userIdFpay
+        walletId?: string,  // ✅ Optionnel
         page: number = 1,
         limit: number = 10,
         startDate?: string,
@@ -523,15 +526,22 @@ export class FpayService {
         status?: string,
         movement?: string,
         search?: string,
-    ): Promise<WalletBalanceResponse> {  // ✅ Utiliser l'interface exportée
+    ): Promise<any> {
         try {
-            this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}, walletId=${walletId}`);
+            this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}, walletId=${walletId || 'non fourni'}`);
 
+            // ✅ Construire l'URL
             const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
 
+            // ✅ Construire les paramètres de requête
             const params = new URLSearchParams();
-            params.set('userId', userId);
-            params.set('walletId', walletId || '');
+            params.set('userId', userId);  // userIdFpay
+
+            // ✅ Ne pas ajouter walletId s'il est vide ou undefined
+            if (walletId && walletId.trim() !== '') {
+                params.set('walletId', walletId);
+            }
+
             params.set('page', page.toString());
             params.set('limit', limit.toString());
 
@@ -546,8 +556,9 @@ export class FpayService {
 
             this.logger.log(`🔗 Appel API: ${fullUrl}`);
 
+            // ✅ Appel HTTP
             const response = await firstValueFrom(
-                this.httpService.get<WalletBalanceResponse>(  // ✅ Type générique
+                this.httpService.get(
                     fullUrl,
                     { headers: this.getHeaders() }
                 )
@@ -559,10 +570,14 @@ export class FpayService {
 
         } catch (error) {
             this.logger.error(`❌ Erreur: ${error.message}`);
+
+            if (error.response) {
+                this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
+            }
+
             throw this.handleError(error);
         }
     }
-
 
     getApiKey(): string {
         return this.apiKey;
