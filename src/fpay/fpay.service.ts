@@ -394,17 +394,7 @@ export class FpayService {
                 throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
             }
 
-            const user = currentUser;
-
-            // ✅ Vérifier que l'acheteur a un compte FPay lié
-            if (!user.userIdFpay || !user.isLink) {
-                this.logger.error(`❌ Payeur ${user.id} n'a pas de compte FPAY lié`);
-
-                throw new HttpException(
-                    'Vous devez d\'abord lier votre compte FPAY. Veuillez vous connecter via OAuth.',
-                    HttpStatus.BAD_REQUEST,
-                );
-            }
+            
 
             // ✅ Vérifier que le client a fourni un access_token
             if (!paymentDto.access_token) {
@@ -414,8 +404,7 @@ export class FpayService {
                 );
             }
 
-            this.logger.log(`💰 Paiement: ${user.phone} → API Key Owner`);
-
+            
             // ✅ Utiliser FPAY_API_URL 
             const url = `${this.fpayApiUrl}/api/external/pay`;
 
