@@ -387,6 +387,8 @@ export class FpayService {
     // ============================================================
     // 4. PAIEMENT
     // ============================================================
+    // src/modules/fpay/fpay.service.ts
+
     async makePayment(
         paymentDto: FpayPaymentDto & { system_user_id?: string; access_token?: string },
         currentUser: UserEntity,
@@ -415,28 +417,6 @@ export class FpayService {
                 this.logger.log(`✅ Payeur récupéré via system_user_id: ${user.id}`);
             }
 
-            // ✅ Décoder le token LOCALEMENT pour récupérer l'utilisateur
-            if (paymentDto.access_token) {
-                try {
-                    const decoded = jwt.decode(paymentDto.access_token) as any;
-                    if (decoded && decoded.id) {
-                        const tokenUser = await this.userRepository.findOne({
-                            where: { userIdFpay: decoded.id },
-                            relations: ['wallets'],
-                        });
-
-                        if (tokenUser) {
-                            if (!paymentDto.system_user_id) {
-                                user = tokenUser;
-                                this.logger.log(`✅ Payeur récupéré depuis le token: ${user.id}`);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    this.logger.error(`❌ Erreur décodage token: ${error.message}`);
-                }
-            }
-
             // ✅ Vérifier que l'acheteur a un compte FPay lié
             if (!user.userIdFpay || !user.isLink) {
                 this.logger.error(`❌ Payeur ${user.id} n'a pas de compte FPAY lié`);
@@ -447,55 +427,39 @@ export class FpayService {
                 );
             }
 
-            // ✅ Récupérer le destinataire depuis l'API Key
-            let cleanApiKey = this.apiKey;
-            if (cleanApiKey.startsWith('Bearer ')) {
-                cleanApiKey = cleanApiKey.substring(7);
-            }
+            // ✅ Récupérer l'access_token depuis le DTO ou depuis l'utilisateur
+            const accessToken = paymentDto.access_token || user.userIdFpay;
 
-            let recipientPhoneOrCode: string | null = null;
-
-            try {
-                const apiKeyParts = cleanApiKey.split('.');
-                if (apiKeyParts.length === 3) {
-                    const payloadJson = Buffer.from(apiKeyParts[1], 'base64').toString('utf-8');
-                    const payload = JSON.parse(payloadJson);
-                    recipientPhoneOrCode = payload.phone || payload.merchantCode || payload.sub;
-                }
-            } catch (error) {
-                this.logger.error(`❌ Erreur lors du décodage de l'API Key: ${error.message}`);
-            }
-
-            if (!recipientPhoneOrCode) {
+            if (!accessToken) {
                 throw new HttpException(
-                    'Impossible d\'extraire le destinataire de l\'API Key',
+                    'Access token requis pour le paiement',
                     HttpStatus.BAD_REQUEST,
                 );
             }
 
-            if (user.phone === recipientPhoneOrCode) {
-                throw new HttpException(
-                    'Vous ne pouvez pas vous payer vous-même',
-                    HttpStatus.BAD_REQUEST,
-                );
-            }
+            this.logger.log(`💰 Paiement: ${user.phone} → API Key Owner`);
 
-            this.logger.log(`💰 Paiement: ${user.phone} → ${recipientPhoneOrCode}`);
+            // ✅ Appeler le endpoint /api/external/pay de l'API Gateway
+            const apiGatewayUrl = process.env.API_GATEWAY_URL || 'http://localhost:3000';
+            const url = `${apiGatewayUrl}/api/external/pay`;
 
-            // ✅ NE PAS envoyer access_token à FPay
-            const url = `${this.fpayApiUrl}/api/external/pay`;
             const paymentData: any = {
-                system_user_id: user.id,
-                toPhoneOrCode: recipientPhoneOrCode,
+                system_user_id: user.id,      // ✅ ID de l'acheteur dans Favor Help
                 amount: paymentDto.amount,
                 currency: paymentDto.currency || 'USD',
-                description: paymentDto.description || `Paiement vers ${recipientPhoneOrCode}`,
+                description: paymentDto.description || `Paiement via FPay`,
+                access_token: accessToken,    // ✅ Token JWT de l'acheteur
             };
 
+            // ✅ Utiliser l'API Key du service (pay)
             const headers = {
-                'Authorization': this.apiKey,
+                'Authorization': this.apiKey,  // ✅ Clé API avec permission 'pay'
                 'Content-Type': 'application/json',
             };
+
+            this.logger.log(`📤 Appel API Gateway: ${url}`);
+            this.logger.log(`📤 Headers: Authorization: ${this.apiKey.substring(0, 20)}...`);
+            this.logger.log(`📤 Payload:`, JSON.stringify(paymentData, null, 2));
 
             const response = await firstValueFrom(
                 this.httpService.post<FpayResponse<PaymentResponseDto>>(
@@ -505,11 +469,16 @@ export class FpayService {
                 )
             );
 
-            this.logger.log(`✅ Paiement réussi: ${response.data.data.transaction.reference}`);
+            this.logger.log(`✅ Paiement réussi: ${response.data.data?.transaction?.reference || 'OK'}`);
             return response.data;
 
         } catch (error) {
             this.logger.error(`❌ Erreur de paiement: ${error.message}`);
+
+            if (error.response) {
+                this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
+            }
+
             throw this.handleError(error);
         }
     }

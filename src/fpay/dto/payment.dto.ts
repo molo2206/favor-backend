@@ -4,8 +4,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class FpayPaymentDto {
-    // ✅ SUPPRIMER system_user_id - il sera récupéré automatiquement
-
     @ApiProperty({
         example: 100,
         description: 'Montant du paiement'
@@ -31,4 +29,13 @@ export class FpayPaymentDto {
     @IsString({ message: 'La description doit être une chaîne de caractères' })
     @IsOptional()
     description?: string;
+
+    @ApiProperty({
+        example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        description: 'Token JWT FPay de l\'acheteur (obligatoire pour le paiement)',
+        required: true
+    })
+    @IsString({ message: 'Le token d\'accès doit être une chaîne de caractères' })
+    @IsNotEmpty({ message: 'Le token d\'accès est requis' })
+    access_token: string;  // ✅ Ajouté - Token JWT de l'acheteur
 }
