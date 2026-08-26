@@ -1,11 +1,19 @@
 // src/modules/fpay/dto/payment.dto.ts
-import { IsString, IsNotEmpty, IsNumber, IsOptional, Min } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 
 export class FpayPaymentDto {
+    @IsNumber()
+    @Min(0.01)
     amount: number;
+
+    @IsString()
+    @IsNotEmpty()
     currency: string;
+
+    @IsOptional()
+    @IsString()
     description?: string;
-    access_token: string;  // ✅ Présent et obligatoire
+
+    @IsString()
+    @IsNotEmpty({ message: 'Le token d\'accès est requis' })
+    access_token: string;  // ✅ Obligatoire
 }

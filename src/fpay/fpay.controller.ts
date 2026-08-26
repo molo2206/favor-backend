@@ -297,12 +297,14 @@ export class FpayController {
     // ============================================================
     // 4. PAIEMENT
     // ============================================================
+    // src/modules/fpay/fpay.controller.ts
+
     @Post('pay')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth()
     async makePayment(
-        @Body() paymentDto: FpayPaymentDto,  // ✅ Maintenant contient access_token
+        @Body() paymentDto: FpayPaymentDto,
         @CurrentUser() user: UserEntity,
     ): Promise<FpayResponse<PaymentResponseDto>> {
         try {
@@ -310,14 +312,14 @@ export class FpayController {
                 throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
             }
 
-            // ✅ Construire le payload avec l'ID de l'utilisateur et le token
-            const paymentData = {
-                ...paymentDto,
-                system_user_id: user.id,  // ✅ Récupéré automatiquement
-            };
+            // ✅ NE PAS ajouter system_user_id - le service le gère via le token
+            // const paymentData = {
+            //     ...paymentDto,
+            //     system_user_id: user.id,  // ❌ À SUPPRIMER
+            // };
 
-            // ✅ Appeler le service
-            return await this.fpayService.makePayment(paymentData, user);
+            // ✅ Appeler directement le service avec le DTO
+            return await this.fpayService.makePayment(paymentDto, user);
 
         } catch (error) {
             this.logger.error(`❌ Erreur paiement: ${error.message}`);
