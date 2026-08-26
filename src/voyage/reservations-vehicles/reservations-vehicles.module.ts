@@ -58,6 +58,7 @@ import { FpayModule } from 'src/fpay/fpay.module'; // ✅ Importer FpayModule
       CompanyHasUserResource,
       Meal,
       ReservationMeal,
+      FpayModule
       // ✅ SUPPRIMER FpayModule d'ici - ce n'est pas une entité !
     ]),
     forwardRef(() => NotificationsModule),

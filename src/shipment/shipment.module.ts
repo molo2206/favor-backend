@@ -1,8 +1,10 @@
 // shipment.module.ts
+
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { HttpModule } from '@nestjs/axios'; // ✅ Ajouter
-import { ConfigModule } from '@nestjs/config'; // ✅ Ajouter
+import { HttpModule } from '@nestjs/axios';
+import { ConfigModule } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt'; // ✅ AJOUTER
 import { ShipmentService } from './shipment.service';
 import { ShipmentController } from './shipment.controller';
 import { TypeTransportService } from './type-transport.service';
@@ -36,17 +38,27 @@ import { UserSettingsEntity } from 'src/users/entities/user-settings.entity';
 import { UserLoyaltyEntity } from 'src/users/entities/user-loyalty.entity';
 import { UserLoyaltyHistoryEntity } from 'src/users/entities/user-loyalty-history.entity';
 import { CompanySettingsEntity } from 'src/company/entities/company-settings.entity';
-import { FpayService } from 'src/fpay/fpay.service';
+import { FpayModule } from 'src/fpay/fpay.module'; // ✅ CHANGER: importer FpayModule au lieu de FpayService
 import { CompanyEntity } from 'src/company/entities/company.entity';
+import { ConfigService } from '@nestjs/config'; // ✅ AJOUTER
 
 @Module({
   imports: [
-    // ✅ Ajouter HttpModule et ConfigModule pour FpayService
     HttpModule.register({
       timeout: 30000,
       maxRedirects: 5,
     }),
     ConfigModule,
+    // ✅ AJOUTER JwtModule
+    JwtModule.registerAsync({
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('ACCESS_TOKEN_SECRET_KEY'),
+        signOptions: { expiresIn: '48h' },
+      }),
+      inject: [ConfigService],
+    }),
+    // ✅ IMPORTER FpayModule (au lieu de mettre FpayService dans providers)
+    FpayModule,
     TypeOrmModule.forFeature([
       Shipment,
       PackageDetails,
@@ -87,7 +99,7 @@ import { CompanyEntity } from 'src/company/entities/company.entity';
     PermissionHelper,
     FcmService,
     PushNotificationHelper,
-    FpayService,
+    // ❌ SUPPRIMER FpayService d'ici - il est fourni par FpayModule
   ],
   exports: [ShipmentService, TypeTransportService, ShipmentTrackingService],
 })
