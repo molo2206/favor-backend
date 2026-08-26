@@ -27,6 +27,6 @@ import { UserEntity } from 'src/users/entities/user.entity';
     ],
     controllers: [FpayController],
     providers: [FpayService],
-    exports: [FpayService],
+    exports: [FpayService, JwtModule], // ✅ AJOUTER JwtModule dans exports
 })
 export class FpayModule { }
