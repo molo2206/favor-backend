@@ -12,6 +12,7 @@ import * as crypto from 'crypto';
 import { AuthLoginDto } from './dto/link-user.dto';
 import * as jwt from 'jsonwebtoken';
 import { FpayPaymentDto } from './dto/payment.dto';
+import { JwtService } from '@nestjs/jwt';
 
 export interface WalletBalanceResponse {
     success: boolean;
@@ -89,6 +90,7 @@ export class FpayService {
         private readonly configService: ConfigService,
         @InjectRepository(UserEntity)
         private readonly userRepository: Repository<UserEntity>,
+        private readonly jwtService: JwtService,
     ) {
         const fpayApiUrl = this.configService.get<string>('FPAY_API_URL');
         const apiKey = this.configService.get<string>('FPAY_API_KEY_HELP');
@@ -227,7 +229,7 @@ export class FpayService {
         accessToken: string,
         systemUserId: string,
         refreshToken?: string,
-    ): Promise<{ success: boolean; message: string; data?: any }> {
+    ): Promise<{ success: boolean; message: string; data?: any; access_token?: string; refresh_token?: string }> {
         try {
             this.logger.log(`🔗 Liaison directe pour systemUserId: ${systemUserId}`);
 
@@ -239,16 +241,15 @@ export class FpayService {
                 throw new Error('system_user_id est requis pour la liaison');
             }
 
-
             const response = await fetch(`${this.fpayApiUrl}/auth/link-user`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    access_token: accessToken,      // ✅ Utiliser access_token (avec underscore)
+                    access_token: accessToken,
                     refresh_token: refreshToken || null,
-                    system_user_id: systemUserId,   // ✅ Utiliser system_user_id (avec underscore)
+                    system_user_id: systemUserId,
                 }),
             });
 
@@ -261,14 +262,65 @@ export class FpayService {
 
             this.logger.log(`✅ Comptes liés avec succès pour ${systemUserId}`);
 
+            // ✅ Récupérer l'utilisateur avec toutes les relations (comme dans le login)
+            const user = await this.userRepository
+                .createQueryBuilder('users')
+                .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+                .leftJoinAndSelect('userHasCompany.company', 'company')
+                .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
+                .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+                .leftJoinAndSelect('company.country', 'country')
+                .leftJoinAndSelect('company.city', 'city')
+                .leftJoinAndSelect('company.category', 'category')
+                .leftJoinAndSelect('company.companyResources', 'companyResources')
+                .leftJoinAndSelect('companyResources.resource', 'resource')
+                .leftJoinAndSelect('company.branches', 'branches')
+                .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
+                .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
+                .leftJoinAndSelect('userPlatformRoles.role', 'role')
+                .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+                .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
+                .leftJoinAndSelect('userCompanyResources.resource', 'userCompanyResourceDetail')
+                .leftJoinAndSelect('users.activeBranch', 'activeBranch')
+                .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
+                .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+                .leftJoinAndSelect('users.loyalty', 'loyalty')
+                .where('users.id = :id', { id: systemUserId })
+                .getOne();
+
+            if (!user) {
+                throw new Error(`Utilisateur ${systemUserId} non trouvé`);
+            }
+
+            // ✅ Mettre à jour userIdFpay et isLink
+            const fpayUserId = data.data?.fpayUserId || data.data?.id;
+            await this.saveFpayUserId(systemUserId, fpayUserId);
+
+            // ✅ Générer les tokens comme dans le login
+            const access_token = await this.accessToken(user);
+            const refresh_token = await this.refreshToken(user);
+
+            // ✅ Construire la même structure que le login
+            const loyaltyPoints = user.loyalty?.[0]?.pointsBalance ?? 0;
+            const loyaltyTier = user.loyalty?.[0]?.currentTier ?? null;
+            const loyaltyCode = user.loyalty?.[0]?.loyaltyCode ?? null;
+
+            const { password, ...userWithoutPassword } = user;
+
             return {
                 success: true,
                 message: data.message || 'Compte lié avec succès',
+                access_token: access_token,
+                refresh_token: refresh_token,
                 data: {
-                    systemUserId: systemUserId,
-                    fpayUserId: data.data?.fpayUserId || data.data?.id,
-                    isLinked: true,
-                    ...data.data,
+                    ...userWithoutPassword,
+                    loyalty: {
+                        points: loyaltyPoints,
+                        tier: loyaltyTier,
+                        code: loyaltyCode,
+                    },
+                    userIdFpay: fpayUserId,
+                    isLink: true,
                 }
             };
 
@@ -307,6 +359,43 @@ export class FpayService {
             console.error(`❌ Erreur lors de la sauvegarde:`, error.message);
             throw error;
         }
+    }
+
+
+    async accessToken(user: UserEntity): Promise<string> {
+        const payload = {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+        };
+
+        const secretKey = this.configService.get<string>('ACCESS_TOKEN_SECRET_KEY');
+        if (!secretKey) {
+            throw new Error('ACCESS_TOKEN_SECRET_KEY is not defined!');
+        }
+
+        return await this.jwtService.signAsync(payload, {
+            expiresIn: '48h',
+            secret: secretKey,
+        });
+    }
+
+    async refreshToken(user: UserEntity): Promise<string> {
+        const payload = {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+        };
+
+        const secretKey = this.configService.get<string>('REFRESH_TOKEN_SECRET_KEY');
+        if (!secretKey) {
+            throw new Error('REFRESH_TOKEN_SECRET_KEY is not defined!');
+        }
+
+        return await this.jwtService.signAsync(payload, {
+            expiresIn: '7d',
+            secret: secretKey,
+        });
     }
 
     async findUserById(systemUserId: string): Promise<UserEntity | null> {
@@ -394,7 +483,7 @@ export class FpayService {
                 throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
             }
 
-            
+
 
             // ✅ Vérifier que le client a fourni un access_token
             if (!paymentDto.access_token) {
@@ -404,7 +493,7 @@ export class FpayService {
                 );
             }
 
-            
+
             // ✅ Utiliser FPAY_API_URL 
             const url = `${this.fpayApiUrl}/api/external/pay`;
 
