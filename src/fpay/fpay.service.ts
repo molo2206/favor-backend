@@ -6,12 +6,12 @@ import { firstValueFrom } from 'rxjs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { FpayPaymentDto } from './dto/payment.dto';
 import { FpaySendDto } from './dto/send.dto';
 import { FpayResponse, PaymentResponseDto } from './dto/response.dto';
 import * as crypto from 'crypto';
 import { AuthLoginDto } from './dto/link-user.dto';
 import * as jwt from 'jsonwebtoken';
+import { FpayPaymentDto } from './dto/payment.dto';
 
 export interface WalletBalanceResponse {
     success: boolean;
@@ -385,10 +385,6 @@ export class FpayService {
     // ============================================================
     // 4. PAIEMENT
     // ============================================================
-    // src/modules/fpay/fpay.service.ts
-
-    // src/modules/fpay/fpay.service.ts
-
     async makePayment(
         paymentDto: FpayPaymentDto,
         currentUser: UserEntity,
