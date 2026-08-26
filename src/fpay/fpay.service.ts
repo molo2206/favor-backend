@@ -239,10 +239,8 @@ export class FpayService {
                 throw new Error('system_user_id est requis pour la liaison');
             }
 
-            // ✅ Appel à l'API Gateway (pas directement FPay)
-            const apiGatewayUrl = process.env.API_GATEWAY_URL || 'http://localhost:3000';
 
-            const response = await fetch(`${apiGatewayUrl}/auth/link-user`, {
+            const response = await fetch(`${this.fpayApiUrl}/auth/link-user`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -389,8 +387,10 @@ export class FpayService {
     // ============================================================
     // src/modules/fpay/fpay.service.ts
 
+    // src/modules/fpay/fpay.service.ts
+
     async makePayment(
-        paymentDto: FpayPaymentDto,  // ✅ Contient access_token fourni par le client
+        paymentDto: FpayPaymentDto,
         currentUser: UserEntity,
     ): Promise<FpayResponse<PaymentResponseDto>> {
         try {
@@ -420,16 +420,15 @@ export class FpayService {
 
             this.logger.log(`💰 Paiement: ${user.phone} → API Key Owner`);
 
-            // ✅ Appeler le endpoint /api/external/pay de l'API Gateway
-            const apiGatewayUrl = process.env.API_GATEWAY_URL || 'http://localhost:3000';
-            const url = `${apiGatewayUrl}/api/external/pay`;
+            // ✅ Utiliser FPAY_API_URL 
+            const url = `${this.fpayApiUrl}/api/external/pay`;
 
             // ✅ NE PAS envoyer system_user_id
             const paymentData = {
                 amount: paymentDto.amount,
                 currency: paymentDto.currency || 'USD',
                 description: paymentDto.description || `Paiement via FPay`,
-                access_token: paymentDto.access_token,  // ✅ Token fourni par le client
+                access_token: paymentDto.access_token,
             };
 
             // ✅ Utiliser l'API Key du service (pay)
