@@ -1,5 +1,5 @@
 // src/shipments/dto/collect-shipment-body.dto.ts
-import { IsOptional, IsString, IsNumber, IsEnum } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsEnum, IsNotEmpty } from 'class-validator';
 import { PaymentMethod } from 'src/operation/enum/payment-method.enum';
 
 export class CollectShipmentBodyDto {
@@ -45,4 +45,9 @@ export class CollectShipmentBodyDto {
   @IsOptional()
   @IsString()
   pin?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty({ message: 'Le token d\'accès FPay est requis pour le paiement FPAY' })
+  access_token?: string;
 }

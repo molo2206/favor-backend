@@ -390,7 +390,7 @@ export class FpayService {
     // src/modules/fpay/fpay.service.ts
 
     async makePayment(
-        paymentDto: FpayPaymentDto & { system_user_id?: string; access_token?: string },
+        paymentDto: FpayPaymentDto,  // ✅ Contient access_token fourni par le client
         currentUser: UserEntity,
     ): Promise<FpayResponse<PaymentResponseDto>> {
         try {
@@ -398,24 +398,7 @@ export class FpayService {
                 throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
             }
 
-            let user = currentUser;
-
-            // ✅ Si system_user_id est fourni, l'utiliser
-            if (paymentDto.system_user_id) {
-                const systemUser = await this.userRepository.findOne({
-                    where: { id: paymentDto.system_user_id },
-                });
-
-                if (!systemUser) {
-                    throw new HttpException(
-                        `Utilisateur avec system_user_id ${paymentDto.system_user_id} non trouvé`,
-                        HttpStatus.NOT_FOUND,
-                    );
-                }
-
-                user = systemUser;
-                this.logger.log(`✅ Payeur récupéré via system_user_id: ${user.id}`);
-            }
+            const user = currentUser;
 
             // ✅ Vérifier que l'acheteur a un compte FPay lié
             if (!user.userIdFpay || !user.isLink) {
@@ -427,12 +410,10 @@ export class FpayService {
                 );
             }
 
-            // ✅ Récupérer l'access_token depuis le DTO ou depuis l'utilisateur
-            const accessToken = paymentDto.access_token || user.userIdFpay;
-
-            if (!accessToken) {
+            // ✅ Vérifier que le client a fourni un access_token
+            if (!paymentDto.access_token) {
                 throw new HttpException(
-                    'Access token requis pour le paiement',
+                    'access_token est requis pour le paiement FPay',
                     HttpStatus.BAD_REQUEST,
                 );
             }
@@ -443,17 +424,17 @@ export class FpayService {
             const apiGatewayUrl = process.env.API_GATEWAY_URL || 'http://localhost:3000';
             const url = `${apiGatewayUrl}/api/external/pay`;
 
-            const paymentData: any = {
-                system_user_id: user.id,      // ✅ ID de l'acheteur dans Favor Help
+            // ✅ NE PAS envoyer system_user_id
+            const paymentData = {
                 amount: paymentDto.amount,
                 currency: paymentDto.currency || 'USD',
                 description: paymentDto.description || `Paiement via FPay`,
-                access_token: accessToken,    // ✅ Token JWT de l'acheteur
+                access_token: paymentDto.access_token,  // ✅ Token fourni par le client
             };
 
             // ✅ Utiliser l'API Key du service (pay)
             const headers = {
-                'Authorization': this.apiKey,  // ✅ Clé API avec permission 'pay'
+                'Authorization': this.apiKey,
                 'Content-Type': 'application/json',
             };
 

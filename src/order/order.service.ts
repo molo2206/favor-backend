@@ -133,7 +133,7 @@ export class OrderService {
     if (signal?.aborted) {
       throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
     }
-
+    const accessToken = createOrderDto.access_token;
     const hasEmailCurrentUser = user.email && user.email.trim() !== '';
     const hasPhoneCurrentUser = user.phone && user.phone.trim() !== '';
     if (!hasEmailCurrentUser && !hasPhoneCurrentUser) {
@@ -176,34 +176,20 @@ export class OrderService {
     let orderStatus = OrderStatus.PENDING;
     let isPaidByMobileMoney = false;
     let selectedMethod: PaymentMethod = PaymentMethod.MANUAL;
-    let fpayTransactionId: string | null = null; // ✅ Ajouté pour FPAY
-    let fpayReference: string | null = null; // ✅ Ajouté pour FPAY
+    let fpayTransactionId: string | null = null;
+    let fpayReference: string | null = null;
 
     // ✅ AJOUT FPAY
     if (paymentMethod === PaymentMethod.FPAY) {
       selectedMethod = PaymentMethod.FPAY;
 
-      // ✅ Vérifier que l'utilisateur a un compte FPay lié
-      if (!user.userIdFpay) {
-        throw new BadRequestException(
-          this.i18nService.translate('order.fpay_account_not_linked', lang)
-        );
-      }
-
-      // ✅ Vérifier que l'utilisateur est bien lié (isLink)
-      if (!user.isLink) {
-        throw new BadRequestException(
-          'Votre compte FPay n\'est pas activé. Veuillez vous connecter via OAuth.'
-        );
-      }
-
       const amountToPay = grandTotal || totalAmount || 0;
 
-      // ✅ Le system_user_id est automatiquement l'ID de l'utilisateur
       const fpayData = {
         amount: amountToPay,
         currency: currency || 'USD',
         description: `Paiement de commande #${invoiceNumb}`,
+        access_token: createOrderDto.access_token as string,  
       };
 
       console.log('[Order] Tentative de paiement FPAY :', {
@@ -211,69 +197,25 @@ export class OrderService {
         amount: fpayData.amount,
         currency: fpayData.currency,
         invoiceNumb,
+        hasAccessToken: !!fpayData.access_token,
       });
 
-      try {
-        // ✅ Le system_user_id est récupéré automatiquement dans le service
-        const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+      // ✅ Appel au service FPay - toutes les exceptions sont gérées dans le service
+      const fpayResponse = await this.fpayService.makePayment(fpayData, user);
 
-        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-          paymentStatus = PaymentStatus.PAID;
-          orderStatus = OrderStatus.VALIDATED;
-          isPaidByMobileMoney = true;
-          fpayTransactionId = fpayResponse.data.transaction.id;
-          fpayReference = fpayResponse.data.transaction.reference;
+      // ✅ Si on arrive ici, le paiement est réussi
+      if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+        paymentStatus = PaymentStatus.PAID;
+        orderStatus = OrderStatus.VALIDATED;
+        isPaidByMobileMoney = true;
+        fpayTransactionId = fpayResponse.data.transaction.id;
+        fpayReference = fpayResponse.data.transaction.reference;
 
-          console.log('[Order] ✅ Paiement FPAY réussi:', {
-            transactionId: fpayTransactionId,
-            reference: fpayReference,
-            amount: fpayResponse.data.transaction.amount,
-          });
-        } else {
-          throw new BadRequestException(
-            this.i18nService.translate('order.fpay_payment_failed', lang)
-          );
-        }
-      } catch (error: any) {
-        console.error('[Order] ❌ Erreur paiement FPAY:', error.message);
-
-        // ✅ Si l'utilisateur n'est pas lié, rediriger vers OAuth
-        if (error.message?.includes('lié') || error.message?.includes('OAuth')) {
-          const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
-          const appUrl = process.env.APP_URL || 'http://localhost:3000';
-          const authCode = randomBytes(32).toString('hex');
-          const clientId = 'web-client';
-          const callbackUrl = `${appUrl}/oauth/callback`;
-
-          // ✅ Récupérer l'API Key
-          const apiKey = process.env.FPAY_API_KEY_HELP || '';
-          const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
-          redirectUrl.searchParams.set('client_id', clientId);
-          redirectUrl.searchParams.set('code', authCode);
-          redirectUrl.searchParams.set('system_user_id', user.id);
-          redirectUrl.searchParams.set('redirect_uri', callbackUrl);
-          redirectUrl.searchParams.set('amount', amountToPay.toString());
-          redirectUrl.searchParams.set('currency', currency || 'USD');
-          redirectUrl.searchParams.set('description', `Paiement de commande #${invoiceNumb}`);
-          // ✅ AJOUTER l'API Key dans l'URL
-          redirectUrl.searchParams.set('api_key', apiKey);
-
-          throw new BadRequestException({
-            status: 'redirect',
-            message: 'Authentification FPay requise avant le paiement.',
-            redirectUrl: redirectUrl.toString(),
-            openInBrowser: redirectUrl.toString(),
-            system_user_id: user.id,
-          });
-        }
-
-        if (error.name === 'AbortError') {
-          throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
-        }
-
-        throw new BadRequestException(
-          error.message || this.i18nService.translate('order.fpay_payment_failed', lang)
-        );
+        console.log('[Order] ✅ Paiement FPAY réussi:', {
+          transactionId: fpayTransactionId,
+          reference: fpayReference,
+          amount: fpayResponse.data.transaction.amount,
+        });
       }
     }
     // ✅ FIN AJOUT FPAY

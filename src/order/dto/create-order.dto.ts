@@ -95,4 +95,9 @@ export class CreateOrderDto {
   @IsNumber()
   @Min(0)
   transactionFee?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty({ message: 'Le token d\'accès FPay est requis pour le paiement FPAY' })
+  access_token?: string;
 }

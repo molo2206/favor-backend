@@ -9,6 +9,7 @@ import {
   Min,
   IsEnum,
   ValidateIf,
+  IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaymentMethod } from 'src/operation/enum/payment-method.enum';
@@ -126,4 +127,9 @@ export class CreateReservationDto {
   @IsNumber()
   @Min(0)
   totalPrice: number;
+
+  @ValidateIf((o) => o.paymentMethod === PaymentMethod.FPAY)
+  @IsString()
+  @IsNotEmpty({ message: 'Le token d\'accès FPay est requis pour le paiement FPAY' })
+  access_token?: string;
 }

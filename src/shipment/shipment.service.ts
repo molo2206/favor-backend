@@ -1162,27 +1162,13 @@ export class ShipmentService {
     if (paymentMethod === PaymentMethod.FPAY) {
       selectedMethod = PaymentMethod.FPAY;
 
-      // ✅ Vérifier que l'utilisateur a un compte FPay lié
-      if (!user.userIdFpay) {
-        throw new BadRequestException(
-          await this.i18n.translate('order.fpay_account_not_linked', lang)
-        );
-      }
-
-      // ✅ Vérifier que l'utilisateur est bien lié (isLink)
-      if (!user.isLink) {
-        throw new BadRequestException(
-          'Votre compte FPay n\'est pas activé. Veuillez vous connecter via OAuth.'
-        );
-      }
-
       const amountToPay = totalAmount || 0;
 
-      // ✅ Données de paiement (sans system_user_id)
       const fpayData = {
         amount: amountToPay,
         currency: currency || 'USD',
         description: `Paiement du colis ${shipment.trackingNumber}`,
+        access_token: body.access_token as string,
       };
 
       console.log('[Shipment] Tentative de paiement FPAY :', {
@@ -1190,58 +1176,22 @@ export class ShipmentService {
         amount: fpayData.amount,
         currency: fpayData.currency,
         trackingNumber: shipment.trackingNumber,
+        hasAccessToken: !!fpayData.access_token,
       });
 
-      try {
-        const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+      // ✅ Appel au service FPay - toutes les exceptions sont gérées dans le service
+      const fpayResponse = await this.fpayService.makePayment(fpayData, user);
 
-        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-          fpayTransactionId = fpayResponse.data.transaction.id;
-          fpayReference = fpayResponse.data.transaction.reference;
+      // ✅ Si on arrive ici, le paiement est réussi
+      if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+        fpayTransactionId = fpayResponse.data.transaction.id;
+        fpayReference = fpayResponse.data.transaction.reference;
 
-          console.log('[Shipment] ✅ Paiement FPAY réussi:', {
-            transactionId: fpayTransactionId,
-            reference: fpayReference,
-            amount: fpayResponse.data.transaction.amount,
-          });
-        } else {
-          throw new BadRequestException(
-            await this.i18n.translate('order.fpay_payment_failed', lang)
-          );
-        }
-      } catch (error: any) {
-        console.error('[Shipment] ❌ Erreur paiement FPAY:', error.message);
-        const crypto = require('crypto');
-        // ✅ Si l'utilisateur n'est pas lié, rediriger vers OAuth
-        if (error.message?.includes('lié') || error.message?.includes('OAuth')) {
-          const fpayUrl = process.env.FPAY_API_URL || 'https://f-pay.favorhelp.com';
-          const appUrl = process.env.APP_URL || 'http://localhost:3000';
-          const authCode = crypto.randomBytes(32).toString('hex');
-          const clientId = 'web-client';
-          const callbackUrl = `${appUrl}/oauth/callback`;
-
-          const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
-          redirectUrl.searchParams.set('client_id', clientId);
-          redirectUrl.searchParams.set('code', authCode);
-          redirectUrl.searchParams.set('system_user_id', user.id);
-          redirectUrl.searchParams.set('redirect_uri', callbackUrl);
-          redirectUrl.searchParams.set('amount', amountToPay.toString());
-          redirectUrl.searchParams.set('currency', currency || 'USD');
-          redirectUrl.searchParams.set('description', `Paiement du colis ${shipment.trackingNumber}`);
-
-          throw new BadRequestException({
-            status: 'redirect',
-            message: 'Authentification FPay requise avant le paiement du colis.',
-            redirectUrl: redirectUrl.toString(),
-            openInBrowser: redirectUrl.toString(),
-            system_user_id: user.id,
-            trackingNumber: shipment.trackingNumber,
-          });
-        }
-
-        throw new BadRequestException(
-          error.message || await this.i18n.translate('order.fpay_payment_failed', lang)
-        );
+        console.log('[Shipment] ✅ Paiement FPAY réussi:', {
+          transactionId: fpayTransactionId,
+          reference: fpayReference,
+          amount: fpayResponse.data.transaction.amount,
+        });
       }
     }
     // ✅ FIN AJOUT FPAY - SHIPMENT
