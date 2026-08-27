@@ -430,27 +430,52 @@ export class ReservationsVehiclesService {
 
       else if (createDto.paymentMethod === PaymentMethod.MOBILE_MONEY && createDto.mobileMoneyDetails) {
         const { providerId, phone } = createDto.mobileMoneyDetails;
-        const amount = realTotal.toString();
-        const pawapayData = { amount, currency: 'USD', provider: providerId, phone: phone.trim() };
+        const amount = realTotal;
+        const currency = 'USD';
+
         try {
-          const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData);
-          const depositStatus = pawapayResponse.finalStatus?.data?.status;
-          if (depositStatus === 'COMPLETED') {
+          // ✅ Paiement Mobile Money via FPay
+          console.log('[Reservation] Paiement Mobile Money via FPay');
+
+          const fpayResponse = await this.fpayService.payWithMobileMoney(
+            amount,
+            currency,
+            `Paiement de réservation #${savedReservation.id.slice(0, 8)}`,
+            'MOBILE_MONEY',
+            lang
+          );
+
+          if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
             savedReservation.status = ReservationStatus.CONFIRMED;
             isPaid = true;
+            fpayTransactionId = fpayResponse.data.transaction.id;
+            fpayReference = fpayResponse.data.transaction.reference;
             await queryRunner.manager.save(savedReservation);
+
+            console.log('[Reservation] ✅ Paiement FPay Mobile Money réussi:', {
+              transactionId: fpayTransactionId,
+              reference: fpayReference,
+              amount: amount,
+            });
           } else {
-            throw new BadRequestException(await this.i18n.translate('reservation.error.payment_failed', lang));
+            throw new BadRequestException(
+              await this.i18n.translate('reservation.error.payment_failed', lang)
+            );
           }
-        } catch (error) {
-          throw new BadRequestException(await this.i18n.translate('reservation.error.payment_failed', lang));
+        } catch (error: any) {
+          console.error('[Reservation] ❌ Erreur paiement FPay Mobile Money:', error.message);
+          throw new BadRequestException(
+            await this.i18n.translate('reservation.error.payment_failed', lang)
+          );
         }
-      } else if (createDto.paymentMethod === PaymentMethod.MANUAL) {
+      }
+      else if (createDto.paymentMethod === PaymentMethod.MANUAL) {
         savedReservation.status = ReservationStatus.PENDING;
         const expiresAfterMinutes = 5;
         savedReservation.expires_at = new Date(Date.now() + expiresAfterMinutes * 60 * 1000);
         await queryRunner.manager.save(savedReservation);
-      } else {
+      }
+      else {
         savedReservation.status = ReservationStatus.PENDING;
         await queryRunner.manager.save(savedReservation);
       }

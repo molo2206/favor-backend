@@ -1456,6 +1456,7 @@ export class ProductService {
       maxSalePrice?: number;
       cityId?: string;
       categoryId?: string;
+      countryId?: string;
       page?: number;
       limit?: number;
       includeSpecifications?: boolean;
@@ -1531,6 +1532,20 @@ export class ProductService {
       if (filters.companyId) {
         queryBuilder.andWhere('product.companyId = :companyId', {
           companyId: filters.companyId
+        });
+      }
+
+      // ✅ Filtrer par pays
+      if (filters.countryId) {
+        queryBuilder.andWhere('company.countryId = :countryId', {
+          countryId: filters.countryId
+        });
+      }
+
+      // ✅ Filtrer par ville
+      if (filters.cityId) {
+        queryBuilder.andWhere('company.cityId = :cityId', {
+          cityId: filters.cityId
         });
       }
 
@@ -1610,13 +1625,6 @@ export class ProductService {
             yearEnd: filters.yearEnd,
           });
         }
-      }
-
-      // Filtrer par ville
-      if (filters.cityId) {
-        queryBuilder.andWhere('city.id = :cityId', {
-          cityId: filters.cityId
-        });
       }
 
       // Filtrer par type de véhicule et prix
@@ -2093,6 +2101,7 @@ export class ProductService {
     minSalePrice?: number,
     maxSalePrice?: number,
     cityId?: string,
+    countryId?: string,
     page = 1,
     limit = 10,
     lang: string = 'fr',
@@ -2147,6 +2156,16 @@ export class ProductService {
 
     if (type) {
       queryBuilder.andWhere('product.type = :type', { type });
+    }
+
+    // ✅ FILTRE PAR PAYS
+    if (countryId) {
+      queryBuilder.andWhere('company.countryId = :countryId', { countryId });
+    }
+
+    // ✅ FILTRE PAR VILLE
+    if (cityId) {
+      queryBuilder.andWhere('city.id = :cityId', { cityId });
     }
 
     if (shopType?.trim()) {
@@ -2213,10 +2232,6 @@ export class ProductService {
           yearEnd,
         });
       }
-    }
-
-    if (cityId) {
-      queryBuilder.andWhere('city.id = :cityId', { cityId });
     }
 
     if (typecar) {
@@ -2395,6 +2410,7 @@ export class ProductService {
     if (year) filters.push(`année: ${year}`);
     if (companyId) filters.push(`entreprise: ${companyId}`);
     if (cityId) filters.push(`ville: ${cityId}`);
+    if (countryId) filters.push(`pays: ${countryId}`);
 
     if (filters.length > 0 && total > 0) {
       message += ` (filtres: ${filters.join(', ')})`;

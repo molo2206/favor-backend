@@ -189,7 +189,7 @@ export class OrderService {
         amount: amountToPay,
         currency: currency || 'USD',
         description: `Paiement de commande #${invoiceNumb}`,
-        access_token: createOrderDto.access_token as string,  
+        access_token: createOrderDto.access_token as string,
       };
 
       console.log('[Order] Tentative de paiement FPAY :', {
@@ -221,51 +221,47 @@ export class OrderService {
     // ✅ FIN AJOUT FPAY
     else if (type === CompanyType.RESTAURANT) {
       selectedMethod = paymentMethod || PaymentMethod.MANUAL;
+
       if (selectedMethod === PaymentMethod.MOBILE_MONEY) {
-        if (!provider || !phone) {
-          throw new BadRequestException(this.i18nService.translate('order.mobile_money_provider_phone_required', lang));
+        if (!provider || !phone || !grandTotal) {
+          throw new BadRequestException(
+            'Provider, phone et grandTotal sont requis pour le paiement Mobile Money'
+          );
         }
-        const phon = phone.trim();
-        if (!phon) {
-          throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
+
+        console.log('[Order] Paiement Mobile Money via FPay');
+
+        const fpayResponse = await this.fpayService.payWithMobileMoney(
+          grandTotal,
+          currency || 'USD',
+          `Paiement de commande #${invoiceNumb}`,
+          'MOBILE_MONEY',
+          lang
+        );
+
+        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+          paymentStatus = PaymentStatus.PAID;
+          orderStatus = OrderStatus.VALIDATED;
+          isPaidByMobileMoney = true;
+          fpayTransactionId = fpayResponse.data.transaction.id;
+          fpayReference = fpayResponse.data.transaction.reference;
+        } else {
+          throw new BadRequestException('Le paiement a échoué');
         }
-        if (!grandTotal) {
-          throw new BadRequestException(this.i18nService.translate('order.mobile_money_grandtotal_required', lang));
-        }
-        const amount = grandTotal.toString();
-        const pawapayData = { amount, currency, provider, phone: phon };
-        console.log('[Order] Création dépôt Pawapay :', pawapayData);
-        try {
-          const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
-          console.log('[Order] Réponse Pawapay :', pawapayResponse);
-          const depositStatus = pawapayResponse.finalStatus?.data?.status;
-          switch (depositStatus) {
-            case 'COMPLETED':
-              console.log('[Order] Dépôt Pawapay confirmé : COMPLETED');
-              paymentStatus = PaymentStatus.PAID;
-              orderStatus = OrderStatus.VALIDATED;
-              isPaidByMobileMoney = true;
-              break;
-            default:
-              throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
-          }
-        } catch (error: any) {
-          if (error.name === 'AbortError') {
-            throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
-          }
-          throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
-        }
-      } else if (selectedMethod === PaymentMethod.CASH) {
+      }
+      else if (selectedMethod === PaymentMethod.CASH) {
         paymentStatus = PaymentStatus.PENDING;
         orderStatus = OrderStatus.PENDING;
         isPaidByMobileMoney = false;
         console.log(`[Order] Commande restaurant avec paiement CASH`);
-      } else {
+      }
+      else {
         paymentStatus = PaymentStatus.PENDING;
         orderStatus = OrderStatus.PENDING;
         console.log(`[Order] Commande restaurant avec paiement ${selectedMethod} – en attente`);
       }
-    } else {
+    }
+    else {
       selectedMethod = paymentMethod || PaymentMethod.MANUAL;
       paymentStatus = PaymentStatus.PENDING;
       orderStatus = OrderStatus.PENDING;
@@ -1013,6 +1009,116 @@ export class OrderService {
       message: this.i18nService.translate('order.invoice_generated_success', lang),
     };
   }
+
+  // ======================== MODIFICATION DE COMMANDE ========================
+  // Dans le service OrderService
+
+  async updateOrderShippingCost(
+    orderId: string,
+    shippingCost: number,
+    user: UserEntity,
+    lang: string = 'fr'
+  ): Promise<{ message: string; data: OrderEntity }> {
+    // 1️⃣ Récupérer la commande avec ses relations
+    const order = await this.orderRepo.findOne({
+      where: { id: orderId },
+      relations: [
+        'orderItems.product.company',
+        'orderItems.product.category',
+        'orderItems.product.measure',
+        'subOrders',
+        'subOrders.items.product.company',
+        'subOrders.items.product.category',
+        'subOrders.items.product.measure',
+        'subOrders.company',
+        'user',
+        'addressUser',
+      ],
+    });
+
+    if (!order) {
+      throw new NotFoundException(
+        this.i18nService.translate('order.not_found', lang)
+      );
+    }
+
+    // 2️⃣ Vérifier les permissions (corrigé)
+    const isAdmin = user.role === UserRole.SUPER_ADMIN;
+    const isOwner = order.userId === user.id;
+
+    if (!isAdmin && !isOwner) {
+      throw new ForbiddenException(
+        this.i18nService.translate('order.access_denied', lang)
+      );
+    }
+
+    // 3️⃣ Vérifier que le prix de livraison est valide
+    if (shippingCost < 0) {
+      throw new BadRequestException(
+        this.i18nService.translate('order.shipping_cost_positive', lang)
+      );
+    }
+
+    // 4️⃣ Vérifier que la commande n'est pas déjà finalisée
+    if (
+      order.status === OrderStatus.DELIVERED ||
+      order.status === OrderStatus.VALIDATED ||
+      order.status === OrderStatus.REJECTED
+    ) {
+      throw new BadRequestException(
+        this.i18nService.translate('order.cannot_modify_finalized', lang)
+      );
+    }
+
+    // 5️⃣ Enregistrer l'ancien prix
+    const oldShippingCost = order.shippingCost || 0;
+
+    // 6️⃣ Mettre à jour le prix de livraison
+    order.shippingCost = shippingCost;
+
+    // 7️⃣ Recalculer le grand total
+    const itemsTotal = order.orderItems?.reduce(
+      (sum, item) => sum + (item.price * item.quantity),
+      0
+    ) || 0;
+
+    order.grandTotal = itemsTotal + shippingCost + (order.transactionFee || 0);
+
+    // 8️⃣ Sauvegarder la commande
+    const updatedOrder = await this.orderRepo.save(order);
+
+    // 9️⃣ Retourner la commande mise à jour
+    const finalOrder = await this.orderRepo.findOne({
+      where: { id: order.id },
+      relations: [
+        'orderItems.product.company',
+        'orderItems.product.category',
+        'orderItems.product.measure',
+        'subOrders',
+        'subOrders.items.product.company',
+        'subOrders.items.product.category',
+        'subOrders.items.product.measure',
+        'subOrders.company',
+        'user',
+        'addressUser',
+      ],
+    });
+
+    if (!finalOrder) {
+      throw new NotFoundException(
+        this.i18nService.translate('order.order_not_found_after_update', lang)
+      );
+    }
+
+    return {
+      message: this.i18nService.translate('order.shipping_cost_updated', lang, {
+        oldCost: oldShippingCost,
+        newCost: shippingCost,
+      }),
+      data: finalOrder,
+    };
+  }
+
 
   async getAllTransctions(): Promise<{ data: TransactionEntity[] }> {
     const transactions = await this.transactionRepository.find({ relations: ['order', 'order.user'] });

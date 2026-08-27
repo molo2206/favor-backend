@@ -366,7 +366,6 @@ export class ProductController {
   async getProductsPublishedByType(
     @Req() req: Request,
     @Query('type') type?: string,
-    // Nouveaux paramètres de filtrage optionnels
     @Query('brandId') brandId?: string,
     @Query('shopType') shopType?: string,
     @Query('fuelType') fuelType?: string,
@@ -382,10 +381,10 @@ export class ProductController {
     @Query('maxSalePrice') maxSalePrice?: string,
     @Query('cityId') cityId?: string,
     @Query('categoryId') categoryId?: string,
+    @Query('countryId') countryId?: string,
   ): Promise<{ message: string; data: Product[] }> {
     const lang = this.extractLanguage(req);
 
-    // Construire l'objet filters avec les valeurs fournies
     const filters = {
       brandId,
       shopType,
@@ -402,6 +401,7 @@ export class ProductController {
       maxSalePrice: maxSalePrice ? Number(maxSalePrice) : undefined,
       cityId,
       categoryId,
+      countryId,
     };
 
     return this.productService.findProductPublishedByType(type, lang, filters);
@@ -471,6 +471,7 @@ export class ProductController {
     @Query('minSalePrice') minSalePrice?: string,
     @Query('maxSalePrice') maxSalePrice?: string,
     @Query('cityId') cityId?: string,
+    @Query('countryId') countryId?: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
   ) {
@@ -517,6 +518,7 @@ export class ProductController {
       minSalePrice ? Number(minSalePrice) : undefined,
       maxSalePrice ? Number(maxSalePrice) : undefined,
       cityId,
+      countryId,
       pageNum,
       limitNum,
       lang,

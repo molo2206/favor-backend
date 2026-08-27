@@ -2,7 +2,8 @@
 import {
     Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards,
     Query, Res, Ip, Logger,
-    HttpException
+    HttpException,
+    Headers
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -330,6 +331,65 @@ export class FpayController {
                 {
                     status: 'error',
                     message: error.message || 'Erreur lors du paiement',
+                },
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+    }
+
+    @Post('pay/mobile-money')
+    @UseGuards(AuthentificationGuard)
+    @HttpCode(HttpStatus.OK)
+    @ApiBearerAuth()
+    @ApiOperation({
+        summary: 'Paiement via Mobile Money',
+        description: 'Effectue un paiement via Mobile Money en utilisant l\'API Key'
+    })
+    async payWithMobileMoney(
+        @Body() body: {
+            amount: number;
+            currency?: string;
+            description?: string;
+            paymentMethod?: string;
+        },
+        @CurrentUser() user: UserEntity,
+        @Ip() ipAddress: string,
+        @Headers('lang') langHeader?: string,
+    ): Promise<any> {
+        try {
+            if (!user) {
+                throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
+            }
+
+            if (!body.amount || body.amount <= 0) {
+                throw new HttpException(
+                    'Le montant doit être supérieur à 0',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            const lang = langHeader || 'fr';
+
+            this.logger.log(`📱 Paiement Mobile Money par l'utilisateur: ${user.id}`);
+
+            return await this.fpayService.payWithMobileMoney(
+                body.amount,
+                body.currency || 'CDF',
+                body.description || `Paiement Mobile Money`,
+                body.paymentMethod || 'MOBILE_MONEY',
+                ipAddress,
+                lang,
+            );
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur paiement Mobile Money: ${error.message}`);
+            if (error instanceof HttpException) {
+                throw error;
+            }
+            throw new HttpException(
+                {
+                    status: 'error',
+                    message: error.message || 'Erreur lors du paiement Mobile Money',
                 },
                 HttpStatus.BAD_REQUEST,
             );

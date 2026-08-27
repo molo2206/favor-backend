@@ -1200,20 +1200,44 @@ export class ShipmentService {
       selectedMethod = PaymentMethod.MOBILE_MONEY;
 
       if (!provider || !phone) {
-        throw new BadRequestException(await this.i18n.translate('shipment.error.pawapay_required', lang));
+        throw new BadRequestException(
+          await this.i18n.translate('shipment.error.pawapay_required', lang)
+        );
       }
-      const phon = phone.trim();
-      if (!phon) throw new BadRequestException(await this.i18n.translate('shipment.error.invalid_phone', lang));
 
-      const pawapayData = { amount: totalAmount.toString(), currency, provider, phone: phon };
+      const phon = phone.trim();
+      if (!phon) {
+        throw new BadRequestException(
+          await this.i18n.translate('shipment.error.invalid_phone', lang)
+        );
+      }
+
+      // ✅ Paiement Mobile Money via FPay
+      console.log('[Shipment] Paiement Mobile Money via FPay');
+
       try {
-        const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData);
-        const depositStatus = pawapayResponse.finalStatus?.data?.status;
-        if (depositStatus !== 'COMPLETED') {
-          throw new BadRequestException(await this.i18n.translate('shipment.error.pawapay_failed', lang));
+        const fpayResponse = await this.fpayService.payWithMobileMoney(
+          totalAmount,
+          currency || 'USD',
+          `Paiement du colis ${shipment.trackingNumber}`,
+          'MOBILE_MONEY',
+          lang
+        );
+
+        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+          console.log('[Shipment] ✅ Paiement FPay Mobile Money réussi');
+          fpayTransactionId = fpayResponse.data.transaction.id;
+          fpayReference = fpayResponse.data.transaction.reference;
+        } else {
+          throw new BadRequestException(
+            await this.i18n.translate('shipment.error.pawapay_failed', lang)
+          );
         }
       } catch (error: any) {
-        throw new BadRequestException(await this.i18n.translate('shipment.error.pawapay_failed', lang));
+        console.error('[Shipment] ❌ Erreur paiement FPay Mobile Money:', error.message);
+        throw new BadRequestException(
+          error.message || await this.i18n.translate('shipment.error.pawapay_failed', lang)
+        );
       }
     }
 

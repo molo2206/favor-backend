@@ -536,6 +536,59 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
+
+    async payWithMobileMoney(
+        amount: number,
+        currency: string = 'CDF',
+        description?: string,
+        paymentMethod: string = 'MOBILE_MONEY',
+        ipAddress?: string,
+        lang: string = 'fr',
+    ): Promise<any> {
+        try {
+            this.logger.log(`💰 Paiement Mobile Money: ${amount} ${currency}`);
+
+            // ✅ Utiliser l'API Key HELP (celle qui a la permission 'pay')
+            const url = `${this.fpayApiUrl}/api/external/pay/mobile_money`;
+
+            const paymentData = {
+                amount: amount,
+                currency: currency || 'CDF',
+                description: description || `Paiement Mobile Money`,
+                paymentMethod: paymentMethod || 'MOBILE_MONEY',
+            };
+
+            // ✅ Utiliser l'API Key du service (pay)
+            const headers = {
+                'Authorization': this.apiKey,
+                'Content-Type': 'application/json',
+            };
+
+            this.logger.log(`📤 Appel API Gateway: ${url}`);
+            this.logger.log(`📤 Headers: Authorization: ${this.apiKey.substring(0, 30)}...`);
+            this.logger.log(`📤 Payload:`, JSON.stringify(paymentData, null, 2));
+
+            const response = await firstValueFrom(
+                this.httpService.post<any>(
+                    url,
+                    paymentData,
+                    { headers: headers }
+                )
+            );
+
+            this.logger.log(`✅ Paiement Mobile Money réussi: ${response.data.data?.transaction?.reference || 'OK'}`);
+            return response.data;
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur paiement Mobile Money: ${error.message}`);
+
+            if (error.response) {
+                this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
+            }
+
+            throw this.handleError(error);
+        }
+    }
     // ============================================================
     // 5. ENVOI (LOGISTIC)
     // ============================================================
