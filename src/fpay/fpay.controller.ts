@@ -473,7 +473,7 @@ export class FpayController {
             search,
         );
     }
-    
+
     @Get('open')
     @UseGuards(AuthentificationGuard)
     @ApiBearerAuth()
@@ -484,7 +484,7 @@ export class FpayController {
     async openOAuthPage(
         @Res() res: Response,
         @CurrentUser() user: UserEntity,
-        @Query('client_token') clientToken?: string,  // ✅ AJOUT - Remplacer client_id
+        @Query('client_token') clientToken?: string,
         @Query('amount') amount?: string,
         @Query('currency') currency?: string,
         @Query('description') description?: string,
