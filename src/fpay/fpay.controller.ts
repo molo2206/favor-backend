@@ -425,6 +425,7 @@ export class FpayController {
     // ============================================================
     // 6. WALLET BALANCE & TRANSACTIONS
     // ============================================================
+
     @Get('wallet/balance-transactions')
     @UseGuards(AuthentificationGuard)
     @ApiBearerAuth()
@@ -449,21 +450,21 @@ export class FpayController {
         }
 
         // ✅ Vérifier que l'utilisateur a un compte FPay lié
-        if (!user.userIdFpay) {
+        if (!user.userIdFpay || !user.isLink) {
             throw new HttpException(
-                'Vous devez d\'abord lier votre compte FPay',
+                'Vous devez d\'abord lier votre compte FPay pour accéder à vos transactions. Utilisez /fpay/open pour vous connecter.',
                 HttpStatus.BAD_REQUEST,
             );
         }
 
-        this.logger.log(`📊 Récupération balance/transactions pour l'utilisateur: ${user.id}`);
+        this.logger.log(`📊 Récupération balance/transactions pour l'utilisateur: ${user.id} (FPay ID: ${user.userIdFpay})`);
 
         const pageNum = page ? parseInt(page, 10) : 1;
         const limitNum = limit ? parseInt(limit, 10) : 10;
 
         // ✅ Utiliser userIdFpay de l'utilisateur connecté
-        return this.fpayService.getWalletBalanceAndTransactions(
-            user.userIdFpay,  // ✅ Récupéré automatiquement
+        const result = await this.fpayService.getWalletBalanceAndTransactions(
+            user.userIdFpay,  // ✅ "b6e103b2-f734-4f12-8947-961423f2a2e8"
             walletId,
             pageNum,
             limitNum,
@@ -474,6 +475,8 @@ export class FpayController {
             movement,
             search,
         );
+
+        return result;
     }
 
     @Get('open')
