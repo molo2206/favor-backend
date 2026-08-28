@@ -499,6 +499,9 @@ export class FpayController {
             const appUrl = process.env.APP_URL || 'http://localhost:3000';
             const authCode = crypto.randomBytes(32).toString('hex');
 
+            // ✅ Si client_token fourni, on l'utilise, sinon web-client par défaut
+            const finalClientId = clientToken ? 'web-client' : 'web-client';
+
             let callbackUrl = redirectUri;
             if (!callbackUrl) {
                 if (clientToken && clientToken.includes('mobile')) {
@@ -510,13 +513,12 @@ export class FpayController {
 
             const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
 
-            // ✅ Transmettre le client_token à FPay (SANS VALIDATION)
+            // ✅ Envoyer le client_token à FPay
             if (clientToken) {
                 redirectUrl.searchParams.set('client_token', clientToken);
             } else {
-                // ⚠️ Fallback: si pas de token, on envoie un token par défaut (qui sera rejeté par FPay)
-                // Ou on peut ne pas l'envoyer du tout
-                console.warn('[OAuth] ⚠️ Aucun client_token fourni, transmission sans token');
+                // Fallback sur client_id si pas de token
+                redirectUrl.searchParams.set('client_id', finalClientId);
             }
 
             redirectUrl.searchParams.set('code', authCode);
