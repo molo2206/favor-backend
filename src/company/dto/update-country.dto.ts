@@ -8,4 +8,8 @@ export class UpdateCountryDto {
   @IsOptional()
   @IsString()
   code?: string;
+
+  @IsOptional()
+  @IsString()
+  flag?: string;
 }

@@ -8,4 +8,8 @@ export class CreateCountryDto {
   @IsOptional()
   @IsString()
   code?: string;
+
+  @IsOptional()
+  @IsString()
+  flag?: string;
 }

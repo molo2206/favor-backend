@@ -473,7 +473,7 @@ export class FpayController {
             search,
         );
     }
-
+    
     @Get('open')
     @UseGuards(AuthentificationGuard)
     @ApiBearerAuth()
@@ -484,11 +484,11 @@ export class FpayController {
     async openOAuthPage(
         @Res() res: Response,
         @CurrentUser() user: UserEntity,
-        @Query('client_id') clientId?: string,  // ✅ AJOUT
+        @Query('client_token') clientToken?: string,  // ✅ AJOUT - Remplacer client_id
         @Query('amount') amount?: string,
         @Query('currency') currency?: string,
         @Query('description') description?: string,
-        @Query('redirect_uri') redirectUri?: string,  // ✅ AJOUT
+        @Query('redirect_uri') redirectUri?: string,
     ) {
         try {
             if (!user) {
@@ -499,13 +499,12 @@ export class FpayController {
             const appUrl = process.env.APP_URL || 'http://localhost:3000';
             const authCode = crypto.randomBytes(32).toString('hex');
 
-            // ✅ Utiliser le client_id fourni ou 'web-client' par défaut
-            const finalClientId = clientId || 'web-client';
+            // ✅ Si client_token fourni, on l'utilise, sinon web-client par défaut
+            const finalClientId = clientToken ? 'web-client' : 'web-client';
 
-            // ✅ Utiliser le redirect_uri fourni ou construire par défaut
             let callbackUrl = redirectUri;
             if (!callbackUrl) {
-                if (finalClientId === 'mobile-client' || finalClientId?.includes('mobile')) {
+                if (clientToken && clientToken.includes('mobile')) {
                     callbackUrl = process.env.MOBILE_CALLBACK_URL || 'fpay://callback';
                 } else {
                     callbackUrl = `${appUrl}/oauth/callback`;
@@ -513,7 +512,15 @@ export class FpayController {
             }
 
             const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
-            redirectUrl.searchParams.set('client_id', finalClientId);
+
+            // ✅ Envoyer le client_token à FPay
+            if (clientToken) {
+                redirectUrl.searchParams.set('client_token', clientToken);
+            } else {
+                // Fallback sur client_id si pas de token
+                redirectUrl.searchParams.set('client_id', finalClientId);
+            }
+
             redirectUrl.searchParams.set('code', authCode);
             redirectUrl.searchParams.set('system_user_id', user.id);
             redirectUrl.searchParams.set('redirect_uri', callbackUrl);
@@ -528,14 +535,14 @@ export class FpayController {
                 redirectUrl.searchParams.set('description', description);
             }
 
-            this.logger.log(`🔗 URL OAuth FPay (client_id: ${finalClientId}): ${redirectUrl.toString()}`);
+            this.logger.log(`🔗 URL OAuth FPay (client_token: ${clientToken ? '✅' : '❌'}): ${redirectUrl.toString()}`);
 
             return res.json({
                 status: 'success',
                 message: 'Page OAuth FPay',
                 url: redirectUrl.toString(),
                 openInBrowser: redirectUrl.toString(),
-                client_id: finalClientId,
+                client_token: clientToken || null,
                 redirect_uri: callbackUrl,
             });
 

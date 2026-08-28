@@ -22,6 +22,9 @@ export class Country {
   @Column({ type: 'boolean', default: true })
   status: boolean;
 
+  @Column({ nullable: true })
+  flag?: string;  // ✅ AJOUT - URL ou chemin du drapeau
+
   @OneToMany(() => City, (city) => city.country)
   cities: City[];
 
