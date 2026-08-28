@@ -448,15 +448,22 @@ export class FpayController {
             throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
         }
 
-
+        // ✅ Vérifier que l'utilisateur a un compte FPay lié
+        if (!user.userIdFpay) {
+            throw new HttpException(
+                'Vous devez d\'abord lier votre compte FPay',
+                HttpStatus.BAD_REQUEST,
+            );
+        }
 
         this.logger.log(`📊 Récupération balance/transactions pour l'utilisateur: ${user.id}`);
 
         const pageNum = page ? parseInt(page, 10) : 1;
         const limitNum = limit ? parseInt(limit, 10) : 10;
 
+        // ✅ Utiliser userIdFpay de l'utilisateur connecté
         return this.fpayService.getWalletBalanceAndTransactions(
-            user.userIdFpay || '',
+            user.userIdFpay,  // ✅ Récupéré automatiquement
             walletId,
             pageNum,
             limitNum,
