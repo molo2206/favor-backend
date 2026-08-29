@@ -176,122 +176,119 @@ export class OrderService {
     let orderStatus = OrderStatus.PENDING;
     let isPaidByMobileMoney = false;
     let selectedMethod: PaymentMethod = PaymentMethod.MANUAL;
-    let fpayTransactionId: string | null = null;
-    let fpayReference: string | null = null;
+    let fpayTransactionId: string | null = null; // ✅ Ajouté pour FPAY
+    let fpayReference: string | null = null; // ✅ Ajouté pour FPAY
 
-    // ✅ AJOUT FPAY
-    if (paymentMethod === PaymentMethod.FPAY) {
-      selectedMethod = PaymentMethod.FPAY;
-
-      const amountToPay = grandTotal || 0;
-
-      const fpayData = {
-        amount: amountToPay,
-        currency: currency || 'USD',
-        description: `Paiement de commande #${invoiceNumb}`,
-        access_token: createOrderDto.access_token as string,
-      };
-
-      console.log('[Order] Tentative de paiement FPAY :', {
-        userId: user.id,
-        amount: fpayData.amount,
-        currency: fpayData.currency,
-        invoiceNumb,
-        hasAccessToken: !!fpayData.access_token,
-      });
-
-      // ✅ Appel au service FPay - toutes les exceptions sont gérées dans le service
-      const fpayResponse = await this.fpayService.makePayment(fpayData, user);
-
-      // ✅ Si on arrive ici, le paiement est réussi
-      if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-        paymentStatus = PaymentStatus.PAID;
-        orderStatus = OrderStatus.VALIDATED;
-        isPaidByMobileMoney = true;
-        fpayTransactionId = fpayResponse.data.transaction.id;
-        fpayReference = fpayResponse.data.transaction.reference;
-
-        console.log('[Order] ✅ Paiement FPAY réussi:', {
-          transactionId: fpayTransactionId,
-          reference: fpayReference,
-          amount: fpayResponse.data.transaction.amount,
-        });
-      }
-    }
-    // ✅ FIN AJOUT FPAY
-    // else if (type === CompanyType.RESTAURANT) {
-    //   selectedMethod = paymentMethod || PaymentMethod.MANUAL;
-
-    //   if (selectedMethod === PaymentMethod.MOBILE_MONEY) {
-    //     if (!provider || !phone || !grandTotal) {
-    //       throw new BadRequestException(
-    //         'Provider, phone et grandTotal sont requis pour le paiement Mobile Money'
-    //       );
-    //     }
-
-    //     console.log('[Order] Paiement Mobile Money via FPay');
-
-    //     const fpayResponse = await this.fpayService.payWithMobileMoney(
-    //       grandTotal,
-    //       currency || 'USD',
-    //       `Paiement de commande #${invoiceNumb}`,
-    //       'MOBILE_MONEY',
-    //       lang
-    //     );
-
-    //     if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-    //       paymentStatus = PaymentStatus.PAID;
-    //       orderStatus = OrderStatus.VALIDATED;
-    //       isPaidByMobileMoney = true;
-    //       fpayTransactionId = fpayResponse.data.transaction.id;
-    //       fpayReference = fpayResponse.data.transaction.reference;
-    //     } else {
-    //       throw new BadRequestException('Le paiement a échoué');
-    //     }
-    //   }
-    else if (type === CompanyType.RESTAURANT) {
+    if (type === CompanyType.RESTAURANT) {
       selectedMethod = paymentMethod || PaymentMethod.MANUAL;
-
       if (selectedMethod === PaymentMethod.MOBILE_MONEY) {
-        if (!provider || !phone || !grandTotal) {
+        if (!provider || !phone) {
+          throw new BadRequestException(this.i18nService.translate('order.mobile_money_provider_phone_required', lang));
+        }
+        const phon = phone.trim();
+        if (!phon) {
+          throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
+        }
+        if (!grandTotal) {
+          throw new BadRequestException(this.i18nService.translate('order.mobile_money_grandtotal_required', lang));
+        }
+        const amount = grandTotal.toString();
+        const pawapayData = { amount, currency, provider, phone: phon };
+        console.log('[Order] Création dépôt Pawapay :', pawapayData);
+        try {
+          const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
+          console.log('[Order] Réponse Pawapay :', pawapayResponse);
+          const depositStatus = pawapayResponse.finalStatus?.data?.status;
+          switch (depositStatus) {
+            case 'COMPLETED':
+              console.log('[Order] Dépôt Pawapay confirmé : COMPLETED');
+              paymentStatus = PaymentStatus.PAID;
+              orderStatus = OrderStatus.VALIDATED;
+              isPaidByMobileMoney = true;
+              break;
+            default:
+              throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
+          }
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
+          }
+          throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
+        }
+      } else if (paymentMethod === PaymentMethod.FPAY) {
+        selectedMethod = PaymentMethod.FPAY;
+
+        if (!user.userIdFpay) {
           throw new BadRequestException(
-            'Provider, phone et grandTotal sont requis pour le paiement Mobile Money'
+            this.i18nService.translate('order.fpay_account_not_linked', lang)
           );
         }
 
-        console.log('[Order] Paiement Mobile Money via FPay');
-
-        const fpayResponse = await this.fpayService.payWithMobileMoney(
-          grandTotal,
-          currency || 'USD',
-          `Paiement de commande #${invoiceNumb}`,
-          'MOBILE_MONEY',
-          lang
-        );
-
-        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-          paymentStatus = PaymentStatus.PAID;
-          orderStatus = OrderStatus.VALIDATED;
-          isPaidByMobileMoney = true;
-          fpayTransactionId = fpayResponse.data.transaction.id;
-          fpayReference = fpayResponse.data.transaction.reference;
-        } else {
-          throw new BadRequestException('Le paiement a échoué');
+        if (!pin) {
+          throw new BadRequestException(
+            this.i18nService.translate('order.fpay_pin_required', lang)
+          );
         }
-      }
-      else if (selectedMethod === PaymentMethod.CASH) {
+
+        if (!phone) {
+          throw new BadRequestException(
+            this.i18nService.translate('order.phone_required', lang)
+          );
+        }
+
+        const amountToPay = grandTotal || 0;
+
+        const fpayData = {
+          amount: amountToPay,
+          currency: currency || 'USD',
+          description: `Paiement de commande #${invoiceNumb}`,
+          access_token: createOrderDto.access_token as string,
+        };
+
+
+        try {
+          const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+
+          if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+            paymentStatus = PaymentStatus.PAID;
+            orderStatus = OrderStatus.VALIDATED;
+            isPaidByMobileMoney = true;
+            fpayTransactionId = fpayResponse.data.transaction.id;
+            fpayReference = fpayResponse.data.transaction.reference;
+
+
+            console.log('[Order] ✅ Paiement FPAY réussi:', {
+              transactionId: fpayTransactionId,
+              reference: fpayReference,
+              amount: fpayResponse.data.transaction.amount,
+            });
+          } else {
+            throw new BadRequestException(
+              this.i18nService.translate('order.fpay_payment_failed', lang)
+            );
+          }
+        } catch (error: any) {
+          console.error('[Order] ❌ Erreur paiement FPAY:', error.message);
+
+          if (error.name === 'AbortError') {
+            throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
+          }
+
+          throw new BadRequestException(
+            error.message || this.i18nService.translate('order.fpay_payment_failed', lang)
+          );
+        }
+      } else if (selectedMethod === PaymentMethod.CASH) {
         paymentStatus = PaymentStatus.PENDING;
         orderStatus = OrderStatus.PENDING;
         isPaidByMobileMoney = false;
         console.log(`[Order] Commande restaurant avec paiement CASH`);
-      }
-      else {
+      } else {
         paymentStatus = PaymentStatus.PENDING;
         orderStatus = OrderStatus.PENDING;
         console.log(`[Order] Commande restaurant avec paiement ${selectedMethod} – en attente`);
       }
-    }
-    else {
+    } else {
       selectedMethod = paymentMethod || PaymentMethod.MANUAL;
       paymentStatus = PaymentStatus.PENDING;
       orderStatus = OrderStatus.PENDING;
