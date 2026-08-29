@@ -32,6 +32,7 @@ import { I18nService } from 'src/libs/common/src';
 import { CancelOrderDto } from './dto/create-cancel-order.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { PayOrderDto } from './dto/pay-order.dto';
 
 @ApiBearerAuth()
 @Controller('orders')
@@ -98,6 +99,89 @@ export class OrderController {
     return {
       message: this.i18nService.translate('order.order_created_success', lang),
       data: order,
+    };
+  }
+
+  @Post('pay')
+  @UseGuards(AuthentificationGuard)
+  @AuditAction(ActionType.UPDATE, 'Order')
+  async payPendingOrder(
+    @Body() payOrderDto: PayOrderDto,
+    @CurrentUser() user: UserEntity,
+    @Req() req: Request,
+  ) {
+    const abortController = new AbortController();
+    (req as unknown as IncomingMessage).on('aborted', () => {
+      console.warn('[Controller] Requête annulée par le client.');
+      abortController.abort();
+    });
+
+    const lang = this.getUserLanguage(user, req);
+
+    // ✅ RECHARGER L'UTILISATEUR POUR AVOIR userIdFpay
+    const fullUser = await this.userRepo.findOne({
+      where: { id: user.id },
+    });
+
+    if (!fullUser) {
+      throw new NotFoundException(
+        this.i18nService.translate('order.user_not_found', lang)
+      );
+    }
+
+    const order = await this.orderService.payPendingOrder(
+      payOrderDto,
+      fullUser,
+      abortController.signal,
+      lang,
+    );
+
+    return {
+      message: this.i18nService.translate('order.payment_success', lang),
+      data: order,
+    };
+  }
+
+  @Patch(':id/shipping-cost')
+  @UseGuards(AuthentificationGuard)
+  @AuditAction(ActionType.UPDATE, 'Order')
+  async updateShippingCost(
+    @Param('id') orderId: string,
+    @Body() body: { shippingCost: number },
+    @CurrentUser() user: UserEntity,
+    @Req() req: Request,
+  ) {
+    const lang = this.getUserLanguage(user, req);
+
+    // ✅ Vérifier que le shippingCost est fourni
+    if (body.shippingCost === undefined || body.shippingCost === null) {
+      throw new BadRequestException(
+        this.i18nService.translate('order.shipping_cost_required', lang)
+      );
+    }
+
+    // ✅ RECHARGER L'UTILISATEUR POUR AVOIR userIdFpay (comme dans createOrder)
+    const fullUser = await this.userRepo.findOne({
+      where: { id: user.id },
+    });
+
+    if (!fullUser) {
+      throw new NotFoundException(
+        this.i18nService.translate('order.user_not_found', lang)
+      );
+    }
+
+    // ✅ Appeler le service
+    const result = await this.orderService.updateOrderShippingCost(
+      orderId,
+      body.shippingCost,
+      fullUser,
+      lang,
+    );
+
+    return {
+      message: result.message,
+      data: result.data,
     };
   }
 

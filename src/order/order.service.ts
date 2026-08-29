@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, Repository } from 'typeorm';
@@ -51,6 +52,7 @@ import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/com
 import { City } from 'src/company/entities/city.entity';
 import { FpayService } from 'src/fpay/fpay.service';
 import { randomBytes } from 'crypto';
+import { PayOrderDto } from './dto/pay-order.dto';
 
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -216,13 +218,23 @@ export class OrderService {
           throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
         }
         try {
-          const fpayData = {
-            amount: amount as any,
-            currency: currency || 'USD',
-            description: `Paiement de commande #${invoiceNumb}`,
-            access_token: createOrderDto.access_token as string,
-          };
-          const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+          const fpayResponse = await this.fpayService.payWithMobileMoney(
+            amount as any,
+            currency || 'USD',
+            `Paiement de commande #${invoiceNumb}`,
+            'MOBILE_MONEY',
+            lang
+          );
+
+          if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+            paymentStatus = PaymentStatus.PAID;
+            orderStatus = OrderStatus.VALIDATED;
+            isPaidByMobileMoney = true;
+            fpayTransactionId = fpayResponse.data.transaction.id;
+            fpayReference = fpayResponse.data.transaction.reference;
+          } else {
+            throw new BadRequestException('Le paiement a échoué');
+          }
         } catch (error: any) {
 
         }
@@ -398,6 +410,536 @@ export class OrderService {
       console.error('Erreur notifications:', err),
     );
     return finalOrder;
+  }
+
+  async payPendingOrder(
+    payOrderDto: PayOrderDto,
+    user: UserEntity,
+    signal?: AbortSignal,
+    langHeader?: string,
+  ): Promise<OrderEntity> {
+    const { orderId, paymentMethod, provider, phone, access_token } = payOrderDto;
+    const lang = langHeader || this.getUserLanguage(user);
+
+    if (signal?.aborted) {
+      throw new BadRequestException(
+        this.i18nService.translate('order.order_request_aborted', lang)
+      );
+    }
+
+    // 1. Récupérer la commande
+    const order = await this.orderRepo.findOne({
+      where: { id: orderId },
+      relations: [
+        'user',
+        'orderItems',
+        'orderItems.product',
+        'orderItems.product.company',
+        'addressUser',
+      ],
+    });
+
+    if (!order) {
+      throw new NotFoundException(
+        this.i18nService.translate('order.order_not_found', lang)
+      );
+    }
+
+    // 2. Vérifier que la commande appartient à l'utilisateur
+    if (order.user.id !== user.id) {
+      throw new UnauthorizedException(
+        this.i18nService.translate('order.unauthorized_payment', lang)
+      );
+    }
+
+    // 3. Vérifier que la commande est en attente
+    if (order.paymentStatus !== PaymentStatus.PENDING) {
+      throw new BadRequestException(
+        this.i18nService.translate('order.order_already_paid', lang)
+      );
+    }
+
+    // 4. Vérifier que la commande n'est pas déjà payée
+    if (order.paid) {
+      throw new BadRequestException(
+        this.i18nService.translate('order.order_already_paid', lang)
+      );
+    }
+
+    // 5. Variables pour suivre l'état du paiement
+    let paymentStatus = PaymentStatus.PENDING;
+    let orderStatus = OrderStatus.PENDING;
+    let isPaidByMobileMoney = false;
+    let selectedMethod: PaymentMethod = PaymentMethod.MANUAL;
+    let fpayTransactionId: string | null = null;
+    let fpayReference: string | null = null;
+
+    // 6. Traiter le paiement selon la méthode choisie
+    if (paymentMethod === PaymentMethod.MOBILE_MONEY) {
+      selectedMethod = PaymentMethod.MOBILE_MONEY;
+
+      if (!provider || !phone) {
+        throw new BadRequestException(
+          this.i18nService.translate('order.mobile_money_provider_phone_required', lang)
+        );
+      }
+
+      const phon = phone.trim();
+      if (!phon) {
+        throw new BadRequestException(
+          this.i18nService.translate('order.mobile_money_invalid_phone', lang)
+        );
+      }
+
+      if (!order.grandTotal) {
+        throw new BadRequestException(
+          this.i18nService.translate('order.mobile_money_grandtotal_required', lang)
+        );
+      }
+
+      const amount = order.grandTotal.toString();
+      const pawapayData = { amount, currency: order.currency, provider, phone: phon };
+
+      console.log('[PayOrder] Création dépôt Pawapay :', pawapayData);
+
+      try {
+        const pawapayResponse = await this.pawapayService.createDepositSimple(
+          pawapayData,
+          signal
+        );
+        console.log('[PayOrder] Réponse Pawapay :', pawapayResponse);
+
+        const depositStatus = pawapayResponse.finalStatus?.data?.status;
+        switch (depositStatus) {
+          case 'COMPLETED':
+            console.log('[PayOrder] Dépôt Pawapay confirmé : COMPLETED');
+            paymentStatus = PaymentStatus.PAID;
+            orderStatus = OrderStatus.VALIDATED;
+            isPaidByMobileMoney = true;
+            break;
+          default:
+            throw new BadRequestException(
+              this.i18nService.translate('order.payment_failed', lang)
+            );
+        }
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          throw new BadRequestException(
+            this.i18nService.translate('order.order_request_aborted', lang)
+          );
+        }
+        throw new BadRequestException(
+          this.i18nService.translate('order.payment_failed', lang)
+        );
+      }
+
+      // Tenter FPAY en parallèle
+      try {
+        const fpayData = {
+          amount: amount as any,
+          currency: order.currency || 'USD',
+          description: `Paiement de commande #${order.invoiceNumber}`,
+          access_token: access_token as string,
+        };
+        await this.fpayService.makePayment(fpayData, user);
+      } catch (error: any) {
+        console.log('[PayOrder] FPAY optionnel ignoré');
+      }
+
+    } else if (paymentMethod === PaymentMethod.FPAY) {
+      selectedMethod = PaymentMethod.FPAY;
+
+      if (!access_token) {
+        throw new BadRequestException(
+          this.i18nService.translate('order.fpay_access_token_required', lang)
+        );
+      }
+
+      const fpayData = {
+        amount: order.totalAmount + (order.shippingCost || 0),
+        currency: order.currency || 'USD',
+        description: `Paiement de commande #${order.invoiceNumber}`,
+        access_token: access_token,
+      };
+
+      console.log('[PayOrder] Tentative de paiement FPAY :', {
+        userId: user.id,
+        amount: fpayData.amount,
+        currency: fpayData.currency,
+        invoiceNumber: order.invoiceNumber,
+        hasAccessToken: !!fpayData.access_token,
+      });
+
+      const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+
+      if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+        paymentStatus = PaymentStatus.PAID;
+        orderStatus = OrderStatus.VALIDATED;
+        isPaidByMobileMoney = true;
+        fpayTransactionId = fpayResponse.data.transaction.id;
+        fpayReference = fpayResponse.data.transaction.reference;
+
+        console.log('[PayOrder] ✅ Paiement FPAY réussi:', {
+          transactionId: fpayTransactionId,
+          reference: fpayReference,
+          amount: fpayResponse.data.transaction.amount,
+        });
+      }
+
+    } else {
+      throw new BadRequestException(
+        this.i18nService.translate('order.invalid_payment_method', lang, {
+          method: paymentMethod,
+        })
+      );
+    }
+
+    // 7. Mettre à jour la commande
+    order.paymentStatus = paymentStatus;
+    order.status = orderStatus;
+    order.paid = paymentStatus === PaymentStatus.PAID;
+    order.paymentMethod = selectedMethod;
+
+    await this.orderRepo.save(order);
+
+    // 8. Mettre à jour les sous-commandes
+    if (paymentStatus === PaymentStatus.PAID) {
+      const subOrders = await this.subOrderRepo.find({
+        where: { order: { id: order.id } },
+      });
+
+      for (const subOrder of subOrders) {
+        subOrder.status = orderStatus;
+        await this.subOrderRepo.save(subOrder);
+      }
+    }
+
+    // 9. Créer l'opération financière
+    if (paymentStatus === PaymentStatus.PAID) {
+      const operationAmount = order.grandTotal || order.totalAmount;
+      const designation = this.i18nService.translate('order.payment_designation', lang, {
+        invoiceNumber: order.invoiceNumber,
+        method: selectedMethod,
+      });
+
+      const operationData: Partial<OperationEntity> = {
+        debit: 0,
+        credit: operationAmount,
+        designation,
+        status: OperationStatus.ACCEPTED,
+        orderId: order.id,
+        userId: user.id,
+        paymentMethod: selectedMethod,
+        reference: order.invoiceNumber,
+      };
+
+      if (selectedMethod === PaymentMethod.FPAY) {
+        operationData.fpayTransactionId = fpayTransactionId || '';
+        operationData.fpayReference = fpayReference || '';
+      }
+
+      if (selectedMethod === PaymentMethod.MOBILE_MONEY && provider) {
+        operationData.provider = provider;
+      }
+
+      const operation = this.operationRepo.create(operationData as any);
+      await this.operationRepo.save(operation);
+
+      console.log(`[PayOrder] Opération ${selectedMethod} enregistrée pour la commande ${order.invoiceNumber}`);
+    }
+
+    // 10. Récupérer la commande mise à jour
+    const updatedOrder = await this.orderRepo.findOne({
+      where: { id: order.id },
+      relations: [
+        'orderItems',
+        'orderItems.product',
+        'orderItems.product.company',
+        'orderItems.product.category',
+        'orderItems.product.measure',
+        'subOrders',
+        'subOrders.items',
+        'subOrders.items.product',
+        'subOrders.items.product.company',
+        'subOrders.company',
+        'user',
+        'addressUser',
+      ],
+    });
+
+    if (!updatedOrder) {
+      throw new NotFoundException(
+        this.i18nService.translate('order.order_not_found_after_update', lang)
+      );
+    }
+
+    // 11. NOTIFICATIONS
+    if (paymentStatus === PaymentStatus.PAID) {
+      const subOrdersForNotification = await this.subOrderRepo.find({
+        where: { order: { id: updatedOrder.id } },
+        relations: ['company', 'items', 'items.product', 'order'],
+      });
+
+      const groupedByCompany = new Map<string, { companyId: string; items: any[]; total: number }>();
+      for (const subOrder of subOrdersForNotification) {
+        if (subOrder.company) {
+          const companyId = subOrder.company.id;
+          if (!groupedByCompany.has(companyId)) {
+            groupedByCompany.set(companyId, {
+              companyId,
+              items: [],
+              total: 0
+            });
+          }
+          const group = groupedByCompany.get(companyId)!;
+          for (const item of subOrder.items || []) {
+            group.items.push(item);
+            group.total += item.price * item.quantity;
+          }
+        }
+      }
+
+      const paymentQrCode = await QRCode.toDataURL(updatedOrder.invoiceNumber);
+
+      this.processPaymentNotifications(
+        updatedOrder,
+        subOrdersForNotification,
+        user,
+        order,
+        paymentQrCode,
+        groupedByCompany,
+        provider,
+        lang
+      ).catch((err) =>
+        console.error('[PayOrder] Erreur notifications:', err),
+      );
+    }
+
+    return updatedOrder;
+  }
+
+  private async processPaymentNotifications(
+    finalOrder: OrderEntity,
+    subOrders: SubOrderEntity[],
+    user: UserEntity,
+    order: OrderEntity,
+    paymentQrCode: string,
+    groupedByCompany: Map<string, { companyId: string; items: SubOrderItemEntity[]; total: number }>,
+    provider?: string,
+    lang: string = 'fr',
+  ): Promise<void> {
+    try {
+      const hasEmail = user.email && user.email.trim() !== '';
+      const hasPhone = user.phone && user.phone.trim() !== '';
+
+      let imageUrl: string | undefined;
+      if (finalOrder.orderItems?.length) {
+        const firstItem = finalOrder.orderItems[0];
+        if (firstItem.product?.images?.length) imageUrl = firstItem.product.images[0].url;
+        else if (firstItem.product?.image) imageUrl = firstItem.product.image;
+      }
+
+      const emailTranslations = {
+        invoice: this.i18nService.translate('order.email.invoice', lang),
+        billed_to: this.i18nService.translate('order.email.billed_to', lang),
+        customer_info: this.i18nService.translate('order.email.customer_info', lang),
+        client: this.i18nService.translate('order.email.client', lang),
+        email_label: this.i18nService.translate('order.email.email', lang),
+        phone_label: this.i18nService.translate('order.email.phone', lang),
+        address_label: this.i18nService.translate('order.email.address', lang),
+        pin: this.i18nService.translate('order.email.pin', lang),
+        date: this.i18nService.translate('order.email.date', lang),
+        reference: this.i18nService.translate('order.email.reference', lang),
+        number: this.i18nService.translate('order.email.number', lang),
+        products: this.i18nService.translate('order.email.products', lang),
+        unit_price: this.i18nService.translate('order.email.unit_price', lang),
+        qty: this.i18nService.translate('order.email.qty', lang),
+        total: this.i18nService.translate('order.email.total', lang),
+        no_items: this.i18nService.translate('order.email.no_items', lang),
+        payment_info: this.i18nService.translate('order.email.payment_info', lang),
+        account: this.i18nService.translate('order.email.account', lang),
+        name: this.i18nService.translate('order.email.name', lang),
+        mobile_money: this.i18nService.translate('order.email.mobile_money', lang),
+        summary: this.i18nService.translate('order.email.summary', lang),
+        subtotal: this.i18nService.translate('order.email.subtotal', lang),
+        delivery: this.i18nService.translate('order.email.delivery', lang),
+        total_amount: this.i18nService.translate('order.email.total_amount', lang),
+        thank_you: this.i18nService.translate('order.email.thank_you', lang),
+        thanks_team: this.i18nService.translate('order.email.thanks_team', lang),
+        contact: this.i18nService.translate('order.email.contact', lang),
+        status_paid: this.i18nService.translate('order.email.status_paid', lang),
+        status_pending: this.i18nService.translate('order.email.status_pending', lang),
+        status_rejected: this.i18nService.translate('order.email.status_rejected', lang),
+      };
+
+      const notificationOptions: any = {
+        userId: user.id,
+        pushTitle: this.i18nService.translate('order.push_order_paid_title', lang),
+        pushBody: this.i18nService.translate('order.push_order_paid_body', lang, {
+          invoiceNumber: order.invoiceNumber,
+          pin: order.pin,
+        }),
+        pushData: { entity: 'ORDER', entityId: finalOrder.id },
+        imageUrl,
+      };
+
+      if (hasPhone) {
+        notificationOptions.phoneNumber = user.phone;
+        notificationOptions.smsBody = this.i18nService.translate('order.sms_order_validated', lang, {
+          invoiceNumber: order.invoiceNumber,
+          shippingCost: order.shippingCost,
+          currency: order.currency,
+          pin: order.pin,
+        });
+        notificationOptions.whatsappNumber = user.phone;
+        notificationOptions.whatsappBody = this.i18nService.translate('order.whatsapp_order_paid', lang, {
+          invoiceNumber: order.invoiceNumber,
+          pin: order.pin,
+        });
+        notificationOptions.whatsappImageUrl = imageUrl;
+      }
+
+      if (hasEmail) {
+        notificationOptions.emailTo = user.email;
+        notificationOptions.emailSubject = this.i18nService.translate('order.paid_invoice_subject', lang);
+        notificationOptions.emailContext = {
+          pinCode: order.pin,
+          invoiceNumber: order.invoiceNumber,
+          user: order.user,
+          subOrders,
+          order,
+          year: new Date().getFullYear(),
+          translations: emailTranslations,
+          lang,
+        };
+        notificationOptions.sendInvoicePaidWithPdf = true;
+      }
+
+      await this.pushNotificationHelper.sendAll(notificationOptions);
+
+      await this.notificationHelpers.sendNotification(
+        this.notificationsService,
+        user.id,
+        NotificationType.ORDER_CREATED,
+        lang,
+        { invoiceNumber: finalOrder.invoiceNumber, totalAmount: finalOrder.totalAmount, currency: finalOrder.currency },
+        'ORDER',
+        finalOrder.id,
+      );
+
+      // Envoyer aux administrateurs par ville
+      const resourceName = this.permissionHelper.getOrderResourceByCompanyType(finalOrder.type);
+      console.log(`🔍 Resource name: ${resourceName}`);
+
+      let orderCityId: string | null = null;
+      let orderCityName: string | null = null;
+
+      if (subOrders.length > 0) {
+        const firstSubOrder = subOrders[0];
+        if (firstSubOrder.company?.cityId) {
+          orderCityId = firstSubOrder.company.cityId;
+          const city = await this.cityRepo.findOne({
+            where: { id: orderCityId }
+          });
+          if (city) {
+            orderCityName = city.name;
+          }
+        }
+      }
+
+      console.log(`🏙️ Ville de la commande: ${orderCityName} (${orderCityId})`);
+
+      if (orderCityId) {
+        const branchesInCity = await this.branchRepo.find({
+          where: { cityId: orderCityId },
+          select: ['id']
+        });
+
+        const branchIdsInCity = branchesInCity.map(b => b.id);
+        console.log(`🏢 Branches dans la ville ${orderCityName}: ${branchIdsInCity.length}`);
+
+        if (branchIdsInCity.length > 0) {
+          const adminUsers = await this.userRepository
+            .createQueryBuilder('u')
+            .innerJoin('user_has_company', 'uhc', 'uhc.userId = u.id')
+            .innerJoin('company_has_user_resource', 'chur', 'chur.userCompanyId = uhc.id')
+            .innerJoin('resources', 'r', 'r.id = chur.resourceId')
+            .innerJoin('branches', 'b', 'b.id = chur.branchId')
+            .where('u.role = :role', { role: 'ADMIN' })
+            .andWhere('r.name = :resourceName', { resourceName })
+            .andWhere(
+              '(chur.canManage = :canManage OR (chur.canRead = :canRead AND b.cityId = :orderCityId))',
+              { canManage: true, canRead: true, orderCityId }
+            )
+            .getMany();
+
+          console.log(`👥 Admins trouvés: ${adminUsers.length}`);
+
+          const processedRecipients = new Set<string>([user.id]);
+
+          for (const admin of adminUsers) {
+            if (processedRecipients.has(admin.id)) continue;
+            processedRecipients.add(admin.id);
+
+            await this.notificationsService.sendNotificationToUser(
+              admin.id,
+              this.i18nService.translate('notification.order_paid_title', lang),
+              this.i18nService.translate('notification.order_paid_content', lang, {
+                invoiceNumber: finalOrder.invoiceNumber,
+                totalAmount: finalOrder.totalAmount,
+                currency: finalOrder.currency,
+                paymentMethod: order.paymentMethod,
+              }),
+              finalOrder.type as any,
+              {
+                orderId: finalOrder.id,
+                invoiceNumber: finalOrder.invoiceNumber,
+                totalAmount: finalOrder.totalAmount,
+                currency: finalOrder.currency,
+                type: finalOrder.type,
+                city: orderCityName,
+                paymentMethod: order.paymentMethod,
+                paymentStatus: order.paymentStatus,
+              }
+            );
+          }
+
+          const superAdmins = await this.userRepository.find({
+            where: { role: UserRole.SUPER_ADMIN },
+          });
+
+          for (const admin of superAdmins) {
+            if (processedRecipients.has(admin.id)) continue;
+
+            await this.notificationsService.sendNotificationToUser(
+              admin.id,
+              this.i18nService.translate('notification.order_paid_title', lang),
+              this.i18nService.translate('notification.order_paid_content', lang, {
+                invoiceNumber: finalOrder.invoiceNumber,
+                totalAmount: finalOrder.totalAmount,
+                currency: finalOrder.currency,
+                paymentMethod: order.paymentMethod,
+              }),
+              finalOrder.type as any,
+              {
+                orderId: finalOrder.id,
+                invoiceNumber: finalOrder.invoiceNumber,
+                totalAmount: finalOrder.totalAmount,
+                currency: finalOrder.currency,
+                type: finalOrder.type,
+                city: orderCityName,
+                paymentMethod: order.paymentMethod,
+                paymentStatus: order.paymentStatus,
+              }
+            );
+          }
+        }
+      }
+
+      console.log('✅ [processPaymentNotifications] Terminé');
+    } catch (error) {
+      console.error('❌ Erreur dans processPaymentNotifications:', error);
+    }
   }
   // ======================== NOTIFICATIONS APRÈS CRÉATION ========================
   private async processOrderNotifications(
