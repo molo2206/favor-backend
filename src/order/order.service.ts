@@ -497,8 +497,17 @@ export class OrderService {
         );
       }
 
-      const amount = order.grandTotal.toString();
-      const pawapayData = { amount, currency: order.currency, provider, phone: phon };
+      // ✅ CORRECTION : Utiliser le nombre directement, pas de conversion en string avec séparateurs
+      const amount = order.grandTotal; // Nombre directement
+      // OU si vous devez absolument avoir une string : 
+      // const amount = order.grandTotal.toFixed(2); // "34500.00"
+
+      const pawapayData = {
+        amount: amount.toString(), // Convertir en string sans séparateurs
+        currency: order.currency,
+        provider,
+        phone: phon
+      };
 
       console.log('[PayOrder] Création dépôt Pawapay :', pawapayData);
 
@@ -510,6 +519,8 @@ export class OrderService {
         console.log('[PayOrder] Réponse Pawapay :', pawapayResponse);
 
         const depositStatus = pawapayResponse.finalStatus?.data?.status;
+        console.log('[PayOrder] Statut final du dépôt :', depositStatus);
+
         switch (depositStatus) {
           case 'COMPLETED':
             console.log('[PayOrder] Dépôt Pawapay confirmé : COMPLETED');
@@ -517,7 +528,16 @@ export class OrderService {
             orderStatus = OrderStatus.VALIDATED;
             isPaidByMobileMoney = true;
             break;
+          case 'FAILED':
+          case 'CANCELED':
+          case 'EXPIRED':
+          case 'REJECTED':
+            console.log(`[PayOrder] Dépôt Pawapay ${depositStatus}`);
+            throw new BadRequestException(
+              this.i18nService.translate('order.payment_failed', lang)
+            );
           default:
+            console.log('[PayOrder] Statut inconnu :', depositStatus);
             throw new BadRequestException(
               this.i18nService.translate('order.payment_failed', lang)
             );
@@ -528,6 +548,7 @@ export class OrderService {
             this.i18nService.translate('order.order_request_aborted', lang)
           );
         }
+        console.error('[PayOrder] Erreur Pawapay :', error.message);
         throw new BadRequestException(
           this.i18nService.translate('order.payment_failed', lang)
         );
@@ -536,14 +557,22 @@ export class OrderService {
       // Tenter FPAY en parallèle
       try {
         const fpayResponse = await this.fpayService.payWithMobileMoney(
-          amount as any,
+          amount, // Utiliser le nombre directement
           order.currency || 'USD',
           `Paiement de commande #${order.invoiceNumber}`,
           'MOBILE_MONEY',
           lang
         );
+
+        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+          paymentStatus = PaymentStatus.PAID;
+          orderStatus = OrderStatus.VALIDATED;
+          isPaidByMobileMoney = true;
+          fpayTransactionId = fpayResponse.data.transaction.id;
+          fpayReference = fpayResponse.data.transaction.reference;
+        }
       } catch (error: any) {
-        console.log('[PayOrder] FPAY optionnel ignoré');
+        console.log('[PayOrder] FPAY optionnel ignoré:', error.message);
       }
 
     } else if (paymentMethod === PaymentMethod.FPAY) {
