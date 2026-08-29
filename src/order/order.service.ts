@@ -183,8 +183,10 @@ export class OrderService {
     if (paymentMethod === PaymentMethod.FPAY) {
       selectedMethod = PaymentMethod.FPAY;
 
+      const amountToPay = grandTotal || 0;
+
       const fpayData = {
-        amount: grandTotal,
+        amount: amountToPay,
         currency: currency || 'USD',
         description: `Paiement de commande #${invoiceNumb}`,
         access_token: createOrderDto.access_token as string,
@@ -268,11 +270,21 @@ export class OrderService {
         );
 
         if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+
+          const fpayResponse = await this.fpayService.payWithMobileMoney(
+            grandTotal,
+            currency || 'USD',
+            `Paiement de commande #${invoiceNumb}`,
+            'MOBILE_MONEY',
+            lang
+          );
+          
           paymentStatus = PaymentStatus.PAID;
           orderStatus = OrderStatus.VALIDATED;
           isPaidByMobileMoney = true;
           fpayTransactionId = fpayResponse.data.transaction.id;
           fpayReference = fpayResponse.data.transaction.reference;
+
         } else {
           throw new BadRequestException('Le paiement a échoué');
         }
