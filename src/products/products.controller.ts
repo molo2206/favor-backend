@@ -598,6 +598,8 @@ export class ProductController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('type') type?: string,
+    @Query('countryId') countryId?: string,
+    @Query('cityId') cityId?: string,
   ) {
     const lang = this.extractLanguage(req);
     const currentPage = page ? Number(page) : 1;
@@ -609,6 +611,8 @@ export class ProductController {
       currentLimit,
       shopType,
       lang,
+      countryId,
+      cityId,
     );
 
     return {
@@ -616,7 +620,7 @@ export class ProductController {
       data: result.data,
     };
   }
-
+  
   @Post('/add/new/wishlist')
   @UseGuards(AuthentificationGuard)
   @AuditAction(ActionType.VIEW, 'products')
@@ -653,9 +657,11 @@ export class ProductController {
     @Req() req: Request,
     @Query('keyword') keyword?: string,
     @Query('type') type?: CompanyType,
+    @Query('countryId') countryId?: string,  // Ajout
+    @Query('cityId') cityId?: string,        // Ajout
   ) {
     const lang = this.extractLanguage(req);
-    return this.productService.search(keyword, type, lang);
+    return this.productService.search(keyword, type, lang, countryId, cityId);
   }
 
   @Post('brand')

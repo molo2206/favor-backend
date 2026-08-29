@@ -829,7 +829,13 @@ export class CategoryService {
     };
   }
 
-  async findAllWithProductsLimitTen(companyId?: string, type?: string, lang: string = 'fr') {
+  async findAllWithProductsLimitTen(
+    companyId?: string,
+    type?: string,
+    lang: string = 'fr',
+    countryId?: string,
+    cityId?: string,
+  ) {
     const categories = await this.categoryRepo
       .createQueryBuilder('category')
       .leftJoinAndSelect('category.parent', 'parent')
@@ -867,6 +873,9 @@ export class CategoryService {
       .leftJoinAndSelect('company.city', 'city')
       .where('category.id IN (:...categoryIds)', { categoryIds })
       .andWhere(companyId ? 'company.id = :companyId' : '1=1', { companyId })
+      // Ajout des filtres country et city
+      .andWhere(countryId ? 'country.id = :countryId' : '1=1', { countryId })
+      .andWhere(cityId ? 'city.id = :cityId' : '1=1', { cityId })
       .andWhere('product.status != :status', { status: 'DELETED' })
       .orderBy('product.createdAt', 'DESC')
       .getMany();

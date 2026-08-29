@@ -2741,6 +2741,8 @@ export class ProductService {
     limit = 5,
     type: string = CompanyType.SHOP,
     lang: string = 'fr',
+    countryId?: string,
+    cityId?: string,
   ) {
     const offset = (page - 1) * limit;
 
@@ -2749,10 +2751,21 @@ export class ProductService {
       .select('orderItem.productId', 'productId')
       .addSelect('SUM(orderItem.quantity)', 'totalSold')
       .leftJoin('orderItem.product', 'product')
+      .leftJoin('product.company', 'company')
+      .leftJoin('company.country', 'country')
+      .leftJoin('company.city', 'city')
       .where('product.type = :type', { type })
       .andWhere('product.status = :status', {
         status: ProductStatus.PUBLISHED,
       });
+
+    // Ajout des filtres country et city
+    if (countryId) {
+      query = query.andWhere('country.id = :countryId', { countryId });
+    }
+    if (cityId) {
+      query = query.andWhere('city.id = :cityId', { cityId });
+    }
 
     query = query
       .groupBy('orderItem.productId')
@@ -2804,7 +2817,25 @@ export class ProductService {
       ),
     }));
 
-    const totalCount = await this.productRepo.count({ where: { type } });
+    // Compter le total avec les filtres
+    let totalQuery = this.productRepo
+      .createQueryBuilder('product')
+      .leftJoin('product.company', 'company')
+      .leftJoin('company.country', 'country')
+      .leftJoin('company.city', 'city')
+      .where('product.type = :type', { type })
+      .andWhere('product.status = :status', {
+        status: ProductStatus.PUBLISHED,
+      });
+
+    if (countryId) {
+      totalQuery = totalQuery.andWhere('country.id = :countryId', { countryId });
+    }
+    if (cityId) {
+      totalQuery = totalQuery.andWhere('city.id = :cityId', { cityId });
+    }
+
+    const totalCount = await totalQuery.getCount();
 
     return {
       message: await this.i18n.translate('best_selling_products', lang),
@@ -2953,6 +2984,8 @@ export class ProductService {
     keyword?: string,
     type?: CompanyType,
     lang: string = 'fr',
+    countryId?: string,  // Ajout du paramètre optionnel
+    cityId?: string,     // Ajout du paramètre optionnel
   ) {
     if (!keyword || keyword.trim() === '') {
       return {
@@ -2986,6 +3019,14 @@ export class ProductService {
       .andWhere('company.status = :validatedStatus', {
         validatedStatus: 'VALIDATED',
       });
+
+    // Ajout des filtres country et city pour les compagnies
+    if (countryId) {
+      companyQuery.andWhere('country.id = :countryId', { countryId });
+    }
+    if (cityId) {
+      companyQuery.andWhere('city.id = :cityId', { cityId });
+    }
 
     if (type) {
       companyQuery.andWhere('company.typeCompany = :type', { type });
@@ -3035,6 +3076,14 @@ export class ProductService {
         },
       );
 
+    // Ajout des filtres country et city pour les produits
+    if (countryId) {
+      productQuery.andWhere('country.id = :countryId', { countryId });
+    }
+    if (cityId) {
+      productQuery.andWhere('city.id = :cityId', { cityId });
+    }
+
     if (type) {
       productQuery.andWhere('company.typeCompany = :type', { type });
     }
@@ -3065,6 +3114,14 @@ export class ProductService {
       AND company.status = :companyStatus`,
         { searchKey, companyStatus: CompanyStatus.VALIDATED },
       );
+
+    // Ajout des filtres country et city pour les services
+    if (countryId) {
+      serviceQuery.andWhere('country.id = :countryId', { countryId });
+    }
+    if (cityId) {
+      serviceQuery.andWhere('city.id = :cityId', { cityId });
+    }
 
     if (type) {
       serviceQuery.andWhere('company.typeCompany = :type', { type });

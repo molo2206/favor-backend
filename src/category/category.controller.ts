@@ -77,7 +77,7 @@ export class CategoryController {
     const acceptLanguage = req.headers['accept-language'];
     if (!acceptLanguage) return 'fr';
     const primary = acceptLanguage.split(',')[0].split(';')[0].trim();
-    const supported = ['fr', 'en', 'sw', 'es','ar'];
+    const supported = ['fr', 'en', 'sw', 'es', 'ar'];
     return supported.includes(primary) ? primary : 'fr';
   }
 
@@ -212,10 +212,12 @@ export class CategoryController {
     @Req() req: Request,
     @Query('companyId') companyId?: string,
     @Query('type') type?: string,
+    @Query('countryId') countryId?: string,
+    @Query('cityId') cityId?: string,
   ) {
     const lang = this.extractLanguage(req);
     this.logger.log(`Fetching top 10 categories with products`);
-    return this.categoryService.findAllWithProductsLimitTen(companyId, type, lang);
+    return this.categoryService.findAllWithProductsLimitTen(companyId, type, lang, countryId, cityId);
   }
 
   @Get('parents')
