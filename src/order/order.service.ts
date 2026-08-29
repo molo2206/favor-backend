@@ -217,7 +217,7 @@ export class OrderService {
         }
         try {
           const fpayData = {
-            amount: grandTotal,
+            amount: amount as any,
             currency: currency || 'USD',
             description: `Paiement de commande #${invoiceNumb}`,
             access_token: createOrderDto.access_token as string,
@@ -229,10 +229,8 @@ export class OrderService {
       } else if (paymentMethod === PaymentMethod.FPAY) {
         selectedMethod = PaymentMethod.FPAY;
 
-        const amountToPay = grandTotal || 0;
-
         const fpayData = {
-          amount: amountToPay,
+          amount: totalAmount + (shippingCost || 0),
           currency: currency || 'USD',
           description: `Paiement de commande #${invoiceNumb}`,
           access_token: createOrderDto.access_token as string,
