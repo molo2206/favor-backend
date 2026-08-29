@@ -183,10 +183,8 @@ export class OrderService {
     if (paymentMethod === PaymentMethod.FPAY) {
       selectedMethod = PaymentMethod.FPAY;
 
-      const amountToPay = grandTotal || totalAmount || 0;
-
       const fpayData = {
-        amount: amountToPay,
+        amount: grandTotal,
         currency: currency || 'USD',
         description: `Paiement de commande #${invoiceNumb}`,
         access_token: createOrderDto.access_token as string,
@@ -219,6 +217,36 @@ export class OrderService {
       }
     }
     // ✅ FIN AJOUT FPAY
+    // else if (type === CompanyType.RESTAURANT) {
+    //   selectedMethod = paymentMethod || PaymentMethod.MANUAL;
+
+    //   if (selectedMethod === PaymentMethod.MOBILE_MONEY) {
+    //     if (!provider || !phone || !grandTotal) {
+    //       throw new BadRequestException(
+    //         'Provider, phone et grandTotal sont requis pour le paiement Mobile Money'
+    //       );
+    //     }
+
+    //     console.log('[Order] Paiement Mobile Money via FPay');
+
+    //     const fpayResponse = await this.fpayService.payWithMobileMoney(
+    //       grandTotal,
+    //       currency || 'USD',
+    //       `Paiement de commande #${invoiceNumb}`,
+    //       'MOBILE_MONEY',
+    //       lang
+    //     );
+
+    //     if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+    //       paymentStatus = PaymentStatus.PAID;
+    //       orderStatus = OrderStatus.VALIDATED;
+    //       isPaidByMobileMoney = true;
+    //       fpayTransactionId = fpayResponse.data.transaction.id;
+    //       fpayReference = fpayResponse.data.transaction.reference;
+    //     } else {
+    //       throw new BadRequestException('Le paiement a échoué');
+    //     }
+    //   }
     else if (type === CompanyType.RESTAURANT) {
       selectedMethod = paymentMethod || PaymentMethod.MANUAL;
 
