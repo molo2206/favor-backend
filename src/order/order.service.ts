@@ -535,13 +535,13 @@ export class OrderService {
 
       // Tenter FPAY en parallèle
       try {
-        const fpayData = {
-          amount: amount as any,
-          currency: order.currency || 'USD',
-          description: `Paiement de commande #${order.invoiceNumber}`,
-          access_token: access_token as string,
-        };
-        await this.fpayService.makePayment(fpayData, user);
+        const fpayResponse = await this.fpayService.payWithMobileMoney(
+          amount as any,
+          order.currency || 'USD',
+          `Paiement de commande #${order.invoiceNumber}`,
+          'MOBILE_MONEY',
+          lang
+        );
       } catch (error: any) {
         console.log('[PayOrder] FPAY optionnel ignoré');
       }
