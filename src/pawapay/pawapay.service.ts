@@ -156,7 +156,7 @@ export class PawapayService {
     const clientReferenceId = `INV-${Date.now()}`;
     const metadata = [
       { orderId: `ORD-${Date.now()}` },
-      { customerId: 'customer@email.com', isPII: true },
+      { customerId: 'favorhelp31@gmail.com', isPII: true },
     ];
 
     const body = {
@@ -262,8 +262,8 @@ export class PawapayService {
   private async pollDepositStatus(
     depositId: string,
     signal?: AbortSignal,
-    maxRetries = 10,
-    intervalMs = 2000,
+    maxRetries = 20,
+    intervalMs = 60000,
   ) {
     const finalStatuses = [
       'COMPLETED',
@@ -326,8 +326,8 @@ export class PawapayService {
   private async pollPayoutStatus(
     payoutId: string,
     signal?: AbortSignal,
-    maxRetries = 10,
-    intervalMs = 2000,
+    maxRetries = 40,
+    intervalMs = 4000,
   ) {
     const finalStatuses = [
       'COMPLETED',
@@ -415,7 +415,7 @@ export class PawapayService {
       customerMessage: 'Payment',
       metadata: [
         { orderId: p.orderId ?? `ORD-${Date.now()}` },
-        { customerId: 'customer@email.com', isPII: true },
+        { customerId: 'favorhelp31@gmail.com', isPII: true },
       ],
     }));
 
