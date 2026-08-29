@@ -740,6 +740,8 @@ export class FpayService {
         }
     }
 
+
+
     getApiKey(): string {
         return this.apiKey;
     }
@@ -785,6 +787,38 @@ export class FpayService {
     // ============================================================
     // 7. GESTION DES ERREURS
     // ============================================================
+
+    // ============================================================
+    // 8. RÉCUPÉRATION D'UNE TRANSACTION PAR ID
+    // ============================================================
+    async getTransactionById(transactionId: string): Promise<any> {
+        try {
+            this.logger.log(`🔍 Récupération de la transaction: ${transactionId}`);
+
+            if (!transactionId) {
+                throw new HttpException(
+                    'ID de transaction requis',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            const url = `${this.fpayApiUrl}/wallet/transactions/${transactionId}`;
+
+            const response = await firstValueFrom(
+                this.httpService.get(
+                    url,
+                    { headers: this.getHeaders() }
+                )
+            );
+
+            this.logger.log(`✅ Transaction récupérée avec succès: ${transactionId}`);
+            return response.data;
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur récupération transaction: ${error.message}`);
+            throw this.handleError(error);
+        }
+    }
 
     private handleError(error: any): HttpException {
         if (error.response) {

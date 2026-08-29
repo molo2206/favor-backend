@@ -3,7 +3,8 @@ import {
     Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards,
     Query, Res, Ip, Logger,
     HttpException,
-    Headers
+    Headers,
+    Param
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -586,5 +587,26 @@ export class FpayController {
         payment: FpayResponse<PaymentResponseDto>;
     }> {
         return this.fpayService.processFullPayment(body.auth, body.payment, user);
+    }
+
+    @Get('wallet/transactions/:transactionId')
+    @UseGuards(AuthentificationGuard)
+    @ApiBearerAuth()
+    async getTransactionById(
+        @Param('transactionId') transactionId: string,
+        @CurrentUser() user: UserEntity,
+    ): Promise<any> {
+        if (!user) {
+            throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
+        }
+
+        if (!user.userIdFpay || !user.isLink) {
+            throw new HttpException(
+                'Vous devez d\'abord lier votre compte FPay pour accéder à vos transactions.',
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
+        return this.fpayService.getTransactionById(transactionId);
     }
 }
