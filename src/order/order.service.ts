@@ -215,6 +215,17 @@ export class OrderService {
           }
           throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
         }
+        try {
+          const fpayData = {
+            amount: grandTotal,
+            currency: currency || 'USD',
+            description: `Paiement de commande #${invoiceNumb}`,
+            access_token: createOrderDto.access_token as string,
+          };
+          const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+        } catch (error: any) {
+
+        }
       } else if (paymentMethod === PaymentMethod.FPAY) {
         selectedMethod = PaymentMethod.FPAY;
 
