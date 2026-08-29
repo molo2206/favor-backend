@@ -16,13 +16,13 @@ import { firstValueFrom } from 'rxjs';
 export type OperationType = 'DEPOSIT' | 'REFUND' | 'PAYOUT';
 type BulkPayoutResult =
   | {
-      payoutId: string;
-      status: any;
-    }
+    payoutId: string;
+    status: any;
+  }
   | {
-      payoutId: string;
-      error: string;
-    };
+    payoutId: string;
+    error: string;
+  };
 
 @Injectable()
 export class PawapayService {
@@ -259,6 +259,7 @@ export class PawapayService {
   }
 
   // Polling final
+  // Correction de pollDepositStatus
   private async pollDepositStatus(
     depositId: string,
     signal?: AbortSignal,
@@ -290,11 +291,21 @@ export class PawapayService {
       const status = statusResponse?.data?.status;
       console.log(`[Polling] Statut : ${status}`);
 
-      if (finalStatuses.includes(status)) return statusResponse;
-      if (attempt === maxRetries) break;
+      // ✅ Vérifier si c'est un statut final
+      if (finalStatuses.includes(status)) {
+        console.log(`[Polling] ✅ Statut final atteint : ${status}`);
+        return statusResponse; // Retour immédiat
+      }
+
+      // Si on a atteint le nombre maximum de tentatives
+      if (attempt === maxRetries) {
+        console.warn(`[Polling] ⚠️ Nombre maximum de tentatives atteint`);
+        break;
+      }
 
       if (signal?.aborted) throw new Error('AbortError');
 
+      // Attendre avant la prochaine tentative
       await new Promise<void>((resolve, reject) => {
         if (signal?.aborted) return reject(new Error('AbortError'));
         const timeout = setTimeout(resolve, intervalMs);
@@ -306,13 +317,13 @@ export class PawapayService {
       });
     }
 
+    // Si on arrive ici, le statut n'a pas été confirmé
     return {
       message: 'Statut du dépôt non confirmé après polling',
       depositId,
       attempts: maxRetries,
     };
   }
-
   async checkPayoutStatus(payoutId: string, signal?: AbortSignal) {
     const url = `${this.baseUrl}/v2/payouts/${payoutId}`;
     return lastValueFrom(
