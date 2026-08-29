@@ -44,7 +44,7 @@ import { CreateReservationAdminDto } from './dto/create-reservation-admin.dto';
 import { PayReservationAdminDto } from './dto/pay-reservation-admin.dto';
 import { I18nService } from 'src/libs/common/src';
 import { FpayService } from 'src/fpay/fpay.service';
-import { randomBytes } from 'crypto';
+
 @Injectable()
 export class ReservationsVehiclesService {
   constructor(
@@ -372,74 +372,79 @@ export class ReservationsVehiclesService {
 
       // ✅ AJOUT FPAY - directement avec pin et phone du body
       if (createDto.paymentMethod === PaymentMethod.FPAY) {
-        // ✅ Récupérer le userId (identifiant de l'utilisateur)
-        const { userId } = createDto;
+        const { pin, phone } = createDto;
 
-        // ✅ Vérifier que userId est fourni
-        if (!userId) {
-          throw new BadRequestException(
-            await this.i18n.translate('reservation.user_id_required', lang)
-          );
+        if (!pin) {
+          throw new BadRequestException(await this.i18n.translate('reservation.fpay_pin_required', lang));
         }
 
-        // ✅ Récupérer l'utilisateur
+        if (!phone) {
+          throw new BadRequestException(await this.i18n.translate('reservation.fpay_phone_required', lang));
+        }
+
+        if (!userId) {
+          throw new BadRequestException(await this.i18n.translate('reservation.user_id_required', lang));
+        }
+
         const user = await this.userRepository.findOne({ where: { id: userId } });
         if (!user) {
-          throw new BadRequestException(
-            await this.i18n.translate('reservation.user_not_found', lang)
-          );
+          throw new BadRequestException(await this.i18n.translate('reservation.user_not_found', lang));
         }
 
-        const amountToPay = realTotal || 0;
-
-        // ✅ Données de paiement avec access_token
+        if (!user.userIdFpay) {
+          throw new BadRequestException(await this.i18n.translate('reservation.fpay_account_not_linked', lang));
+        }
         const fpayData = {
-          amount: amountToPay,
+          amount: realSegmentsTotal + totalMealsFee,
           currency: 'USD',
           description: `Paiement de réservation #${savedReservation.id.slice(0, 8)}`,
           access_token: createDto.access_token as string,
         };
 
-        console.log('[Reservation] Tentative de paiement FPAY :', {
-          userId: user.id,
-          amount: fpayData.amount,
-          currency: fpayData.currency,
-          reservationId: savedReservation.id,
-          hasAccessToken: !!fpayData.access_token,
-        });
+        try {
+          const fpayResponse = await this.fpayService.makePayment(fpayData, user);
 
-        // ✅ Appel au service FPay - toutes les exceptions sont gérées dans le service
-        const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+          if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+            savedReservation.status = ReservationStatus.CONFIRMED;
+            isPaid = true;
+            fpayTransactionId = fpayResponse.data.transaction.id;
+            fpayReference = fpayResponse.data.transaction.reference;
+            await queryRunner.manager.save(savedReservation);
 
-        // ✅ Si on arrive ici, le paiement est réussi
-        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-          savedReservation.status = ReservationStatus.CONFIRMED;
-          isPaid = true;
-          fpayTransactionId = fpayResponse.data.transaction.id;
-          fpayReference = fpayResponse.data.transaction.reference;
-          await queryRunner.manager.save(savedReservation);
-
-          console.log('[Reservation] ✅ Paiement FPAY réussi:', {
-            transactionId: fpayTransactionId,
-            reference: fpayReference,
-            amount: fpayResponse.data.transaction.amount,
-          });
+            console.log('[Reservation] ✅ Paiement FPAY réussi:', {
+              transactionId: fpayTransactionId,
+              reference: fpayReference,
+              amount: fpayResponse.data.transaction.amount,
+            });
+          } else {
+            throw new BadRequestException(await this.i18n.translate('reservation.fpay_payment_failed', lang));
+          }
+        } catch (error: any) {
+          console.error('[Reservation] ❌ Erreur paiement FPAY:', error.message);
+          throw new BadRequestException(
+            error.message || await this.i18n.translate('reservation.fpay_payment_failed', lang)
+          );
         }
       }
       // ✅ FIN AJOUT FPAY
 
       else if (createDto.paymentMethod === PaymentMethod.MOBILE_MONEY && createDto.mobileMoneyDetails) {
         const { providerId, phone } = createDto.mobileMoneyDetails;
-        const amount = realTotal;
-        const currency = 'USD';
-
+        const amount = realTotal.toString();
+        const pawapayData = { amount, currency: 'USD', provider: providerId, phone: phone.trim() };
         try {
-          // ✅ Paiement Mobile Money via FPay
-          console.log('[Reservation] Paiement Mobile Money via FPay');
-
+          const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData);
+          const depositStatus = pawapayResponse.finalStatus?.data?.status;
+          if (depositStatus === 'COMPLETED') {
+            savedReservation.status = ReservationStatus.CONFIRMED;
+            isPaid = true;
+            await queryRunner.manager.save(savedReservation);
+          } else {
+            throw new BadRequestException(await this.i18n.translate('reservation.error.payment_failed', lang));
+          }
           const fpayResponse = await this.fpayService.payWithMobileMoney(
-            amount,
-            currency,
+            realSegmentsTotal + totalMealsFee,
+            'USD',
             `Paiement de réservation #${savedReservation.id.slice(0, 8)}`,
             'MOBILE_MONEY',
             lang
@@ -452,30 +457,24 @@ export class ReservationsVehiclesService {
             fpayReference = fpayResponse.data.transaction.reference;
             await queryRunner.manager.save(savedReservation);
 
-            console.log('[Reservation] ✅ Paiement FPay Mobile Money réussi:', {
+            console.log('[Reservation] ✅ Paiement FPAY réussi:', {
               transactionId: fpayTransactionId,
               reference: fpayReference,
-              amount: amount,
+              amount: fpayResponse.data.transaction.amount,
             });
           } else {
-            throw new BadRequestException(
-              await this.i18n.translate('reservation.error.payment_failed', lang)
-            );
+            throw new BadRequestException('Le paiement a échoué');
           }
-        } catch (error: any) {
-          console.error('[Reservation] ❌ Erreur paiement FPay Mobile Money:', error.message);
-          throw new BadRequestException(
-            await this.i18n.translate('reservation.error.payment_failed', lang)
-          );
+
+        } catch (error) {
+          throw new BadRequestException(await this.i18n.translate('reservation.error.payment_failed', lang));
         }
-      }
-      else if (createDto.paymentMethod === PaymentMethod.MANUAL) {
+      } else if (createDto.paymentMethod === PaymentMethod.MANUAL) {
         savedReservation.status = ReservationStatus.PENDING;
         const expiresAfterMinutes = 5;
         savedReservation.expires_at = new Date(Date.now() + expiresAfterMinutes * 60 * 1000);
         await queryRunner.manager.save(savedReservation);
-      }
-      else {
+      } else {
         savedReservation.status = ReservationStatus.PENDING;
         await queryRunner.manager.save(savedReservation);
       }
