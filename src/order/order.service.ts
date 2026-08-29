@@ -229,24 +229,6 @@ export class OrderService {
       } else if (paymentMethod === PaymentMethod.FPAY) {
         selectedMethod = PaymentMethod.FPAY;
 
-        if (!user.userIdFpay) {
-          throw new BadRequestException(
-            this.i18nService.translate('order.fpay_account_not_linked', lang)
-          );
-        }
-
-        if (!pin) {
-          throw new BadRequestException(
-            this.i18nService.translate('order.fpay_pin_required', lang)
-          );
-        }
-
-        if (!phone) {
-          throw new BadRequestException(
-            this.i18nService.translate('order.phone_required', lang)
-          );
-        }
-
         const amountToPay = grandTotal || 0;
 
         const fpayData = {
@@ -256,40 +238,31 @@ export class OrderService {
           access_token: createOrderDto.access_token as string,
         };
 
+        console.log('[Order] Tentative de paiement FPAY :', {
+          userId: user.id,
+          amount: fpayData.amount,
+          currency: fpayData.currency,
+          invoiceNumb,
+          hasAccessToken: !!fpayData.access_token,
+        });
 
-        try {
-          const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+        const fpayResponse = await this.fpayService.makePayment(fpayData, user);
 
-          if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-            paymentStatus = PaymentStatus.PAID;
-            orderStatus = OrderStatus.VALIDATED;
-            isPaidByMobileMoney = true;
-            fpayTransactionId = fpayResponse.data.transaction.id;
-            fpayReference = fpayResponse.data.transaction.reference;
+        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+          paymentStatus = PaymentStatus.PAID;
+          orderStatus = OrderStatus.VALIDATED;
+          isPaidByMobileMoney = true;
+          fpayTransactionId = fpayResponse.data.transaction.id;
+          fpayReference = fpayResponse.data.transaction.reference;
 
-
-            console.log('[Order] ✅ Paiement FPAY réussi:', {
-              transactionId: fpayTransactionId,
-              reference: fpayReference,
-              amount: fpayResponse.data.transaction.amount,
-            });
-          } else {
-            throw new BadRequestException(
-              this.i18nService.translate('order.fpay_payment_failed', lang)
-            );
-          }
-        } catch (error: any) {
-          console.error('[Order] ❌ Erreur paiement FPAY:', error.message);
-
-          if (error.name === 'AbortError') {
-            throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
-          }
-
-          throw new BadRequestException(
-            error.message || this.i18nService.translate('order.fpay_payment_failed', lang)
-          );
+          console.log('[Order] ✅ Paiement FPAY réussi:', {
+            transactionId: fpayTransactionId,
+            reference: fpayReference,
+            amount: fpayResponse.data.transaction.amount,
+          });
         }
-      } else if (selectedMethod === PaymentMethod.CASH) {
+      }
+      else if (selectedMethod === PaymentMethod.CASH) {
         paymentStatus = PaymentStatus.PENDING;
         orderStatus = OrderStatus.PENDING;
         isPaidByMobileMoney = false;
