@@ -213,14 +213,28 @@ export class OrderService {
         // ============================================================
         // 1. PAIEMENT PRINCIPAL VIA PAWAPAY (OBLIGATOIRE)
         // ============================================================
-        // Dans createOrder, remplacer le bloc try/catch Pawapay par :
-
         try {
           const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
           console.log('[Order] Réponse Pawapay :', JSON.stringify(pawapayResponse, null, 2));
 
           const depositStatus = pawapayResponse.finalStatus?.data?.status;
           const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
+
+          if (depositStatus && depositStatus !== 'COMPLETED' && depositStatus !== 'PENDING') {
+            console.log(`[Order] ❌ Statut Pawapay: ${depositStatus}`);
+
+            // ✅ Retourner directement le message brut de Pawapay
+            if (failureReason?.failureMessage) {
+              throw new BadRequestException(failureReason.failureMessage);
+            }
+
+            // ✅ Si pas de failureMessage, retourner le statut
+            throw new BadRequestException(`Paiement échoué: ${depositStatus}`);
+          }
+
+          if (depositStatus === 'PENDING') {
+            console.log('[Order] ⏳ Dépôt en attente, polling en cours...');
+          }
 
           switch (depositStatus) {
             case 'COMPLETED':
@@ -231,73 +245,18 @@ export class OrderService {
               break;
 
             case 'REJECTED':
-              // ✅ Gérer les rejets avec des messages spécifiques
-              console.log('[Order] ❌ Dépôt Pawapay REJETÉ');
-
-              if (failureReason) {
-                const failureCode = failureReason.failureCode;
-                const failureMessage = failureReason.failureMessage;
-
-                console.log(`[Order] Code: ${failureCode}, Message: ${failureMessage}`);
-
-                // ✅ Messages d'erreur personnalisés selon le code
-                let userMessage = this.i18nService.translate('order.payment_failed', lang);
-
-                switch (failureCode) {
-                  case 'INVALID_AMOUNT':
-                    userMessage = `Le montant n'est pas valide. ${failureMessage}`;
-                    break;
-                  case 'AMOUNT_OUT_OF_BOUNDS':
-                    userMessage = `Le montant est en dehors des limites autorisées. ${failureMessage}`;
-                    break;
-                  case 'INVALID_CURRENCY':
-                    userMessage = `La devise n'est pas supportée. ${failureMessage}`;
-                    break;
-                  case 'INVALID_PHONE_NUMBER':
-                    userMessage = `Le numéro de téléphone n'est pas valide. ${failureMessage}`;
-                    break;
-                  case 'INVALID_PROVIDER':
-                    userMessage = `Le fournisseur n'est pas valide. ${failureMessage}`;
-                    break;
-                  case 'INSUFFICIENT_BALANCE':
-                    userMessage = `Solde insuffisant. ${failureMessage}`;
-                    break;
-                  case 'PROVIDER_UNAVAILABLE':
-                    userMessage = `Le fournisseur est temporairement indisponible. ${failureMessage}`;
-                    break;
-                  case 'RATE_LIMIT_EXCEEDED':
-                    userMessage = `Trop de tentatives. Veuillez réessayer plus tard. ${failureMessage}`;
-                    break;
-                  default:
-                    userMessage = failureMessage || this.i18nService.translate('order.payment_failed', lang);
-                }
-
-                throw new BadRequestException(userMessage);
-              }
-
-              throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
-
             case 'FAILED':
-              console.log('[Order] ❌ Dépôt Pawapay FAILED');
-              const failMsg = failureReason?.failureMessage || this.i18nService.translate('order.payment_failed', lang);
-              throw new BadRequestException(failMsg);
-
             case 'CANCELED':
-              console.log('[Order] ❌ Dépôt Pawapay CANCELED');
-              throw new BadRequestException('Le paiement a été annulé.');
-
             case 'EXPIRED':
-              console.log('[Order] ❌ Dépôt Pawapay EXPIRED');
-              throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
+              // ✅ Retourner le message brut ou le statut
+              const errorMsg = failureReason?.failureMessage || `Paiement échoué: ${depositStatus}`;
+              throw new BadRequestException(errorMsg);
 
             default:
               console.log(`[Order] ❌ Statut inconnu: ${depositStatus}`);
-              throw new BadRequestException(
-                this.i18nService.translate('order.payment_failed', lang)
-              );
+              throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
           }
         } catch (error: any) {
-          // ✅ Gérer l'annulation
           if (error.name === 'AbortError' || signal?.aborted) {
             console.log('[Order] ⚠️ Opération annulée par l\'utilisateur');
             throw new BadRequestException(
@@ -305,7 +264,6 @@ export class OrderService {
             );
           }
 
-          // ✅ Si c'est déjà une BadRequestException, la relancer
           if (error instanceof BadRequestException) {
             throw error;
           }
@@ -622,6 +580,21 @@ export class OrderService {
         const depositStatus = pawapayResponse.finalStatus?.data?.status;
         const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
 
+        if (depositStatus && depositStatus !== 'COMPLETED' && depositStatus !== 'PENDING') {
+          console.log(`[PayOrder] ❌ Statut Pawapay: ${depositStatus}`);
+
+          // ✅ Retourner directement le message brut de Pawapay
+          if (failureReason?.failureMessage) {
+            throw new BadRequestException(failureReason.failureMessage);
+          }
+
+          throw new BadRequestException(`Paiement échoué: ${depositStatus}`);
+        }
+
+        if (depositStatus === 'PENDING') {
+          console.log('[PayOrder] ⏳ Dépôt en attente, polling en cours...');
+        }
+
         switch (depositStatus) {
           case 'COMPLETED':
             console.log('[PayOrder] ✅ Dépôt Pawapay confirmé : COMPLETED');
@@ -631,65 +604,15 @@ export class OrderService {
             break;
 
           case 'REJECTED':
-            console.log('[PayOrder] ❌ Dépôt Pawapay REJETÉ');
-
-            if (failureReason) {
-              const failureCode = failureReason.failureCode;
-              const failureMessage = failureReason.failureMessage;
-
-              console.log(`[PayOrder] Code: ${failureCode}, Message: ${failureMessage}`);
-
-              let userMessage = this.i18nService.translate('order.payment_failed', lang);
-
-              switch (failureCode) {
-                case 'INVALID_AMOUNT':
-                  userMessage = `Le montant n'est pas valide. ${failureMessage}`;
-                  break;
-                case 'AMOUNT_OUT_OF_BOUNDS':
-                  userMessage = `Le montant est en dehors des limites autorisées. ${failureMessage}`;
-                  break;
-                case 'INVALID_CURRENCY':
-                  userMessage = `La devise n'est pas supportée. ${failureMessage}`;
-                  break;
-                case 'INVALID_PHONE_NUMBER':
-                  userMessage = `Le numéro de téléphone n'est pas valide. ${failureMessage}`;
-                  break;
-                case 'INVALID_PROVIDER':
-                  userMessage = `Le fournisseur n'est pas valide. ${failureMessage}`;
-                  break;
-                case 'INSUFFICIENT_BALANCE':
-                  userMessage = `Solde insuffisant. ${failureMessage}`;
-                  break;
-                case 'PROVIDER_UNAVAILABLE':
-                  userMessage = `Le fournisseur est temporairement indisponible. ${failureMessage}`;
-                  break;
-                default:
-                  userMessage = failureMessage || this.i18nService.translate('order.payment_failed', lang);
-              }
-
-              throw new BadRequestException(userMessage);
-            }
-
-            throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
-
           case 'FAILED':
-            console.log('[PayOrder] ❌ Dépôt Pawapay FAILED');
-            const failMsg = failureReason?.failureMessage || this.i18nService.translate('order.payment_failed', lang);
-            throw new BadRequestException(failMsg);
-
           case 'CANCELED':
-            console.log('[PayOrder] ❌ Dépôt Pawapay CANCELED');
-            throw new BadRequestException('Le paiement a été annulé.');
-
           case 'EXPIRED':
-            console.log('[PayOrder] ❌ Dépôt Pawapay EXPIRED');
-            throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
+            const errorMsg = failureReason?.failureMessage || `Paiement échoué: ${depositStatus}`;
+            throw new BadRequestException(errorMsg);
 
           default:
             console.log(`[PayOrder] ❌ Statut inconnu: ${depositStatus}`);
-            throw new BadRequestException(
-              this.i18nService.translate('order.payment_failed', lang)
-            );
+            throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
         }
       } catch (error: any) {
         if (error.name === 'AbortError' || signal?.aborted) {
