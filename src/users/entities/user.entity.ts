@@ -33,6 +33,7 @@ import { UserNotification } from 'src/firebase/entities/user-notification.entity
 import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { UserSettingsEntity } from './user-settings.entity';
 import { UserLoyaltyEntity } from './user-loyalty.entity';
+import { ReferralEntity } from './referral.entity';
 // import { DriverVehicle } from 'src/Course/Traitment/Entity/DriverVehicle.entity';
 // import { Ride } from 'src/Course/Traitment/Entity/Ride.entity';
 
