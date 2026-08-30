@@ -19,6 +19,7 @@ import { FilesService } from 'src/files/files.service';
 import { UserSettingsEntity } from './entities/user-settings.entity';
 import { CommonModule } from 'src/libs/common/src/common.module';
 import { UserLoyaltyEntity } from './entities/user-loyalty.entity';
+import { ReferralEntity } from './entities/referral.entity';
 
 
 @Module({
@@ -32,7 +33,8 @@ import { UserLoyaltyEntity } from './entities/user-loyalty.entity';
       CompanyEntity,
       BranchEntity,
       UserSettingsEntity,
-      UserLoyaltyEntity
+      UserLoyaltyEntity,
+      ReferralEntity
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
