@@ -2351,7 +2351,7 @@ export class UsersService {
     })) || [];
 
     // ✅ Construction du lien de parrainage
-    const baseUrl = process.env.FRONTEND_URL || 'https://favorhelp.com';
+    const baseUrl ='https://favorhelp.com';
     const referralLink = user.referralCode
       ? `${baseUrl}/register?ref=${user.referralCode}`
       : null;
