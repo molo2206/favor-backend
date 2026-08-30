@@ -220,6 +220,7 @@ export class OrderService {
 
           const depositStatus = pawapayResponse.finalStatus?.data?.status;
           const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
+          const lastStatus = pawapayResponse.finalStatus?.data?.lastStatus;
 
           console.log(`[Order] Statut final Pawapay: ${depositStatus}`);
 
@@ -230,30 +231,61 @@ export class OrderService {
             orderStatus = OrderStatus.VALIDATED;
             isPaidByMobileMoney = true;
           }
-          // ✅ Si TIMEOUT -> Le paiement est en attente, on ne bloque pas la commande ?
-          else if (depositStatus === 'TIMEOUT') {
-            console.log('[Order] ⏳ Timeout du polling - paiement en attente');
-            // ❌ Option 1: On rejette la commande
-            throw new BadRequestException(
-              'Le paiement est en attente de confirmation. Veuillez vérifier le statut plus tard.'
-            );
-            // ✅ Option 2: On continue mais on met la commande en attente
-            // paymentStatus = PaymentStatus.PENDING;
-            // orderStatus = OrderStatus.PENDING;
-            // isPaidByMobileMoney = false;
-          }
-          // ✅ Si statut d'erreur définitif
-          else if (depositStatus === 'REJECTED' || depositStatus === 'FAILED' ||
-            depositStatus === 'CANCELED' || depositStatus === 'EXPIRED') {
-            console.log(`[Order] ❌ Statut d'erreur: ${depositStatus}`);
+          // ✅ Si REJECTED -> Échec (mauvais PIN, etc.)
+          else if (depositStatus === 'REJECTED') {
+            console.log('[Order] ❌ Paiement rejeté par Pawapay');
 
             if (failureReason?.failureMessage) {
               throw new BadRequestException(failureReason.failureMessage);
             }
 
-            throw new BadRequestException(`Paiement échoué: ${depositStatus}`);
+            throw new BadRequestException('Le paiement a été rejeté. Veuillez vérifier vos informations.');
+          }
+          // ✅ Si FAILED -> Échec
+          else if (depositStatus === 'FAILED') {
+            console.log('[Order] ❌ Paiement échoué');
+
+            if (failureReason?.failureMessage) {
+              throw new BadRequestException(failureReason.failureMessage);
+            }
+
+            throw new BadRequestException('Le paiement a échoué. Veuillez réessayer.');
+          }
+          // ✅ Si CANCELED -> Annulé
+          else if (depositStatus === 'CANCELED') {
+            console.log('[Order] ❌ Paiement annulé');
+            throw new BadRequestException('Le paiement a été annulé.');
+          }
+          // ✅ Si EXPIRED -> Expiré
+          else if (depositStatus === 'EXPIRED') {
+            console.log('[Order] ❌ Paiement expiré');
+            throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
+          }
+          // ✅ Si TIMEOUT -> Le paiement est en attente depuis trop longtemps
+          else if (depositStatus === 'TIMEOUT') {
+            console.log('[Order] ⏳ Timeout du polling');
+
+            // ✅ Si le dernier statut était ACCEPTED, on considère que le paiement est en cours
+            if (lastStatus === 'ACCEPTED' || lastStatus === 'PENDING' || lastStatus === 'PROCESSING') {
+              throw new BadRequestException(
+                `Le paiement est en cours de traitement (${lastStatus}). Veuillez vérifier le statut plus tard.`
+              );
+            }
+
+            throw new BadRequestException(
+              'Le paiement est en attente depuis trop longtemps. Veuillez vérifier le statut manuellement.'
+            );
           }
           // ✅ Si statut en attente (normalement ne devrait pas arriver car polling retourne un statut final)
+          else if (depositStatus === 'ACCEPTED' || depositStatus === 'PENDING' || depositStatus === 'PROCESSING' || depositStatus === 'WAITING') {
+            console.log(`[Order] ⏳ Statut en attente: ${depositStatus}`);
+            // ✅ On continue mais on met la commande en attente
+            paymentStatus = PaymentStatus.PENDING;
+            orderStatus = OrderStatus.PENDING;
+            isPaidByMobileMoney = false;
+            console.log(`[Order] Commande en attente de confirmation du paiement (${depositStatus})`);
+          }
+          // ✅ Si statut inconnu
           else {
             console.log(`[Order] ⚠️ Statut inattendu: ${depositStatus}`);
             throw new BadRequestException(`Statut de paiement inattendu: ${depositStatus}`);
