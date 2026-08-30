@@ -258,7 +258,6 @@ export class PawapayService {
     ).then((r) => r.data);
   }
 
-  // Polling final
   private async pollDepositStatus(
     depositId: string,
     signal?: AbortSignal,
@@ -306,7 +305,7 @@ export class PawapayService {
       }
 
       // ✅ Si statut en attente, log
-      console.log(`[Polling] ⏳ En attente: ${status}, prochaine tentative dans ${intervalMs / 1000}s`);
+      console.log(`[Polling] ⏳ En attente: ${status}`);
 
       if (attempt === maxRetries) {
         console.warn(`[Polling] ⚠️ Max retries atteint, dernier statut: ${status}`);
@@ -338,6 +337,7 @@ export class PawapayService {
       }
     };
   }
+  
   async checkPayoutStatus(payoutId: string, signal?: AbortSignal) {
     const url = `${this.baseUrl}/v2/payouts/${payoutId}`;
     return lastValueFrom(
