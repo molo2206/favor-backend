@@ -194,9 +194,18 @@ export class OrderService {
         if (!grandTotal) {
           throw new BadRequestException(this.i18nService.translate('order.mobile_money_grandtotal_required', lang));
         }
-        const amount = totalAmount + (shippingCost || 0);
+        const finalGrandTotal = grandTotal || (totalAmount + (shippingCost || 0));
+
+        // ✅ Vérifier que le montant est valide
+        if (!finalGrandTotal || finalGrandTotal <= 0) {
+          throw new BadRequestException(
+            this.i18nService.translate('order.mobile_money_grandtotal_required', lang)
+          );
+        }
+
+        const amount = finalGrandTotal.toString();
         const pawapayData = {
-          amount: amount.toString(), // ✅ Convertir en string
+          amount: amount, // ✅ Convertir en string
           currency,
           provider,
           phone: phon
