@@ -12,10 +12,10 @@ import { Server, Socket } from 'socket.io';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { RideService } from 'src/Course/Ride/ride.service';
+import { RideService } from 'src/Course et Taxi/Ride/ride.service';
 import { NotificationsService } from './notifications.service';
 import { NotificationType } from './type/notification.type';
-import { DriverLocationService } from 'src/Course/DriverLocation/driver-location.service';
+import { DriverLocationService } from 'src/Course et Taxi/DriverLocation/driver-location.service';
 
 interface ActiveUser {
   id: string;

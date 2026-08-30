@@ -1,6 +1,6 @@
 // types/ride-notification.types.ts
-import { Ride } from 'src/Course/Ride/entity/Ride.entity';
-import { RideStatus } from 'src/Course/Ride/enum/RideStatus.enum';
+import { Ride } from 'src/Course et Taxi/Ride/entity/Ride.entity';
+import { RideStatus } from 'src/Course et Taxi/Ride/enum/RideStatus.enum';
 import { UserEntity } from 'src/users/entities/user.entity';
 
 export interface RideNotificationData {

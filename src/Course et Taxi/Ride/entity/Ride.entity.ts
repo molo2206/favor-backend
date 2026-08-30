@@ -1,6 +1,6 @@
 import { CategoryEntity } from 'src/category/entities/category.entity';
 import { City } from 'src/company/entities/city.entity';
-import { RideStatus } from 'src/Course/Ride/enum/RideStatus.enum';
+import { RideStatus } from 'src/Course et Taxi/Ride/enum/RideStatus.enum';
 import { UserEntity } from 'src/users/entities/user.entity';
 import {
   Entity,

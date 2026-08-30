@@ -1,5 +1,5 @@
 import { CategoryAttribute } from 'src/AttributGlobal/entities/category_attributes.entity';
-import { Pricing } from 'src/Course/Pricing/entity/Pricing.entity';
+import { Pricing } from 'src/Course et Taxi/Pricing/entity/Pricing.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { Service } from 'src/service/entities/service.entity';
 import { CategorySpecification } from 'src/specification/entities/CategorySpecification.entity';

@@ -95,7 +95,6 @@ export class UsersService {
     userId: string,
     existingCodes?: string[],
   ): Promise<string> {
-    // ✅ Format: REF-XXXX-XXXXXX
     const prefix = 'REF';
     const userIdShort = userId.substring(0, 4).toUpperCase();
 
@@ -297,29 +296,36 @@ export class UsersService {
     const referralCodeGenerated = await this.generateReferralCode(savedUser.id);
     savedUser.referralCode = referralCodeGenerated;
 
-    // ✅ Traiter le parrainage si un code a été fourni
     if (referralCode) {
+      // 1. Trouver le parrain
       const referrer = await this.usersRepository.findOne({
         where: { referralCode },
       });
 
       if (referrer && referrer.id !== savedUser.id) {
-        savedUser.referredBy = referrer.id;
-
+        // 2. Mettre à jour UserEntity du parrain
         referrer.referralCount = (referrer.referralCount || 0) + 1;
+        referrer.referralPoints = (referrer.referralPoints || 0) + 5; // 5 points
         referrer.lastReferralDate = new Date();
         await this.usersRepository.save(referrer);
 
+        // 3. Mettre à jour UserEntity du parrainé
+        savedUser.referredBy = referrer.id;
+        await this.usersRepository.save(savedUser);
+
+        // 4. Créer ReferralEntity (historique)
         const referral = this.referralRepository.create({
           referrerId: referrer.id,
           referredId: savedUser.id,
           referralCode: referralCode,
-          status: ReferralStatus.PENDING,
+          status: ReferralStatus.COMPLETED, // ✅ Directement COMPLETED
+          rewardAmount: 5,
+          rewardType: 'POINTS',
+          completedAt: new Date(),
         });
         await this.referralRepository.save(referral);
       }
     }
-
     // ✅ Sauvegarder l'utilisateur avec le code de parrainage
     await this.usersRepository.save(savedUser);
 
@@ -2289,6 +2295,82 @@ export class UsersService {
       console.error('Erreur extraction public_id:', error);
       return null;
     }
+  }
+
+  async getReferralPoints(
+    userId: string,
+    lang: string = 'fr',
+  ): Promise<{
+    message: string;
+    data: {
+      referralPoints: number;
+      totalReferralRewards: number;
+      referralCount: number;
+      referralCode: string;
+      referralLink: string;
+      referralActive: boolean;
+      history: {
+        id: string;
+        referredUser: string;
+        referredEmail: string;
+        referredPhone: string;
+        status: string;
+        rewardAmount: number;
+        rewardType: string;
+        createdAt: Date;
+        completedAt: Date | null;
+      }[];
+    };
+  }> {
+    // ✅ Récupérer l'utilisateur avec ses parrainages
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: [
+        'referralHistory',
+        'referralHistory.referred',
+      ],
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        await this.i18n.translate('user_not_found', lang)
+      );
+    }
+
+    // ✅ Historique des parrainages
+    const history = user.referralHistory?.map((referral) => ({
+      id: referral.id,
+      referredUser: referral.referred?.fullName || 'Utilisateur inconnu',
+      referredEmail: referral.referred?.email || 'Non renseigné',
+      referredPhone: referral.referred?.phone || 'Non renseigné',
+      status: referral.status,
+      rewardAmount: Number(referral.rewardAmount) || 0,
+      rewardType: referral.rewardType || 'POINTS',
+      createdAt: referral.createdAt,
+      completedAt: referral.completedAt || null,
+    })) || [];
+
+    // ✅ Construction du lien de parrainage
+    const baseUrl = process.env.FRONTEND_URL || 'https://favorhelp.com';
+    const referralLink = user.referralCode
+      ? `${baseUrl}/register?ref=${user.referralCode}`
+      : null;
+
+    return {
+      message: await this.i18n.translate('referral_points_retrieved', lang),
+      data: {
+        referralPoints: user.referralPoints || 0,
+        totalReferralRewards: user.referralHistory?.reduce(
+          (sum, r) => sum + Number(r.rewardAmount || 0),
+          0
+        ) || 0,
+        referralCount: user.referralCount || 0,
+        referralCode: user.referralCode || 'Non généré',
+        referralLink: referralLink || 'Non disponible',
+        referralActive: user.referralActive !== false,
+        history,
+      },
+    };
   }
 
   async sendOtp(email: string, lang: string = 'fr'): Promise<any> {

@@ -58,7 +58,7 @@ export class UsersController {
     const acceptLanguage = req.headers['accept-language'];
     if (!acceptLanguage) return 'fr';
     const primary = acceptLanguage.split(',')[0].split(';')[0].trim();
-    const supported = ['fr', 'en', 'sw', 'es','ar'];
+    const supported = ['fr', 'en', 'sw', 'es', 'ar'];
     return supported.includes(primary) ? primary : 'fr';
   }
 
@@ -202,6 +202,13 @@ export class UsersController {
       lang,
     );
     return { data: fullUser };
+  }
+
+  @Get('referral/points')
+  @UseGuards(AuthentificationGuard)
+  async getReferralPoints(@CurrentUser() user: UserEntity, @Req() req: Request) {
+    const lang = this.extractLanguage(req);
+    return this.usersService.getReferralPoints(user.id, lang);
   }
 
   @Post('forgot-password')

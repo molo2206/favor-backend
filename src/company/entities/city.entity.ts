@@ -10,8 +10,8 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Country } from './country.entity';
-import { ServiceZone } from 'src/Course/ServiceZone/entity/ServiceZone.entity';
-import { Pricing } from 'src/Course/Pricing/entity/Pricing.entity';
+import { ServiceZone } from 'src/Course et Taxi/ServiceZone/entity/ServiceZone.entity';
+import { Pricing } from 'src/Course et Taxi/Pricing/entity/Pricing.entity';
 
 export interface QuantityTier {
   min: number;
