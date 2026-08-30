@@ -191,9 +191,9 @@ export class OrderService {
         if (!phon) {
           throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
         }
-        if (!grandTotal) {
-          throw new BadRequestException(this.i18nService.translate('order.mobile_money_grandtotal_required', lang));
-        }
+        // if (!grandTotal) {
+        //   throw new BadRequestException(this.i18nService.translate('order.mobile_money_grandtotal_required', lang));
+        // }
         const finalGrandTotal = grandTotal || (totalAmount + (shippingCost || 0));
 
         // ✅ Vérifier que le montant est valide
