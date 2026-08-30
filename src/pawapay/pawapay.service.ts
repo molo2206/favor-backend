@@ -815,23 +815,31 @@ export class PawapayService {
   // 3) Fallback pays par défaut
   // -------------------
   private async getDefaultCountry() {
-    const defaultCode = 'CD'; // Code Pawapay pour RDC
+    // ✅ Essayer plusieurs codes possibles
+    const defaultCodes = ['COD', 'CD'];
 
-    const country = await this.countryRepo.findOne({
-      where: { code: defaultCode },
-      relations: ['networkProviders'],
-    });
+    for (const code of defaultCodes) {
+      console.log(`[PawaPay] Recherche du pays par défaut avec le code: ${code}`);
 
-    if (!country) {
-      return {
-        message: 'Pays par défaut introuvable dans la base',
-        data: null,
-      };
+      const country = await this.countryRepo.findOne({
+        where: { code: code },
+        relations: ['networkProviders'],
+      });
+
+      if (country) {
+        console.log(`[PawaPay] ✅ Pays par défaut trouvé: ${country.name} (${country.code})`);
+        return {
+          message: `Pays par défaut "${code}" retourné`,
+          data: country,
+        };
+      }
     }
 
+    // ✅ Si aucun pays trouvé, retourner null avec un message clair
+    console.warn('[PawaPay] ⚠️ Aucun pays par défaut trouvé');
     return {
-      message: `Pays par défaut "${defaultCode}" retourné`,
-      data: country,
+      message: 'Pays par défaut introuvable dans la base. Veuillez créer un pays avec le code "COD".',
+      data: null,
     };
   }
 }
