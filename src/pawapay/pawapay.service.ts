@@ -188,19 +188,35 @@ export class PawapayService {
       deposit = await lastValueFrom(
         this.httpService.post(`${this.baseUrl}/v2/deposits`, body, {
           headers: this.headers,
-          signal, // ✅ Le signal est passé ici
+          signal,
         }),
       ).then((r) => r.data);
     } catch (error: any) {
-      // ✅ Vérifier si c'est une annulation
       if (error.name === 'AbortError' || signal?.aborted) {
         console.log('[PawaPay] ⚠️ Création du dépôt annulée');
         throw new Error('AbortError');
       }
-      throw error;
+      // ✅ Propager l'erreur HTTP
+      console.error('[PawaPay] ❌ Erreur création dépôt:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.message || error.message || 'Erreur lors de la création du dépôt');
     }
 
     console.log('[PawaPay] Dépôt créé :', deposit.depositId);
+
+    // ✅ Vérifier si le dépôt a un statut d'erreur immédiat
+    if (deposit.status && deposit.status !== 'PENDING') {
+      console.log('[PawaPay] ❌ Statut immédiat:', deposit.status);
+      // ✅ Retourner le statut pour que le caller puisse le traiter
+      return {
+        deposit,
+        finalStatus: {
+          data: {
+            status: deposit.status,
+            failureReason: deposit.failureReason || null
+          }
+        }
+      };
+    }
 
     // ✅ Vérifier l'annulation avant le polling
     if (signal?.aborted) {
@@ -294,8 +310,10 @@ export class PawapayService {
       'REJECTED',
     ];
 
+    // ✅ Statuts d'erreur qui arrêtent immédiatement
+    const errorStatuses = ['REJECTED', 'FAILED', 'CANCELED', 'EXPIRED'];
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      // ✅ Vérifier l'annulation AVANT chaque tentative
       if (signal?.aborted) {
         console.log('[Polling] ⚠️ Opération annulée, arrêt du polling');
         throw new Error('AbortError');
@@ -307,38 +325,45 @@ export class PawapayService {
       try {
         statusResponse = await this.checkDepositStatus(depositId, signal);
       } catch (err: any) {
-        // ✅ Vérifier si l'erreur est due à une annulation
         if (err.name === 'AbortError' || signal?.aborted) {
           console.log('[Polling] ⚠️ Opération annulée pendant la requête');
           throw new Error('AbortError');
         }
+        console.error('[Polling] ❌ Erreur check status:', err.message);
         throw err;
       }
 
       const status = statusResponse?.data?.status;
+      const failureReason = statusResponse?.data?.failureReason;
+
       console.log(`[Polling] Statut : ${status}`);
 
-      // ✅ Vérifier si c'est un statut final
-      if (finalStatuses.includes(status)) {
+      // ✅ Si c'est un statut d'erreur, retourner immédiatement
+      if (errorStatuses.includes(status)) {
+        console.log(`[Polling] ❌ Statut d'erreur : ${status}`);
+        if (failureReason) {
+          console.log(`[Polling] Code: ${failureReason.failureCode}, Message: ${failureReason.failureMessage}`);
+        }
+        return statusResponse;
+      }
+
+      // ✅ Si c'est un statut final (COMPLETED)
+      if (status === 'COMPLETED') {
         console.log(`[Polling] ✅ Statut final atteint : ${status}`);
         return statusResponse;
       }
 
-      // ✅ Si on a atteint le nombre maximum de tentatives
       if (attempt === maxRetries) {
         console.warn(`[Polling] ⚠️ Nombre maximum de tentatives atteint`);
         break;
       }
 
-      // ✅ Vérifier l'annulation avant l'attente
       if (signal?.aborted) {
         console.log('[Polling] ⚠️ Opération annulée avant l\'attente');
         throw new Error('AbortError');
       }
 
-      // ✅ Attendre avec vérification d'annulation
       await new Promise<void>((resolve, reject) => {
-        // Vérifier immédiatement si annulé
         if (signal?.aborted) {
           return reject(new Error('AbortError'));
         }
@@ -350,10 +375,8 @@ export class PawapayService {
           reject(new Error('AbortError'));
         };
 
-        // Ajouter l'écouteur d'annulation
         signal?.addEventListener('abort', abortHandler, { once: true });
 
-        // Nettoyer l'écouteur si le timeout se déclenche
         const originalResolve = resolve;
         resolve = () => {
           signal?.removeEventListener('abort', abortHandler);
