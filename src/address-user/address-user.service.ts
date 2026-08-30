@@ -173,15 +173,15 @@ export class AddressUserService {
       where: {
         user: { id: user.id },
       },
-      relations: ['country', 'city'], // ✅ Ajout des relations
+      relations: ['country', 'city'],
       order: { createdAt: 'DESC' },
     });
   }
 
   async findOne(id: string, user: UserEntity): Promise<AddressUser> {
     const address = await this.addressUserRepo.findOne({
-      where: { id, user: { id: user.id } }, // ✅ Correction du where
-      relations: ['country', 'city'], // ✅ Ajout des relations
+      where: { id, user: { id: user.id } },
+      relations: ['country', 'city'],
     });
 
     if (!address) {
@@ -251,7 +251,11 @@ export class AddressUserService {
   // Récupérer l'adresse par défaut
   async getDefaultAddress(user: UserEntity): Promise<AddressUser> {
     const address = await this.addressUserRepo.findOne({
-      where: { user, isDefault: true },
+      where: {
+        user: { id: user.id },
+        isDefault: true
+      },
+      relations: ['country', 'city'], // ✅ Ajout des relations
     });
 
     if (!address) {

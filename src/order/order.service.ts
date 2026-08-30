@@ -599,7 +599,7 @@ export class OrderService {
       const amount = order.grandTotal;
 
       const pawapayData = {
-        amount: amount.toString(),
+        amount: (order.totalAmount + (order.shippingCost || 0)).toString(),
         currency: order.currency,
         provider,
         phone: phon
