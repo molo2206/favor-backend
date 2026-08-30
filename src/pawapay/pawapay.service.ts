@@ -717,30 +717,97 @@ export class PawapayService {
   //     return await this.getDefaultCountry();
   //   }
   // }
+  private ipCache = new Map<string, any>();
+
   async getCountryByCode(ip: string) {
     try {
-      // Code pays forcé (RDC)
-      const countryCode = 'COD';
+      // ✅ Vérifier le cache
+      if (this.ipCache.has(ip)) {
+        console.log(`[PawaPay] ✅ Pays trouvé en cache pour IP: ${ip}`);
+        return this.ipCache.get(ip);
+      }
+
+      // ✅ IP locale
+      if (
+        !ip ||
+        ip === '127.0.0.1' ||
+        ip === '::1' ||
+        ip === 'localhost' ||
+        ip.startsWith('192.168') ||
+        ip.startsWith('10.') ||
+        ip.startsWith('172.')
+      ) {
+        console.log(`[PawaPay] IP locale détectée: ${ip}`);
+        const defaultCountry = await this.getDefaultCountry();
+        this.ipCache.set(ip, defaultCountry);
+        return defaultCountry;
+      }
+
+      console.log(`[PawaPay] Récupération du pays pour l'IP: ${ip}`);
+
+      // ✅ Appel à l'API ipapi
+      const response = await firstValueFrom(
+        this.httpService.get(`https://ipapi.co/${ip}/json/`, {
+          timeout: 5000,
+        }),
+      );
+
+      if (response.data?.error) {
+        console.warn('[PawaPay] ipapi limité:', response.data);
+        const defaultCountry = await this.getDefaultCountry();
+        this.ipCache.set(ip, defaultCountry);
+        return defaultCountry;
+      }
+
+      const countryIso = response.data?.country;
+      console.log(`[PawaPay] Pays détecté par IP: ${countryIso}`);
+
+      if (!countryIso) {
+        const defaultCountry = await this.getDefaultCountry();
+        this.ipCache.set(ip, defaultCountry);
+        return defaultCountry;
+      }
+
+      const pawapayCode = this.mapIsoToPawapayCode(countryIso);
+      console.log(`[PawaPay] Code Pawapay: ${pawapayCode}`);
+
+      if (!pawapayCode) {
+        const defaultCountry = await this.getDefaultCountry();
+        this.ipCache.set(ip, defaultCountry);
+        return defaultCountry;
+      }
 
       const country = await this.countryRepo.findOne({
-        where: { code: countryCode },
+        where: { code: pawapayCode },
         relations: ['networkProviders'],
       });
 
       if (!country) {
-        return await this.getDefaultCountry();
+        console.warn(`[PawaPay] Pays non trouvé: ${pawapayCode}`);
+        const defaultCountry = await this.getDefaultCountry();
+        this.ipCache.set(ip, defaultCountry);
+        return defaultCountry;
       }
 
-      return {
-        message: `Pays "${countryCode}" défini par défaut`,
+      console.log(`[PawaPay] ✅ Pays trouvé: ${country.name} (${country.code})`);
+
+      const result = {
+        message: `Pays "${pawapayCode}" récupéré avec succès`,
         data: country,
       };
+
+      // ✅ Sauvegarder dans le cache
+      this.ipCache.set(ip, result);
+
+      return result;
     } catch (err: any) {
       console.error(
-        'Erreur récupération pays :',
+        '[PawaPay] ❌ Erreur récupération pays par IP :',
         err.response?.data || err.message,
       );
-      return await this.getDefaultCountry();
+      const defaultCountry = await this.getDefaultCountry();
+      this.ipCache.set(ip, defaultCountry);
+      return defaultCountry;
     }
   }
 
