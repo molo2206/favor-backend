@@ -151,6 +151,12 @@ export class PawapayService {
     },
     signal?: AbortSignal,
   ): Promise<any> {
+    // ✅ Vérifier l'annulation avant de commencer
+    if (signal?.aborted) {
+      console.log('[PawaPay] ⚠️ Opération annulée avant création du dépôt');
+      throw new Error('AbortError');
+    }
+
     // 1️⃣ Création du dépôt
     const depositId = uuidv4();
     const clientReferenceId = `INV-${Date.now()}`;
@@ -170,21 +176,37 @@ export class PawapayService {
       },
       amount: data.amount,
       currency: data.currency,
-      preAuthorisationCode: '3c', // ou vide si Pawapay doit générer
+      preAuthorisationCode: '3c',
       clientReferenceId,
       customerMessage: 'Note of 4 to 22 chars',
       metadata,
     };
 
-    // Appel direct à l'API Pawapay
-    const deposit = await lastValueFrom(
-      this.httpService.post(`${this.baseUrl}/v2/deposits`, body, {
-        headers: this.headers,
-        signal,
-      }),
-    ).then((r) => r.data);
+    // ✅ Appel avec signal d'annulation
+    let deposit;
+    try {
+      deposit = await lastValueFrom(
+        this.httpService.post(`${this.baseUrl}/v2/deposits`, body, {
+          headers: this.headers,
+          signal, // ✅ Le signal est passé ici
+        }),
+      ).then((r) => r.data);
+    } catch (error: any) {
+      // ✅ Vérifier si c'est une annulation
+      if (error.name === 'AbortError' || signal?.aborted) {
+        console.log('[PawaPay] ⚠️ Création du dépôt annulée');
+        throw new Error('AbortError');
+      }
+      throw error;
+    }
 
     console.log('[PawaPay] Dépôt créé :', deposit.depositId);
+
+    // ✅ Vérifier l'annulation avant le polling
+    if (signal?.aborted) {
+      console.log('[PawaPay] ⚠️ Opération annulée après création du dépôt');
+      throw new Error('AbortError');
+    }
 
     // 2️⃣ Polling jusqu’au statut final
     const finalStatus = await this.pollDepositStatus(deposit.depositId, signal);
@@ -258,8 +280,6 @@ export class PawapayService {
     ).then((r) => r.data);
   }
 
-  // Polling final
-  // Correction de pollDepositStatus
   private async pollDepositStatus(
     depositId: string,
     signal?: AbortSignal,
@@ -275,7 +295,11 @@ export class PawapayService {
     ];
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      if (signal?.aborted) throw new Error('AbortError');
+      // ✅ Vérifier l'annulation AVANT chaque tentative
+      if (signal?.aborted) {
+        console.log('[Polling] ⚠️ Opération annulée, arrêt du polling');
+        throw new Error('AbortError');
+      }
 
       console.log(`[Polling] Tentative ${attempt}/${maxRetries}`);
 
@@ -283,8 +307,11 @@ export class PawapayService {
       try {
         statusResponse = await this.checkDepositStatus(depositId, signal);
       } catch (err: any) {
-        if (err.name === 'AbortError' || signal?.aborted)
+        // ✅ Vérifier si l'erreur est due à une annulation
+        if (err.name === 'AbortError' || signal?.aborted) {
+          console.log('[Polling] ⚠️ Opération annulée pendant la requête');
           throw new Error('AbortError');
+        }
         throw err;
       }
 
@@ -294,36 +321,54 @@ export class PawapayService {
       // ✅ Vérifier si c'est un statut final
       if (finalStatuses.includes(status)) {
         console.log(`[Polling] ✅ Statut final atteint : ${status}`);
-        return statusResponse; // Retour immédiat
+        return statusResponse;
       }
 
-      // Si on a atteint le nombre maximum de tentatives
+      // ✅ Si on a atteint le nombre maximum de tentatives
       if (attempt === maxRetries) {
         console.warn(`[Polling] ⚠️ Nombre maximum de tentatives atteint`);
         break;
       }
 
-      if (signal?.aborted) throw new Error('AbortError');
+      // ✅ Vérifier l'annulation avant l'attente
+      if (signal?.aborted) {
+        console.log('[Polling] ⚠️ Opération annulée avant l\'attente');
+        throw new Error('AbortError');
+      }
 
-      // Attendre avant la prochaine tentative
+      // ✅ Attendre avec vérification d'annulation
       await new Promise<void>((resolve, reject) => {
-        if (signal?.aborted) return reject(new Error('AbortError'));
+        // Vérifier immédiatement si annulé
+        if (signal?.aborted) {
+          return reject(new Error('AbortError'));
+        }
+
         const timeout = setTimeout(resolve, intervalMs);
+
         const abortHandler = () => {
           clearTimeout(timeout);
           reject(new Error('AbortError'));
         };
+
+        // Ajouter l'écouteur d'annulation
         signal?.addEventListener('abort', abortHandler, { once: true });
+
+        // Nettoyer l'écouteur si le timeout se déclenche
+        const originalResolve = resolve;
+        resolve = () => {
+          signal?.removeEventListener('abort', abortHandler);
+          originalResolve();
+        };
       });
     }
 
-    // Si on arrive ici, le statut n'a pas été confirmé
     return {
       message: 'Statut du dépôt non confirmé après polling',
       depositId,
       attempts: maxRetries,
     };
   }
+
   async checkPayoutStatus(payoutId: string, signal?: AbortSignal) {
     const url = `${this.baseUrl}/v2/payouts/${payoutId}`;
     return lastValueFrom(

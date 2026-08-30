@@ -228,11 +228,17 @@ export class OrderService {
               throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
           }
         } catch (error: any) {
-          if (error.name === 'AbortError') {
-            throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
+          // ✅ Gérer l'annulation correctement
+          if (error.name === 'AbortError' || signal?.aborted) {
+            console.log('[Order] ⚠️ Opération annulée par l\'utilisateur');
+            throw new BadRequestException(
+              this.i18nService.translate('order.order_request_aborted', lang)
+            );
           }
           console.error('[Order] Erreur Pawapay:', error.message);
-          throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
+          throw new BadRequestException(
+            this.i18nService.translate('order.payment_failed', lang)
+          );
         }
 
         // ============================================================
@@ -566,12 +572,13 @@ export class OrderService {
             );
         }
       } catch (error: any) {
-        if (error.name === 'AbortError') {
+        if (error.name === 'AbortError' || signal?.aborted) {
+          console.log('[PayOrder] ⚠️ Opération annulée par l\'utilisateur');
           throw new BadRequestException(
             this.i18nService.translate('order.order_request_aborted', lang)
           );
         }
-        console.error('[PayOrder] Erreur Pawapay :', error.message);
+        console.error('[PayOrder] Erreur Pawapay:', error.message);
         throw new BadRequestException(
           this.i18nService.translate('order.payment_failed', lang)
         );
