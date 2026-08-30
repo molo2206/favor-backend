@@ -1212,29 +1212,112 @@ export class ShipmentService {
         );
       }
 
-      // ✅ Paiement Mobile Money via FPay
-      console.log('[Shipment] Paiement Mobile Money via FPay');
+      // ✅ Paiement Mobile Money via Pawapay
+      console.log('[Shipment] Paiement Mobile Money via Pawapay');
+
+      const amount = totalAmount.toString();
+      const pawapayData = { amount, currency: currency || 'USD', provider, phone: phon };
 
       try {
-        const fpayResponse = await this.fpayService.payWithMobileMoney(
-          totalAmount,
-          currency || 'USD',
-          `Paiement du colis ${shipment.trackingNumber}`,
-          'MOBILE_MONEY',
-          lang
-        );
+        const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData);
+        console.log('[Shipment] Réponse Pawapay :', JSON.stringify(pawapayResponse, null, 2));
 
-        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-          console.log('[Shipment] ✅ Paiement FPay Mobile Money réussi');
-          fpayTransactionId = fpayResponse.data.transaction.id;
-          fpayReference = fpayResponse.data.transaction.reference;
-        } else {
+        const depositStatus = pawapayResponse.finalStatus?.data?.status;
+        const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
+
+        console.log(`[Shipment] Statut final Pawapay: ${depositStatus}`);
+
+        // ✅ Si COMPLETED -> Succès
+        if (depositStatus === 'COMPLETED') {
+          console.log('[Shipment] ✅ Paiement confirmé : COMPLETED');
+          // Paiement réussi
+        }
+        // ✅ Si REJECTED -> Échec (mauvais PIN, etc.)
+        else if (depositStatus === 'REJECTED') {
+          console.log('[Shipment] ❌ Paiement rejeté');
+
+          if (failureReason?.failureMessage) {
+            throw new BadRequestException(failureReason.failureMessage);
+          }
+
           throw new BadRequestException(
             await this.i18n.translate('shipment.error.pawapay_failed', lang)
           );
         }
+        // ✅ Si FAILED -> Échec
+        else if (depositStatus === 'FAILED') {
+          console.log('[Shipment] ❌ Paiement échoué');
+
+          if (failureReason?.failureMessage) {
+            throw new BadRequestException(failureReason.failureMessage);
+          }
+
+          throw new BadRequestException(
+            await this.i18n.translate('shipment.error.pawapay_failed', lang)
+          );
+        }
+        // ✅ Si CANCELED -> Annulé
+        else if (depositStatus === 'CANCELED') {
+          console.log('[Shipment] ❌ Paiement annulé');
+          throw new BadRequestException('Le paiement a été annulé.');
+        }
+        // ✅ Si EXPIRED -> Expiré
+        else if (depositStatus === 'EXPIRED') {
+          console.log('[Shipment] ❌ Paiement expiré');
+          throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
+        }
+        // ✅ Si TIMEOUT -> Le paiement est en attente depuis trop longtemps
+        else if (depositStatus === 'TIMEOUT') {
+          console.log('[Shipment] ⏳ Timeout du polling');
+          throw new BadRequestException(
+            'Le paiement est en attente de confirmation. Veuillez vérifier le statut plus tard.'
+          );
+        }
+        // ✅ Si statut en attente (ACCEPTED, PENDING, etc.)
+        else if (depositStatus === 'ACCEPTED' || depositStatus === 'PENDING' ||
+          depositStatus === 'PROCESSING' || depositStatus === 'WAITING') {
+          console.log(`[Shipment] ⏳ Statut en attente: ${depositStatus}`);
+          // Le paiement est en attente, on continue
+        }
+        // ✅ Si statut inconnu
+        else {
+          console.log(`[Shipment] ❌ Statut inconnu: ${depositStatus}`);
+          throw new BadRequestException(
+            await this.i18n.translate('shipment.error.pawapay_failed', lang)
+          );
+        }
+
+        // ✅ Tenter FPAY en parallèle (optionnel - ne bloque pas)
+        try {
+          const fpayResponse = await this.fpayService.payWithMobileMoney(
+            totalAmount,
+            currency || 'USD',
+            `Paiement du colis ${shipment.trackingNumber}`,
+            'MOBILE_MONEY',
+            lang
+          );
+
+          if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+            fpayTransactionId = fpayResponse.data.transaction.id;
+            fpayReference = fpayResponse.data.transaction.reference;
+            console.log('[Shipment] ✅ FPAY Mobile Money réussi:', {
+              transactionId: fpayTransactionId,
+              reference: fpayReference,
+            });
+          } else {
+            console.log('[Shipment] ⚠️ FPAY Mobile Money échoué (ignoré)');
+          }
+        } catch (error: any) {
+          console.log('[Shipment] FPAY Mobile Money ignoré:', error.message);
+        }
+
       } catch (error: any) {
-        console.error('[Shipment] ❌ Erreur paiement FPay Mobile Money:', error.message);
+        console.error('[Shipment] Erreur Pawapay:', error.message);
+
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+
         throw new BadRequestException(
           error.message || await this.i18n.translate('shipment.error.pawapay_failed', lang)
         );

@@ -432,42 +432,95 @@ export class ReservationsVehiclesService {
         const { providerId, phone } = createDto.mobileMoneyDetails;
         const amount = realTotal.toString();
         const pawapayData = { amount, currency: 'USD', provider: providerId, phone: phone.trim() };
+
         try {
           const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData);
+          console.log('[Reservation] Réponse Pawapay :', JSON.stringify(pawapayResponse, null, 2));
+
           const depositStatus = pawapayResponse.finalStatus?.data?.status;
-          if (depositStatus === 'COMPLETED') {
-            savedReservation.status = ReservationStatus.CONFIRMED;
-            isPaid = true;
-            await queryRunner.manager.save(savedReservation);
-          } else {
-            throw new BadRequestException(await this.i18n.translate('reservation.error.payment_failed', lang));
+          const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
+
+          console.log(`[Reservation] Statut final Pawapay: ${depositStatus}`);
+
+          switch (depositStatus) {
+            case 'COMPLETED':
+              console.log('[Reservation] ✅ Paiement confirmé : COMPLETED');
+              savedReservation.status = ReservationStatus.CONFIRMED;
+              isPaid = true;
+              await queryRunner.manager.save(savedReservation);
+              break;
+
+            case 'REJECTED':
+              console.log('[Reservation] ❌ Paiement rejeté');
+              throw new BadRequestException(
+                failureReason?.failureMessage || await this.i18n.translate('reservation.error.payment_failed', lang)
+              );
+
+            case 'FAILED':
+              console.log('[Reservation] ❌ Paiement échoué');
+              throw new BadRequestException(
+                failureReason?.failureMessage || await this.i18n.translate('reservation.error.payment_failed', lang)
+              );
+
+            case 'CANCELED':
+              console.log('[Reservation] ❌ Paiement annulé');
+              throw new BadRequestException('Le paiement a été annulé.');
+
+            case 'EXPIRED':
+              console.log('[Reservation] ❌ Paiement expiré');
+              throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
+
+            case 'TIMEOUT':
+              console.log('[Reservation] ⏳ Timeout du polling');
+              throw new BadRequestException(
+                'Le paiement est en attente de confirmation. Veuillez vérifier le statut plus tard.'
+              );
+
+            case 'ACCEPTED':
+            case 'PENDING':
+            case 'PROCESSING':
+            case 'WAITING':
+              console.log(`[Reservation] ⏳ Statut en attente: ${depositStatus}`);
+              savedReservation.status = ReservationStatus.PENDING;
+              await queryRunner.manager.save(savedReservation);
+              break;
+
+            default:
+              console.log(`[Reservation] ❌ Statut inconnu: ${depositStatus}`);
+              throw new BadRequestException(await this.i18n.translate('reservation.error.payment_failed', lang));
           }
-          const fpayResponse = await this.fpayService.payWithMobileMoney(
-            realSegmentsTotal + totalMealsFee,
-            'USD',
-            `Paiement de réservation #${savedReservation.id.slice(0, 8)}`,
-            'MOBILE_MONEY',
-            lang
+
+          // ✅ Tenter FPAY en parallèle (optionnel - ne bloque pas)
+          try {
+            const fpayResponse = await this.fpayService.payWithMobileMoney(
+              realSegmentsTotal + totalMealsFee,
+              'USD',
+              `Paiement de réservation #${savedReservation.id.slice(0, 8)}`,
+              'MOBILE_MONEY',
+              lang
+            );
+
+            if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+              fpayTransactionId = fpayResponse.data.transaction.id;
+              fpayReference = fpayResponse.data.transaction.reference;
+              console.log('[Reservation] ✅ FPAY Mobile Money réussi');
+            } else {
+              console.log('[Reservation] ⚠️ FPAY Mobile Money échoué (ignoré)');
+            }
+          } catch (error: any) {
+            console.log('[Reservation] FPAY Mobile Money ignoré:', error.message);
+          }
+
+        } catch (error: any) {
+          console.error('[Reservation] Erreur Pawapay:', error.message);
+
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+
+          throw new BadRequestException(
+            error.message || await this.i18n.translate('reservation.error.payment_failed', lang)
           );
-
-          if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-            savedReservation.status = ReservationStatus.CONFIRMED;
-            isPaid = true;
-            fpayTransactionId = fpayResponse.data.transaction.id;
-            fpayReference = fpayResponse.data.transaction.reference;
-            await queryRunner.manager.save(savedReservation);
-
-            console.log('[Reservation] ✅ Paiement FPAY réussi:', {
-              transactionId: fpayTransactionId,
-              reference: fpayReference,
-              amount: fpayResponse.data.transaction.amount,
-            });
-          } else {
-            throw new BadRequestException('Le paiement a échoué');
-          }
-
-        } catch (error) {
-          throw new BadRequestException(await this.i18n.translate('reservation.error.payment_failed', lang));
         }
       } else if (createDto.paymentMethod === PaymentMethod.MANUAL) {
         savedReservation.status = ReservationStatus.PENDING;
