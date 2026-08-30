@@ -191,9 +191,7 @@ export class OrderService {
         if (!phon) {
           throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
         }
-        // if (!grandTotal) {
-        //   throw new BadRequestException(this.i18nService.translate('order.mobile_money_grandtotal_required', lang));
-        // }
+
         const finalGrandTotal = grandTotal || (totalAmount + (shippingCost || 0));
 
         // ✅ Vérifier que le montant est valide
@@ -205,12 +203,16 @@ export class OrderService {
 
         const amount = finalGrandTotal.toString();
         const pawapayData = {
-          amount: amount, // ✅ Convertir en string
+          amount: amount,
           currency,
           provider,
           phone: phon
         };
         console.log('[Order] Création dépôt Pawapay :', pawapayData);
+
+        // ============================================================
+        // 1. PAIEMENT PRINCIPAL VIA PAWAPAY (OBLIGATOIRE)
+        // ============================================================
         try {
           const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
           console.log('[Order] Réponse Pawapay :', pawapayResponse);
@@ -229,8 +231,13 @@ export class OrderService {
           if (error.name === 'AbortError') {
             throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
           }
+          console.error('[Order] Erreur Pawapay:', error.message);
           throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
         }
+
+        // ============================================================
+        // 2. PAIEMENT OPTIONNEL VIA FPAY (NE BLOQUE JAMAIS)
+        // ============================================================
         try {
           const fpayResponse = await this.fpayService.payWithMobileMoney(
             amount as any,
@@ -241,16 +248,20 @@ export class OrderService {
           );
 
           if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-            paymentStatus = PaymentStatus.PAID;
-            orderStatus = OrderStatus.VALIDATED;
-            isPaidByMobileMoney = true;
+            // ✅ Mettre à jour les infos FPAY si réussi
             fpayTransactionId = fpayResponse.data.transaction.id;
             fpayReference = fpayResponse.data.transaction.reference;
+            console.log('[Order] ✅ FPAY Mobile Money réussi:', {
+              transactionId: fpayTransactionId,
+              reference: fpayReference,
+            });
           } else {
-            throw new BadRequestException('Le paiement a échoué');
+            // ✅ FPAY échoue mais on continue (Pawapay a déjà réussi)
+            console.log('[Order] ⚠️ FPAY Mobile Money échoué - statut:', fpayResponse?.data?.transaction?.status);
           }
         } catch (error: any) {
-
+          // ✅ FPAY en erreur mais on continue (Pawapay a déjà réussi)
+          console.log('[Order] FPAY Mobile Money ignoré (erreur):', error.message);
         }
       } else if (paymentMethod === PaymentMethod.FPAY) {
         selectedMethod = PaymentMethod.FPAY;
