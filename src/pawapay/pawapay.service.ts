@@ -265,7 +265,7 @@ export class PawapayService {
     maxRetries = 20,
     intervalMs = 60000,
   ) {
-    // ✅ Ajouter REJECTED dans les statuts finaux
+    // ✅ Tous les statuts finaux
     const finalStatuses = [
       'COMPLETED',
       'FAILED',
@@ -277,7 +277,7 @@ export class PawapayService {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       if (signal?.aborted) throw new Error('AbortError');
 
-      console.log(`[Polling] Tentative ${attempt}/${maxRetries}`);
+      console.log(`[Polling] Tentative ${attempt}/${maxRetries} pour depositId: ${depositId}`);
 
       let statusResponse;
       try {
@@ -285,19 +285,33 @@ export class PawapayService {
       } catch (err: any) {
         if (err.name === 'AbortError' || signal?.aborted)
           throw new Error('AbortError');
-        throw err;
+        console.error('[Polling] ❌ Erreur check status:', err.message);
+        if (attempt === maxRetries) break;
+        continue;
       }
 
       const status = statusResponse?.data?.status;
+      const failureReason = statusResponse?.data?.failureReason;
+
       console.log(`[Polling] Statut : ${status}`);
 
-      // ✅ REJECTED est maintenant dans finalStatuses, donc il retourne immédiatement
+      if (failureReason) {
+        console.log(`[Polling] 🔴 Failure: ${failureReason.failureCode} - ${failureReason.failureMessage}`);
+      }
+
+      // ✅ Si statut final, retourner immédiatement
       if (finalStatuses.includes(status)) {
         console.log(`[Polling] ✅ Statut final: ${status}`);
         return statusResponse;
       }
 
-      if (attempt === maxRetries) break;
+      // ✅ Si statut en attente, log
+      console.log(`[Polling] ⏳ En attente: ${status}, prochaine tentative dans ${intervalMs / 1000}s`);
+
+      if (attempt === maxRetries) {
+        console.warn(`[Polling] ⚠️ Max retries atteint, dernier statut: ${status}`);
+        break;
+      }
 
       if (signal?.aborted) throw new Error('AbortError');
 
@@ -312,10 +326,16 @@ export class PawapayService {
       });
     }
 
+    // ✅ Timeout
+    console.warn(`[Polling] ⚠️ TIMEOUT pour depositId: ${depositId} après ${maxRetries} tentatives`);
     return {
-      message: 'Statut du dépôt non confirmé après polling',
-      depositId,
-      attempts: maxRetries,
+      data: {
+        status: 'TIMEOUT',
+        failureReason: {
+          failureCode: 'POLLING_TIMEOUT',
+          failureMessage: `Le paiement est en attente depuis trop longtemps (${(maxRetries * intervalMs) / 1000}s)`
+        }
+      }
     };
   }
   async checkPayoutStatus(payoutId: string, signal?: AbortSignal) {
