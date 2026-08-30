@@ -5,6 +5,8 @@ import { AddressUser } from './entities/address-user.entity';
 import { CreateAddressUserDto } from './dto/create-address-user.dto';
 import { UpdateAddressUserDto } from './dto/update-address-user.dto';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { Country } from 'src/company/entities/country.entity';
+import { City } from 'src/company/entities/city.entity';
 
 @Injectable()
 export class AddressUserService {
@@ -14,6 +16,11 @@ export class AddressUserService {
 
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
+
+    @InjectRepository(Country) // ✅ Ajout du repository Country
+    private readonly countryRepo: Repository<Country>,
+    @InjectRepository(City) // ✅ Ajout du repository City
+    private readonly cityRepo: Repository<City>,
   ) { }
 
   async create(
@@ -135,7 +142,7 @@ export class AddressUserService {
 
     return addressWithRelations || updatedAddress;
   }
-  
+
   async updateDefaultAddress(user: UserEntity, addressId: string): Promise<AddressUser> {
     const address = await this.addressUserRepo.findOne({
       where: { id: addressId, user: { id: user.id } },
