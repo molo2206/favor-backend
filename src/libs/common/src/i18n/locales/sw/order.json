@@ -144,5 +144,14 @@
   "order.user_not_found": "Mtumiaji hajapatikana",
   "notification.order_paid_title": "Malipo ya agizo yamethibitishwa",
   "notification.order_paid_content": "Agizo #{{invoiceNumber}} limelipwa na {{paymentMethod}}. Kiasi: {{totalAmount}} {{currency}}",
-  "order.whatsapp_order_paid": "Malipo yamethibitishwa kwa agizo #{{invoiceNumber}}. PIN: {{pin}}\nAsante kwa uaminifu wako!"
+  "order.whatsapp_order_paid": "Malipo yamethibitishwa kwa agizo #{{invoiceNumber}}. PIN: {{pin}}\nAsante kwa uaminifu wako!",
+  "order.payment_invalid_amount": "Kiasi batili. {{message}}",
+  "order.payment_amount_out_of_bounds": "Kiasi kiko nje ya mipaka inayoruhusiwa. {{message}}",
+  "order.payment_invalid_currency": "Sarafu haitumiki. {{message}}",
+  "order.payment_invalid_phone": "Nambari ya simu batili. {{message}}",
+  "order.payment_invalid_provider": "Mtoa huduma batili. {{message}}",
+  "order.payment_insufficient_balance": "Salio haitoshi. {{message}}",
+  "order.payment_provider_unavailable": "Mtoa huduma hapatikani kwa muda. {{message}}",
+  "order.payment_canceled": "Malipo yameghairiwa.",
+  "order.payment_expired": "Malipo yameisha muda wake. Tafadhali jaribu tena."
 }

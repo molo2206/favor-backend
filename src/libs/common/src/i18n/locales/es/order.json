@@ -144,5 +144,14 @@
   "order.user_not_found": "Usuario no encontrado",
   "notification.order_paid_title": "Pago de pedido confirmado",
   "notification.order_paid_content": "El pedido #{{invoiceNumber}} ha sido pagado por {{paymentMethod}}. Monto: {{totalAmount}} {{currency}}",
-  "order.whatsapp_order_paid": "Pago confirmado para el pedido #{{invoiceNumber}}. PIN: {{pin}}\n¡Gracias por su confianza!"
+  "order.whatsapp_order_paid": "Pago confirmado para el pedido #{{invoiceNumber}}. PIN: {{pin}}\n¡Gracias por su confianza!",
+  "order.payment_invalid_amount": "Monto inválido. {{message}}",
+  "order.payment_amount_out_of_bounds": "El monto está fuera de los límites permitidos. {{message}}",
+  "order.payment_invalid_currency": "Moneda no soportada. {{message}}",
+  "order.payment_invalid_phone": "Número de teléfono inválido. {{message}}",
+  "order.payment_invalid_provider": "Proveedor inválido. {{message}}",
+  "order.payment_insufficient_balance": "Saldo insuficiente. {{message}}",
+  "order.payment_provider_unavailable": "El proveedor no está disponible temporalmente. {{message}}",
+  "order.payment_canceled": "El pago ha sido cancelado.",
+  "order.payment_expired": "El pago ha expirado. Por favor, intente nuevamente."
 }

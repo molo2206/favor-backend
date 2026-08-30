@@ -144,5 +144,14 @@
   "order.user_not_found": "المستخدم غير موجود",
   "notification.order_paid_title": "تأكيد دفع الطلب",
   "notification.order_paid_content": "تم دفع الطلب #{{invoiceNumber}} عن طريق {{paymentMethod}}. المبلغ: {{totalAmount}} {{currency}}",
-  "order.whatsapp_order_paid": "تم تأكيد الدفع للطلب #{{invoiceNumber}}. PIN: {{pin}}\nشكراً لثقتك!"
+  "order.whatsapp_order_paid": "تم تأكيد الدفع للطلب #{{invoiceNumber}}. PIN: {{pin}}\nشكراً لثقتك!",
+  "order.payment_invalid_amount": "المبلغ غير صالح. {{message}}",
+  "order.payment_amount_out_of_bounds": "المبلغ خارج الحدود المسموح بها. {{message}}",
+  "order.payment_invalid_currency": "العملة غير مدعومة. {{message}}",
+  "order.payment_invalid_phone": "رقم الهاتف غير صالح. {{message}}",
+  "order.payment_invalid_provider": "المزود غير صالح. {{message}}",
+  "order.payment_insufficient_balance": "الرصيد غير كافٍ. {{message}}",
+  "order.payment_provider_unavailable": "المزود غير متوفر مؤقتاً. {{message}}",
+  "order.payment_canceled": "تم إلغاء الدفع.",
+  "order.payment_expired": "انتهت صلاحية الدفع. يرجى المحاولة مرة أخرى."
 }

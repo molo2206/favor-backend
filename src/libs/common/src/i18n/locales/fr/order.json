@@ -144,5 +144,14 @@
   "order.user_not_found": "Utilisateur non trouvé",
   "notification.order_paid_title": "Paiement de commande confirmé",
   "notification.order_paid_content": "La commande #{{invoiceNumber}} a été payée par {{paymentMethod}}. Montant: {{totalAmount}} {{currency}}",
-  "order.whatsapp_order_paid": " Paiement confirmé pour la commande #{{invoiceNumber}}. PIN: {{pin}}\nMerci pour votre confiance !"
+  "order.whatsapp_order_paid": " Paiement confirmé pour la commande #{{invoiceNumber}}. PIN: {{pin}}\nMerci pour votre confiance !",
+  "order.payment_invalid_amount": "Le montant n'est pas valide. {{message}}",
+  "order.payment_amount_out_of_bounds": "Le montant est en dehors des limites autorisées. {{message}}",
+  "order.payment_invalid_currency": "La devise n'est pas supportée. {{message}}",
+  "order.payment_invalid_phone": "Le numéro de téléphone n'est pas valide. {{message}}",
+  "order.payment_invalid_provider": "Le fournisseur n'est pas valide. {{message}}",
+  "order.payment_insufficient_balance": "Solde insuffisant. {{message}}",
+  "order.payment_provider_unavailable": "Le fournisseur est temporairement indisponible. {{message}}",
+  "order.payment_canceled": "Le paiement a été annulé.",
+  "order.payment_expired": "Le paiement a expiré. Veuillez réessayer."
 }
