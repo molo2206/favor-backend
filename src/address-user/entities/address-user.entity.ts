@@ -45,18 +45,18 @@ export class AddressUser {
     // ============================================================
 
     @Column({ nullable: true })
-    countryId: string;
+    countryId: string | null; // ✅ Ajouter | null
 
     @ManyToOne(() => Country, { nullable: true })
     @JoinColumn({ name: 'countryId' })
-    country: Country;
+    country: Country | null; // ✅ Ajouter | null
 
     @Column({ nullable: true })
-    cityId: string;
+    cityId: string | null; // ✅ Ajouter | null
 
     @ManyToOne(() => City, { nullable: true })
     @JoinColumn({ name: 'cityId' })
-    city: City;
+    city: City | null; // ✅ Ajouter | null
 
     @CreateDateColumn()
     createdAt: Date;

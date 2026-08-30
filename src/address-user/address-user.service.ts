@@ -30,14 +30,12 @@ export class AddressUserService {
     const isDefault = createDto.isDefault === true;
 
     if (isDefault) {
-      // Désactiver les anciennes adresses par défaut
       await this.addressUserRepo.update(
         { user: { id: user.id }, isDefault: true },
         { isDefault: false },
       );
     }
 
-    // ✅ Vérifier que le pays existe si countryId est fourni
     if (createDto.countryId) {
       const country = await this.countryRepo.findOne({
         where: { id: createDto.countryId },
@@ -47,7 +45,6 @@ export class AddressUserService {
       }
     }
 
-    // ✅ Vérifier que la ville existe si cityId est fourni
     if (createDto.cityId) {
       const city = await this.cityRepo.findOne({
         where: { id: createDto.cityId },
@@ -57,33 +54,30 @@ export class AddressUserService {
       }
     }
 
-    // Créer et sauvegarder l'adresse
-    const address = this.addressUserRepo.create({
-      ...createDto,
-      isDefault, // toujours défini (true/false)
-      user,
-      latitude: Number(createDto.latitude),
-      longitude: Number(createDto.longitude),
-      countryId: createDto.countryId || null,
-      cityId: createDto.cityId || null,
-    });
+    // ✅ Utiliser new AddressUser()
+    const address = new AddressUser();
+    address.firstName = createDto.firstName;
+    address.lastName = createDto.lastName;
+    address.address = createDto.address;
+    address.phone = createDto.phone;
+    address.type = createDto.type;
+    address.isDefault = isDefault;
+    address.user = user;
+    address.latitude = Number(createDto.latitude);
+    address.longitude = Number(createDto.longitude);
+    address.countryId = createDto.countryId || null;
+    address.cityId = createDto.cityId || null;
 
-    const savedAddress = await this.addressUserRepo.save(address);
+    // ✅ Sauvegarder et caster le résultat
+    const savedAddress = await this.addressUserRepo.save(address) as unknown as AddressUser;
 
-    // Mettre à jour l'utilisateur si cette adresse est par défaut
     if (isDefault) {
       await this.userRepo.update(user.id, {
         defaultAddressId: savedAddress.id,
       });
-
-      // Optionnel : si tu veux aussi mettre la relation (non seulement l'id)
-      await this.userRepo.save({
-        ...user,
-        defaultAddress: savedAddress,
-      });
     }
 
-    // ✅ Recharger l'adresse avec les relations country et city
+    // ✅ Recharger avec les relations
     const addressWithRelations = await this.addressUserRepo.findOne({
       where: { id: savedAddress.id },
       relations: ['country', 'city'],
@@ -103,14 +97,12 @@ export class AddressUserService {
     const address = await this.findOne(id, user);
 
     if (updateDto.isDefault) {
-      // Désactiver les autres adresses par défaut avant de mettre à jour
       await this.addressUserRepo.update(
         { user, isDefault: true },
         { isDefault: false },
       );
     }
 
-    // ✅ Vérifier que le pays existe si countryId est fourni
     if (updateDto.countryId) {
       const country = await this.countryRepo.findOne({
         where: { id: updateDto.countryId },
@@ -120,7 +112,6 @@ export class AddressUserService {
       }
     }
 
-    // ✅ Vérifier que la ville existe si cityId est fourni
     if (updateDto.cityId) {
       const city = await this.cityRepo.findOne({
         where: { id: updateDto.cityId },
@@ -132,16 +123,23 @@ export class AddressUserService {
 
     Object.assign(address, updateDto);
 
-    const updatedAddress = await this.addressUserRepo.save(address);
+    // ✅ Sauvegarder et s'assurer d'avoir un objet unique
+    const savedAddress = await this.addressUserRepo.save(address);
 
-    // ✅ Recharger l'adresse avec les relations country et city
+    // ✅ Vérifier que savedAddress est un objet et non un tableau
+    if (Array.isArray(savedAddress)) {
+      throw new Error('Erreur lors de la sauvegarde de l\'adresse');
+    }
+
+    // ✅ Utiliser savedAddress.id pour recharger
     const addressWithRelations = await this.addressUserRepo.findOne({
-      where: { id: updatedAddress.id },
+      where: { id: savedAddress.id },
       relations: ['country', 'city'],
     });
 
-    return addressWithRelations || updatedAddress;
+    return addressWithRelations || savedAddress;
   }
+
 
   async updateDefaultAddress(user: UserEntity, addressId: string): Promise<AddressUser> {
     const address = await this.addressUserRepo.findOne({
