@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { UserEntity } from '../../users/entities/user.entity'; // adapte le chemin selon ta structure
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
+import { UserEntity } from '../../users/entities/user.entity';
 import { Address } from 'src/address-user/enum/address.status.enum';
-
+import { Country } from 'src/company/entities/country.entity';
+import { City } from 'src/company/entities/city.entity';
 
 @Entity('address_user')
 export class AddressUser {
@@ -38,7 +39,24 @@ export class AddressUser {
     
     @Column({ type: 'double precision' })
     longitude: number;
-    
+
+    // ============================================================
+    // ✅ AJOUT DES CHAMPS countryId ET cityId
+    // ============================================================
+
+    @Column({ nullable: true })
+    countryId: string;
+
+    @ManyToOne(() => Country, { nullable: true })
+    @JoinColumn({ name: 'countryId' })
+    country: Country;
+
+    @Column({ nullable: true })
+    cityId: string;
+
+    @ManyToOne(() => City, { nullable: true })
+    @JoinColumn({ name: 'cityId' })
+    city: City;
 
     @CreateDateColumn()
     createdAt: Date;

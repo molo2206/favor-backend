@@ -14,7 +14,7 @@ export class AddressUserService {
 
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
-  ) {}
+  ) { }
 
   async create(
     createDto: CreateAddressUserDto,
@@ -30,13 +30,35 @@ export class AddressUserService {
       );
     }
 
-    // Créer et sauvegarder l’adresse
+    // ✅ Vérifier que le pays existe si countryId est fourni
+    if (createDto.countryId) {
+      const country = await this.countryRepo.findOne({
+        where: { id: createDto.countryId },
+      });
+      if (!country) {
+        throw new NotFoundException(`Pays avec l'ID ${createDto.countryId} non trouvé`);
+      }
+    }
+
+    // ✅ Vérifier que la ville existe si cityId est fourni
+    if (createDto.cityId) {
+      const city = await this.cityRepo.findOne({
+        where: { id: createDto.cityId },
+      });
+      if (!city) {
+        throw new NotFoundException(`Ville avec l'ID ${createDto.cityId} non trouvée`);
+      }
+    }
+
+    // Créer et sauvegarder l'adresse
     const address = this.addressUserRepo.create({
       ...createDto,
       isDefault, // toujours défini (true/false)
       user,
       latitude: Number(createDto.latitude),
       longitude: Number(createDto.longitude),
+      countryId: createDto.countryId || null,
+      cityId: createDto.cityId || null,
     });
 
     const savedAddress = await this.addressUserRepo.save(address);
@@ -54,12 +76,66 @@ export class AddressUserService {
       });
     }
 
+    // ✅ Recharger l'adresse avec les relations country et city
+    const addressWithRelations = await this.addressUserRepo.findOne({
+      where: { id: savedAddress.id },
+      relations: ['country', 'city'],
+    });
+
     return {
       message: 'Adresse créée avec succès',
-      data: savedAddress,
+      data: addressWithRelations || savedAddress,
     };
   }
 
+  async update(
+    id: string,
+    updateDto: UpdateAddressUserDto,
+    user: UserEntity,
+  ): Promise<AddressUser> {
+    const address = await this.findOne(id, user);
+
+    if (updateDto.isDefault) {
+      // Désactiver les autres adresses par défaut avant de mettre à jour
+      await this.addressUserRepo.update(
+        { user, isDefault: true },
+        { isDefault: false },
+      );
+    }
+
+    // ✅ Vérifier que le pays existe si countryId est fourni
+    if (updateDto.countryId) {
+      const country = await this.countryRepo.findOne({
+        where: { id: updateDto.countryId },
+      });
+      if (!country) {
+        throw new NotFoundException(`Pays avec l'ID ${updateDto.countryId} non trouvé`);
+      }
+    }
+
+    // ✅ Vérifier que la ville existe si cityId est fourni
+    if (updateDto.cityId) {
+      const city = await this.cityRepo.findOne({
+        where: { id: updateDto.cityId },
+      });
+      if (!city) {
+        throw new NotFoundException(`Ville avec l'ID ${updateDto.cityId} non trouvée`);
+      }
+    }
+
+    Object.assign(address, updateDto);
+
+    const updatedAddress = await this.addressUserRepo.save(address);
+
+    // ✅ Recharger l'adresse avec les relations country et city
+    const addressWithRelations = await this.addressUserRepo.findOne({
+      where: { id: updatedAddress.id },
+      relations: ['country', 'city'],
+    });
+
+    return addressWithRelations || updatedAddress;
+  }
+  
   async updateDefaultAddress(user: UserEntity, addressId: string): Promise<AddressUser> {
     const address = await this.addressUserRepo.findOne({
       where: { id: addressId, user: { id: user.id } },
@@ -159,22 +235,7 @@ export class AddressUserService {
     return address;
   }
 
-  async update(
-    id: string,
-    updateDto: UpdateAddressUserDto,
-    user: UserEntity,
-  ): Promise<AddressUser> {
-    const address = await this.findOne(id, user);
 
-    if (updateDto.isDefault) {
-      // Désactiver les autres adresses par défaut avant de mettre à jour
-      await this.addressUserRepo.update({ user, isDefault: true }, { isDefault: false });
-    }
-
-    Object.assign(address, updateDto);
-
-    return this.addressUserRepo.save(address);
-  }
 
   async remove(id: string, user: UserEntity): Promise<void> {
     const address = await this.findOne(id, user);

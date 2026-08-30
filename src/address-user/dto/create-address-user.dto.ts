@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsBoolean, IsOptional } from 'class-validator';
+import { IsString, IsEnum, IsBoolean, IsOptional, IsUUID } from 'class-validator';
 import { Address } from 'src/address-user/enum/address.status.enum';
 
 
@@ -27,4 +27,12 @@ export class CreateAddressUserDto {
     @IsBoolean()
     @IsOptional()
     isDefault?: boolean;
+
+    @IsOptional()
+    @IsUUID()
+    countryId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    cityId?: string;
 }
