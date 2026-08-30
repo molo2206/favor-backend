@@ -222,17 +222,36 @@ export class OrderService {
 
           console.log(`[Order] Statut Pawapay: ${depositStatus}`);
 
-          // ✅ Liste des statuts Pawapay
-          // ACCEPTED = Succès
-          // REJECTED, FAILED, CANCELED, EXPIRED = Échec
-          // PENDING, PROCESSING, WAITING = En cours
+          // ✅ Statuts finaux
+          // COMPLETED = Succès définitif
+          // REJECTED, FAILED, CANCELED, EXPIRED = Échec définitif
 
-          const successStatuses = ['ACCEPTED'];
-          const errorStatuses = ['REJECTED', 'FAILED', 'CANCELED', 'EXPIRED'];
-          const pendingStatuses = ['PENDING', 'PROCESSING', 'WAITING'];
+          // ✅ Statuts temporaires (en attente)
+          // ACCEPTED, PENDING, PROCESSING, WAITING = La requête est acceptée mais en traitement
 
-          // ✅ Si c'est un statut d'erreur
-          if (errorStatuses.includes(depositStatus)) {
+          // ✅ Si statut en attente (ACCEPTED, PENDING, etc.)
+          if (depositStatus === 'ACCEPTED' || depositStatus === 'PENDING' ||
+            depositStatus === 'PROCESSING' || depositStatus === 'WAITING') {
+            console.log(`[Order] ⏳ Paiement en cours de traitement: ${depositStatus}`);
+
+            // Le polling va continuer à vérifier le statut
+            // On retourne un message indiquant que le paiement est en cours
+            throw new BadRequestException(
+              `Le paiement est en cours de traitement. Veuillez patienter... Statut: ${depositStatus}`
+            );
+          }
+
+          // ✅ Si succès
+          if (depositStatus === 'COMPLETED') {
+            console.log('[Order] ✅ Dépôt Pawapay confirmé : COMPLETED');
+            paymentStatus = PaymentStatus.PAID;
+            orderStatus = OrderStatus.VALIDATED;
+            isPaidByMobileMoney = true;
+          }
+
+          // ✅ Si échec définitif
+          if (depositStatus === 'REJECTED' || depositStatus === 'FAILED' ||
+            depositStatus === 'CANCELED' || depositStatus === 'EXPIRED') {
             console.log(`[Order] ❌ Statut d'erreur: ${depositStatus}`);
 
             if (failureReason?.failureMessage) {
@@ -242,27 +261,9 @@ export class OrderService {
             throw new BadRequestException(`Paiement échoué: ${depositStatus}`);
           }
 
-          // ✅ Si c'est un statut de succès (ACCEPTED)
-          if (successStatuses.includes(depositStatus)) {
-            console.log('[Order] ✅ Dépôt Pawapay confirmé : ACCEPTED');
-            paymentStatus = PaymentStatus.PAID;
-            orderStatus = OrderStatus.VALIDATED;
-            isPaidByMobileMoney = true;
-          }
-
-          // ✅ Si c'est un statut en attente
-          if (pendingStatuses.includes(depositStatus)) {
-            console.log(`[Order] ⏳ Dépôt en attente: ${depositStatus}`);
-            throw new BadRequestException(`Le paiement est en attente de confirmation. Veuillez réessayer plus tard.`);
-          }
-
           // ✅ Si statut inconnu
-          if (!successStatuses.includes(depositStatus) &&
-            !errorStatuses.includes(depositStatus) &&
-            !pendingStatuses.includes(depositStatus)) {
-            console.log(`[Order] ❌ Statut inconnu: ${depositStatus}`);
-            throw new BadRequestException(`Statut de paiement inconnu: ${depositStatus}`);
-          }
+          console.log(`[Order] ❌ Statut inconnu: ${depositStatus}`);
+          throw new BadRequestException(`Statut de paiement inconnu: ${depositStatus}`);
 
         } catch (error: any) {
           if (error.name === 'AbortError' || signal?.aborted) {
@@ -588,41 +589,75 @@ export class OrderService {
         const depositStatus = pawapayResponse.finalStatus?.data?.status;
         const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
 
-        console.log(`[PayOrder] Statut Pawapay: ${depositStatus}`);
+        switch (depositStatus) {
+          case 'COMPLETED':
+            console.log('[PayOrder] ✅ Dépôt Pawapay confirmé : COMPLETED');
+            paymentStatus = PaymentStatus.PAID;
+            orderStatus = OrderStatus.VALIDATED;
+            isPaidByMobileMoney = true;
+            break;
 
-        const successStatuses = ['ACCEPTED'];
-        const errorStatuses = ['REJECTED', 'FAILED', 'CANCELED', 'EXPIRED'];
-        const pendingStatuses = ['PENDING', 'PROCESSING', 'WAITING'];
+          case 'REJECTED':
+            console.log('[PayOrder] ❌ Dépôt Pawapay REJETÉ');
 
-        if (errorStatuses.includes(depositStatus)) {
-          console.log(`[PayOrder] ❌ Statut d'erreur: ${depositStatus}`);
+            if (failureReason) {
+              const failureCode = failureReason.failureCode;
+              const failureMessage = failureReason.failureMessage;
 
-          if (failureReason?.failureMessage) {
-            throw new BadRequestException(failureReason.failureMessage);
-          }
+              console.log(`[PayOrder] Code: ${failureCode}, Message: ${failureMessage}`);
 
-          throw new BadRequestException(`Paiement échoué: ${depositStatus}`);
+              let userMessage = this.i18nService.translate('order.payment_failed', lang);
+
+              switch (failureCode) {
+                case 'INVALID_AMOUNT':
+                  userMessage = `Le montant n'est pas valide. ${failureMessage}`;
+                  break;
+                case 'AMOUNT_OUT_OF_BOUNDS':
+                  userMessage = `Le montant est en dehors des limites autorisées. ${failureMessage}`;
+                  break;
+                case 'INVALID_CURRENCY':
+                  userMessage = `La devise n'est pas supportée. ${failureMessage}`;
+                  break;
+                case 'INVALID_PHONE_NUMBER':
+                  userMessage = `Le numéro de téléphone n'est pas valide. ${failureMessage}`;
+                  break;
+                case 'INVALID_PROVIDER':
+                  userMessage = `Le fournisseur n'est pas valide. ${failureMessage}`;
+                  break;
+                case 'INSUFFICIENT_BALANCE':
+                  userMessage = `Solde insuffisant. ${failureMessage}`;
+                  break;
+                case 'PROVIDER_UNAVAILABLE':
+                  userMessage = `Le fournisseur est temporairement indisponible. ${failureMessage}`;
+                  break;
+                default:
+                  userMessage = failureMessage || this.i18nService.translate('order.payment_failed', lang);
+              }
+
+              throw new BadRequestException(userMessage);
+            }
+
+            throw new BadRequestException(this.i18nService.translate('order.payment_failed', lang));
+
+          case 'FAILED':
+            console.log('[PayOrder] ❌ Dépôt Pawapay FAILED');
+            const failMsg = failureReason?.failureMessage || this.i18nService.translate('order.payment_failed', lang);
+            throw new BadRequestException(failMsg);
+
+          case 'CANCELED':
+            console.log('[PayOrder] ❌ Dépôt Pawapay CANCELED');
+            throw new BadRequestException('Le paiement a été annulé.');
+
+          case 'EXPIRED':
+            console.log('[PayOrder] ❌ Dépôt Pawapay EXPIRED');
+            throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
+
+          default:
+            console.log(`[PayOrder] ❌ Statut inconnu: ${depositStatus}`);
+            throw new BadRequestException(
+              this.i18nService.translate('order.payment_failed', lang)
+            );
         }
-
-        if (successStatuses.includes(depositStatus)) {
-          console.log('[PayOrder] ✅ Dépôt Pawapay confirmé : ACCEPTED');
-          paymentStatus = PaymentStatus.PAID;
-          orderStatus = OrderStatus.VALIDATED;
-          isPaidByMobileMoney = true;
-        }
-
-        if (pendingStatuses.includes(depositStatus)) {
-          console.log(`[PayOrder] ⏳ Dépôt en attente: ${depositStatus}`);
-          throw new BadRequestException(`Le paiement est en attente de confirmation. Veuillez réessayer plus tard.`);
-        }
-
-        if (!successStatuses.includes(depositStatus) &&
-          !errorStatuses.includes(depositStatus) &&
-          !pendingStatuses.includes(depositStatus)) {
-          console.log(`[PayOrder] ❌ Statut inconnu: ${depositStatus}`);
-          throw new BadRequestException(`Statut de paiement inconnu: ${depositStatus}`);
-        }
-
       } catch (error: any) {
         if (error.name === 'AbortError' || signal?.aborted) {
           console.log('[PayOrder] ⚠️ Opération annulée par l\'utilisateur');

@@ -299,23 +299,29 @@ export class PawapayService {
   private async pollDepositStatus(
     depositId: string,
     signal?: AbortSignal,
-    maxRetries = 20,
-    intervalMs = 60000,
+    maxRetries = 30, // ✅ Augmenté de 20 à 30
+    intervalMs = 5000, // ✅ Réduit de 60000 à 5000 (5 secondes)
   ) {
+    // ✅ Statuts finaux qui arrêtent le polling
     const finalStatuses = [
-      'COMPLETED',
-      'FAILED',
-      'CANCELED',
-      'EXPIRED',
-      'REJECTED',
+      'COMPLETED',   // Succès
+      'REJECTED',    // Échec définitif
+      'FAILED',      // Échec définitif
+      'CANCELED',    // Annulé
+      'EXPIRED',     // Expiré
     ];
 
-    // ✅ Statuts d'erreur qui arrêtent immédiatement
-    const errorStatuses = ['REJECTED', 'FAILED', 'CANCELED', 'EXPIRED'];
+    // ✅ Statuts temporaires (on continue le polling)
+    const pendingStatuses = [
+      'ACCEPTED',    // Accepté mais en traitement
+      'PENDING',     // En attente
+      'PROCESSING',  // En cours de traitement
+      'WAITING',     // En attente
+    ];
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       if (signal?.aborted) {
-        console.log('[Polling] ⚠️ Opération annulée, arrêt du polling');
+        console.log('[Polling] ⚠️ Opération annulée');
         throw new Error('AbortError');
       }
 
@@ -326,43 +332,41 @@ export class PawapayService {
         statusResponse = await this.checkDepositStatus(depositId, signal);
       } catch (err: any) {
         if (err.name === 'AbortError' || signal?.aborted) {
-          console.log('[Polling] ⚠️ Opération annulée pendant la requête');
           throw new Error('AbortError');
         }
-        console.error('[Polling] ❌ Erreur check status:', err.message);
         throw err;
       }
 
       const status = statusResponse?.data?.status;
       const failureReason = statusResponse?.data?.failureReason;
 
-      console.log(`[Polling] Statut : ${status}`);
+      console.log(`[Polling] Statut actuel: ${status}`);
 
-      // ✅ Si c'est un statut d'erreur, retourner immédiatement
-      if (errorStatuses.includes(status)) {
-        console.log(`[Polling] ❌ Statut d'erreur : ${status}`);
-        if (failureReason) {
-          console.log(`[Polling] Code: ${failureReason.failureCode}, Message: ${failureReason.failureMessage}`);
-        }
+      // ✅ Si statut final, retourner immédiatement
+      if (finalStatuses.includes(status)) {
+        console.log(`[Polling] ✅ Statut final: ${status}`);
         return statusResponse;
       }
 
-      // ✅ Si c'est un statut final (COMPLETED)
-      if (status === 'COMPLETED') {
-        console.log(`[Polling] ✅ Statut final atteint : ${status}`);
-        return statusResponse;
+      // ✅ Si statut en attente, continuer le polling
+      if (pendingStatuses.includes(status)) {
+        console.log(`[Polling] ⏳ Statut en attente: ${status}, continuation du polling...`);
+        // Continuer la boucle
+      } else {
+        // ✅ Si statut inconnu
+        console.log(`[Polling] ⚠️ Statut inconnu: ${status}, continuation du polling...`);
       }
 
       if (attempt === maxRetries) {
-        console.warn(`[Polling] ⚠️ Nombre maximum de tentatives atteint`);
+        console.warn(`[Polling] ⚠️ Nombre maximum de tentatives atteint (${maxRetries})`);
         break;
       }
 
       if (signal?.aborted) {
-        console.log('[Polling] ⚠️ Opération annulée avant l\'attente');
         throw new Error('AbortError');
       }
 
+      // ✅ Attendre avant la prochaine tentative
       await new Promise<void>((resolve, reject) => {
         if (signal?.aborted) {
           return reject(new Error('AbortError'));
@@ -385,10 +389,15 @@ export class PawapayService {
       });
     }
 
+    // ✅ Si timeout après toutes les tentatives
     return {
-      message: 'Statut du dépôt non confirmé après polling',
-      depositId,
-      attempts: maxRetries,
+      data: {
+        status: 'TIMEOUT',
+        failureReason: {
+          failureCode: 'POLLING_TIMEOUT',
+          failureMessage: `Le paiement est en attente depuis trop longtemps. Veuillez vérifier le statut manuellement.`
+        }
+      }
     };
   }
 
