@@ -497,13 +497,11 @@ export class OrderService {
         );
       }
 
-      // ✅ CORRECTION : Utiliser le nombre directement, pas de conversion en string avec séparateurs
-      const amount = order.grandTotal; // Nombre directement
-      // OU si vous devez absolument avoir une string : 
-      // const amount = order.grandTotal.toFixed(2); // "34500.00"
+      // ✅ CORRECTION : Utiliser le nombre directement
+      const amount = order.grandTotal;
 
       const pawapayData = {
-        amount: amount.toString(), // Convertir en string sans séparateurs
+        amount: amount.toString(),
         currency: order.currency,
         provider,
         phone: phon
@@ -557,7 +555,7 @@ export class OrderService {
       // Tenter FPAY en parallèle
       try {
         const fpayResponse = await this.fpayService.payWithMobileMoney(
-          amount, // Utiliser le nombre directement
+          amount,
           order.currency || 'USD',
           `Paiement de commande #${order.invoiceNumber}`,
           'MOBILE_MONEY',
@@ -584,8 +582,23 @@ export class OrderService {
         );
       }
 
+      // ✅ CORRECTION : Calculer et nettoyer le montant
+      const totalAmount = Number(order.totalAmount) + Number(order.shippingCost || 0);
+
+      // ✅ S'assurer que le montant est un nombre valide
+      const cleanAmount = Number(totalAmount);
+
+      console.log('[PayOrder] Montant original:', totalAmount);
+      console.log('[PayOrder] Montant nettoyé:', cleanAmount);
+
+      if (isNaN(cleanAmount) || cleanAmount <= 0) {
+        throw new BadRequestException(
+          'Le montant total est invalide'
+        );
+      }
+
       const fpayData = {
-        amount: order.totalAmount + (order.shippingCost || 0),
+        amount: cleanAmount, // ✅ Envoyer comme nombre
         currency: order.currency || 'USD',
         description: `Paiement de commande #${order.invoiceNumber}`,
         access_token: access_token,
@@ -599,20 +612,33 @@ export class OrderService {
         hasAccessToken: !!fpayData.access_token,
       });
 
-      const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+      try {
+        const fpayResponse = await this.fpayService.makePayment(fpayData, user);
 
-      if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-        paymentStatus = PaymentStatus.PAID;
-        orderStatus = OrderStatus.VALIDATED;
-        isPaidByMobileMoney = true;
-        fpayTransactionId = fpayResponse.data.transaction.id;
-        fpayReference = fpayResponse.data.transaction.reference;
+        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+          paymentStatus = PaymentStatus.PAID;
+          orderStatus = OrderStatus.VALIDATED;
+          isPaidByMobileMoney = true;
+          fpayTransactionId = fpayResponse.data.transaction.id;
+          fpayReference = fpayResponse.data.transaction.reference;
 
-        console.log('[PayOrder] ✅ Paiement FPAY réussi:', {
-          transactionId: fpayTransactionId,
-          reference: fpayReference,
-          amount: fpayResponse.data.transaction.amount,
-        });
+          console.log('[PayOrder] ✅ Paiement FPAY réussi:', {
+            transactionId: fpayTransactionId,
+            reference: fpayReference,
+            amount: fpayResponse.data.transaction.amount,
+          });
+        } else {
+          // ✅ Si FPAY échoue, on garde le statut PENDING
+          console.log('[PayOrder] ❌ Paiement FPAY échoué:', fpayResponse);
+          throw new BadRequestException(
+            this.i18nService.translate('order.payment_failed', lang)
+          );
+        }
+      } catch (error: any) {
+        console.error('[PayOrder] Erreur FPAY:', error.message);
+        throw new BadRequestException(
+          this.i18nService.translate('order.payment_failed', lang)
+        );
       }
 
     } else {
