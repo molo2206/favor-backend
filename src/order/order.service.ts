@@ -595,27 +595,17 @@ export class OrderService {
         );
       }
 
-      // ✅ CORRECTION : Utiliser le nombre directement
-      const totalAmount = Number(order.totalAmount) + Number(order.shippingCost || 0);
-      const cleanAmount = Number(
-        String(totalAmount).replace(/[^0-9.]/g, '')
-      );
+      // ✅ Calculer le montant une seule fois
+      const amount = Number(order.totalAmount) + Number(order.shippingCost || 0);
 
-      let amountString = String(cleanAmount);
-      const parts = amountString.split('.');
-      if (parts.length > 2) {
-        // Plusieurs points -> séparateurs de milliers
-        // Garder seulement le dernier point comme séparateur décimal
-        const integerPart = parts.slice(0, -1).join('');
-        const decimalPart = parts[parts.length - 1];
-        amountString = `${integerPart}.${decimalPart}`;
-      }
+      // ✅ Nettoyer pour Pawapay (enlever les séparateurs de milliers)
+      const amountForPawapay = amount.toString().replace(/[^0-9.]/g, '');
 
-      console.log('[PayOrder] Montant original:', order.totalAmount);
-      console.log('[PayOrder] Montant nettoyé:', amountString);
+      console.log('[PayOrder] Montant:', amount);
+      console.log('[PayOrder] Montant pour Pawapay:', amountForPawapay);
 
       const pawapayData = {
-        amount: amountString, // ✅ Envoyer le montant nettoyé
+        amount: amountForPawapay,
         currency: order.currency,
         provider,
         phone: phon
@@ -623,11 +613,113 @@ export class OrderService {
 
       console.log('[PayOrder] Création dépôt Pawapay :', pawapayData);
 
-      // Tenter FPAY en parallèle (NE BLOQUE JAMAIS)
+      // ============================================================
+      // 1. PAWAPAY - OBLIGATOIRE
+      // ============================================================
+      try {
+        const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
+        console.log('[PayOrder] Réponse Pawapay :', JSON.stringify(pawapayResponse, null, 2));
+
+        const depositStatus = pawapayResponse.finalStatus?.data?.status;
+        const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
+        const lastStatus = pawapayResponse.finalStatus?.data?.lastStatus;
+
+        console.log(`[PayOrder] Statut final Pawapay: ${depositStatus}`);
+
+        switch (depositStatus) {
+          // ✅ Succès
+          case 'COMPLETED':
+            console.log('[PayOrder] ✅ Dépôt Pawapay confirmé : COMPLETED');
+            paymentStatus = PaymentStatus.PAID;
+            orderStatus = OrderStatus.VALIDATED;
+            isPaidByMobileMoney = true;
+            break;
+
+          // ✅ Erreurs définitives
+          case 'REJECTED':
+            console.log('[PayOrder] ❌ Dépôt Pawapay REJETÉ');
+
+            if (failureReason?.failureMessage) {
+              throw new BadRequestException(failureReason.failureMessage);
+            }
+
+            throw new BadRequestException('Le paiement a été rejeté. Veuillez vérifier vos informations.');
+
+          case 'FAILED':
+            console.log('[PayOrder] ❌ Dépôt Pawapay FAILED');
+
+            if (failureReason?.failureMessage) {
+              throw new BadRequestException(failureReason.failureMessage);
+            }
+
+            throw new BadRequestException('Le paiement a échoué. Veuillez réessayer.');
+
+          case 'CANCELED':
+            console.log('[PayOrder] ❌ Dépôt Pawapay CANCELED');
+            throw new BadRequestException('Le paiement a été annulé.');
+
+          case 'EXPIRED':
+            console.log('[PayOrder] ❌ Dépôt Pawapay EXPIRED');
+            throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
+
+          // ✅ Timeout
+          case 'TIMEOUT':
+            console.log('[PayOrder] ⏳ Timeout du polling');
+
+            if (lastStatus === 'ACCEPTED' || lastStatus === 'PENDING' || lastStatus === 'PROCESSING') {
+              throw new BadRequestException(
+                `Le paiement est en cours de traitement (${lastStatus}). Veuillez vérifier le statut plus tard.`
+              );
+            }
+
+            throw new BadRequestException(
+              'Le paiement est en attente depuis trop longtemps. Veuillez vérifier le statut manuellement.'
+            );
+
+          // ✅ Statuts en attente (normalement ne devrait pas arriver car polling retourne un statut final)
+          case 'ACCEPTED':
+          case 'PENDING':
+          case 'PROCESSING':
+          case 'WAITING':
+            console.log(`[PayOrder] ⏳ Statut en attente: ${depositStatus}`);
+            paymentStatus = PaymentStatus.PENDING;
+            orderStatus = OrderStatus.PENDING;
+            isPaidByMobileMoney = false;
+            console.log(`[PayOrder] Commande en attente de confirmation du paiement (${depositStatus})`);
+            break;
+
+          // ✅ Statut inconnu
+          default:
+            console.log(`[PayOrder] ❌ Statut inconnu: ${depositStatus}`);
+            throw new BadRequestException(
+              `Statut de paiement inattendu: ${depositStatus}`
+            );
+        }
+      } catch (error: any) {
+        if (error.name === 'AbortError' || signal?.aborted) {
+          console.log('[PayOrder] ⚠️ Opération annulée par l\'utilisateur');
+          throw new BadRequestException(
+            this.i18nService.translate('order.order_request_aborted', lang)
+          );
+        }
+
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+
+        console.error('[PayOrder] Erreur Pawapay:', error.message);
+        throw new BadRequestException(
+          error.message || this.i18nService.translate('order.payment_failed', lang)
+        );
+      }
+
+      // ============================================================
+      // 2. FPAY - OPTIONNEL (NE BLOQUE JAMAIS)
+      // ============================================================
       try {
         console.log('[PayOrder] Tentative FPAY Mobile Money...');
         const fpayResponse = await this.fpayService.payWithMobileMoney(
-          Number(amountString), // ✅ Convertir en number
+          amount, // ✅ Utiliser amount
           order.currency || 'USD',
           `Paiement de commande #${order.invoiceNumber}`,
           'MOBILE_MONEY',
@@ -635,7 +727,6 @@ export class OrderService {
         );
 
         if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-          // ✅ Mettre à jour les infos FPAY si réussi
           fpayTransactionId = fpayResponse.data.transaction.id;
           fpayReference = fpayResponse.data.transaction.reference;
           console.log('[PayOrder] ✅ FPAY Mobile Money réussi:', {
@@ -643,35 +734,12 @@ export class OrderService {
             reference: fpayReference,
           });
         } else {
-          // ✅ FPAY échoue mais on continue (Pawapay a déjà réussi ou échoué)
           console.log('[PayOrder] ⚠️ FPAY Mobile Money échoué - statut:',
             fpayResponse?.data?.transaction?.status || 'inconnu'
           );
         }
       } catch (error: any) {
-        // ✅ FPAY en erreur mais on continue (Pawapay a déjà réussi ou échoué)
         console.log('[PayOrder] FPAY Mobile Money ignoré (erreur):', error.message);
-      }
-
-      // Tenter FPAY en parallèle
-      try {
-        const fpayResponse = await this.fpayService.payWithMobileMoney(
-          amount,
-          order.currency || 'USD',
-          `Paiement de commande #${order.invoiceNumber}`,
-          'MOBILE_MONEY',
-          lang
-        );
-
-        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-          paymentStatus = PaymentStatus.PAID;
-          orderStatus = OrderStatus.VALIDATED;
-          isPaidByMobileMoney = true;
-          fpayTransactionId = fpayResponse.data.transaction.id;
-          fpayReference = fpayResponse.data.transaction.reference;
-        }
-      } catch (error: any) {
-        console.log('[PayOrder] FPAY optionnel ignoré:', error.message);
       }
 
     } else if (paymentMethod === PaymentMethod.FPAY) {
