@@ -261,8 +261,8 @@ export class PawapayService {
   private async pollDepositStatus(
     depositId: string,
     signal?: AbortSignal,
-    maxRetries = 20,
-    intervalMs = 60000,
+    maxRetries = 60, // ✅ 60 tentatives
+    intervalMs = 1000, // ✅ 1 seconde
   ) {
     // ✅ Tous les statuts finaux
     const finalStatuses = [
@@ -270,7 +270,7 @@ export class PawapayService {
       'FAILED',
       'CANCELED',
       'EXPIRED',
-      'REJECTED', // ✅ AJOUTÉ
+      'REJECTED',
     ];
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -304,16 +304,17 @@ export class PawapayService {
         return statusResponse;
       }
 
-      // ✅ Si statut en attente, log
-      console.log(`[Polling] ⏳ En attente: ${status}`);
+      // ✅ Si statut en attente
+      console.log(`[Polling] ⏳ En attente: ${status}, prochaine vérification dans 1s (${attempt}/${maxRetries})`);
 
       if (attempt === maxRetries) {
-        console.warn(`[Polling] ⚠️ Max retries atteint, dernier statut: ${status}`);
+        console.warn(`[Polling] ⚠️ Max retries atteint (${maxRetries}), dernier statut: ${status}`);
         break;
       }
 
       if (signal?.aborted) throw new Error('AbortError');
 
+      // ✅ Attendre 1 seconde avant la prochaine tentative
       await new Promise<void>((resolve, reject) => {
         if (signal?.aborted) return reject(new Error('AbortError'));
         const timeout = setTimeout(resolve, intervalMs);
@@ -325,19 +326,19 @@ export class PawapayService {
       });
     }
 
-    // ✅ Timeout
-    console.warn(`[Polling] ⚠️ TIMEOUT pour depositId: ${depositId} après ${maxRetries} tentatives`);
+    // ✅ Timeout après 60 secondes
+    console.warn(`[Polling] ⚠️ TIMEOUT pour depositId: ${depositId} après ${maxRetries} secondes`);
     return {
       data: {
         status: 'TIMEOUT',
         failureReason: {
           failureCode: 'POLLING_TIMEOUT',
-          failureMessage: `Le paiement est en attente depuis trop longtemps (${(maxRetries * intervalMs) / 1000}s)`
+          failureMessage: `Le paiement est en attente depuis 60 secondes. Veuillez vérifier le statut manuellement.`
         }
       }
     };
   }
-  
+
   async checkPayoutStatus(payoutId: string, signal?: AbortSignal) {
     const url = `${this.baseUrl}/v2/payouts/${payoutId}`;
     return lastValueFrom(
