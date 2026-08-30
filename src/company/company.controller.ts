@@ -349,6 +349,16 @@ export class CompanyController {
     };
   }
 
+  @Get('city/by-name')
+  async getCityByName(
+    @Req() req: Request,
+    @Query('name') name: string,
+    @Query('countryId') countryId?: string,
+  ) {
+    const lang = this.extractLanguage(req);
+    return this.companyService.getCityByName(name, lang);
+  }
+
   @Patch('country/:id')
   async updateCountry(
     @Req() req: Request,

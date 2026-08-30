@@ -52,4 +52,8 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   platform?: 'ios' | 'android' | 'web';
+
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
 }

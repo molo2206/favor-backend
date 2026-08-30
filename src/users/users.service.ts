@@ -39,6 +39,8 @@ import { UserSettingsEntity } from './entities/user-settings.entity';
 import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { I18nService } from 'src/libs/common/src';
 import { LoyaltyTier, UserLoyaltyEntity } from './entities/user-loyalty.entity';
+import { v4 as uuidv4 } from 'uuid';
+import { ReferralEntity, ReferralStatus } from './entities/referral.entity';
 
 @Injectable()
 export class UsersService {
@@ -53,6 +55,9 @@ export class UsersService {
 
     @InjectRepository(DeviceToken)
     private readonly deviceTokenRepo: Repository<DeviceToken>,
+
+    @InjectRepository(ReferralEntity)
+    private readonly referralRepository: Repository<ReferralEntity>,
 
     @InjectRepository(UserHasResourceEntity)
     private readonly userHasResourceRepository: Repository<UserHasResourceEntity>,
@@ -80,6 +85,73 @@ export class UsersService {
     private readonly i18n: I18nService,
   ) { }
 
+  /**
+ * Génère un code de parrainage unique pour un utilisateur
+ * @param userId - ID de l'utilisateur
+ * @param existingCodes - Liste des codes existants (optionnel)
+ * @returns Code de parrainage unique
+ */
+  private async generateReferralCode(
+    userId: string,
+    existingCodes?: string[],
+  ): Promise<string> {
+    // ✅ Format: REF-XXXX-XXXXXX
+    const prefix = 'REF';
+    const userIdShort = userId.substring(0, 4).toUpperCase();
+
+    // ✅ Générer un code aléatoire
+    let code: string;
+    let exists = true;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    // ✅ Liste des codes à vérifier
+    const codesToCheck = existingCodes || [];
+
+    do {
+      // Générer une partie aléatoire
+      const random = Math.random()
+        .toString(36)
+        .substring(2, 8)
+        .toUpperCase()
+        .padStart(6, '0');
+
+      code = `${prefix}-${userIdShort}-${random}`;
+
+      // Vérifier si le code existe déjà
+      const existingUser = await this.usersRepository.findOne({
+        where: { referralCode: code },
+      });
+
+      exists = !!existingUser || codesToCheck.includes(code);
+      attempts++;
+
+    } while (exists && attempts < maxAttempts);
+
+    // ✅ Fallback si jamais collision après 10 tentatives
+    if (exists) {
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const randomSuffix = Math.random()
+        .toString(36)
+        .substring(2, 4)
+        .toUpperCase();
+      code = `${prefix}-${timestamp.slice(-6)}-${randomSuffix}`;
+
+      // Vérifier une dernière fois le fallback
+      const existingUser = await this.usersRepository.findOne({
+        where: { referralCode: code },
+      });
+
+      if (existingUser) {
+        // Fallback ultime avec UUID
+        const uuidPart = uuidv4().substring(0, 8).toUpperCase();
+        code = `${prefix}-${uuidPart}`;
+      }
+    }
+
+    return code;
+  }
+
   async signup(
     createUserDto: CreateUserDto,
     lang: string = 'fr',
@@ -98,6 +170,7 @@ export class UsersService {
       password,
       fcmToken: clientFcmToken,
       platform,
+      referralCode, // ✅ Ajout du code de parrainage (optionnel)
     } = createUserDto;
 
     const hasEmail = email && email !== '';
@@ -220,6 +293,36 @@ export class UsersService {
 
     const savedUser = await this.usersRepository.save(newUser);
 
+    // ✅ Générer le code de parrainage
+    const referralCodeGenerated = await this.generateReferralCode(savedUser.id);
+    savedUser.referralCode = referralCodeGenerated;
+
+    // ✅ Traiter le parrainage si un code a été fourni
+    if (referralCode) {
+      const referrer = await this.usersRepository.findOne({
+        where: { referralCode },
+      });
+
+      if (referrer && referrer.id !== savedUser.id) {
+        savedUser.referredBy = referrer.id;
+
+        referrer.referralCount = (referrer.referralCount || 0) + 1;
+        referrer.lastReferralDate = new Date();
+        await this.usersRepository.save(referrer);
+
+        const referral = this.referralRepository.create({
+          referrerId: referrer.id,
+          referredId: savedUser.id,
+          referralCode: referralCode,
+          status: ReferralStatus.PENDING,
+        });
+        await this.referralRepository.save(referral);
+      }
+    }
+
+    // ✅ Sauvegarder l'utilisateur avec le code de parrainage
+    await this.usersRepository.save(savedUser);
+
     const generateUniqueLoyaltyCode = async (): Promise<string> => {
       let code: string;
       let exists: UserLoyaltyEntity | null = null;
@@ -235,7 +338,6 @@ export class UsersService {
       } while (exists && attempts < maxAttempts);
 
       if (exists) {
-        // Fallback avec timestamp si jamais collision après 10 tentatives
         const timestamp = Date.now().toString().slice(-8);
         code = timestamp;
       }
@@ -316,6 +418,7 @@ export class UsersService {
         phone: userWithoutPassword.phone || 'Non renseigné',
         role: userWithoutPassword.role || 'Client',
         loyaltyCode: loyaltyCode,
+        referralCode: savedUser.referralCode,
         createdAt: userWithoutPassword.createdAt
           ? new Date(
             typeof userWithoutPassword.createdAt === 'string'
@@ -343,6 +446,9 @@ export class UsersService {
         contact_us: await this.i18n.translate('user.contact_us', lang),
         footer_copyright: await this.i18n.translate('user.footer_copyright', lang),
         footer_legal: await this.i18n.translate('user.footer_legal', lang),
+        referral_code_title: await this.i18n.translate('user.referral_code_title', lang),
+        referral_code_description: await this.i18n.translate('user.referral_code_description', lang),
+        share_referral: await this.i18n.translate('user.share_referral', lang),
       };
 
       await this.mailService.sendHtmlEmail(
@@ -364,7 +470,10 @@ export class UsersService {
 
     return {
       message: await this.i18n.translate('user.signup_success', lang),
-      data: userWithoutPassword,
+      data: {
+        ...userWithoutPassword,
+        referralCode: savedUser.referralCode,
+      },
       access_token,
       refresh_token,
       fcmToken: savedFcmToken,
@@ -435,6 +544,8 @@ export class UsersService {
       .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
       .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
       .leftJoinAndSelect('users.loyalty', 'loyalty')
+      .leftJoinAndSelect('users.referrals', 'referrals')
+      .leftJoinAndSelect('users.referrer', 'referrer')
       .where('users.email = :login OR users.phone = :login', {
         login: userSignInDto.email,
       })
@@ -523,6 +634,8 @@ export class UsersService {
         .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
         .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
         .leftJoinAndSelect('users.loyalty', 'loyalty')
+        .leftJoinAndSelect('users.referrals', 'referrals')
+        .leftJoinAndSelect('users.referrer', 'referrer')
         .where('users.id = :id', { id: user.id })
         .getOne();
 
@@ -702,6 +815,17 @@ export class UsersService {
         role: upr.role,
       })) ?? [];
 
+    // ✅ Ajout des informations de parrainage
+    const referralData = {
+      referralCode: user.referralCode,
+      referralCount: user.referralCount || 0,
+      referralPoints: user.referralPoints || 0,
+      referredBy: user.referredBy,
+      referrerName: user.referrer?.fullName || null,
+      referralActive: user.referralActive !== false,
+      totalReferrals: user.referrals?.length || 0
+    };
+
     return {
       message: await this.i18n.translate('user.login_success', lang),
       data: instanceToPlain({
@@ -714,6 +838,7 @@ export class UsersService {
           tier: loyaltyTier,
           code: loyaltyCode,
         },
+        referral: referralData,
       }),
       access_token,
       refresh_token,
@@ -763,6 +888,8 @@ export class UsersService {
       .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
       .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
       .leftJoinAndSelect('users.loyalty', 'loyalty')
+      .leftJoinAndSelect('users.referrals', 'referrals')
+      .leftJoinAndSelect('users.referrer', 'referrer')
       .where('users.email = :email', { email: email.toLowerCase() })
       .getOne();
 
@@ -790,6 +917,11 @@ export class UsersService {
       });
       user = await this.usersRepository.save(newUser);
       isNewUser = true;
+
+      // ✅ Générer le code de parrainage
+      const referralCodeGenerated = await this.generateReferralCode(user.id);
+      user.referralCode = referralCodeGenerated;
+      await this.usersRepository.save(user);
 
       // ✅ Création du compte fidélité
       const generateUniqueLoyaltyCode = async (): Promise<string> => {
@@ -857,6 +989,8 @@ export class UsersService {
         .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
         .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
         .leftJoinAndSelect('users.loyalty', 'loyalty')
+        .leftJoinAndSelect('users.referrals', 'referrals')
+        .leftJoinAndSelect('users.referrer', 'referrer')
         .where('users.id = :id', { id: user.id })
         .getOne();
     }
@@ -905,6 +1039,8 @@ export class UsersService {
           .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
           .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
           .leftJoinAndSelect('users.loyalty', 'loyalty')
+          .leftJoinAndSelect('users.referrals', 'referrals')
+          .leftJoinAndSelect('users.referrer', 'referrer')
           .where('users.id = :id', { id: user.id })
           .getOne();
         if (reloaded) user = reloaded;
@@ -1106,6 +1242,17 @@ export class UsersService {
       }
       : null;
 
+    // ✅ Ajout des informations de parrainage
+    const referralData = {
+      referralCode: user.referralCode,
+      referralCount: user.referralCount || 0,
+      referralPoints: user.referralPoints || 0,
+      referredBy: user.referredBy,
+      referrerName: user.referrer?.fullName || null,
+      referralActive: user.referralActive !== false,
+      totalReferrals: user.referrals?.length || 0
+    };
+
     return {
       message: isNewUser
         ? await this.i18n.translate('user.google_account_created', lang)
@@ -1121,13 +1268,13 @@ export class UsersService {
           tier: user.loyalty?.[0]?.currentTier ?? null,
           code: user.loyalty?.[0]?.loyaltyCode ?? null,
         },
+        referral: referralData,
       }),
       access_token,
       refresh_token,
       fcmToken,
     };
   }
-
   // ==================== APPLE LOGIN ====================
   async appleLogin(
     dto: {
@@ -1185,6 +1332,8 @@ export class UsersService {
       .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
       .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
       .leftJoinAndSelect('users.loyalty', 'loyalty')
+      .leftJoinAndSelect('users.referrals', 'referrals')
+      .leftJoinAndSelect('users.referrer', 'referrer')
       .where('users.appleUserId = :appleUserId', { appleUserId })
       .getOne();
 
@@ -1213,6 +1362,11 @@ export class UsersService {
       });
       user = await this.usersRepository.save(newUser);
       isNewUser = true;
+
+      // ✅ Générer le code de parrainage
+      const referralCodeGenerated = await this.generateReferralCode(user.id);
+      user.referralCode = referralCodeGenerated;
+      await this.usersRepository.save(user);
 
       // ✅ Création du compte fidélité
       const generateUniqueLoyaltyCode = async (): Promise<string> => {
@@ -1282,6 +1436,8 @@ export class UsersService {
         .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
         .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
         .leftJoinAndSelect('users.loyalty', 'loyalty')
+        .leftJoinAndSelect('users.referrals', 'referrals')
+        .leftJoinAndSelect('users.referrer', 'referrer')
         .where('users.id = :id', { id: user.id })
         .getOne();
     } else {
@@ -1336,6 +1492,8 @@ export class UsersService {
           .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
           .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
           .leftJoinAndSelect('users.loyalty', 'loyalty')
+          .leftJoinAndSelect('users.referrals', 'referrals')
+          .leftJoinAndSelect('users.referrer', 'referrer')
           .where('users.id = :id', { id: user.id })
           .getOne();
       }
@@ -1541,6 +1699,17 @@ export class UsersService {
       }
       : null;
 
+    // ✅ Ajout des informations de parrainage
+    const referralData = {
+      referralCode: user.referralCode,
+      referralCount: user.referralCount || 0,
+      referralPoints: user.referralPoints || 0,
+      referredBy: user.referredBy,
+      referrerName: user.referrer?.fullName || null,
+      referralActive: user.referralActive !== false,
+      totalReferrals: user.referrals?.length || 0,
+    };
+
     return {
       message: isNewUser
         ? await this.i18n.translate('user.apple_account_created', lang)
@@ -1556,6 +1725,7 @@ export class UsersService {
           tier: user.loyalty?.[0]?.currentTier ?? null,
           code: user.loyalty?.[0]?.loyaltyCode ?? null,
         },
+        referral: referralData,
       }),
       access_token,
       refresh_token,
@@ -2330,6 +2500,8 @@ export class UsersService {
       .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
       .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
       .leftJoinAndSelect('users.loyalty', 'loyalty')
+      .leftJoinAndSelect('users.referrals', 'referrals')
+      .leftJoinAndSelect('users.referrer', 'referrer')
       .where('users.id = :id', { id: userId })
       .getOne();
 
@@ -2369,7 +2541,6 @@ export class UsersService {
       });
       await this.loyaltyRepository.save(loyalty);
 
-      // Recharger l'utilisateur avec la relation loyalty
       const reloadedUser = await this.usersRepository
         .createQueryBuilder('users')
         .addSelect('users.password')
@@ -2396,6 +2567,8 @@ export class UsersService {
         .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
         .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
         .leftJoinAndSelect('users.loyalty', 'loyalty')
+        .leftJoinAndSelect('users.referrals', 'referrals')
+        .leftJoinAndSelect('users.referrer', 'referrer')
         .where('users.id = :id', { id: userId })
         .getOne();
 
@@ -2595,6 +2768,17 @@ export class UsersService {
       }
       : null;
 
+    // ✅ Ajout des informations de parrainage
+    const referralData = {
+      referralCode: user.referralCode,
+      referralCount: user.referralCount || 0,
+      referralPoints: user.referralPoints || 0,
+      referredBy: user.referredBy,
+      referrerName: user.referrer?.fullName || null,
+      referralActive: user.referralActive !== false,
+      totalReferrals: user.referrals?.length || 0,
+    };
+
     return instanceToPlain({
       ...userWithoutPassword,
       userHasCompany,
@@ -2607,6 +2791,7 @@ export class UsersService {
         tier: user.loyalty?.[0]?.currentTier ?? null,
         code: user.loyalty?.[0]?.loyaltyCode ?? null,
       },
+      referral: referralData,
     });
   }
 

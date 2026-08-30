@@ -1898,6 +1898,30 @@ export class CompanyService {
     };
   }
 
+  async getCityByName(name: string, lang: string = 'fr'): Promise<{ message: string; data: City }> {
+    if (!name || name.trim() === '') {
+      throw new BadRequestException(
+        await this.i18n.translate('city_name_required', lang),
+      );
+    }
+
+    const city = await this.cityRepo.findOne({
+      where: { name: name.trim() },
+      relations: ['country'],
+    });
+
+    if (!city) {
+      throw new NotFoundException(
+        await this.i18n.translate('city_not_found', lang, { name: name.trim() }),
+      );
+    }
+
+    return {
+      message: await this.i18n.translate('city_retrieved', lang, { name: city.name }),
+      data: city,
+    };
+  }
+
   async updateCity(id: string, dto: UpdateCityDto, lang: string = 'fr') {
     const city = await this.cityRepo.findOne({
       where: { id },

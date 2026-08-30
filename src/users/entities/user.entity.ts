@@ -215,4 +215,45 @@ export class UserEntity {
 
   @OneToMany(() => UserLoyaltyEntity, (loyalty) => loyalty.user)
   loyalty: UserLoyaltyEntity[];
+
+  // ============================================================
+  // 🔥 FONCTIONNALITÉ DE PARRAINAGE
+  // ============================================================
+
+  // Code de parrainage unique de l'utilisateur
+  @Column({ unique: true, nullable: true, length: 20 })
+  referralCode?: string;
+
+  // ID de l'utilisateur qui a parrainé cet utilisateur
+  @Column({ nullable: true })
+  referredBy?: string;
+
+  // Relation avec le parrain
+  @ManyToOne(() => UserEntity, { nullable: true })
+  @JoinColumn({ name: 'referredBy' })
+  referrer?: UserEntity;
+
+  // Liste des utilisateurs parrainés
+  @OneToMany(() => UserEntity, (user) => user.referrer)
+  referrals: UserEntity[];
+
+  // Historique des parrainages
+  @OneToMany(() => ReferralEntity, (referral) => referral.referrer)
+  referralHistory: ReferralEntity[];
+
+  // Nombre de personnes parrainées
+  @Column({ default: 0 })
+  referralCount: number;
+
+  // Points de parrainage gagnés
+  @Column({ default: 0 })
+  referralPoints: number;
+
+  // Date du dernier parrainage
+  @Column({ nullable: true })
+  lastReferralDate?: Date;
+
+  // Statut du parrainage (actif/inactif)
+  @Column({ default: true })
+  referralActive: boolean;
 }

@@ -2848,6 +2848,241 @@ export class ProductService {
     };
   }
 
+  /**
+ * Récupère les produits de type restaurant par jour de la semaine avec rotation
+ */
+  async getRestaurantProductsByDay(
+    day?: string,
+    lang: string = 'fr',
+    filters?: {
+      categoryId?: string;
+      brandId?: string;
+      companyId?: string;
+      cityId?: string;
+      countryId?: string;
+      minPrice?: number;
+      maxPrice?: number;
+      search?: string;
+      page?: number;
+      limit?: number;
+      includeSpecifications?: boolean;
+      includeVariations?: boolean;
+    }
+  ): Promise<{
+    message: string;
+    data: {
+      [key: string]: Product[];
+    };
+    total?: number;
+    day?: string;
+  }> {
+    // Paramètres de pagination
+    const page = Math.max(filters?.page || 1, 1);
+    const limit = Math.min(filters?.limit || 20, 100);
+    const includeSpecs = filters?.includeSpecifications !== false;
+    const includeVars = filters?.includeVariations !== false;
+
+    // ✅ Définition des jours de la semaine
+    const daysOfWeek = [
+      { key: 'monday', label: 'Lundi', order: 1 },
+      { key: 'tuesday', label: 'Mardi', order: 2 },
+      { key: 'wednesday', label: 'Mercredi', order: 3 },
+      { key: 'thursday', label: 'Jeudi', order: 4 },
+      { key: 'friday', label: 'Vendredi', order: 5 },
+      { key: 'saturday', label: 'Samedi', order: 6 },
+      { key: 'sunday', label: 'Dimanche', order: 7 },
+    ];
+
+    // ✅ Construction de la requête principale (comme dans findProductPublishedByType)
+    const queryBuilder = this.productRepo
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('product.brand', 'brand')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('category.parent', 'categoryParent')
+      .leftJoinAndSelect('category.children', 'categoryChildren')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .where('product.type = :type', { type: CompanyType.RESTAURANT })
+      .andWhere('product.status = :status', { status: ProductStatus.PUBLISHED })
+      .andWhere('company.status = :companyStatus', {
+        companyStatus: CompanyStatus.VALIDATED,
+      });
+
+    // ✅ Charger les spécifications seulement si demandé
+    if (includeSpecs) {
+      queryBuilder
+        .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+        .leftJoinAndSelect('specificationValues.specification', 'specification');
+    }
+
+    // ✅ Charger les variations seulement si demandé
+    if (includeVars) {
+      queryBuilder
+        .leftJoinAndSelect('product.variations', 'variations')
+        .leftJoinAndSelect('variations.image', 'variationImage')
+        .leftJoinAndSelect(
+          'variations.attributeValues',
+          'variationAttributeValues',
+        )
+        .leftJoinAndSelect(
+          'variationAttributeValues.attribute',
+          'variationAttribute',
+        );
+    }
+
+    // ✅ Appliquer les filtres (comme dans findProductPublishedByType)
+    if (filters) {
+      // Filtrer par catégorie
+      if (filters.categoryId) {
+        queryBuilder.andWhere(
+          '(category.id = :categoryId OR categoryParent.id = :categoryId OR categoryChildren.id = :categoryId)',
+          { categoryId: filters.categoryId },
+        );
+      }
+
+      // Filtrer par marque
+      if (filters.brandId) {
+        queryBuilder.andWhere('product.brand_id = :brandId', {
+          brandId: filters.brandId,
+        });
+      }
+
+      // Filtrer par entreprise
+      if (filters.companyId) {
+        queryBuilder.andWhere('product.companyId = :companyId', {
+          companyId: filters.companyId,
+        });
+      }
+
+      // Filtrer par pays
+      if (filters.countryId) {
+        queryBuilder.andWhere('company.countryId = :countryId', {
+          countryId: filters.countryId,
+        });
+      }
+
+      // Filtrer par ville
+      if (filters.cityId) {
+        queryBuilder.andWhere('company.cityId = :cityId', {
+          cityId: filters.cityId,
+        });
+      }
+
+      // Filtrer par prix
+      if (filters.minPrice !== undefined) {
+        queryBuilder.andWhere('product.price >= :minPrice', {
+          minPrice: filters.minPrice,
+        });
+      }
+      if (filters.maxPrice !== undefined) {
+        queryBuilder.andWhere('product.price <= :maxPrice', {
+          maxPrice: filters.maxPrice,
+        });
+      }
+
+      // Recherche par nom
+      if (filters.search && filters.search.trim() !== '') {
+        queryBuilder.andWhere('LOWER(product.name) LIKE :search', {
+          search: `%${filters.search.toLowerCase().trim()}%`,
+        });
+      }
+    }
+
+    // ✅ Appliquer le tri
+    queryBuilder.orderBy('product.createdAt', 'DESC');
+
+    // ✅ Exécuter la requête
+    const products = await queryBuilder.getMany();
+
+    // ✅ Fonction de rotation des produits
+    const rotateProducts = (productList: Product[], dayIndex: number): Product[] => {
+      if (productList.length === 0) return [];
+
+      const sorted = [...productList];
+      sorted.sort((a, b) => (b.price || 0) - (a.price || 0));
+
+      const rotationFactor = dayIndex + 1;
+      const half = Math.ceil(sorted.length / 2);
+      const firstHalf = sorted.slice(0, half);
+      const secondHalf = sorted.slice(half);
+
+      const interleaved: Product[] = [];
+      const maxLength = Math.max(firstHalf.length, secondHalf.length);
+
+      for (let i = 0; i < maxLength; i++) {
+        if (i < firstHalf.length) {
+          const index = (i + rotationFactor) % firstHalf.length;
+          interleaved.push(firstHalf[index]);
+        }
+        if (i < secondHalf.length) {
+          const index = (i + rotationFactor * 2) % secondHalf.length;
+          interleaved.push(secondHalf[index]);
+        }
+      }
+
+      const final: Product[] = [];
+      const step = Math.max(1, Math.floor(interleaved.length / 7));
+      for (let i = 0; i < interleaved.length; i++) {
+        const sourceIndex = (i * step + dayIndex * 3) % interleaved.length;
+        final.push(interleaved[sourceIndex]);
+      }
+
+      return final;
+    };
+
+    // ✅ Si un jour spécifique est demandé
+    if (day) {
+      const dayKey = day.toLowerCase();
+      const dayIndex = daysOfWeek.findIndex((d) => d.key === dayKey);
+
+      if (dayIndex === -1) {
+        throw new BadRequestException(
+          await this.i18n.translate('invalid_day', lang, {
+            day: day,
+            available: daysOfWeek.map((d) => d.key).join(', '),
+          }),
+        );
+      }
+
+      const rotatedProducts = rotateProducts(products, dayIndex);
+      const start = (page - 1) * limit;
+      const paginatedProducts = rotatedProducts.slice(start, start + limit);
+
+      return {
+        message: await this.i18n.translate('restaurant_products_by_day', lang, {
+          day: daysOfWeek[dayIndex].label,
+        }),
+        data: {
+          [dayKey]: paginatedProducts,
+        },
+        total: rotatedProducts.length,
+        day: dayKey,
+      };
+    }
+
+    // ✅ Si aucun jour spécifique, retourner tous les jours avec pagination
+    const result: { [key: string]: Product[] } = {};
+    let totalCount = 0;
+
+    for (let i = 0; i < daysOfWeek.length; i++) {
+      const day = daysOfWeek[i];
+      const rotated = rotateProducts(products, i);
+      const start = (page - 1) * limit;
+      result[day.key] = rotated.slice(start, start + limit);
+      totalCount += rotated.length;
+    }
+
+    return {
+      message: await this.i18n.translate('restaurant_products_all_days', lang),
+      data: result,
+      total: totalCount,
+    };
+  }
+
   async addToWishlist(user: UserEntity, dto: CreateWishlistDto, lang: string = 'fr') {
     if (!user || !user.id) {
       throw new BadRequestException(await this.i18n.translate('user_not_authenticated', lang));

@@ -525,6 +525,43 @@ export class ProductController {
     );
   }
 
+  @Get('public/restaurant/by-day')
+  async getRestaurantProductsByDay(
+    @Req() req: Request,
+    @Query('day') day?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('brandId') brandId?: string,
+    @Query('companyId') companyId?: string,
+    @Query('cityId') cityId?: string,
+    @Query('countryId') countryId?: string,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('includeSpecifications') includeSpecifications?: string,
+    @Query('includeVariations') includeVariations?: string,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    const filters = {
+      categoryId,
+      brandId,
+      companyId,
+      cityId,
+      countryId,
+      minPrice: minPrice ? Number(minPrice) : undefined,
+      maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      search,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      includeSpecifications: includeSpecifications === 'true',
+      includeVariations: includeVariations === 'true',
+    };
+
+    return this.productService.getRestaurantProductsByDay(day, lang, filters);
+  }
+
   @Get('group-by-type')
   @UseGuards(AuthentificationGuard, RolesGuard)
   @AuditAction(ActionType.VIEW, 'products')
@@ -620,7 +657,7 @@ export class ProductController {
       data: result.data,
     };
   }
-  
+
   @Post('/add/new/wishlist')
   @UseGuards(AuthentificationGuard)
   @AuditAction(ActionType.VIEW, 'products')
