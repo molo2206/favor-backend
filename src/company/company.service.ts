@@ -60,6 +60,7 @@ import { I18nService } from 'src/libs/common/src';
 import { PushNotificationHelper } from 'src/users/utility/helpers/push-notification.helper';
 import { CompanySettingsEntity } from './entities/company-settings.entity';
 import { CreateCompanySettingsDto, UpdateCompanySettingsDto } from './dto/create-company-settings.dto';
+import { UpdateCityDto } from './dto/update-city.dto';
 
 @Injectable()
 export class CompanyService {
@@ -1855,26 +1856,6 @@ export class CompanyService {
     return await this.countryRepo.save(country);
   }
 
-  async createCity(dto: CreateCityDto, lang: string = 'fr'): Promise<City> {
-    const country = await this.countryRepo.findOne({
-      where: { id: dto.countryId },
-    });
-    if (!country)
-      throw new NotFoundException(
-        await this.i18n.translate('company_not_found', lang),
-      );
-    const existingCity = await this.cityRepo.findOne({
-      where: { name: dto.name, country: { id: dto.countryId } },
-      relations: ['country'],
-    });
-    if (existingCity)
-      throw new BadRequestException(
-        await this.i18n.translate('company_city_exists', lang, { name: dto.name }),
-      );
-    const city = this.cityRepo.create({ name: dto.name, country, tarif: dto.tarif ?? null });
-    return await this.cityRepo.save(city);
-  }
-
   async updateCountry(id: string, dto: Partial<CreateCountryDto>, lang: string = 'fr') {
     const country = await this.countryRepo.findOne({ where: { id } });
     if (!country)
@@ -1885,12 +1866,45 @@ export class CompanyService {
     return { message: await this.i18n.translate('company_country_updated', lang), data: updated };
   }
 
-  async updateCity(id: string, dto: Partial<CreateCityDto>, lang: string = 'fr') {
+  async createCity(dto: CreateCityDto, lang: string = 'fr'): Promise<any> {
+    const country = await this.countryRepo.findOne({
+      where: { id: dto.countryId },
+    });
+    if (!country)
+      throw new NotFoundException(
+        await this.i18n.translate('company_not_found', lang),
+      );
+
+    const existingCity = await this.cityRepo.findOne({
+      where: { name: dto.name, country: { id: dto.countryId } },
+      relations: ['country'],
+    });
+    if (existingCity)
+      throw new BadRequestException(
+        await this.i18n.translate('company_city_exists', lang, { name: dto.name }),
+      );
+
+    // ✅ Le tarif est stocké en pur JSON avec la devise
+    const city = this.cityRepo.create({
+      name: dto.name,
+      country,
+      tarif: dto.tarif ?? null,
+    });
+
+    const saved = await this.cityRepo.save(city);
+    return {
+      message: await this.i18n.translate('company_city_created', lang),
+      data: saved,
+    };
+  }
+
+  async updateCity(id: string, dto: UpdateCityDto, lang: string = 'fr') {
     const city = await this.cityRepo.findOne({
       where: { id },
       relations: ['country'],
     });
     if (!city) throw new NotFoundException(await this.i18n.translate('company_not_found', lang));
+
     if (dto.name && dto.name.trim() !== '') {
       const existingCity = await this.cityRepo.findOne({
         where: { name: dto.name, country: { id: city.country.id } },
@@ -1903,6 +1917,7 @@ export class CompanyService {
       }
       city.name = dto.name;
     }
+
     if (dto.countryId && dto.countryId !== city.country.id) {
       const newCountry = await this.countryRepo.findOne({
         where: { id: dto.countryId },
@@ -1912,17 +1927,22 @@ export class CompanyService {
       city.country = newCountry;
     }
 
-    if (dto.tarif !== undefined) {
-      // Si null ou undefined, on supprime le tarif
-      if (dto.tarif === null) {
-        city.tarif = null;
-      } else {
-        // Sinon on met à jour avec le nouveau JSON
-        city.tarif = dto.tarif;
-      }
+    // ✅ Gestion du tarif en pur JSON avec devise
+    if (dto.clearTarif) {
+      city.tarif = null;
+    } else if (dto.tarif !== undefined) {
+      city.tarif = dto.tarif === null ? null : dto.tarif;
     }
+
+    if (dto.status !== undefined) {
+      city.status = dto.status;
+    }
+
     const updated = await this.cityRepo.save(city);
-    return { message: await this.i18n.translate('company_city_updated', lang), data: updated };
+    return {
+      message: await this.i18n.translate('company_city_updated', lang),
+      data: updated,
+    };
   }
 
   async getAllCountries(lang: string = 'fr'): Promise<Country[]> {

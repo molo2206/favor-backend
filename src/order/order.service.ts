@@ -194,8 +194,13 @@ export class OrderService {
         if (!grandTotal) {
           throw new BadRequestException(this.i18nService.translate('order.mobile_money_grandtotal_required', lang));
         }
-        const amount = grandTotal.toString();
-        const pawapayData = { amount, currency, provider, phone: phon };
+        const amount = totalAmount + (shippingCost || 0);
+        const pawapayData = {
+          amount: amount.toString(), // ✅ Convertir en string
+          currency,
+          provider,
+          phone: phon
+        };
         console.log('[Order] Création dépôt Pawapay :', pawapayData);
         try {
           const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);

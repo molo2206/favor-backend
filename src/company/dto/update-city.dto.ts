@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID, IsBoolean, IsObject } from 'class-validator';
+// update-city.dto.ts
+import { IsOptional, IsString, IsUUID, IsBoolean, IsObject } from 'class-validator';
 
 export class UpdateCityDto {
   @IsOptional()
@@ -16,4 +17,8 @@ export class UpdateCityDto {
   @IsOptional()
   @IsObject()
   tarif?: any;
+
+  @IsOptional()
+  @IsBoolean()
+  clearTarif?: boolean;
 }

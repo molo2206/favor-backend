@@ -1,3 +1,4 @@
+// city.entity.ts
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -11,6 +12,29 @@ import {
 import { Country } from './country.entity';
 import { ServiceZone } from 'src/Course/ServiceZone/entity/ServiceZone.entity';
 import { Pricing } from 'src/Course/Pricing/entity/Pricing.entity';
+
+export interface QuantityTier {
+  min: number;
+  max: number;
+  fee: number;
+  label?: string;
+}
+
+export interface DeliveryFees {
+  currency: string;           // Devise (USD, CDF, EUR, etc.)
+  baseFee: number;
+  quantityTiers?: QuantityTier[];
+  perKm?: number;
+  perKg?: number;
+  freeDeliveryThreshold?: number;
+  rushFee?: number;
+  nightFee?: number;
+  zones?: {
+    name: string;
+    fee: number;
+    radius: number;
+  }[];
+}
 
 @Entity('cities')
 export class City {
@@ -31,7 +55,7 @@ export class City {
   countryId: string;
 
   @Column({ type: 'json', nullable: true })
-  tarif?: any;
+  tarif?: DeliveryFees | any;
 
   @OneToMany(() => ServiceZone, (zone) => zone.city)
   zones: ServiceZone[];
