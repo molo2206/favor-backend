@@ -299,8 +299,8 @@ export class PawapayService {
   private async pollDepositStatus(
     depositId: string,
     signal?: AbortSignal,
-    maxRetries = 30, // ✅ Augmenté de 20 à 30
-    intervalMs = 5000, // ✅ Réduit de 60000 à 5000 (5 secondes)
+    maxRetries = 30, // 30 tentatives
+    intervalMs = 5000, // 5 secondes entre chaque tentative
   ) {
     // ✅ Statuts finaux qui arrêtent le polling
     const finalStatuses = [
@@ -348,12 +348,11 @@ export class PawapayService {
         return statusResponse;
       }
 
-      // ✅ Si statut en attente, continuer le polling
+      // ✅ Si statut en attente (ACCEPTED, PENDING, etc.), continuer le polling
       if (pendingStatuses.includes(status)) {
         console.log(`[Polling] ⏳ Statut en attente: ${status}, continuation du polling...`);
-        // Continuer la boucle
+        // Continue la boucle
       } else {
-        // ✅ Si statut inconnu
         console.log(`[Polling] ⚠️ Statut inconnu: ${status}, continuation du polling...`);
       }
 

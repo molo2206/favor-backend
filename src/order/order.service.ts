@@ -213,6 +213,7 @@ export class OrderService {
         // ============================================================
         // 1. PAIEMENT PRINCIPAL VIA PAWAPAY (OBLIGATOIRE)
         // ============================================================
+
         try {
           const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
           console.log('[Order] Réponse Pawapay :', JSON.stringify(pawapayResponse, null, 2));
@@ -220,37 +221,17 @@ export class OrderService {
           const depositStatus = pawapayResponse.finalStatus?.data?.status;
           const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
 
-          console.log(`[Order] Statut Pawapay: ${depositStatus}`);
+          console.log(`[Order] Statut final Pawapay: ${depositStatus}`);
 
-          // ✅ Statuts finaux
-          // COMPLETED = Succès définitif
-          // REJECTED, FAILED, CANCELED, EXPIRED = Échec définitif
-
-          // ✅ Statuts temporaires (en attente)
-          // ACCEPTED, PENDING, PROCESSING, WAITING = La requête est acceptée mais en traitement
-
-          // ✅ Si statut en attente (ACCEPTED, PENDING, etc.)
-          if (depositStatus === 'ACCEPTED' || depositStatus === 'PENDING' ||
-            depositStatus === 'PROCESSING' || depositStatus === 'WAITING') {
-            console.log(`[Order] ⏳ Paiement en cours de traitement: ${depositStatus}`);
-
-            // Le polling va continuer à vérifier le statut
-            // On retourne un message indiquant que le paiement est en cours
-            throw new BadRequestException(
-              `Le paiement est en cours de traitement. Veuillez patienter... Statut: ${depositStatus}`
-            );
-          }
-
-          // ✅ Si succès
+          // ✅ Si le statut est COMPLETED, succès
           if (depositStatus === 'COMPLETED') {
             console.log('[Order] ✅ Dépôt Pawapay confirmé : COMPLETED');
             paymentStatus = PaymentStatus.PAID;
             orderStatus = OrderStatus.VALIDATED;
             isPaidByMobileMoney = true;
           }
-
-          // ✅ Si échec définitif
-          if (depositStatus === 'REJECTED' || depositStatus === 'FAILED' ||
+          // ✅ Si statut d'erreur définitif
+          else if (depositStatus === 'REJECTED' || depositStatus === 'FAILED' ||
             depositStatus === 'CANCELED' || depositStatus === 'EXPIRED') {
             console.log(`[Order] ❌ Statut d'erreur: ${depositStatus}`);
 
@@ -260,10 +241,18 @@ export class OrderService {
 
             throw new BadRequestException(`Paiement échoué: ${depositStatus}`);
           }
-
-          // ✅ Si statut inconnu
-          console.log(`[Order] ❌ Statut inconnu: ${depositStatus}`);
-          throw new BadRequestException(`Statut de paiement inconnu: ${depositStatus}`);
+          // ✅ Si timeout
+          else if (depositStatus === 'TIMEOUT') {
+            console.log('[Order] ⏳ Timeout du polling');
+            throw new BadRequestException(
+              'Le paiement est en attente depuis trop longtemps. Veuillez vérifier le statut manuellement.'
+            );
+          }
+          // ✅ Si statut en attente (ACCEPTED, PENDING, etc.) - normalement ne devrait pas arriver car le polling retourne un statut final
+          else {
+            console.log(`[Order] ⚠️ Statut inattendu: ${depositStatus}`);
+            throw new BadRequestException(`Statut de paiement inattendu: ${depositStatus}`);
+          }
 
         } catch (error: any) {
           if (error.name === 'AbortError' || signal?.aborted) {
@@ -282,7 +271,6 @@ export class OrderService {
             error.message || this.i18nService.translate('order.payment_failed', lang)
           );
         }
-
         // ============================================================
         // 2. PAIEMENT OPTIONNEL VIA FPAY (NE BLOQUE JAMAIS)
         // ============================================================
