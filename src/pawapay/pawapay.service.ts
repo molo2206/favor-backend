@@ -299,24 +299,26 @@ export class PawapayService {
   private async pollDepositStatus(
     depositId: string,
     signal?: AbortSignal,
-    maxRetries = 30, // 30 tentatives
-    intervalMs = 5000, // 5 secondes entre chaque tentative
+    maxRetries = 30,
+    intervalMs = 5000,
   ) {
     // ✅ Statuts finaux qui arrêtent le polling
     const finalStatuses = [
-      'COMPLETED',   // Succès
-      'REJECTED',    // Échec définitif
-      'FAILED',      // Échec définitif
-      'CANCELED',    // Annulé
-      'EXPIRED',     // Expiré
+      'COMPLETED',
+      'REJECTED',
+      'FAILED',
+      'CANCELED',
+      'EXPIRED',
     ];
 
     // ✅ Statuts temporaires (on continue le polling)
     const pendingStatuses = [
-      'ACCEPTED',    // Accepté mais en traitement
-      'PENDING',     // En attente
-      'PROCESSING',  // En cours de traitement
-      'WAITING',     // En attente
+      'ACCEPTED',
+      'PENDING',
+      'PROCESSING',
+      'WAITING',
+      'INITIATED',
+      'CREATED',
     ];
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -325,7 +327,7 @@ export class PawapayService {
         throw new Error('AbortError');
       }
 
-      console.log(`[Polling] Tentative ${attempt}/${maxRetries}`);
+      console.log(`[Polling] Tentative ${attempt}/${maxRetries} pour depositId: ${depositId}`);
 
       let statusResponse;
       try {
@@ -334,6 +336,7 @@ export class PawapayService {
         if (err.name === 'AbortError' || signal?.aborted) {
           throw new Error('AbortError');
         }
+        console.error('[Polling] ❌ Erreur check status:', err.message);
         throw err;
       }
 
@@ -348,11 +351,12 @@ export class PawapayService {
         return statusResponse;
       }
 
-      // ✅ Si statut en attente (ACCEPTED, PENDING, etc.), continuer le polling
+      // ✅ Si statut en attente, continuer le polling
       if (pendingStatuses.includes(status)) {
         console.log(`[Polling] ⏳ Statut en attente: ${status}, continuation du polling...`);
-        // Continue la boucle
+        // On continue la boucle
       } else {
+        // ✅ Si statut inconnu, on continue quand même (peut-être un nouveau statut)
         console.log(`[Polling] ⚠️ Statut inconnu: ${status}, continuation du polling...`);
       }
 
@@ -388,13 +392,14 @@ export class PawapayService {
       });
     }
 
-    // ✅ Si timeout après toutes les tentatives
+    // ✅ Si on arrive ici, c'est un TIMEOUT (aucun statut final atteint)
+    console.warn(`[Polling] ⚠️ TIMEOUT pour depositId: ${depositId} après ${maxRetries} tentatives`);
     return {
       data: {
         status: 'TIMEOUT',
         failureReason: {
           failureCode: 'POLLING_TIMEOUT',
-          failureMessage: `Le paiement est en attente depuis trop longtemps. Veuillez vérifier le statut manuellement.`
+          failureMessage: `Le paiement est en attente depuis trop longtemps (${maxRetries * intervalMs / 1000}s). Veuillez vérifier le statut manuellement.`
         }
       }
     };

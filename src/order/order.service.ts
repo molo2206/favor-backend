@@ -223,12 +223,24 @@ export class OrderService {
 
           console.log(`[Order] Statut final Pawapay: ${depositStatus}`);
 
-          // ✅ Si le statut est COMPLETED, succès
+          // ✅ Si COMPLETED -> Succès
           if (depositStatus === 'COMPLETED') {
             console.log('[Order] ✅ Dépôt Pawapay confirmé : COMPLETED');
             paymentStatus = PaymentStatus.PAID;
             orderStatus = OrderStatus.VALIDATED;
             isPaidByMobileMoney = true;
+          }
+          // ✅ Si TIMEOUT -> Le paiement est en attente, on ne bloque pas la commande ?
+          else if (depositStatus === 'TIMEOUT') {
+            console.log('[Order] ⏳ Timeout du polling - paiement en attente');
+            // ❌ Option 1: On rejette la commande
+            throw new BadRequestException(
+              'Le paiement est en attente de confirmation. Veuillez vérifier le statut plus tard.'
+            );
+            // ✅ Option 2: On continue mais on met la commande en attente
+            // paymentStatus = PaymentStatus.PENDING;
+            // orderStatus = OrderStatus.PENDING;
+            // isPaidByMobileMoney = false;
           }
           // ✅ Si statut d'erreur définitif
           else if (depositStatus === 'REJECTED' || depositStatus === 'FAILED' ||
@@ -241,14 +253,7 @@ export class OrderService {
 
             throw new BadRequestException(`Paiement échoué: ${depositStatus}`);
           }
-          // ✅ Si timeout
-          else if (depositStatus === 'TIMEOUT') {
-            console.log('[Order] ⏳ Timeout du polling');
-            throw new BadRequestException(
-              'Le paiement est en attente depuis trop longtemps. Veuillez vérifier le statut manuellement.'
-            );
-          }
-          // ✅ Si statut en attente (ACCEPTED, PENDING, etc.) - normalement ne devrait pas arriver car le polling retourne un statut final
+          // ✅ Si statut en attente (normalement ne devrait pas arriver car polling retourne un statut final)
           else {
             console.log(`[Order] ⚠️ Statut inattendu: ${depositStatus}`);
             throw new BadRequestException(`Statut de paiement inattendu: ${depositStatus}`);
