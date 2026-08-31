@@ -46,6 +46,18 @@ export class UpdateShipmentAdminDto {
   clientPhone?: string;
 
   // -----------------------
+  // Fournisseur
+  // -----------------------
+
+  @IsOptional()
+  @IsString()
+  fournisseurName?: string;
+
+  @IsOptional()
+  @IsString()
+  fournisseurPhone?: string;
+
+  // -----------------------
   // Status
   // -----------------------
 
@@ -72,11 +84,6 @@ export class UpdateShipmentAdminDto {
   // -----------------------
   // Pickup
   // -----------------------
-
-  // ❌ SUPPRESSION de companyId (remplacé par les trois champs ci-dessous)
-  // @IsNotEmpty()
-  // @IsString()
-  // companyId: string;
 
   @IsOptional()
   @IsUUID()
@@ -205,7 +212,23 @@ export class UpdateShipmentAdminDto {
   @Min(0)
   totalPrice?: number;
 
+  // 🔹 WHATSAPP (pour le fournisseur)
+  @IsOptional()
+  @IsString()
+  whatsapp_number?: string;
+
+  // 🔹 PAYMENT METHOD
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  // 🔹 LOYALTY CODE - CLIENT (expéditeur)
   @IsOptional()
   @IsString()
   loyaltyCode?: string;
+
+  // 🔹 LOYALTY CODE - FOURNISSEUR
+  @IsOptional()
+  @IsString()
+  loyaltyCodeFournisseur?: string;
 }

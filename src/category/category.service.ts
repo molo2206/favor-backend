@@ -873,11 +873,11 @@ export class CategoryService {
       .leftJoinAndSelect('company.city', 'city')
       .where('category.id IN (:...categoryIds)', { categoryIds })
       .andWhere(companyId ? 'company.id = :companyId' : '1=1', { companyId })
-      // Ajout des filtres country et city
       .andWhere(countryId ? 'country.id = :countryId' : '1=1', { countryId })
       .andWhere(cityId ? 'city.id = :cityId' : '1=1', { cityId })
       .andWhere('product.status != :status', { status: 'DELETED' })
-      .orderBy('product.createdAt', 'DESC')
+      // ✅ ORDRE ALEATOIRE - DONNE UNE CHANCE À TOUS LES PRODUITS
+      .orderBy('RAND()')
       .getMany();
 
     const productsByCategory: Record<string, Product[]> = {};

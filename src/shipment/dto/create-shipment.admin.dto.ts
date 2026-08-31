@@ -40,6 +40,15 @@ export class CreateShipmentAdminDto {
   clientPhone?: string;
 
   @IsOptional()
+  @IsString()
+  fournisseurName?: string;
+
+  @IsOptional()
+  @IsString()
+  fournisseurPhone?: string;
+
+
+  @IsOptional()
   @IsEnum(ShipmentStatus)
   status?: ShipmentStatus = ShipmentStatus.PENDING;
 
@@ -212,4 +221,8 @@ export class CreateShipmentAdminDto {
   @IsOptional()
   @IsString()
   loyaltyCode?: string;
+
+  @IsOptional()
+  @IsString()
+  loyaltyCodeFournisseur?: string;
 }

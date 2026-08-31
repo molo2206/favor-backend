@@ -148,6 +148,14 @@ export class Shipment {
   @Column({ nullable: true })
   clientPhone?: string;
 
+  @Column({ nullable: true })
+  fournisseurName?: string;
+
+  @Column({ nullable: true })
+  fournisseurPhone?: string;
+
+
+
   @OneToMany(() => LtaShipmentEntity, (ltaShipment) => ltaShipment.shipment)
   ltaShipments: LtaShipmentEntity[];
 
@@ -214,4 +222,7 @@ export class Shipment {
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   loyaltyCode?: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  loyaltyCodeFournisseur?: string;
 }

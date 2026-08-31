@@ -2158,12 +2158,10 @@ export class ProductService {
       queryBuilder.andWhere('product.type = :type', { type });
     }
 
-    // ✅ FILTRE PAR PAYS
     if (countryId) {
       queryBuilder.andWhere('company.countryId = :countryId', { countryId });
     }
 
-    // ✅ FILTRE PAR VILLE
     if (cityId) {
       queryBuilder.andWhere('city.id = :cityId', { cityId });
     }
@@ -2271,7 +2269,8 @@ export class ProductService {
       queryBuilder.andWhere('product.typecar = :typecar', { typecar });
     }
 
-    queryBuilder.orderBy('product.createdAt', 'DESC').skip(skip).take(limit);
+    // ✅ ORDRE ALEATOIRE - DONNE UNE CHANCE À TOUS LES PRODUITS
+    queryBuilder.orderBy('RAND()').skip(skip).take(limit);
 
     const [products, total] = await Promise.all([
       queryBuilder.getMany(),
@@ -2746,6 +2745,7 @@ export class ProductService {
   ) {
     const offset = (page - 1) * limit;
 
+    // ✅ Récupérer d'abord tous les produits avec leurs ventes
     let query = this.orderItemRepo
       .createQueryBuilder('orderItem')
       .select('orderItem.productId', 'productId')
@@ -2759,7 +2759,6 @@ export class ProductService {
         status: ProductStatus.PUBLISHED,
       });
 
-    // Ajout des filtres country et city
     if (countryId) {
       query = query.andWhere('country.id = :countryId', { countryId });
     }
@@ -2817,6 +2816,32 @@ export class ProductService {
       ),
     }));
 
+    // ✅ Trier les produits par totalSold (du plus vendu au moins vendu)
+    const sortedProducts = productsWithSales.sort((a, b) => b.totalSold - a.totalSold);
+
+    // ✅ Mélanger aléatoirement les produits ayant le même totalSold
+    // Cela donne une chance à tous les produits d'apparaître en premier
+    const groupedBySales: Record<number, any[]> = {};
+    for (const product of sortedProducts) {
+      const key = product.totalSold;
+      if (!groupedBySales[key]) groupedBySales[key] = [];
+      groupedBySales[key].push(product);
+    }
+
+    // ✅ Pour chaque groupe de même totalSold, mélanger aléatoirement
+    const finalProducts: any[] = [];
+    const sortedKeys = Object.keys(groupedBySales).sort((a, b) => Number(b) - Number(a));
+
+    for (const key of sortedKeys) {
+      const group = groupedBySales[Number(key)];
+      // Mélanger le groupe aléatoirement
+      for (let i = group.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [group[i], group[j]] = [group[j], group[i]];
+      }
+      finalProducts.push(...group);
+    }
+
     // Compter le total avec les filtres
     let totalQuery = this.productRepo
       .createQueryBuilder('product')
@@ -2840,14 +2865,13 @@ export class ProductService {
     return {
       message: await this.i18n.translate('best_selling_products', lang),
       data: {
-        data: productsWithSales.sort((a, b) => b.totalSold - a.totalSold),
+        data: finalProducts,
         total: totalCount,
         page,
         limit,
       },
     };
   }
-
   /**
  * Récupère les produits de type restaurant par jour de la semaine avec rotation
  */
