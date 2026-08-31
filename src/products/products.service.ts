@@ -1421,7 +1421,9 @@ export class ProductService {
 
     const skip = (page - 1) * limit;
     queryBuilder.skip(skip).take(limit);
-    queryBuilder.orderBy('product.createdAt', 'DESC');
+
+    // ✅ ORDRE ALEATOIRE - DONNE UNE CHANCE À TOUS LES PRODUITS (comme dans findProductPublishedByTypeByCompany)
+    queryBuilder.orderBy('RAND()');
 
     const [products, total] = await queryBuilder.getManyAndCount();
     const paginatedData = new PaginatedResponseDto(
@@ -2742,7 +2744,7 @@ export class ProductService {
   ) {
     const offset = (page - 1) * limit;
 
-    // ✅ Récupérer d'abord tous les produits avec leurs ventes
+    // ✅ Récupérer les produits les plus vendus avec RAND() pour les ex-aequo
     let query = this.orderItemRepo
       .createQueryBuilder('orderItem')
       .select('orderItem.productId', 'productId')
@@ -2766,6 +2768,7 @@ export class ProductService {
     query = query
       .groupBy('orderItem.productId')
       .orderBy('totalSold', 'DESC')
+      .addOrderBy('RAND()') // ✅ Pour les ex-aequo, mélange aléatoire
       .offset(offset)
       .limit(limit);
 
@@ -2813,31 +2816,8 @@ export class ProductService {
       ),
     }));
 
-    // ✅ Trier les produits par totalSold (du plus vendu au moins vendu)
+    // ✅ Trier par totalSold décroissant
     const sortedProducts = productsWithSales.sort((a, b) => b.totalSold - a.totalSold);
-
-    // ✅ Mélanger aléatoirement les produits ayant le même totalSold
-    // Cela donne une chance à tous les produits d'apparaître en premier
-    const groupedBySales: Record<number, any[]> = {};
-    for (const product of sortedProducts) {
-      const key = product.totalSold;
-      if (!groupedBySales[key]) groupedBySales[key] = [];
-      groupedBySales[key].push(product);
-    }
-
-    // ✅ Pour chaque groupe de même totalSold, mélanger aléatoirement
-    const finalProducts: any[] = [];
-    const sortedKeys = Object.keys(groupedBySales).sort((a, b) => Number(b) - Number(a));
-
-    for (const key of sortedKeys) {
-      const group = groupedBySales[Number(key)];
-      // Mélanger le groupe aléatoirement
-      for (let i = group.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [group[i], group[j]] = [group[j], group[i]];
-      }
-      finalProducts.push(...group);
-    }
 
     // Compter le total avec les filtres
     let totalQuery = this.productRepo
@@ -2862,7 +2842,7 @@ export class ProductService {
     return {
       message: await this.i18n.translate('best_selling_products', lang),
       data: {
-        data: finalProducts,
+        data: sortedProducts,
         total: totalCount,
         page,
         limit,
