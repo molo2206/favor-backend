@@ -1463,13 +1463,11 @@ export class ProductService {
       includeVariations?: boolean;
     }
   ): Promise<{ message: string; data: Product[]; total?: number }> {
-    // Paramètres de pagination
     const page = Math.max(filters?.page || 1, 1);
     const limit = Math.min(filters?.limit || 20, 100);
     const includeSpecs = filters?.includeSpecifications !== false;
     const includeVars = filters?.includeVariations !== false;
 
-    // Construction de la requête principale
     const queryBuilder = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
@@ -1484,14 +1482,12 @@ export class ProductService {
       .leftJoinAndSelect('product.measure', 'measure')
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
-    // Charger les spécifications seulement si demandé
     if (includeSpecs) {
       queryBuilder
         .leftJoinAndSelect('product.specificationValues', 'specificationValues')
         .leftJoinAndSelect('specificationValues.specification', 'specification');
     }
 
-    // Charger les variations seulement si demandé
     if (includeVars) {
       queryBuilder
         .leftJoinAndSelect('product.variations', 'variations')
@@ -1506,50 +1502,37 @@ export class ProductService {
         );
     }
 
-    // Filtrer par type (existant)
     if (type) {
       queryBuilder.andWhere('product.type = :type', { type });
     }
 
-    // Appliquer les nouveaux filtres si présents
     if (filters) {
-      // Filtrer par catégorie
       if (filters.categoryId) {
         queryBuilder.andWhere(
           '(category.id = :categoryId OR categoryParent.id = :categoryId OR categoryChildren.id = :categoryId)',
           { categoryId: filters.categoryId },
         );
       }
-
-      // Filtrer par marque
       if (filters.brandId) {
         queryBuilder.andWhere('product.brand_id = :brandId', {
           brandId: filters.brandId
         });
       }
-
-      // Filtrer par entreprise
       if (filters.companyId) {
         queryBuilder.andWhere('product.companyId = :companyId', {
           companyId: filters.companyId
         });
       }
-
-      // ✅ Filtrer par pays
       if (filters.countryId) {
         queryBuilder.andWhere('company.countryId = :countryId', {
           countryId: filters.countryId
         });
       }
-
-      // ✅ Filtrer par ville
       if (filters.cityId) {
         queryBuilder.andWhere('company.cityId = :cityId', {
           cityId: filters.cityId
         });
       }
-
-      // Filtrer par type de boutique
       if (filters.shopType?.trim()) {
         const activities: string[] = [];
         if (filters.shopType === CompanyActivity.WHOLESALER) {
@@ -1587,29 +1570,21 @@ export class ProductService {
           );
         }
       }
-
-      // Filtrer par type de carburant
       if (filters.fuelType) {
         queryBuilder.andWhere('product.fuelType = :fuelType', {
           fuelType: filters.fuelType
         });
       }
-
-      // Filtrer par transmission
       if (filters.transmission) {
         queryBuilder.andWhere('product.transmission = :transmission', {
           transmission: filters.transmission,
         });
       }
-
-      // Filtrer par année
       if (filters.year) {
         queryBuilder.andWhere('product.year = :year', {
           year: filters.year
         });
       }
-
-      // Filtrer par plage d'années
       if (filters.yearStart !== undefined || filters.yearEnd !== undefined) {
         if (filters.yearStart !== undefined && filters.yearEnd !== undefined) {
           queryBuilder.andWhere(
@@ -1626,8 +1601,6 @@ export class ProductService {
           });
         }
       }
-
-      // Filtrer par type de véhicule et prix
       if (filters.typecar) {
         const saleTypes = [
           Type_rental_both_sale_car.SALE,
@@ -1668,13 +1641,12 @@ export class ProductService {
       }
     }
 
-    // Appliquer la pagination et le tri
+    // ✅ ORDRE ALEATOIRE - DONNE UNE CHANCE À TOUS LES PRODUITS
     queryBuilder
-      .orderBy('product.createdAt', 'DESC')
+      .orderBy('RAND()')
       .skip((page - 1) * limit)
       .take(limit);
 
-    // Exécuter la requête avec count simultanément
     const [products, total] = await queryBuilder.getManyAndCount();
 
     return {
@@ -1787,7 +1759,8 @@ export class ProductService {
       });
     }
 
-    queryBuilder.orderBy('product.createdAt', 'DESC').skip(skip).take(limit);
+    // ✅ ORDRE ALEATOIRE - DONNE UNE CHANCE À TOUS LES PRODUITS
+    queryBuilder.orderBy('RAND()').skip(skip).take(limit);
 
     const [products, total] = await Promise.all([
       queryBuilder.getMany(),
@@ -2048,6 +2021,7 @@ export class ProductService {
       formattedProducts.push(formattedProduct);
     }
 
+    // ✅ Tri par popularité pour les produits ayant le même score, puis aléatoire
     formattedProducts.sort((a, b) => {
       const commandesA = a.company?.start?.totalCommande || 0;
       const commandesB = b.company?.start?.totalCommande || 0;
@@ -2396,6 +2370,29 @@ export class ProductService {
       };
     });
 
+    // ✅ Mélanger aléatoirement les produits ayant le même nombre de commandes
+    // Cela donne une chance à tous les produits d'apparaître en premier
+    const groupedByCommande: Record<number, any[]> = {};
+    for (const product of formattedProducts) {
+      const key = product.company?.start?.totalCommande || 0;
+      if (!groupedByCommande[key]) groupedByCommande[key] = [];
+      groupedByCommande[key].push(product);
+    }
+
+    // ✅ Pour chaque groupe de même totalCommande, mélanger aléatoirement
+    const finalProducts: any[] = [];
+    const sortedKeys = Object.keys(groupedByCommande).sort((a, b) => Number(b) - Number(a));
+
+    for (const key of sortedKeys) {
+      const group = groupedByCommande[Number(key)];
+      // Mélanger le groupe aléatoirement (Fisher-Yates shuffle)
+      for (let i = group.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [group[i], group[j]] = [group[j], group[i]];
+      }
+      finalProducts.push(...group);
+    }
+
     let message = await this.i18n.translate('products_by_category', lang);
     const filters: string[] = [];
 
@@ -2425,7 +2422,7 @@ export class ProductService {
     return {
       message,
       data: {
-        data: formattedProducts,
+        data: finalProducts,
         total,
         page,
         limit,
