@@ -162,7 +162,7 @@ export class UsersService {
       password,
       fcmToken: clientFcmToken,
       platform,
-      referralCode, // ✅ Ajout du code de parrainage (optionnel)
+      referralCode,
     } = createUserDto;
 
     const hasEmail = email && email !== '';
@@ -193,7 +193,48 @@ export class UsersService {
       );
     }
 
+    // ============================================================
+    // ✅ VÉRIFICATION DU CODE DE PARRAINAGE (AVANT OTP)
+    // ============================================================
+    let referrer: UserEntity | null = null;
+
+    if (referralCode) {
+      // ✅ Vérifier si le code de parrainage existe
+      referrer = await this.usersRepository.findOne({
+        where: { referralCode },
+      });
+
+      if (!referrer) {
+        throw new BadRequestException(
+          await this.i18n.translate('referral.invalid_code', lang)
+        );
+      }
+
+      // ✅ Vérifier que le parrain est actif
+      if (!referrer.isActive || referrer.deleted) {
+        throw new BadRequestException(
+          await this.i18n.translate('referral.referrer_inactive', lang)
+        );
+      }
+
+      // ✅ Vérifier si l'utilisateur essaye de se parrainer lui-même (via email)
+      if (email && referrer.email === email) {
+        throw new BadRequestException(
+          await this.i18n.translate('referral.self_referral_not_allowed', lang)
+        );
+      }
+
+      // ✅ Vérifier si l'utilisateur essaye de se parrainer lui-même (via phone)
+      if (phone && referrer.phone === phone) {
+        throw new BadRequestException(
+          await this.i18n.translate('referral.self_referral_not_allowed', lang)
+        );
+      }
+    }
+
+    // ============================================================
     // 1️⃣ Vérification doublons
+    // ============================================================
     const userExists = await this.usersRepository.findOne({
       where: [{ email: email || undefined }, { phone: phone || undefined }],
     });
@@ -204,7 +245,9 @@ export class UsersService {
       );
     }
 
+    // ============================================================
     // 2️⃣ Envoi OTP si non fourni
+    // ============================================================
     if (!otpCode) {
       const generatedOtpCode = Math.floor(
         1000 + Math.random() * 9000,
@@ -259,7 +302,9 @@ export class UsersService {
       };
     }
 
+    // ============================================================
     // 3️⃣ Vérification OTP
+    // ============================================================
     const otpEntry = await this.otpRepository.findOne({
       where: { email: destination, otpCode, isUsed: false },
     });
@@ -269,7 +314,9 @@ export class UsersService {
       );
     }
 
+    // ============================================================
     // 4️⃣ Création utilisateur
+    // ============================================================
     const hashedPassword = password
       ? await bcrypt.hash(password, 10)
       : undefined;
@@ -285,43 +332,52 @@ export class UsersService {
 
     const savedUser = await this.usersRepository.save(newUser);
 
-    // ✅ Générer le code de parrainage
+    // ============================================================
+    // 🔥 GÉNÉRATION DU CODE DE PARRAINAGE
+    // ============================================================
     const referralCodeGenerated = await this.generateReferralCode(savedUser.id);
     savedUser.referralCode = referralCodeGenerated;
 
-    if (referralCode) {
-      // 1. Trouver le parrain
-      const referrer = await this.usersRepository.findOne({
-        where: { referralCode },
-      });
-
-      if (referrer && referrer.id !== savedUser.id) {
-        // 2. Mettre à jour UserEntity du parrain
-        referrer.referralCount = (referrer.referralCount || 0) + 1;
-        referrer.referralPoints = (referrer.referralPoints || 0) + 5; // 5 points
-        referrer.lastReferralDate = new Date();
-        await this.usersRepository.save(referrer);
-
-        // 3. Mettre à jour UserEntity du parrainé
-        savedUser.referredBy = referrer.id;
-        await this.usersRepository.save(savedUser);
-
-        // 4. Créer ReferralEntity (historique)
-        const referral = this.referralRepository.create({
-          referrerId: referrer.id,
-          referredId: savedUser.id,
-          referralCode: referralCode,
-          status: ReferralStatus.COMPLETED, // ✅ Directement COMPLETED
-          rewardAmount: 5,
-          rewardType: 'POINTS',
-          completedAt: new Date(),
-        });
-        await this.referralRepository.save(referral);
+    // ============================================================
+    // ✅ TRAITEMENT DU PARRAINAGE (si un code a été fourni)
+    // ============================================================
+    if (referralCode && referrer) {
+      // ✅ Vérification finale que l'utilisateur ne se parraine pas
+      if (referrer.id === savedUser.id) {
+        throw new BadRequestException(
+          await this.i18n.translate('referral.self_referral_not_allowed', lang)
+        );
       }
+
+      // ✅ Mettre à jour le parrain
+      referrer.referralCount = (referrer.referralCount || 0) + 1;
+      referrer.referralPoints = (referrer.referralPoints || 0) + 5;
+      referrer.lastReferralDate = new Date();
+      await this.usersRepository.save(referrer);
+
+      // ✅ Lier le nouvel utilisateur au parrain
+      savedUser.referredBy = referrer.id;
+      await this.usersRepository.save(savedUser);
+
+      // ✅ Créer l'historique de parrainage
+      const referral = this.referralRepository.create({
+        referrerId: referrer.id,
+        referredId: savedUser.id,
+        referralCode: referralCode,
+        status: ReferralStatus.COMPLETED,
+        rewardAmount: 5,
+        rewardType: 'POINTS',
+        completedAt: new Date(),
+      });
+      await this.referralRepository.save(referral);
     }
+
     // ✅ Sauvegarder l'utilisateur avec le code de parrainage
     await this.usersRepository.save(savedUser);
 
+    // ============================================================
+    // 5️⃣ CRÉATION DU COMPTE FIDÉLITÉ
+    // ============================================================
     const generateUniqueLoyaltyCode = async (): Promise<string> => {
       let code: string;
       let exists: UserLoyaltyEntity | null = null;
@@ -357,6 +413,9 @@ export class UsersService {
     });
     await this.loyaltyRepository.save(loyalty);
 
+    // ============================================================
+    // 6️⃣ GESTION DU FCM TOKEN
+    // ============================================================
     let savedFcmToken: string | undefined;
     if (clientFcmToken && platform) {
       const existingToken = await this.deviceTokenRepo.findOne({
@@ -383,10 +442,16 @@ export class UsersService {
       }
     }
 
+    // ============================================================
+    // 7️⃣ MARQUER L'OTP COMME UTILISÉ
+    // ============================================================
     otpEntry.isUsed = true;
     otpEntry.user = savedUser;
     await this.otpRepository.save(otpEntry);
 
+    // ============================================================
+    // 8️⃣ RECHARGER L'UTILISATEUR AVEC SES RELATIONS
+    // ============================================================
     const userFull = await this.usersRepository.findOne({
       where: { id: savedUser.id },
       relations: [
@@ -409,7 +474,9 @@ export class UsersService {
 
     const { password: _pw, ...userWithoutPassword } = userFull;
 
-    // 6️⃣ Envoyer email de bienvenue si c'est un email
+    // ============================================================
+    // 9️⃣ ENVOI EMAIL DE BIENVENUE
+    // ============================================================
     if (email && email !== '' && validator.isEmail(email)) {
       const userData = {
         fullName: userWithoutPassword.fullName || userWithoutPassword.email || 'Utilisateur',
@@ -464,6 +531,9 @@ export class UsersService {
       );
     }
 
+    // ============================================================
+    // 🔟 GÉNÉRATION DES TOKENS
+    // ============================================================
     const access_token = await this.accessToken(savedUser);
     const refresh_token = await this.refreshToken(savedUser);
 
