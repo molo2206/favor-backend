@@ -832,6 +832,8 @@ export class CategoryService {
   async findAllWithProductsLimitTen(
     companyId?: string,
     type?: string,
+    cityId?: string,
+    countryId?: string,
     lang: string = 'fr',
   ) {
     const categories = await this.categoryRepo
@@ -874,6 +876,8 @@ export class CategoryService {
       .leftJoinAndSelect('company.city', 'city')
       .where('category.id IN (:...categoryIds)', { categoryIds })
       .andWhere(companyId ? 'company.id = :companyId' : '1=1', { companyId })
+      .andWhere(cityId ? 'city.id = :cityId' : '1=1', { cityId })
+      .andWhere(countryId ? 'country.id = :countryId' : '1=1', { countryId })
       .andWhere('product.status != :status', { status: 'DELETED' })
       .orderBy('RAND()')
       .getMany();
