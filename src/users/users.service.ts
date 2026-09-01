@@ -162,7 +162,7 @@ export class UsersService {
       password,
       fcmToken: clientFcmToken,
       platform,
-      referralCode,
+      referralCode, // ✅ Code du parrain
     } = createUserDto;
 
     const hasEmail = email && email !== '';
@@ -194,7 +194,7 @@ export class UsersService {
     }
 
     // ============================================================
-    // ✅ VÉRIFICATION DU CODE DE PARRAINAGE (AVANT OTP)
+    // ✅ VÉRIFICATION DU CODE DE PARRAINAGE
     // ============================================================
     let referrer: UserEntity | null = null;
 
@@ -311,20 +311,25 @@ export class UsersService {
     }
 
     // ============================================================
-    // 4️⃣ Création utilisateur
+    // 4️⃣ CRÉATION UTILISATEUR - ✅ GÉNÉRER SON PROPRE CODE
     // ============================================================
     const hashedPassword = password
       ? await bcrypt.hash(password, 10)
       : undefined;
+
+    // ✅ Créer l'utilisateur SANS referralCode
     const newUser = this.usersRepository.create({
-      ...createUserDto,
+      fullName: createUserDto.fullName,
       email: email || undefined,
       phone: phone || undefined,
       password: hashedPassword,
       role: UserRole.CUSTOMER,
       isActive: true,
       provider: 'otp',
-      // ❌ NE PAS mettre referralCode ici
+      country: createUserDto.country,
+      city: createUserDto.city,
+      fcmToken: clientFcmToken,
+      // ❌ PAS DE referralCode
     });
 
     const savedUser = await this.usersRepository.save(newUser);
@@ -332,23 +337,21 @@ export class UsersService {
     // ============================================================
     // 🔥 GÉNÉRATION DU CODE DE PARRAINAGE POUR LE NOUVEL UTILISATEUR
     // ============================================================
-    // ✅ Générer un NOUVEAU code pour le nouvel utilisateur
+    // ✅ Générer un NOUVEAU code unique pour le nouvel utilisateur
     const referralCodeGenerated = await this.generateReferralCode(savedUser.id);
     savedUser.referralCode = referralCodeGenerated;
+    await this.usersRepository.save(savedUser);
+
+    console.log(`[Signup] Nouveau code généré pour ${savedUser.email}: ${savedUser.referralCode}`);
 
     // ============================================================
     // ✅ TRAITEMENT DU PARRAINAGE (si un code a été fourni)
     // ============================================================
     if (referralCode && referrer) {
+      // ✅ Vérifier que l'utilisateur ne se parraine pas
       if (referrer.id === savedUser.id) {
         throw new BadRequestException(
           await this.i18n.translate('referral.self_referral_not_allowed', lang)
-        );
-      }
-
-      if (savedUser.referredBy) {
-        throw new BadRequestException(
-          await this.i18n.translate('referral.already_referred', lang)
         );
       }
 
@@ -366,17 +369,16 @@ export class UsersService {
       const referral = this.referralRepository.create({
         referrerId: referrer.id,
         referredId: savedUser.id,
-        referralCode: referralCode, // ✅ Le code du parrain
+        referralCode: referralCode, // ✅ Le code du parrain (1A9F563774)
         status: ReferralStatus.COMPLETED,
         rewardAmount: 5,
         rewardType: 'POINTS',
         completedAt: new Date(),
       });
       await this.referralRepository.save(referral);
-    }
 
-    // ✅ Sauvegarder l'utilisateur avec son propre code de parrainage
-    await this.usersRepository.save(savedUser);
+      console.log(`[Signup] ✅ Parrainage enregistré: ${referrer.fullName} -> ${savedUser.fullName}`);
+    }
 
     // ============================================================
     // 5️⃣ CRÉATION DU COMPTE FIDÉLITÉ
@@ -487,7 +489,7 @@ export class UsersService {
         phone: userWithoutPassword.phone || 'Non renseigné',
         role: userWithoutPassword.role || 'Client',
         loyaltyCode: loyaltyCode,
-        referralCode: savedUser.referralCode,
+        referralCode: savedUser.referralCode, // ✅ Son propre code
         createdAt: userWithoutPassword.createdAt
           ? new Date(
             typeof userWithoutPassword.createdAt === 'string'
@@ -543,7 +545,7 @@ export class UsersService {
       message: await this.i18n.translate('user.signup_success', lang),
       data: {
         ...userWithoutPassword,
-        referralCode: savedUser.referralCode,
+        referralCode: savedUser.referralCode, // ✅ Son propre code
       },
       access_token,
       refresh_token,
