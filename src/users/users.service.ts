@@ -85,17 +85,10 @@ export class UsersService {
     private readonly i18n: I18nService,
   ) { }
 
-  /**
- * Génère un code de parrainage unique pour un utilisateur
- * @param userId - ID de l'utilisateur
- * @param existingCodes - Liste des codes existants (optionnel)
- * @returns Code de parrainage unique
- */
   private async generateReferralCode(
     userId: string,
     existingCodes?: string[],
   ): Promise<string> {
-    const prefix = 'REF';
     const userIdShort = userId.substring(0, 4).toUpperCase();
 
     // ✅ Générer un code aléatoire
@@ -115,7 +108,7 @@ export class UsersService {
         .toUpperCase()
         .padStart(6, '0');
 
-      code = `${prefix}-${userIdShort}-${random}`;
+      code = `${userIdShort}${random}`; // ✅ Sans REF et sans tirets
 
       // Vérifier si le code existe déjà
       const existingUser = await this.usersRepository.findOne({
@@ -134,7 +127,7 @@ export class UsersService {
         .toString(36)
         .substring(2, 4)
         .toUpperCase();
-      code = `${prefix}-${timestamp.slice(-6)}-${randomSuffix}`;
+      code = `${timestamp.slice(-6)}${randomSuffix}`; // ✅ Sans REF et sans tirets
 
       // Vérifier une dernière fois le fallback
       const existingUser = await this.usersRepository.findOne({
@@ -144,7 +137,7 @@ export class UsersService {
       if (existingUser) {
         // Fallback ultime avec UUID
         const uuidPart = uuidv4().substring(0, 8).toUpperCase();
-        code = `${prefix}-${uuidPart}`;
+        code = `${uuidPart}`; // ✅ Sans REF et sans tirets
       }
     }
 
@@ -2300,34 +2293,13 @@ export class UsersService {
   async getReferralPoints(
     userId: string,
     lang: string = 'fr',
-  ): Promise<{
-    message: string;
-    data: {
-      referralPoints: number;
-      totalReferralRewards: number;
-      referralCount: number;
-      referralCode: string;
-      referralLink: string;
-      referralActive: boolean;
-      history: {
-        id: string;
-        referredUser: string;
-        referredEmail: string;
-        referredPhone: string;
-        status: string;
-        rewardAmount: number;
-        rewardType: string;
-        createdAt: Date;
-        completedAt: Date | null;
-      }[];
-    };
-  }> {
-    // ✅ Récupérer l'utilisateur avec ses parrainages
+  ): Promise<any> {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
       relations: [
         'referralHistory',
         'referralHistory.referred',
+        'referralHistory.referred.orders',
       ],
     });
 
@@ -2337,21 +2309,50 @@ export class UsersService {
       );
     }
 
-    // ✅ Historique des parrainages
-    const history = user.referralHistory?.map((referral) => ({
-      id: referral.id,
-      referredUser: referral.referred?.fullName || 'Utilisateur inconnu',
-      referredEmail: referral.referred?.email || 'Non renseigné',
-      referredPhone: referral.referred?.phone || 'Non renseigné',
-      status: referral.status,
-      rewardAmount: Number(referral.rewardAmount) || 0,
-      rewardType: referral.rewardType || 'POINTS',
-      createdAt: referral.createdAt,
-      completedAt: referral.completedAt || null,
-    })) || [];
+    let totalPoints = 0;
+    const history = user.referralHistory?.map((referral) => {
+      const referred = referral.referred;
+      let rewardAmount = 0;
+      let orderDetails: any[] = [];
 
-    // ✅ Construction du lien de parrainage
-    const baseUrl ='https://favorhelp.com';
+      if (referred && referred.orders && referred.orders.length > 0) {
+        // ✅ Détail par commande avec shippingCost
+        orderDetails = referred.orders.map((order) => ({
+          orderId: order.id,
+          shippingCost: order.shippingCost || 0,
+          reward: (Number(order.shippingCost || 0) * 0.10),
+          createdAt: order.createdAt,
+        }));
+
+        const totalShippingCost = referred.orders.reduce(
+          (sum, order) => sum + Number(order.shippingCost || 0),
+          0
+        );
+        rewardAmount = totalShippingCost * 0.10;
+      }
+
+      totalPoints += rewardAmount;
+
+      return {
+        id: referral.id,
+        referredUser: referred?.fullName || 'Utilisateur inconnu',
+        referredEmail: referred?.email || 'Non renseigné',
+        referredPhone: referred?.phone || 'Non renseigné',
+        status: referral.status,
+        rewardAmount: Math.round(Number(rewardAmount) * 100) / 100,
+        rewardType: 'POINTS (10% shipping)',
+        createdAt: referral.createdAt,
+        completedAt: referral.completedAt || null,
+        orders: orderDetails, // ✅ Détail des commandes avec shippingCost
+      };
+    }) || [];
+
+    if (totalPoints !== user.referralPoints) {
+      user.referralPoints = totalPoints;
+      await this.usersRepository.save(user);
+    }
+
+    const baseUrl = 'https://favorhelp.com';
     const referralLink = user.referralCode
       ? `${baseUrl}/register?ref=${user.referralCode}`
       : null;
@@ -2359,11 +2360,8 @@ export class UsersService {
     return {
       message: await this.i18n.translate('referral_points_retrieved', lang),
       data: {
-        referralPoints: user.referralPoints || 0,
-        totalReferralRewards: user.referralHistory?.reduce(
-          (sum, r) => sum + Number(r.rewardAmount || 0),
-          0
-        ) || 0,
+        referralPoints: Math.round(totalPoints * 100) / 100,
+        totalReferralRewards: Math.round(totalPoints * 100) / 100,
         referralCount: user.referralCount || 0,
         referralCode: user.referralCode || 'Non généré',
         referralLink: referralLink || 'Non disponible',
