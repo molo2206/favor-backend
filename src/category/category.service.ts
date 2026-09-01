@@ -836,51 +836,60 @@ export class CategoryService {
     countryId?: string,
     lang: string = 'fr',
   ) {
-    // 1. Récupération des catégories qui ont au moins un produit valide
-    const categoriesQuery = this.categoryRepo
-      .createQueryBuilder('category')
-      .innerJoin('category.products', 'product')
-      .leftJoin('product.company', 'company')
-      .leftJoin('company.city', 'city')
-      .leftJoin('company.country', 'country')
-      .leftJoinAndSelect('category.parent', 'parent')
-      .leftJoinAndSelect('category.children', 'children')
-      .leftJoinAndSelect('category.specifications', 'categorySpec')
-      .leftJoinAndSelect('categorySpec.specification', 'specification')
-      .leftJoinAndSelect('category.categoryAttributes', 'categoryAttribute')
-      .leftJoinAndSelect('categoryAttribute.attribute', 'attribute')
-      .where('category.deleted = false')
-      .andWhere('category.status = true')
-      .andWhere('product.status != :status', { status: 'DELETED' });
+    // 1. Sous-requête pour trouver les IDs uniques des catégories ayant des produits
+    const categoryIdsSubQuery = this.categoryRepo
+      .createQueryBuilder('cat')
+      .select('cat.id', 'id')
+      .innerJoin('cat.products', 'prod')
+      .leftJoin('prod.company', 'comp')
+      .leftJoin('comp.city', 'city')
+      .leftJoin('comp.country', 'country')
+      .where('cat.deleted = false')
+      .andWhere('cat.status = true')
+      .andWhere('prod.status != :status', { status: 'DELETED' });
 
-    // Application des filtres optionnels
     if (type) {
-      categoriesQuery.andWhere('category.type = :type', { type });
+      categoryIdsSubQuery.andWhere('cat.type = :type', { type });
     }
     if (companyId) {
-      categoriesQuery.andWhere('company.id = :companyId', { companyId });
+      categoryIdsSubQuery.andWhere('comp.id = :companyId', { companyId });
     }
     if (cityId) {
-      categoriesQuery.andWhere('city.id = :cityId', { cityId });
+      categoryIdsSubQuery.andWhere('city.id = :cityId', { cityId });
     }
     if (countryId) {
-      categoriesQuery.andWhere('country.id = :countryId', { countryId });
+      categoryIdsSubQuery.andWhere('country.id = :countryId', { countryId });
     }
 
-    const categories = await categoriesQuery
+    // On extrait jusqu'à 10 IDs distincts de façon aléatoire
+    const rawCategoryIds = await categoryIdsSubQuery
+      .groupBy('cat.id')
       .orderBy('RAND()')
-      .take(10)
-      .getMany();
+      .limit(10)
+      .getRawMany();
 
-    if (!categories.length) {
+    const matchedIds = rawCategoryIds.map((row) => row.id);
+
+    if (matchedIds.length === 0) {
       return {
         message: this.translate('category.message.no_categories', lang),
         data: [],
       };
     }
 
-    // 2. Récupération des produits associés à ces catégories
-    const categoryIds = categories.map((c) => c.id);
+    // 2. Chargement complet des 10 catégories sélectionnées avec leurs relations
+    const categories = await this.categoryRepo
+      .createQueryBuilder('category')
+      .leftJoinAndSelect('category.parent', 'parent')
+      .leftJoinAndSelect('category.children', 'children')
+      .leftJoinAndSelect('category.specifications', 'categorySpec')
+      .leftJoinAndSelect('categorySpec.specification', 'specification')
+      .leftJoinAndSelect('category.categoryAttributes', 'categoryAttribute')
+      .leftJoinAndSelect('categoryAttribute.attribute', 'attribute')
+      .where('category.id IN (:...matchedIds)', { matchedIds })
+      .getMany();
+
+    // 3. Récupération des produits associés à ces catégories
     const productsQuery = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
@@ -896,7 +905,7 @@ export class CategoryService {
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
-      .where('category.id IN (:...categoryIds)', { categoryIds })
+      .where('category.id IN (:...matchedIds)', { matchedIds })
       .andWhere('product.status != :status', { status: 'DELETED' });
 
     if (companyId) {
@@ -911,17 +920,18 @@ export class CategoryService {
 
     const products = await productsQuery.orderBy('RAND()').getMany();
 
-    // 3. Regroupement par catégorie (limite de 10 produits max par catégorie)
+    // 4. Regroupement (10 produits max par catégorie)
     const productsByCategory: Record<string, Product[]> = {};
     for (const product of products) {
       const categoryId = product.category?.id;
       if (!categoryId) continue;
       if (!productsByCategory[categoryId]) productsByCategory[categoryId] = [];
-      if (productsByCategory[categoryId].length < 10)
+      if (productsByCategory[categoryId].length < 10) {
         productsByCategory[categoryId].push(product);
+      }
     }
 
-    // 4. Construction du résultat
+    // 5. Assemblage final
     const categoriesWithProducts = categories
       .map((category) => ({
         ...category,
