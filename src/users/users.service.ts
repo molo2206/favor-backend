@@ -2373,7 +2373,7 @@ export class UsersService {
       relations: [
         'referralHistory',
         'referralHistory.referred',
-        'referralHistory.referred.orders',
+        // ❌ SUPPRIMER 'referralHistory.referred.orders'
       ],
     });
 
@@ -2384,27 +2384,11 @@ export class UsersService {
     }
 
     let totalPoints = 0;
+
+    // ✅ Historique des parrainages avec les infos des utilisateurs parrainés
     const history = user.referralHistory?.map((referral) => {
       const referred = referral.referred;
-      let rewardAmount = 0;
-      let orderDetails: any[] = [];
-
-      if (referred && referred.orders && referred.orders.length > 0) {
-        // ✅ Détail par commande avec shippingCost
-        orderDetails = referred.orders.map((order) => ({
-          orderId: order.id,
-          shippingCost: order.shippingCost || 0,
-          reward: (Number(order.shippingCost || 0) * 0.10),
-          createdAt: order.createdAt,
-        }));
-
-        const totalShippingCost = referred.orders.reduce(
-          (sum, order) => sum + Number(order.shippingCost || 0),
-          0
-        );
-        rewardAmount = totalShippingCost * 0.10;
-      }
-
+      const rewardAmount = Number(referral.rewardAmount) || 0;
       totalPoints += rewardAmount;
 
       return {
@@ -2412,19 +2396,31 @@ export class UsersService {
         referredUser: referred?.fullName || 'Utilisateur inconnu',
         referredEmail: referred?.email || 'Non renseigné',
         referredPhone: referred?.phone || 'Non renseigné',
+        referredId: referred?.id || null, // ✅ ID de l'utilisateur parrainé
         status: referral.status,
-        rewardAmount: Math.round(Number(rewardAmount) * 100) / 100,
-        rewardType: 'POINTS (10% shipping)',
+        rewardAmount: Math.round(rewardAmount * 100) / 100,
+        rewardType: referral.rewardType || 'POINTS',
         createdAt: referral.createdAt,
         completedAt: referral.completedAt || null,
-        orders: orderDetails, // ✅ Détail des commandes avec shippingCost
       };
     }) || [];
 
+    // ✅ Mettre à jour les points de l'utilisateur
     if (totalPoints !== user.referralPoints) {
       user.referralPoints = totalPoints;
       await this.usersRepository.save(user);
     }
+
+    // ✅ Liste des utilisateurs parrainés (simplifiée)
+    const referredUsers = user.referralHistory?.map((referral) => ({
+      id: referral.referred?.id || null,
+      fullName: referral.referred?.fullName || 'Utilisateur inconnu',
+      email: referral.referred?.email || null,
+      phone: referral.referred?.phone || null,
+      status: referral.status,
+      createdAt: referral.createdAt,
+      completedAt: referral.completedAt || null,
+    })) || [];
 
     const baseUrl = 'https://favorhelp.com';
     const referralLink = user.referralCode
@@ -2440,7 +2436,8 @@ export class UsersService {
         referralCode: user.referralCode || 'Non généré',
         referralLink: referralLink || 'Non disponible',
         referralActive: user.referralActive !== false,
-        history,
+        history, // ✅ Historique complet avec les infos des parrainés
+        referredUsers, // ✅ Liste simplifiée des utilisateurs parrainés
       },
     };
   }
