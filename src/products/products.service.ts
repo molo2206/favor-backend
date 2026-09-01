@@ -3093,31 +3093,40 @@ export class ProductService {
     }
 
     // ✅ Si aucun jour spécifique, retourner tous les jours en liste plate
-    const allProducts: (Product & { day: string; position: number })[] = [];
-    let totalCount = 0;
+    // 1. D'abord, générer toutes les listes rotées pour chaque jour
+    const allRotatedProducts: { product: Product; day: string; dayIndex: number }[] = [];
 
     for (let i = 0; i < daysOfWeek.length; i++) {
       const day = daysOfWeek[i];
       const rotated = rotateProducts(products, i);
-      const start = (page - 1) * limit;
-      const paginated = rotated.slice(start, start + limit);
 
-      // ✅ Ajouter le jour et la position à chaque produit
-      paginated.forEach((product, index) => {
-        allProducts.push({
-          ...product,
+      rotated.forEach((product) => {
+        allRotatedProducts.push({
+          product,
           day: day.key,
-          position: start + index + 1,
+          dayIndex: i,
         });
       });
-
-      totalCount += rotated.length;
     }
+
+    // 2. Calculer le total avant pagination
+    const totalCount = allRotatedProducts.length;
+
+    // 3. Appliquer la pagination sur l'ensemble
+    const start = (page - 1) * limit;
+    const paginatedAll = allRotatedProducts.slice(start, start + limit);
+
+    // 4. Ajouter la position à chaque produit paginé
+    const dataWithDay = paginatedAll.map((item, index) => ({
+      ...item.product,
+      day: item.day,
+      position: start + index + 1,
+    }));
 
     return {
       message: await this.i18n.translate('restaurant_products_all_days', lang),
       data: {
-        data: allProducts,
+        data: dataWithDay,
         total: totalCount,
         page: page,
         limit: limit,
