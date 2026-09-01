@@ -41,6 +41,7 @@ import { I18nService } from 'src/libs/common/src';
 import { LoyaltyTier, UserLoyaltyEntity } from './entities/user-loyalty.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { ReferralEntity, ReferralStatus } from './entities/referral.entity';
+import { OrderStatus } from 'src/order/enum/order.status.enum';
 
 @Injectable()
 export class UsersService {
@@ -2367,7 +2368,7 @@ export class UsersService {
       relations: [
         'referralHistory',
         'referralHistory.referred',
-        'referralHistory.referred.orders', // ✅ Récupérer les commandes des parrainés
+        'referralHistory.referred.orders',
       ],
     });
 
@@ -2379,33 +2380,32 @@ export class UsersService {
 
     let totalPoints = 0;
 
-    // ✅ Historique des parrainages avec calcul des points basés sur le shippingCost des commandes VALIDATED
+    // ✅ Historique des parrainages
     const history = user.referralHistory?.map((referral) => {
       const referred = referral.referred;
       let rewardAmount = 0;
       let orderDetails: any[] = [];
+      let validatedOrdersLength = 0;
 
-      // ✅ Filtrer uniquement les commandes avec status = VALIDATED
       if (referred && referred.orders && referred.orders.length > 0) {
         const validatedOrders = referred.orders.filter(
           (order) => order.status === OrderStatus.VALIDATED
         );
+        validatedOrdersLength = validatedOrders.length;
 
-        // Détail des commandes VALIDATED avec shippingCost
         orderDetails = validatedOrders.map((order) => ({
           orderId: order.id,
           shippingCost: order.shippingCost || 0,
-          reward: (Number(order.shippingCost || 0) * 0.10), // ✅ 10% du shippingCost
+          reward: (Number(order.shippingCost || 0) * 0.10),
           createdAt: order.createdAt,
           status: order.status,
         }));
 
-        // Calcul du total des shippingCost des commandes VALIDATED
         const totalShippingCost = validatedOrders.reduce(
           (sum, order) => sum + Number(order.shippingCost || 0),
           0
         );
-        rewardAmount = totalShippingCost * 0.10; // ✅ 10% du total des shippingCost
+        rewardAmount = totalShippingCost * 0.10;
       }
 
       totalPoints += rewardAmount;
@@ -2421,18 +2421,18 @@ export class UsersService {
         rewardType: 'POINTS (10% shipping - VALIDATED)',
         createdAt: referral.createdAt,
         completedAt: referral.completedAt || null,
-        orders: orderDetails, // ✅ Détail des commandes VALIDATED avec shippingCost
-        totalValidatedOrders: validatedOrders.length, // ✅ Nombre de commandes validées
+        orders: orderDetails,
+        totalValidatedOrders: validatedOrdersLength, // ✅ Utiliser la variable
       };
     }) || [];
 
-    // ✅ Mettre à jour les points de l'utilisateur
+    // ✅ Mettre à jour les points
     if (Math.round(totalPoints * 100) / 100 !== user.referralPoints) {
       user.referralPoints = Math.round(totalPoints * 100) / 100;
       await this.usersRepository.save(user);
     }
 
-    // ✅ Liste des utilisateurs parrainés avec leurs statistiques shipping (UNIQUEMENT VALIDATED)
+    // ✅ Liste des utilisateurs parrainés
     const referredUsers = user.referralHistory?.map((referral) => {
       const referred = referral.referred;
       const validatedOrders = referred?.orders?.filter(
@@ -2473,12 +2473,12 @@ export class UsersService {
         referralCode: user.referralCode || 'Non généré',
         referralLink: referralLink || 'Non disponible',
         referralActive: user.referralActive !== false,
-        history, // ✅ Historique complet avec détails des shippingCost VALIDATED
-        referredUsers, // ✅ Liste des parrainés avec leurs statistiques VALIDATED
+        history,
+        referredUsers,
       },
     };
   }
-  
+
   async sendOtp(email: string, lang: string = 'fr'): Promise<any> {
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
 
