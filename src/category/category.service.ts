@@ -836,8 +836,13 @@ export class CategoryService {
     countryId?: string,
     lang: string = 'fr',
   ) {
-    const categories = await this.categoryRepo
+    // 1. Récupération des catégories qui ont au moins un produit valide
+    const categoriesQuery = this.categoryRepo
       .createQueryBuilder('category')
+      .innerJoin('category.products', 'product')
+      .leftJoin('product.company', 'company')
+      .leftJoin('company.city', 'city')
+      .leftJoin('company.country', 'country')
       .leftJoinAndSelect('category.parent', 'parent')
       .leftJoinAndSelect('category.children', 'children')
       .leftJoinAndSelect('category.specifications', 'categorySpec')
@@ -846,7 +851,23 @@ export class CategoryService {
       .leftJoinAndSelect('categoryAttribute.attribute', 'attribute')
       .where('category.deleted = false')
       .andWhere('category.status = true')
-      .andWhere(type ? 'category.type = :type' : '1=1', { type })
+      .andWhere('product.status != :status', { status: 'DELETED' });
+
+    // Application des filtres optionnels
+    if (type) {
+      categoriesQuery.andWhere('category.type = :type', { type });
+    }
+    if (companyId) {
+      categoriesQuery.andWhere('company.id = :companyId', { companyId });
+    }
+    if (cityId) {
+      categoriesQuery.andWhere('city.id = :cityId', { cityId });
+    }
+    if (countryId) {
+      categoriesQuery.andWhere('country.id = :countryId', { countryId });
+    }
+
+    const categories = await categoriesQuery
       .orderBy('RAND()')
       .take(10)
       .getMany();
@@ -858,8 +879,9 @@ export class CategoryService {
       };
     }
 
+    // 2. Récupération des produits associés à ces catégories
     const categoryIds = categories.map((c) => c.id);
-    const products = await this.productRepo
+    const productsQuery = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.images', 'images')
@@ -875,13 +897,21 @@ export class CategoryService {
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
       .where('category.id IN (:...categoryIds)', { categoryIds })
-      .andWhere(companyId ? 'company.id = :companyId' : '1=1', { companyId })
-      .andWhere(cityId ? 'city.id = :cityId' : '1=1', { cityId })
-      .andWhere(countryId ? 'country.id = :countryId' : '1=1', { countryId })
-      .andWhere('product.status != :status', { status: 'DELETED' })
-      .orderBy('RAND()')
-      .getMany();
+      .andWhere('product.status != :status', { status: 'DELETED' });
 
+    if (companyId) {
+      productsQuery.andWhere('company.id = :companyId', { companyId });
+    }
+    if (cityId) {
+      productsQuery.andWhere('city.id = :cityId', { cityId });
+    }
+    if (countryId) {
+      productsQuery.andWhere('country.id = :countryId', { countryId });
+    }
+
+    const products = await productsQuery.orderBy('RAND()').getMany();
+
+    // 3. Regroupement par catégorie (limite de 10 produits max par catégorie)
     const productsByCategory: Record<string, Product[]> = {};
     for (const product of products) {
       const categoryId = product.category?.id;
@@ -891,6 +921,7 @@ export class CategoryService {
         productsByCategory[categoryId].push(product);
     }
 
+    // 4. Construction du résultat
     const categoriesWithProducts = categories
       .map((category) => ({
         ...category,
