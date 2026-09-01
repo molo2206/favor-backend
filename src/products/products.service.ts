@@ -2744,7 +2744,10 @@ export class ProductService {
   ) {
     const offset = (page - 1) * limit;
 
-    // ✅ Une seule requête avec RAND() et pagination
+    // ============================================================
+    // PRODUITS LES PLUS VENDUS
+    // ============================================================
+
     let query = this.orderItemRepo
       .createQueryBuilder('orderItem')
       .select('orderItem.productId', 'productId')
@@ -2753,32 +2756,79 @@ export class ProductService {
       .leftJoin('product.company', 'company')
       .leftJoin('company.country', 'country')
       .leftJoin('company.city', 'city')
-      .where('product.type = :type', { type })
+      .where('product.type = :type', {
+        type,
+      })
       .andWhere('product.status = :status', {
         status: ProductStatus.PUBLISHED,
       });
 
+    // ============================================================
+    // FILTRE PAYS
+    // ============================================================
+
     if (countryId) {
-      query = query.andWhere('country.id = :countryId', { countryId });
-    }
-    if (cityId) {
-      query = query.andWhere('city.id = :cityId', { cityId });
+      query = query.andWhere(
+        'country.id = :countryId',
+        {
+          countryId,
+        },
+      );
     }
 
-    // ✅ RAND() pour mélanger les ex-aequo
+    // ============================================================
+    // FILTRE VILLE
+    // ============================================================
+
+    if (cityId) {
+      query = query.andWhere(
+        'city.id = :cityId',
+        {
+          cityId,
+        },
+      );
+    }
+
+    // ============================================================
+    // GROUP + ORDER + PAGINATION
+    // ============================================================
+
     query = query
       .groupBy('orderItem.productId')
-      .orderBy('totalSold', 'DESC')
+      .orderBy('SUM(orderItem.quantity)', 'DESC')
       .addOrderBy('RAND()')
       .offset(offset)
       .limit(limit);
 
+    // ============================================================
+    // EXECUTION
+    // ============================================================
+
     const results = await query.getRawMany();
-    const productIds = results.map((r) => r.productId);
+
+    console.log(
+      'BEST SELLING RESULTS:',
+      JSON.stringify(results, null, 2),
+    );
+
+    // ============================================================
+    // IDS
+    // ============================================================
+
+    const productIds = results.map(
+      (r) => r.productId,
+    );
+
+    // ============================================================
+    // AUCUN PRODUIT
+    // ============================================================
 
     if (productIds.length === 0) {
       return {
-        message: await this.i18n.translate('no_products_found', lang),
+        message: await this.i18n.translate(
+          'no_products_found',
+          lang,
+        ),
         data: {
           data: [],
           total: 0,
@@ -2788,64 +2838,204 @@ export class ProductService {
       };
     }
 
-    // ✅ Récupérer les produits avec leurs relations
+    // ============================================================
+    // RÉCUPÉRER LES PRODUITS AVEC LEURS RELATIONS
+    // ============================================================
+
     const products = await this.productRepo
       .createQueryBuilder('product')
-      .leftJoinAndSelect('product.company', 'company')
-      .leftJoinAndSelect('company.country', 'country')
-      .leftJoinAndSelect('company.city', 'city')
-      .leftJoinAndSelect('product.category', 'category')
-      .leftJoinAndSelect('product.measure', 'measure')
-      .leftJoinAndSelect('product.images', 'images')
-      .leftJoinAndSelect('product.brand', 'brand')
-      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
-      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
-      .leftJoinAndSelect('specificationValues.specification', 'specification')
-      .leftJoinAndSelect('product.attributes', 'attributes')
-      .leftJoinAndSelect('attributes.attribute', 'attribute')
-      .leftJoinAndSelect('product.variations', 'variations')
-      .leftJoinAndSelect('variations.image', 'variationImage')
+
+      .leftJoinAndSelect(
+        'product.company',
+        'company',
+      )
+
+      .leftJoinAndSelect(
+        'company.country',
+        'country',
+      )
+
+      .leftJoinAndSelect(
+        'company.city',
+        'city',
+      )
+
+      .leftJoinAndSelect(
+        'product.category',
+        'category',
+      )
+
+      .leftJoinAndSelect(
+        'product.measure',
+        'measure',
+      )
+
+      .leftJoinAndSelect(
+        'product.images',
+        'images',
+      )
+
+      .leftJoinAndSelect(
+        'product.brand',
+        'brand',
+      )
+
+      .leftJoinAndSelect(
+        'company.tauxCompanies',
+        'tauxCompanies',
+      )
+
+      .leftJoinAndSelect(
+        'product.specificationValues',
+        'specificationValues',
+      )
+
+      .leftJoinAndSelect(
+        'specificationValues.specification',
+        'specification',
+      )
+
+      .leftJoinAndSelect(
+        'product.attributes',
+        'attributes',
+      )
+
+      .leftJoinAndSelect(
+        'attributes.attribute',
+        'attribute',
+      )
+
+      .leftJoinAndSelect(
+        'product.variations',
+        'variations',
+      )
+
+      .leftJoinAndSelect(
+        'variations.image',
+        'variationImage',
+      )
+
       .leftJoinAndSelect(
         'variations.attributeValues',
         'variationAttributeValues',
       )
+
       .leftJoinAndSelect(
         'variationAttributeValues.attribute',
         'variationAttribute',
       )
-      .where('product.id IN (:...productIds)', { productIds })
-      .orderBy(`FIELD(product.id, ${productIds.map(id => `'${id}'`).join(',')})`)
+
+      .where(
+        'product.id IN (:...productIds)',
+        {
+          productIds,
+        },
+      )
+
+      // Garder l'ordre du classement
+      .orderBy(
+        `FIELD(
+        product.id,
+        ${productIds
+          .map((id) => `'${id}'`)
+          .join(',')}
+      )`,
+      )
+
       .getMany();
 
-    const productsWithSales = products.map((p) => ({
-      ...p,
-      totalSold: Number(
-        results.find((r) => r.productId === p.id)?.totalSold || 0,
-      ),
-    }));
+    // ============================================================
+    // AJOUTER totalSold
+    // ============================================================
 
-    // ✅ Total
+    const productsWithSales = products.map(
+      (p) => ({
+        ...p,
+
+        totalSold: Number(
+          results.find(
+            (r) =>
+              r.productId === p.id,
+          )?.totalSold || 0,
+        ),
+      }),
+    );
+
+    // ============================================================
+    // TOTAL
+    // ============================================================
+
     let totalQuery = this.productRepo
       .createQueryBuilder('product')
-      .leftJoin('product.company', 'company')
-      .leftJoin('company.country', 'country')
-      .leftJoin('company.city', 'city')
-      .where('product.type = :type', { type })
-      .andWhere('product.status = :status', {
-        status: ProductStatus.PUBLISHED,
-      });
+      .leftJoin(
+        'product.company',
+        'company',
+      )
+      .leftJoin(
+        'company.country',
+        'country',
+      )
+      .leftJoin(
+        'company.city',
+        'city',
+      )
+      .where(
+        'product.type = :type',
+        {
+          type,
+        },
+      )
+      .andWhere(
+        'product.status = :status',
+        {
+          status:
+            ProductStatus.PUBLISHED,
+        },
+      );
+
+    // ============================================================
+    // FILTRE PAYS
+    // ============================================================
 
     if (countryId) {
-      totalQuery = totalQuery.andWhere('country.id = :countryId', { countryId });
-    }
-    if (cityId) {
-      totalQuery = totalQuery.andWhere('city.id = :cityId', { cityId });
+      totalQuery = totalQuery.andWhere(
+        'country.id = :countryId',
+        {
+          countryId,
+        },
+      );
     }
 
-    const totalCount = await totalQuery.getCount();
+    // ============================================================
+    // FILTRE VILLE
+    // ============================================================
+
+    if (cityId) {
+      totalQuery = totalQuery.andWhere(
+        'city.id = :cityId',
+        {
+          cityId,
+        },
+      );
+    }
+
+    // ============================================================
+    // TOTAL
+    // ============================================================
+
+    const totalCount =
+      await totalQuery.getCount();
+
+    // ============================================================
+    // RESPONSE
+    // ============================================================
 
     return {
-      message: await this.i18n.translate('best_selling_products', lang),
+      message: await this.i18n.translate(
+        'best_selling_products',
+        lang,
+      ),
+
       data: {
         data: productsWithSales,
         total: totalCount,
