@@ -2744,7 +2744,7 @@ export class ProductService {
   ) {
     const offset = (page - 1) * limit;
 
-    // ✅ Récupérer les produits avec RAND() pour mélanger
+    // ✅ Une seule requête avec RAND() et pagination
     let query = this.orderItemRepo
       .createQueryBuilder('orderItem')
       .select('orderItem.productId', 'productId')
@@ -2765,15 +2765,18 @@ export class ProductService {
       query = query.andWhere('city.id = :cityId', { cityId });
     }
 
-    // ✅ Récupérer TOUS les résultats avec RAND() pour mélanger les ex-aequo
+    // ✅ RAND() pour mélanger les ex-aequo
     query = query
       .groupBy('orderItem.productId')
       .orderBy('totalSold', 'DESC')
-      .addOrderBy('RAND()');
+      .addOrderBy('RAND()')
+      .offset(offset)
+      .limit(limit);
 
-    const allResults = await query.getRawMany();
+    const results = await query.getRawMany();
+    const productIds = results.map((r) => r.productId);
 
-    if (allResults.length === 0) {
+    if (productIds.length === 0) {
       return {
         message: await this.i18n.translate('no_products_found', lang),
         data: {
@@ -2785,11 +2788,7 @@ export class ProductService {
       };
     }
 
-    // ✅ Pagination après le tri aléatoire
-    const paginatedResults = allResults.slice(offset, offset + limit);
-    const productIds = paginatedResults.map((r) => r.productId);
-
-    // ✅ Récupérer les produits dans l'ordre
+    // ✅ Récupérer les produits avec leurs relations
     const products = await this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
@@ -2815,15 +2814,13 @@ export class ProductService {
         'variationAttribute',
       )
       .where('product.id IN (:...productIds)', { productIds })
-      // ✅ Garder l'ordre du résultat RAND()
       .orderBy(`FIELD(product.id, ${productIds.map(id => `'${id}'`).join(',')})`)
       .getMany();
 
-    // ✅ Ajouter totalSold
     const productsWithSales = products.map((p) => ({
       ...p,
       totalSold: Number(
-        paginatedResults.find((r) => r.productId === p.id)?.totalSold || 0,
+        results.find((r) => r.productId === p.id)?.totalSold || 0,
       ),
     }));
 
