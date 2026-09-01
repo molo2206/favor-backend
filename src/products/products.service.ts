@@ -2077,6 +2077,7 @@ export class ProductService {
     minSalePrice?: number,
     maxSalePrice?: number,
     cityId?: string,
+    countryId?: string,
     page = 1,
     limit = 10,
     lang: string = 'fr',
@@ -2201,6 +2202,10 @@ export class ProductService {
 
     if (cityId) {
       queryBuilder.andWhere('city.id = :cityId', { cityId });
+    }
+
+    if (countryId) {
+      queryBuilder.andWhere('country.id = :countryId', { countryId });
     }
 
     if (typecar) {
@@ -2383,6 +2388,7 @@ export class ProductService {
     if (year) filters.push(`année: ${year}`);
     if (companyId) filters.push(`entreprise: ${companyId}`);
     if (cityId) filters.push(`ville: ${cityId}`);
+    if (countryId) filters.push(`pays: ${countryId}`);
 
     if (filters.length > 0 && total > 0) {
       message += ` (filtres: ${filters.join(', ')})`;
