@@ -324,6 +324,7 @@ export class UsersService {
       role: UserRole.CUSTOMER,
       isActive: true,
       provider: 'otp',
+      // ❌ NE PAS mettre referralCode ici
     });
 
     const savedUser = await this.usersRepository.save(newUser);
@@ -331,6 +332,7 @@ export class UsersService {
     // ============================================================
     // 🔥 GÉNÉRATION DU CODE DE PARRAINAGE POUR LE NOUVEL UTILISATEUR
     // ============================================================
+    // ✅ Générer un NOUVEAU code pour le nouvel utilisateur
     const referralCodeGenerated = await this.generateReferralCode(savedUser.id);
     savedUser.referralCode = referralCodeGenerated;
 
@@ -364,7 +366,7 @@ export class UsersService {
       const referral = this.referralRepository.create({
         referrerId: referrer.id,
         referredId: savedUser.id,
-        referralCode: referralCode,
+        referralCode: referralCode, // ✅ Le code du parrain
         status: ReferralStatus.COMPLETED,
         rewardAmount: 5,
         rewardType: 'POINTS',
@@ -549,7 +551,7 @@ export class UsersService {
       platform,
     };
   }
-  
+
   async changePassword(
     userId: string,
     changePasswordDto: ChangePasswordDto,
