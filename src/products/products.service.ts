@@ -2744,6 +2744,7 @@ export class ProductService {
   ) {
     const offset = (page - 1) * limit;
 
+    // ✅ Récupérer tous les produits avec leurs ventes triés par RAND()
     let query = this.orderItemRepo
       .createQueryBuilder('orderItem')
       .select('orderItem.productId', 'productId')
@@ -2764,17 +2765,15 @@ export class ProductService {
       query = query.andWhere('city.id = :cityId', { cityId });
     }
 
+    // ✅ Récupérer TOUS les résultats triés par ventes puis aléatoire
     query = query
       .groupBy('orderItem.productId')
       .orderBy('totalSold', 'DESC')
-      .addOrderBy('RAND()')
-      .offset(offset)
-      .limit(limit);
+      .addOrderBy('RAND()');
 
-    const result = await query.getRawMany();
-    const productIds = result.map((r) => r.productId);
+    const allResults = await query.getRawMany();
 
-    if (productIds.length === 0) {
+    if (allResults.length === 0) {
       return {
         message: await this.i18n.translate('no_products_found', lang),
         data: {
@@ -2786,6 +2785,9 @@ export class ProductService {
       };
     }
 
+    const allProductIds = allResults.map((r) => r.productId);
+
+    // ✅ Récupérer les produits avec RAND()
     const products = await this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
@@ -2810,39 +2812,25 @@ export class ProductService {
         'variationAttributeValues.attribute',
         'variationAttribute',
       )
-      .where('product.id IN (:...productIds)', { productIds })
-      .orderBy(`FIELD(product.id, ${productIds.map(id => `'${id}'`).join(',')})`)
+      .where('product.id IN (:...allProductIds)', { allProductIds })
+      .orderBy('RAND()') // ✅ Mélange aléatoire
       .getMany();
 
+    // ✅ Ajouter totalSold
     const productsWithSales = products.map((p) => ({
       ...p,
       totalSold: Number(
-        result.find((r) => r.productId === p.id)?.totalSold || 0,
+        allResults.find((r) => r.productId === p.id)?.totalSold || 0,
       ),
     }));
 
-    // ✅ Grouper par totalSold et mélanger chaque groupe
-    const groupedBySales: Record<number, any[]> = {};
-    for (const product of productsWithSales) {
-      const key = product.totalSold;
-      if (!groupedBySales[key]) groupedBySales[key] = [];
-      groupedBySales[key].push(product);
-    }
+    // ✅ Trier par ventes décroissantes
+    productsWithSales.sort((a, b) => b.totalSold - a.totalSold);
 
-    // ✅ Mélanger chaque groupe de même totalSold
-    const finalProducts: any[] = [];
-    const sortedKeys = Object.keys(groupedBySales).sort((a, b) => Number(b) - Number(a));
+    // ✅ Pagination
+    const paginatedProducts = productsWithSales.slice(offset, offset + limit);
 
-    for (const key of sortedKeys) {
-      const group = groupedBySales[Number(key)];
-      // Mélanger aléatoirement le groupe
-      for (let i = group.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [group[i], group[j]] = [group[j], group[i]];
-      }
-      finalProducts.push(...group);
-    }
-
+    // ✅ Total
     let totalQuery = this.productRepo
       .createQueryBuilder('product')
       .leftJoin('product.company', 'company')
@@ -2865,7 +2853,7 @@ export class ProductService {
     return {
       message: await this.i18n.translate('best_selling_products', lang),
       data: {
-        data: finalProducts,
+        data: paginatedProducts,
         total: totalCount,
         page,
         limit,
