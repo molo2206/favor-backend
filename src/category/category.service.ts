@@ -832,52 +832,10 @@ export class CategoryService {
   async findAllWithProductsLimitTen(
     companyId?: string,
     type?: string,
-    cityId?: string,
-    countryId?: string,
     lang: string = 'fr',
+    countryId?: string,
+    cityId?: string,
   ) {
-    // 1. Sous-requête pour trouver les IDs uniques des catégories ayant des produits
-    const categoryIdsSubQuery = this.categoryRepo
-      .createQueryBuilder('cat')
-      .select('cat.id', 'id')
-      .innerJoin('cat.products', 'prod')
-      .leftJoin('prod.company', 'comp')
-      .leftJoin('comp.city', 'city')
-      .leftJoin('comp.country', 'country')
-      .where('cat.deleted = false')
-      .andWhere('cat.status = true')
-      .andWhere('prod.status != :status', { status: 'DELETED' });
-
-    if (type) {
-      categoryIdsSubQuery.andWhere('cat.type = :type', { type });
-    }
-    if (companyId) {
-      categoryIdsSubQuery.andWhere('comp.id = :companyId', { companyId });
-    }
-    if (cityId) {
-      categoryIdsSubQuery.andWhere('city.id = :cityId', { cityId });
-    }
-    if (countryId) {
-      categoryIdsSubQuery.andWhere('country.id = :countryId', { countryId });
-    }
-
-    // On extrait jusqu'à 10 IDs distincts de façon aléatoire
-    const rawCategoryIds = await categoryIdsSubQuery
-      .groupBy('cat.id')
-      .orderBy('RAND()')
-      .limit(10)
-      .getRawMany();
-
-    const matchedIds = rawCategoryIds.map((row) => row.id);
-
-    if (matchedIds.length === 0) {
-      return {
-        message: this.translate('category.message.no_categories', lang),
-        data: [],
-      };
-    }
-
-    // 2. Chargement complet des 10 catégories sélectionnées avec leurs relations
     const categories = await this.categoryRepo
       .createQueryBuilder('category')
       .leftJoinAndSelect('category.parent', 'parent')
@@ -886,52 +844,50 @@ export class CategoryService {
       .leftJoinAndSelect('categorySpec.specification', 'specification')
       .leftJoinAndSelect('category.categoryAttributes', 'categoryAttribute')
       .leftJoinAndSelect('categoryAttribute.attribute', 'attribute')
-      .where('category.id IN (:...matchedIds)', { matchedIds })
+      .where('category.deleted = false')
+      .andWhere('category.status = true')
+      .andWhere(type ? 'category.type = :type' : '1=1', { type })
+      .orderBy('category.name', 'ASC')
+      .take(10)
       .getMany();
 
-    // 3. Récupération des produits associés à ces catégories
-    const productsQuery = this.productRepo
+    if (!categories.length) {
+      return {
+        message: this.translate('category.message.no_categories', lang),
+        data: [],
+      };
+    }
+
+    const categoryIds = categories.map((c) => c.id);
+    const products = await this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
       .leftJoinAndSelect('product.specificationValues', 'specificationValues')
-      .leftJoinAndSelect(
-        'specificationValues.specification',
-        'specificationDetail',
-      )
+      .leftJoinAndSelect('specificationValues.specification', 'specificationDetail')
       .leftJoinAndSelect('product.attributes', 'attributes')
       .leftJoinAndSelect('product.wishlist', 'wishlist')
       .leftJoinAndSelect('product.company', 'company')
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
-      .where('category.id IN (:...matchedIds)', { matchedIds })
-      .andWhere('product.status != :status', { status: 'DELETED' });
+      .where('category.id IN (:...categoryIds)', { categoryIds })
+      .andWhere(companyId ? 'company.id = :companyId' : '1=1', { companyId })
+      .andWhere(countryId ? 'country.id = :countryId' : '1=1', { countryId })
+      .andWhere(cityId ? 'city.id = :cityId' : '1=1', { cityId })
+      .andWhere('product.status != :status', { status: 'DELETED' })
+      .orderBy('RAND()')
+      .getMany();
 
-    if (companyId) {
-      productsQuery.andWhere('company.id = :companyId', { companyId });
-    }
-    if (cityId) {
-      productsQuery.andWhere('city.id = :cityId', { cityId });
-    }
-    if (countryId) {
-      productsQuery.andWhere('country.id = :countryId', { countryId });
-    }
-
-    const products = await productsQuery.orderBy('RAND()').getMany();
-
-    // 4. Regroupement (10 produits max par catégorie)
     const productsByCategory: Record<string, Product[]> = {};
     for (const product of products) {
       const categoryId = product.category?.id;
       if (!categoryId) continue;
       if (!productsByCategory[categoryId]) productsByCategory[categoryId] = [];
-      if (productsByCategory[categoryId].length < 10) {
+      if (productsByCategory[categoryId].length < 10)
         productsByCategory[categoryId].push(product);
-      }
     }
 
-    // 5. Assemblage final
     const categoriesWithProducts = categories
       .map((category) => ({
         ...category,
@@ -942,10 +898,7 @@ export class CategoryService {
     return {
       message: categoriesWithProducts.length
         ? this.translate('category.message.categories_with_products', lang)
-        : this.translate(
-          'category.message.no_categories_with_products',
-          lang,
-        ),
+        : this.translate('category.message.no_categories_with_products', lang),
       data: categoriesWithProducts,
     };
   }
