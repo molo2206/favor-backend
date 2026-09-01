@@ -836,6 +836,10 @@ export class CategoryService {
     countryId?: string,
     cityId?: string,
   ) {
+    // ✅ Seed qui change chaque jour pour un mélange cohérent
+    const seed = Math.floor(Date.now() / 86400000);
+
+    // ✅ Catégories avec RAND(seed)
     const categories = await this.categoryRepo
       .createQueryBuilder('category')
       .leftJoinAndSelect('category.parent', 'parent')
@@ -847,7 +851,7 @@ export class CategoryService {
       .where('category.deleted = false')
       .andWhere('category.status = true')
       .andWhere(type ? 'category.type = :type' : '1=1', { type })
-      .orderBy('category.name', 'ASC')
+      .orderBy(`RAND(${seed})`)
       .take(10)
       .getMany();
 
@@ -859,6 +863,8 @@ export class CategoryService {
     }
 
     const categoryIds = categories.map((c) => c.id);
+
+    // ✅ Produits avec RAND(seed + 1) pour un mélange différent
     const products = await this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
@@ -876,8 +882,8 @@ export class CategoryService {
       .andWhere(countryId ? 'country.id = :countryId' : '1=1', { countryId })
       .andWhere(cityId ? 'city.id = :cityId' : '1=1', { cityId })
       .andWhere('product.status != :status', { status: 'DELETED' })
-      // ✅ ORDRE ALEATOIRE - DONNE UNE CHANCE À TOUS LES PRODUITS
-      .orderBy('RAND()')
+      .andWhere('product.status = :published', { published: 'PUBLISHED' })
+      .orderBy(`RAND(${seed + 1})`)
       .getMany();
 
     const productsByCategory: Record<string, Product[]> = {};
@@ -885,8 +891,9 @@ export class CategoryService {
       const categoryId = product.category?.id;
       if (!categoryId) continue;
       if (!productsByCategory[categoryId]) productsByCategory[categoryId] = [];
-      if (productsByCategory[categoryId].length < 10)
+      if (productsByCategory[categoryId].length < 10) {
         productsByCategory[categoryId].push(product);
+      }
     }
 
     const categoriesWithProducts = categories
@@ -896,11 +903,14 @@ export class CategoryService {
       }))
       .filter((category) => category.products.length > 0);
 
+    // ✅ Mélanger les catégories finales
+    const shuffledCategories = categoriesWithProducts.sort(() => Math.random() - 0.5);
+
     return {
-      message: categoriesWithProducts.length
+      message: shuffledCategories.length
         ? this.translate('category.message.categories_with_products', lang)
         : this.translate('category.message.no_categories_with_products', lang),
-      data: categoriesWithProducts,
+      data: shuffledCategories,
     };
   }
 

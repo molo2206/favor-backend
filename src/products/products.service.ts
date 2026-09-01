@@ -2113,7 +2113,9 @@ export class ProductService {
         'variationAttributeValues.attribute',
         'variationAttribute',
       )
-      .where('product.status = :status', { status: ProductStatus.PUBLISHED });
+      .where('product.status = :status', { status: ProductStatus.PUBLISHED })
+      // ✅ ORDRE ALEATOIRE - DONNE UNE CHANCE À TOUS LES PRODUITS
+      .orderBy('RAND()');
 
     if (brandId) {
       queryBuilder.andWhere('product.brand_id = :brandId', { brandId });
@@ -2245,8 +2247,7 @@ export class ProductService {
       queryBuilder.andWhere('product.typecar = :typecar', { typecar });
     }
 
-    // ✅ ORDRE ALEATOIRE - DONNE UNE CHANCE À TOUS LES PRODUITS
-    queryBuilder.orderBy('RAND()').skip(skip).take(limit);
+    queryBuilder.skip(skip).take(limit);
 
     const [products, total] = await Promise.all([
       queryBuilder.getMany(),
@@ -2373,7 +2374,6 @@ export class ProductService {
     });
 
     // ✅ Mélanger aléatoirement les produits ayant le même nombre de commandes
-    // Cela donne une chance à tous les produits d'apparaître en premier
     const groupedByCommande: Record<number, any[]> = {};
     for (const product of formattedProducts) {
       const key = product.company?.start?.totalCommande || 0;
@@ -2744,7 +2744,6 @@ export class ProductService {
   ) {
     const offset = (page - 1) * limit;
 
-    // ✅ Récupérer les produits les plus vendus avec RAND() pour les ex-aequo
     let query = this.orderItemRepo
       .createQueryBuilder('orderItem')
       .select('orderItem.productId', 'productId')
@@ -2768,7 +2767,7 @@ export class ProductService {
     query = query
       .groupBy('orderItem.productId')
       .orderBy('totalSold', 'DESC')
-      .addOrderBy('RAND()') // ✅ Pour les ex-aequo, mélange aléatoire
+      .addOrderBy('RAND()')
       .offset(offset)
       .limit(limit);
 
@@ -2787,27 +2786,33 @@ export class ProductService {
       };
     }
 
-    const products = await this.productRepo.find({
-      where: { id: In(productIds) },
-      relations: [
-        'company',
-        'category',
-        'measure',
-        'images',
-        'brand',
-        'company.tauxCompanies',
-        'company.country',
-        'company.city',
-        'specificationValues',
-        'specificationValues.specification',
-        'attributes',
-        'attributes.attribute',
-        'variations',
-        'variations.image',
+    const products = await this.productRepo
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.company', 'company')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.measure', 'measure')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.brand', 'brand')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('product.specificationValues', 'specificationValues')
+      .leftJoinAndSelect('specificationValues.specification', 'specification')
+      .leftJoinAndSelect('product.attributes', 'attributes')
+      .leftJoinAndSelect('attributes.attribute', 'attribute')
+      .leftJoinAndSelect('product.variations', 'variations')
+      .leftJoinAndSelect('variations.image', 'variationImage')
+      .leftJoinAndSelect(
         'variations.attributeValues',
-        'variations.attributeValues.attribute',
-      ],
-    });
+        'variationAttributeValues',
+      )
+      .leftJoinAndSelect(
+        'variationAttributeValues.attribute',
+        'variationAttribute',
+      )
+      .where('product.id IN (:...productIds)', { productIds })
+      .orderBy(`FIELD(product.id, ${productIds.map(id => `'${id}'`).join(',')})`)
+      .getMany();
 
     const productsWithSales = products.map((p) => ({
       ...p,
@@ -2816,10 +2821,28 @@ export class ProductService {
       ),
     }));
 
-    // ✅ Trier par totalSold décroissant
-    const sortedProducts = productsWithSales.sort((a, b) => b.totalSold - a.totalSold);
+    // ✅ Grouper par totalSold et mélanger chaque groupe
+    const groupedBySales: Record<number, any[]> = {};
+    for (const product of productsWithSales) {
+      const key = product.totalSold;
+      if (!groupedBySales[key]) groupedBySales[key] = [];
+      groupedBySales[key].push(product);
+    }
 
-    // Compter le total avec les filtres
+    // ✅ Mélanger chaque groupe de même totalSold
+    const finalProducts: any[] = [];
+    const sortedKeys = Object.keys(groupedBySales).sort((a, b) => Number(b) - Number(a));
+
+    for (const key of sortedKeys) {
+      const group = groupedBySales[Number(key)];
+      // Mélanger aléatoirement le groupe
+      for (let i = group.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [group[i], group[j]] = [group[j], group[i]];
+      }
+      finalProducts.push(...group);
+    }
+
     let totalQuery = this.productRepo
       .createQueryBuilder('product')
       .leftJoin('product.company', 'company')
@@ -2842,7 +2865,7 @@ export class ProductService {
     return {
       message: await this.i18n.translate('best_selling_products', lang),
       data: {
-        data: sortedProducts,
+        data: finalProducts,
         total: totalCount,
         page,
         limit,
@@ -2872,9 +2895,11 @@ export class ProductService {
   ): Promise<{
     message: string;
     data: {
-      [key: string]: Product[];
+      data: (Product & { day: string; position: number })[];
+      total: number;
+      page: number;
+      limit: number;
     };
-    total?: number;
     day?: string;
   }> {
     // Paramètres de pagination
@@ -2894,7 +2919,7 @@ export class ProductService {
       { key: 'sunday', label: 'Dimanche', order: 7 },
     ];
 
-    // ✅ Construction de la requête principale (comme dans findProductPublishedByType)
+    // ✅ Construction de la requête principale
     const queryBuilder = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
@@ -2935,9 +2960,8 @@ export class ProductService {
         );
     }
 
-    // ✅ Appliquer les filtres (comme dans findProductPublishedByType)
+    // ✅ Appliquer les filtres
     if (filters) {
-      // Filtrer par catégorie
       if (filters.categoryId) {
         queryBuilder.andWhere(
           '(category.id = :categoryId OR categoryParent.id = :categoryId OR categoryChildren.id = :categoryId)',
@@ -2945,35 +2969,30 @@ export class ProductService {
         );
       }
 
-      // Filtrer par marque
       if (filters.brandId) {
         queryBuilder.andWhere('product.brand_id = :brandId', {
           brandId: filters.brandId,
         });
       }
 
-      // Filtrer par entreprise
       if (filters.companyId) {
         queryBuilder.andWhere('product.companyId = :companyId', {
           companyId: filters.companyId,
         });
       }
 
-      // Filtrer par pays
       if (filters.countryId) {
         queryBuilder.andWhere('company.countryId = :countryId', {
           countryId: filters.countryId,
         });
       }
 
-      // Filtrer par ville
       if (filters.cityId) {
         queryBuilder.andWhere('company.cityId = :cityId', {
           cityId: filters.cityId,
         });
       }
 
-      // Filtrer par prix
       if (filters.minPrice !== undefined) {
         queryBuilder.andWhere('product.price >= :minPrice', {
           minPrice: filters.minPrice,
@@ -2985,7 +3004,6 @@ export class ProductService {
         });
       }
 
-      // Recherche par nom
       if (filters.search && filters.search.trim() !== '') {
         queryBuilder.andWhere('LOWER(product.name) LIKE :search', {
           search: `%${filters.search.toLowerCase().trim()}%`,
@@ -3053,34 +3071,57 @@ export class ProductService {
       const start = (page - 1) * limit;
       const paginatedProducts = rotatedProducts.slice(start, start + limit);
 
+      // ✅ Ajouter le jour et la position à chaque produit
+      const dataWithDay = paginatedProducts.map((product, index) => ({
+        ...product,
+        day: dayKey,
+        position: start + index + 1,
+      }));
+
       return {
         message: await this.i18n.translate('restaurant_products_by_day', lang, {
           day: daysOfWeek[dayIndex].label,
         }),
         data: {
-          [dayKey]: paginatedProducts,
+          data: dataWithDay,
+          total: rotatedProducts.length,
+          page: page,
+          limit: limit,
         },
-        total: rotatedProducts.length,
         day: dayKey,
       };
     }
 
-    // ✅ Si aucun jour spécifique, retourner tous les jours avec pagination
-    const result: { [key: string]: Product[] } = {};
+    // ✅ Si aucun jour spécifique, retourner tous les jours en liste plate
+    const allProducts: (Product & { day: string; position: number })[] = [];
     let totalCount = 0;
 
     for (let i = 0; i < daysOfWeek.length; i++) {
       const day = daysOfWeek[i];
       const rotated = rotateProducts(products, i);
       const start = (page - 1) * limit;
-      result[day.key] = rotated.slice(start, start + limit);
+      const paginated = rotated.slice(start, start + limit);
+
+      // ✅ Ajouter le jour et la position à chaque produit
+      paginated.forEach((product, index) => {
+        allProducts.push({
+          ...product,
+          day: day.key,
+          position: start + index + 1,
+        });
+      });
+
       totalCount += rotated.length;
     }
 
     return {
       message: await this.i18n.translate('restaurant_products_all_days', lang),
-      data: result,
-      total: totalCount,
+      data: {
+        data: allProducts,
+        total: totalCount,
+        page: page,
+        limit: limit,
+      },
     };
   }
 
