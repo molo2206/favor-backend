@@ -2743,10 +2743,8 @@ export class ProductService {
     cityId?: string,
   ) {
     const offset = (page - 1) * limit;
-    // ✅ Seed qui change toutes les 6 heures
-    const seed = Math.floor(Date.now() / 21600000);
 
-    // ✅ Récupérer les produits avec RAND(seed)
+    // ✅ Récupérer les produits avec RAND() pour mélanger
     let query = this.orderItemRepo
       .createQueryBuilder('orderItem')
       .select('orderItem.productId', 'productId')
@@ -2767,9 +2765,11 @@ export class ProductService {
       query = query.andWhere('city.id = :cityId', { cityId });
     }
 
+    // ✅ Récupérer TOUS les résultats avec RAND() pour mélanger les ex-aequo
     query = query
       .groupBy('orderItem.productId')
-      .orderBy('totalSold', 'DESC');
+      .orderBy('totalSold', 'DESC')
+      .addOrderBy('RAND()');
 
     const allResults = await query.getRawMany();
 
@@ -2785,46 +2785,11 @@ export class ProductService {
       };
     }
 
-    // ✅ Grouper par totalSold et mélanger
-    const groupedBySales: Record<number, string[]> = {};
-    for (const result of allResults) {
-      const totalSold = Number(result.totalSold);
-      if (!groupedBySales[totalSold]) {
-        groupedBySales[totalSold] = [];
-      }
-      groupedBySales[totalSold].push(result.productId);
-    }
+    // ✅ Pagination après le tri aléatoire
+    const paginatedResults = allResults.slice(offset, offset + limit);
+    const productIds = paginatedResults.map((r) => r.productId);
 
-    // ✅ Mélanger chaque groupe avec un seed
-    const shuffledProductIds: string[] = [];
-    const sortedKeys = Object.keys(groupedBySales).sort((a, b) => Number(b) - Number(a));
-
-    for (const key of sortedKeys) {
-      const group = groupedBySales[Number(key)];
-      // ✅ Mélanger avec le seed
-      const shuffled = group.sort(() => {
-        const x = Math.sin(seed + Number(key)) * 10000;
-        return x - Math.floor(x);
-      });
-      shuffledProductIds.push(...shuffled);
-    }
-
-    // ✅ Pagination
-    const paginatedIds = shuffledProductIds.slice(offset, offset + limit);
-
-    if (paginatedIds.length === 0) {
-      return {
-        message: await this.i18n.translate('no_products_found', lang),
-        data: {
-          data: [],
-          total: 0,
-          page,
-          limit,
-        },
-      };
-    }
-
-    // ✅ Récupérer les produits
+    // ✅ Récupérer les produits dans l'ordre
     const products = await this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
@@ -2849,14 +2814,16 @@ export class ProductService {
         'variationAttributeValues.attribute',
         'variationAttribute',
       )
-      .where('product.id IN (:...paginatedIds)', { paginatedIds })
-      .orderBy(`FIELD(product.id, ${paginatedIds.map(id => `'${id}'`).join(',')})`)
+      .where('product.id IN (:...productIds)', { productIds })
+      // ✅ Garder l'ordre du résultat RAND()
+      .orderBy(`FIELD(product.id, ${productIds.map(id => `'${id}'`).join(',')})`)
       .getMany();
 
+    // ✅ Ajouter totalSold
     const productsWithSales = products.map((p) => ({
       ...p,
       totalSold: Number(
-        allResults.find((r) => r.productId === p.id)?.totalSold || 0,
+        paginatedResults.find((r) => r.productId === p.id)?.totalSold || 0,
       ),
     }));
 
