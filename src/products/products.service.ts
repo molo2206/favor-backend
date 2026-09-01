@@ -2077,7 +2077,6 @@ export class ProductService {
     minSalePrice?: number,
     maxSalePrice?: number,
     cityId?: string,
-    countryId?: string,
     page = 1,
     limit = 10,
     lang: string = 'fr',
@@ -2113,9 +2112,7 @@ export class ProductService {
         'variationAttributeValues.attribute',
         'variationAttribute',
       )
-      .where('product.status = :status', { status: ProductStatus.PUBLISHED })
-      // ✅ ORDRE ALEATOIRE - DONNE UNE CHANCE À TOUS LES PRODUITS
-      .orderBy('RAND()');
+      .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
     if (brandId) {
       queryBuilder.andWhere('product.brand_id = :brandId', { brandId });
@@ -2134,14 +2131,6 @@ export class ProductService {
 
     if (type) {
       queryBuilder.andWhere('product.type = :type', { type });
-    }
-
-    if (countryId) {
-      queryBuilder.andWhere('company.countryId = :countryId', { countryId });
-    }
-
-    if (cityId) {
-      queryBuilder.andWhere('city.id = :cityId', { cityId });
     }
 
     if (shopType?.trim()) {
@@ -2210,6 +2199,10 @@ export class ProductService {
       }
     }
 
+    if (cityId) {
+      queryBuilder.andWhere('city.id = :cityId', { cityId });
+    }
+
     if (typecar) {
       const saleTypes = [
         Type_rental_both_sale_car.SALE,
@@ -2247,7 +2240,11 @@ export class ProductService {
       queryBuilder.andWhere('product.typecar = :typecar', { typecar });
     }
 
-    queryBuilder.skip(skip).take(limit);
+    // ============================================================
+    // TRI ALEATOIRE A CHAQUE EXECUTION
+    // ============================================================
+
+    queryBuilder.orderBy('RAND()').skip(skip).take(limit);
 
     const [products, total] = await Promise.all([
       queryBuilder.getMany(),
@@ -2373,28 +2370,6 @@ export class ProductService {
       };
     });
 
-    // ✅ Mélanger aléatoirement les produits ayant le même nombre de commandes
-    const groupedByCommande: Record<number, any[]> = {};
-    for (const product of formattedProducts) {
-      const key = product.company?.start?.totalCommande || 0;
-      if (!groupedByCommande[key]) groupedByCommande[key] = [];
-      groupedByCommande[key].push(product);
-    }
-
-    // ✅ Pour chaque groupe de même totalCommande, mélanger aléatoirement
-    const finalProducts: any[] = [];
-    const sortedKeys = Object.keys(groupedByCommande).sort((a, b) => Number(b) - Number(a));
-
-    for (const key of sortedKeys) {
-      const group = groupedByCommande[Number(key)];
-      // Mélanger le groupe aléatoirement (Fisher-Yates shuffle)
-      for (let i = group.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [group[i], group[j]] = [group[j], group[i]];
-      }
-      finalProducts.push(...group);
-    }
-
     let message = await this.i18n.translate('products_by_category', lang);
     const filters: string[] = [];
 
@@ -2408,7 +2383,6 @@ export class ProductService {
     if (year) filters.push(`année: ${year}`);
     if (companyId) filters.push(`entreprise: ${companyId}`);
     if (cityId) filters.push(`ville: ${cityId}`);
-    if (countryId) filters.push(`pays: ${countryId}`);
 
     if (filters.length > 0 && total > 0) {
       message += ` (filtres: ${filters.join(', ')})`;
@@ -2424,7 +2398,7 @@ export class ProductService {
     return {
       message,
       data: {
-        data: finalProducts,
+        data: formattedProducts,
         total,
         page,
         limit,
