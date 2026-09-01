@@ -199,7 +199,6 @@ export class UsersService {
     let referrer: UserEntity | null = null;
 
     if (referralCode) {
-      // ✅ Vérifier si le code de parrainage existe
       referrer = await this.usersRepository.findOne({
         where: { referralCode },
       });
@@ -210,21 +209,18 @@ export class UsersService {
         );
       }
 
-      // ✅ Vérifier que le parrain est actif
       if (!referrer.isActive || referrer.deleted) {
         throw new BadRequestException(
           await this.i18n.translate('referral.referrer_inactive', lang)
         );
       }
 
-      // ✅ Vérifier si l'utilisateur essaye de se parrainer lui-même (via email)
       if (email && referrer.email === email) {
         throw new BadRequestException(
           await this.i18n.translate('referral.self_referral_not_allowed', lang)
         );
       }
 
-      // ✅ Vérifier si l'utilisateur essaye de se parrainer lui-même (via phone)
       if (phone && referrer.phone === phone) {
         throw new BadRequestException(
           await this.i18n.translate('referral.self_referral_not_allowed', lang)
@@ -333,7 +329,7 @@ export class UsersService {
     const savedUser = await this.usersRepository.save(newUser);
 
     // ============================================================
-    // 🔥 GÉNÉRATION DU CODE DE PARRAINAGE
+    // 🔥 GÉNÉRATION DU CODE DE PARRAINAGE POUR LE NOUVEL UTILISATEUR
     // ============================================================
     const referralCodeGenerated = await this.generateReferralCode(savedUser.id);
     savedUser.referralCode = referralCodeGenerated;
@@ -342,10 +338,15 @@ export class UsersService {
     // ✅ TRAITEMENT DU PARRAINAGE (si un code a été fourni)
     // ============================================================
     if (referralCode && referrer) {
-      // ✅ Vérification finale que l'utilisateur ne se parraine pas
       if (referrer.id === savedUser.id) {
         throw new BadRequestException(
           await this.i18n.translate('referral.self_referral_not_allowed', lang)
+        );
+      }
+
+      if (savedUser.referredBy) {
+        throw new BadRequestException(
+          await this.i18n.translate('referral.already_referred', lang)
         );
       }
 
@@ -372,7 +373,7 @@ export class UsersService {
       await this.referralRepository.save(referral);
     }
 
-    // ✅ Sauvegarder l'utilisateur avec le code de parrainage
+    // ✅ Sauvegarder l'utilisateur avec son propre code de parrainage
     await this.usersRepository.save(savedUser);
 
     // ============================================================
@@ -512,9 +513,8 @@ export class UsersService {
         contact_us: await this.i18n.translate('user.contact_us', lang),
         footer_copyright: await this.i18n.translate('user.footer_copyright', lang),
         footer_legal: await this.i18n.translate('user.footer_legal', lang),
-        referral_code_title: await this.i18n.translate('user.referral_code_title', lang),
-        referral_code_description: await this.i18n.translate('user.referral_code_description', lang),
-        share_referral: await this.i18n.translate('user.share_referral', lang),
+        referral_code_title: await this.i18n.translate('referral.referral_code_title', lang),
+        share_referral: await this.i18n.translate('referral.share_referral', lang),
       };
 
       await this.mailService.sendHtmlEmail(
@@ -549,7 +549,7 @@ export class UsersService {
       platform,
     };
   }
-
+  
   async changePassword(
     userId: string,
     changePasswordDto: ChangePasswordDto,
