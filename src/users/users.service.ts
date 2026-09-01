@@ -144,6 +144,39 @@ export class UsersService {
     return code;
   }
 
+  async changePassword(
+    userId: string,
+    changePasswordDto: ChangePasswordDto,
+    lang: string = 'fr',
+  ): Promise<{ message: string }> {
+    const { currentPassword, newPassword } = changePasswordDto;
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'password'],
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        await this.i18n.translate('user.user_not_found', lang),
+      );
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      throw new BadRequestException(
+        await this.i18n.translate('user.current_password_incorrect', lang),
+      );
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedNewPassword;
+    await this.usersRepository.save(user);
+
+    return {
+      message: await this.i18n.translate('user.password_updated', lang),
+    };
+  }
+
   async signup(
     createUserDto: CreateUserDto,
     lang: string = 'fr',
@@ -162,7 +195,7 @@ export class UsersService {
       password,
       fcmToken: clientFcmToken,
       platform,
-      referralCode, // ✅ Code du parrain
+      referralCode,
     } = createUserDto;
 
     const hasEmail = email && email !== '';
@@ -311,13 +344,12 @@ export class UsersService {
     }
 
     // ============================================================
-    // 4️⃣ CRÉATION UTILISATEUR - ✅ GÉNÉRER SON PROPRE CODE
+    // 4️⃣ CRÉATION UTILISATEUR - SANS referralCode
     // ============================================================
     const hashedPassword = password
       ? await bcrypt.hash(password, 10)
       : undefined;
 
-    // ✅ Créer l'utilisateur SANS referralCode
     const newUser = this.usersRepository.create({
       fullName: createUserDto.fullName,
       email: email || undefined,
@@ -329,7 +361,6 @@ export class UsersService {
       country: createUserDto.country,
       city: createUserDto.city,
       fcmToken: clientFcmToken,
-      // ❌ PAS DE referralCode
     });
 
     const savedUser = await this.usersRepository.save(newUser);
@@ -337,27 +368,22 @@ export class UsersService {
     // ============================================================
     // 🔥 GÉNÉRATION DU CODE DE PARRAINAGE POUR LE NOUVEL UTILISATEUR
     // ============================================================
-    // ✅ Générer un NOUVEAU code unique pour le nouvel utilisateur
     const referralCodeGenerated = await this.generateReferralCode(savedUser.id);
     savedUser.referralCode = referralCodeGenerated;
     await this.usersRepository.save(savedUser);
 
-    console.log(`[Signup] Nouveau code généré pour ${savedUser.email}: ${savedUser.referralCode}`);
-
     // ============================================================
-    // ✅ TRAITEMENT DU PARRAINAGE (si un code a été fourni)
+    // ✅ TRAITEMENT DU PARRAINAGE (si un code a été fourni) - SANS POINTS
     // ============================================================
     if (referralCode && referrer) {
-      // ✅ Vérifier que l'utilisateur ne se parraine pas
       if (referrer.id === savedUser.id) {
         throw new BadRequestException(
           await this.i18n.translate('referral.self_referral_not_allowed', lang)
         );
       }
 
-      // ✅ Mettre à jour le parrain
+      // ✅ Mettre à jour le parrain (UNIQUEMENT le compteur, PAS DE POINTS)
       referrer.referralCount = (referrer.referralCount || 0) + 1;
-      referrer.referralPoints = (referrer.referralPoints || 0) + 5;
       referrer.lastReferralDate = new Date();
       await this.usersRepository.save(referrer);
 
@@ -365,20 +391,21 @@ export class UsersService {
       savedUser.referredBy = referrer.id;
       await this.usersRepository.save(savedUser);
 
-      // ✅ Créer l'historique de parrainage
+      // ✅ Créer l'historique de parrainage avec rewardAmount = 0
       const referral = this.referralRepository.create({
         referrerId: referrer.id,
         referredId: savedUser.id,
-        referralCode: referralCode, // ✅ Le code du parrain (1A9F563774)
+        referralCode: referralCode,
         status: ReferralStatus.COMPLETED,
-        rewardAmount: 5,
+        rewardAmount: 0,
         rewardType: 'POINTS',
         completedAt: new Date(),
       });
       await this.referralRepository.save(referral);
-
-      console.log(`[Signup] ✅ Parrainage enregistré: ${referrer.fullName} -> ${savedUser.fullName}`);
     }
+
+    // ✅ Sauvegarder l'utilisateur avec son propre code
+    await this.usersRepository.save(savedUser);
 
     // ============================================================
     // 5️⃣ CRÉATION DU COMPTE FIDÉLITÉ
@@ -489,7 +516,7 @@ export class UsersService {
         phone: userWithoutPassword.phone || 'Non renseigné',
         role: userWithoutPassword.role || 'Client',
         loyaltyCode: loyaltyCode,
-        referralCode: savedUser.referralCode, // ✅ Son propre code
+        referralCode: savedUser.referralCode,
         createdAt: userWithoutPassword.createdAt
           ? new Date(
             typeof userWithoutPassword.createdAt === 'string'
@@ -545,45 +572,12 @@ export class UsersService {
       message: await this.i18n.translate('user.signup_success', lang),
       data: {
         ...userWithoutPassword,
-        referralCode: savedUser.referralCode, // ✅ Son propre code
+        referralCode: savedUser.referralCode,
       },
       access_token,
       refresh_token,
       fcmToken: savedFcmToken,
       platform,
-    };
-  }
-
-  async changePassword(
-    userId: string,
-    changePasswordDto: ChangePasswordDto,
-    lang: string = 'fr',
-  ): Promise<{ message: string }> {
-    const { currentPassword, newPassword } = changePasswordDto;
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-      select: ['id', 'password'],
-    });
-
-    if (!user) {
-      throw new NotFoundException(
-        await this.i18n.translate('user.user_not_found', lang),
-      );
-    }
-
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      throw new BadRequestException(
-        await this.i18n.translate('user.current_password_incorrect', lang),
-      );
-    }
-
-    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedNewPassword;
-    await this.usersRepository.save(user);
-
-    return {
-      message: await this.i18n.translate('user.password_updated', lang),
     };
   }
 
