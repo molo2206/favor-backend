@@ -2379,24 +2379,29 @@ export class UsersService {
 
     let totalPoints = 0;
 
-    // ✅ Historique des parrainages avec calcul des points basés sur le shippingCost
+    // ✅ Historique des parrainages avec calcul des points basés sur le shippingCost des commandes VALIDATED
     const history = user.referralHistory?.map((referral) => {
       const referred = referral.referred;
       let rewardAmount = 0;
       let orderDetails: any[] = [];
 
-      // ✅ Calculer les points basés sur le shippingCost des commandes du parrainé
+      // ✅ Filtrer uniquement les commandes avec status = VALIDATED
       if (referred && referred.orders && referred.orders.length > 0) {
-        // Détail des commandes avec shippingCost
-        orderDetails = referred.orders.map((order) => ({
+        const validatedOrders = referred.orders.filter(
+          (order) => order.status === OrderStatus.VALIDATED
+        );
+
+        // Détail des commandes VALIDATED avec shippingCost
+        orderDetails = validatedOrders.map((order) => ({
           orderId: order.id,
           shippingCost: order.shippingCost || 0,
           reward: (Number(order.shippingCost || 0) * 0.10), // ✅ 10% du shippingCost
           createdAt: order.createdAt,
+          status: order.status,
         }));
 
-        // Calcul du total des shippingCost
-        const totalShippingCost = referred.orders.reduce(
+        // Calcul du total des shippingCost des commandes VALIDATED
+        const totalShippingCost = validatedOrders.reduce(
           (sum, order) => sum + Number(order.shippingCost || 0),
           0
         );
@@ -2413,10 +2418,11 @@ export class UsersService {
         referredId: referred?.id || null,
         status: referral.status,
         rewardAmount: Math.round(rewardAmount * 100) / 100,
-        rewardType: 'POINTS (10% shipping)',
+        rewardType: 'POINTS (10% shipping - VALIDATED)',
         createdAt: referral.createdAt,
         completedAt: referral.completedAt || null,
-        orders: orderDetails, // ✅ Détail des commandes avec shippingCost
+        orders: orderDetails, // ✅ Détail des commandes VALIDATED avec shippingCost
+        totalValidatedOrders: validatedOrders.length, // ✅ Nombre de commandes validées
       };
     }) || [];
 
@@ -2426,13 +2432,17 @@ export class UsersService {
       await this.usersRepository.save(user);
     }
 
-    // ✅ Liste des utilisateurs parrainés avec leurs statistiques shipping
+    // ✅ Liste des utilisateurs parrainés avec leurs statistiques shipping (UNIQUEMENT VALIDATED)
     const referredUsers = user.referralHistory?.map((referral) => {
       const referred = referral.referred;
-      const totalShippingCost = referred?.orders?.reduce(
+      const validatedOrders = referred?.orders?.filter(
+        (order) => order.status === OrderStatus.VALIDATED
+      ) || [];
+
+      const totalShippingCost = validatedOrders.reduce(
         (sum, order) => sum + Number(order.shippingCost || 0),
         0
-      ) || 0;
+      );
 
       return {
         id: referred?.id || null,
@@ -2441,6 +2451,7 @@ export class UsersService {
         phone: referred?.phone || null,
         status: referral.status,
         totalOrders: referred?.orders?.length || 0,
+        totalValidatedOrders: validatedOrders.length,
         totalShippingCost: Math.round(totalShippingCost * 100) / 100,
         pointsEarned: Math.round(totalShippingCost * 0.10 * 100) / 100,
         createdAt: referral.createdAt,
@@ -2462,11 +2473,12 @@ export class UsersService {
         referralCode: user.referralCode || 'Non généré',
         referralLink: referralLink || 'Non disponible',
         referralActive: user.referralActive !== false,
-        history, // ✅ Historique complet avec détails des shippingCost
-        referredUsers, // ✅ Liste des parrainés avec leurs statistiques shipping
+        history, // ✅ Historique complet avec détails des shippingCost VALIDATED
+        referredUsers, // ✅ Liste des parrainés avec leurs statistiques VALIDATED
       },
     };
   }
+  
   async sendOtp(email: string, lang: string = 'fr'): Promise<any> {
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
 
