@@ -698,10 +698,13 @@ export class FpayService {
     async makeSendparrainage(
         sendDto: FpaySendDto,
         currentUser: UserEntity,
-    ): Promise<FpayResponse<PaymentResponseDto>> {
+    ): Promise<{ success: boolean; message: string; data?: any }> {
         try {
             if (!currentUser) {
-                throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+                return {
+                    success: false,
+                    message: 'Utilisateur non authentifié',
+                };
             }
 
             let cleanApiKey = this.parrainageApiKey;
@@ -720,38 +723,37 @@ export class FpayService {
                 }
             } catch (error) {
                 this.logger.error(`❌ Erreur lors du décodage de l'API Key PARRAINAGE: ${error.message}`);
+                return {
+                    success: false,
+                    message: 'Erreur de configuration de l\'API Key PARRAINAGE',
+                };
             }
 
             if (!recipientPhoneOrCode) {
-                throw new HttpException(
-                    'Impossible d\'extraire le destinataire de l\'API Key PARRAINAGE',
-                    HttpStatus.BAD_REQUEST,
-                );
+                return {
+                    success: false,
+                    message: 'Impossible d\'extraire le destinataire de l\'API Key PARRAINAGE',
+                };
             }
 
+            // ✅ Récupérer le client par son userIdFpay
             const client = await this.userRepository.findOne({
                 where: { userIdFpay: sendDto.userId },
             });
 
             if (!client) {
-                throw new HttpException(
-                    `Client avec l'ID ${sendDto.userId} non trouvé`,
-                    HttpStatus.NOT_FOUND,
-                );
-            }
-
-            if (!client.userIdFpay) {
-                throw new HttpException(
-                    'Le client n\'a pas de compte FPay lié',
-                    HttpStatus.BAD_REQUEST,
-                );
+                this.logger.warn(`⚠️ Client avec userIdFpay ${sendDto.userId} non trouvé`);
+                return {
+                    success: false,
+                    message: `Client avec userIdFpay ${sendDto.userId} non trouvé`,
+                };
             }
 
             if (client.phone === recipientPhoneOrCode) {
-                throw new HttpException(
-                    'Vous ne pouvez pas vous envoyer d\'argent à vous-même',
-                    HttpStatus.BAD_REQUEST,
-                );
+                return {
+                    success: false,
+                    message: 'Vous ne pouvez pas vous envoyer d\'argent à vous-même',
+                };
             }
 
             // ✅ Vérifier le paymentMethod
@@ -759,15 +761,15 @@ export class FpayService {
             const paymentMethod = sendDto.paymentMethod || 'MOBILE_MONEY';
 
             if (!validPaymentMethods.includes(paymentMethod)) {
-                throw new HttpException(
-                    `paymentMethod invalide. Valeurs acceptées: ${validPaymentMethods.join(', ')}`,
-                    HttpStatus.BAD_REQUEST,
-                );
+                return {
+                    success: false,
+                    message: `paymentMethod invalide. Valeurs acceptées: ${validPaymentMethods.join(', ')}`,
+                };
             }
 
             this.logger.log(`📤 Envoi PARRAINAGE: ${client.phone} → ${recipientPhoneOrCode} (${paymentMethod})`);
 
-            const url = `${this.fpayApiUrl}/api/external/send/parrainage`; // ✅ Nouvelle URL
+            const url = `${this.fpayApiUrl}/api/external/send/parrainage`;
             const sendData = {
                 userId: sendDto.userId,
                 amount: sendDto.amount,
@@ -777,7 +779,6 @@ export class FpayService {
                 paymentMethod: paymentMethod,
             };
 
-            // ✅ Utiliser les headers pour parrainage
             const headers = {
                 'Authorization': this.parrainageApiKey,
                 'Content-Type': 'application/json',
@@ -795,7 +796,11 @@ export class FpayService {
             );
 
             this.logger.log(`✅ Envoi PARRAINAGE réussi: ${response.data.data?.transaction?.reference || 'OK'}`);
-            return response.data;
+            return {
+                success: true,
+                message: 'Parrainage envoyé avec succès',
+                data: response.data,
+            };
 
         } catch (error) {
             this.logger.error(`❌ Erreur d'envoi PARRAINAGE: ${error.message}`);
@@ -804,7 +809,12 @@ export class FpayService {
                 this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
             }
 
-            throw this.handleError(error);
+            // ✅ TOUJOURS retourner un objet avec success: false, ne jamais throw
+            return {
+                success: false,
+                message: error.message || 'Erreur lors de l\'envoi du parrainage',
+                error: error.response?.data || null,
+            };
         }
     }
 
