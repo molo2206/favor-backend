@@ -519,11 +519,13 @@ export class OrderService {
 
       shippingFeesSent = true;
 
-      if (parrainageAmount > 0) {
+      if (parrainageAmount > 0 && userWithReferrer?.referrer) {
+        // ✅ Vérification que le parrain existe
+        const referrerId = userWithReferrer.referrer.id;
+
         // ✅ Récupérer le parrain et envoyer - NON BLOQUANT
         this.userRepository.findOne({
-          where: { id: userWithReferrer.referrer.id },
-          relations: ['referrer'],
+          where: { id: referrerId },
         })
           .then(parrainUser => {
             if (parrainUser && parrainUser.userIdFpay) {
@@ -538,7 +540,7 @@ export class OrderService {
 
               return this.fpayService.makeSendparrainage(sendDto, user);
             } else {
-              console.log(`[Order] ⚠️ Le parrain n'a pas de userIdFpay ou compte non lié`);
+              console.log(`[Order] ⚠️ Le parrain (${referrerId}) n'a pas de userIdFpay ou compte non lié`);
               return null;
             }
           })
@@ -554,6 +556,8 @@ export class OrderService {
           });
 
         console.log(`[Order] 📤 Envoi parrainage en cours (non bloquant)...`);
+      } else {
+        console.log(`[Order] ⚠️ Aucun parrain trouvé ou parrainage = 0`);
       }
     } else {
       if (selectedMethod === PaymentMethod.MANUAL && paymentStatus === PaymentStatus.PAID && shippingCost && shippingCost > 0) {
@@ -770,39 +774,46 @@ export class OrderService {
 
         // ✅ Si paiement réussi et a un parrain → Envoyer le parrainage - NON BLOQUANT
         if (paymentStatus === PaymentStatus.PAID && hasReferrer && parrainageAmount > 0) {
-          this.userRepository.findOne({
-            where: { id: userWithReferrer.referrer.id },
-            relations: ['referrer'],
-          })
-            .then(parrainUser => {
-              if (parrainUser && parrainUser.userIdFpay) {
-                const sendDto: FpaySendDto = {
-                  userId: parrainUser.userIdFpay,  // ✅ userIdFpay du parrain
-                  amount: parrainageAmount,
-                  description: `Parrainage (10%) - Commande #${order.invoiceNumber}`,
-                  currency: order.currency || 'USD',
-                  countryCode: 'CD',
-                  paymentMethod: 'MOBILE_MONEY',
-                };
+          // ✅ Vérification que le parrain existe
+          if (userWithReferrer?.referrer) {
+            const referrerId = userWithReferrer.referrer.id;
 
-                return this.fpayService.makeSendparrainage(sendDto, user);
-              } else {
-                console.log(`[PayOrder] ⚠️ Le parrain n'a pas de userIdFpay ou compte non lié`);
-                return null;
-              }
+            this.userRepository.findOne({
+              where: { id: referrerId },
+              relations: ['referrer'],
             })
-            .then(result => {
-              if (result && result.success) {
-                console.log(`[PayOrder] ✅ ${parrainageAmount} envoyé au compte du parrain via FPay`);
-              } else if (result) {
-                console.log(`[PayOrder] ⚠️ Parrainage non envoyé: ${result.message}`);
-              }
-            })
-            .catch(error => {
-              console.error('[PayOrder] ❌ Erreur envoi parrainage:', error.message);
-            });
+              .then(parrainUser => {
+                if (parrainUser && parrainUser.userIdFpay) {
+                  const sendDto: FpaySendDto = {
+                    userId: parrainUser.userIdFpay,  // ✅ userIdFpay du parrain
+                    amount: parrainageAmount,
+                    description: `Parrainage (10%) - Commande #${order.invoiceNumber}`,
+                    currency: order.currency || 'USD',
+                    countryCode: 'CD',
+                    paymentMethod: 'MOBILE_MONEY',
+                  };
 
-          console.log(`[PayOrder] 📤 Envoi parrainage en cours (non bloquant)...`);
+                  return this.fpayService.makeSendparrainage(sendDto, user);
+                } else {
+                  console.log(`[PayOrder] ⚠️ Le parrain (${referrerId}) n'a pas de userIdFpay ou compte non lié`);
+                  return null;
+                }
+              })
+              .then(result => {
+                if (result && result.success) {
+                  console.log(`[PayOrder] ✅ ${parrainageAmount} envoyé au compte du parrain via FPay`);
+                } else if (result) {
+                  console.log(`[PayOrder] ⚠️ Parrainage non envoyé: ${result.message}`);
+                }
+              })
+              .catch(error => {
+                console.error('[PayOrder] ❌ Erreur envoi parrainage:', error.message);
+              });
+
+            console.log(`[PayOrder] 📤 Envoi parrainage en cours (non bloquant)...`);
+          } else {
+            console.log(`[PayOrder] ⚠️ Aucun parrain trouvé`);
+          }
         }
 
       } catch (error: any) {
