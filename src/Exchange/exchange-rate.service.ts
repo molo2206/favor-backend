@@ -293,7 +293,17 @@ export class ExchangeRateService {
                     defaultCurrency: 'CDF',
                     name: 'République Démocratique du Congo'
                 },
+                'COD': {
+                    currencies: ['CDF', 'USD'],
+                    defaultCurrency: 'CDF',
+                    name: 'République Démocratique du Congo'
+                },
                 'BJ': {
+                    currencies: ['XOF'],
+                    defaultCurrency: 'XOF',
+                    name: 'Bénin'
+                },
+                'BEN': {
                     currencies: ['XOF'],
                     defaultCurrency: 'XOF',
                     name: 'Bénin'
@@ -306,6 +316,7 @@ export class ExchangeRateService {
 
             console.log(`🖥️ IP Publique du serveur: ${serverPublicIp}`);
             console.log(`🖥️ IP Locale du serveur: ${serverLocalIp}`);
+            console.log(`🌍 IP du client: ${ip}`);
 
             // ✅ Si countryId est fourni
             if (countryId) {
@@ -323,80 +334,103 @@ export class ExchangeRateService {
                         defaultCurrency = data.defaultCurrency;
                     }
                 }
-            }
+            } else {
+                // ✅ Utiliser l'IP du client pour la détection
+                let ipToUse = ip;
 
-            // ✅ Si pas de pays spécifié, utiliser l'IP du serveur
-            if (!countryId) {
-                // Utiliser l'IP publique du serveur pour la détection
-                const serverIp = serverPublicIp !== '127.0.0.1' ? serverPublicIp : ip;
+                // Si l'IP est 'server' ou locale, utiliser l'IP publique du serveur
+                if (ipToUse === 'server' || ipToUse === '127.0.0.1' || ipToUse === '::1' || ipToUse === 'localhost') {
+                    ipToUse = serverPublicIp !== '127.0.0.1' ? serverPublicIp : serverLocalIp;
+                }
 
-                console.log(`🌍 Détection du pays avec l'IP: ${serverIp}`);
+                console.log(`🌍 Détection du pays avec l'IP: ${ipToUse}`);
 
-                // Vérifier si l'IP est locale
-                const isLocalIp = serverIp === '127.0.0.1' ||
-                    serverIp === '::1' ||
-                    serverIp === 'localhost' ||
-                    serverIp.startsWith('192.168') ||
-                    serverIp.startsWith('10.') ||
-                    serverIp.startsWith('172.');
+                // ✅ Vérifier d'abord si l'IP est dans les plages de la RDC
+                const ipParts = ipToUse.split('.');
+                if (ipParts.length === 4) {
+                    const firstOctet = parseInt(ipParts[0]);
+                    const secondOctet = parseInt(ipParts[1]);
 
-                if (!isLocalIp) {
+                    // Plages IP de la RDC
+                    if ((firstOctet === 41 && secondOctet === 243) ||
+                        (firstOctet === 196 && secondOctet === 250) ||
+                        (firstOctet === 154) ||
+                        (firstOctet === 197) ||
+                        (firstOctet === 41 && secondOctet === 242)) {
+                        countryCode = 'CD';
+                        countryName = 'République Démocratique du Congo';
+                        currenciesList = ['CDF', 'USD'];
+                        defaultCurrency = 'CDF';
+                        console.log(`🌍 IP ${ipToUse} détectée comme RDC (plage IP)`);
+                    }
+                }
+
+                // ✅ Si pas encore détecté, appeler l'API
+                if (!countryCode) {
                     try {
                         const response = await firstValueFrom(
-                            this.httpService.get(`https://ipapi.co/${serverIp}/json/`, {
+                            this.httpService.get(`https://ipapi.co/${ipToUse}/json/`, {
                                 timeout: 5000,
                             }),
                         );
 
                         const countryIso = response.data?.country;
-                        countryName = response.data?.country_name;
+                        const detectedCountryName = response.data?.country_name;
 
-                        console.log(`🌍 Pays détecté par IP: ${countryIso} - ${countryName}`);
+                        console.log(`🌍 Pays détecté par ipapi: ${countryIso} - ${detectedCountryName}`);
 
                         if (countryIso) {
-                            const data = countryCurrencyMap[countryIso];
+                            // Chercher dans le mapping
+                            let data = countryCurrencyMap[countryIso];
+                            if (!data && countryIso.length === 2) {
+                                data = countryCurrencyMap[countryIso];
+                            }
 
                             if (data) {
                                 countryCode = countryIso;
                                 currenciesList = data.currencies;
                                 defaultCurrency = data.defaultCurrency;
+                                countryName = data.name;
                             }
                         }
                     } catch (apiError) {
                         console.error('❌ Erreur API ipapi:', apiError.message);
-                    }
-                } else {
-                    console.log('📍 IP locale détectée, utilisation de l\'IP publique du serveur');
 
-                    // Si l'IP est locale, essayer avec l'IP publique
-                    if (serverPublicIp && serverPublicIp !== '127.0.0.1') {
+                        // ✅ Fallback: utiliser ip-api.com
                         try {
-                            const response = await firstValueFrom(
-                                this.httpService.get(`https://ipapi.co/${serverPublicIp}/json/`, {
+                            const fallbackResponse = await firstValueFrom(
+                                this.httpService.get(`http://ip-api.com/json/${ipToUse}`, {
                                     timeout: 5000,
                                 }),
                             );
 
-                            const countryIso = response.data?.country;
-                            countryName = response.data?.country_name;
+                            if (fallbackResponse.data?.status === 'success') {
+                                const countryIso = fallbackResponse.data.countryCode;
+                                const detectedCountryName = fallbackResponse.data.country;
 
-                            if (countryIso) {
-                                const data = countryCurrencyMap[countryIso];
+                                console.log(`🌍 Pays détecté par fallback: ${countryIso} - ${detectedCountryName}`);
 
-                                if (data) {
-                                    countryCode = countryIso;
-                                    currenciesList = data.currencies;
-                                    defaultCurrency = data.defaultCurrency;
+                                if (countryIso) {
+                                    let data = countryCurrencyMap[countryIso];
+                                    if (!data && countryIso.length === 2) {
+                                        data = countryCurrencyMap[countryIso];
+                                    }
+                                    if (data) {
+                                        countryCode = countryIso;
+                                        currenciesList = data.currencies;
+                                        defaultCurrency = data.defaultCurrency;
+                                        countryName = data.name;
+                                    }
                                 }
                             }
-                        } catch (apiError) {
-                            console.error('❌ Erreur API ipapi:', apiError.message);
+                        } catch (fallbackError) {
+                            console.error('❌ Erreur fallback API:', fallbackError.message);
                         }
                     }
                 }
             }
 
-            // Récupérer les taux de change
+            // ✅ Récupérer les taux de change
             const exchangeRates = await this.exchangeRateRepo
                 .createQueryBuilder('rate')
                 .where('rate.currency IN (:...currencies)', { currencies: currenciesList })
@@ -435,8 +469,8 @@ export class ExchangeRateService {
                 data: {
                     defaultCurrency,
                     currencies: finalCurrencies,
-                    countryCode,
-                    countryName: countryName || 'Pays non reconnu',
+                    countryCode: countryCode || 'CD',
+                    countryName: countryName || 'République Démocratique du Congo',
                     ip: ip || '127.0.0.1',
                     serverInfo: {
                         publicIp: serverPublicIp,
@@ -470,8 +504,8 @@ export class ExchangeRateService {
                 data: {
                     defaultCurrency: 'USD',
                     currencies: defaultCurrencies,
-                    countryCode: 'US',
-                    countryName: 'États-Unis (défaut)',
+                    countryCode: 'CD',
+                    countryName: 'République Démocratique du Congo',
                     ip: ip || '127.0.0.1'
                 }
             };

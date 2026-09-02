@@ -57,34 +57,58 @@ export class ExchangeRateController {
         @Query('countryId') countryId?: string,
     ) {
         try {
-            // Récupérer l'IP du client
+            // ✅ Récupérer l'IP du client depuis différents headers
             let ip = req.headers['x-forwarded-for'] as string ||
                 req.headers['x-real-ip'] as string ||
+                req.headers['cf-connecting-ip'] as string ||
                 req.connection?.remoteAddress ||
+                req.socket?.remoteAddress ||
                 req.ip ||
                 '127.0.0.1';
 
+            // ✅ Si plusieurs IPs (proxy), prendre la première (celle du client)
             if (ip && ip.includes(',')) {
                 ip = ip.split(',')[0].trim();
             }
 
+            // ✅ Enlever le préfixe IPv6 si présent
             ip = ip.replace(/^::ffff:/, '');
+
+            // ✅ Nettoyer l'IP (enlever le port si présent)
+            if (ip && ip.includes(':')) {
+                ip = ip.split(':')[0];
+            }
 
             const host = req.get('host');
             const protocol = req.protocol;
             const baseUrl = `${protocol}://${host}`;
 
             console.log(`🌍 Domaine: ${baseUrl}`);
-            console.log(`🌍 IP détectée: ${ip}`);
+            console.log(`🌍 IP brute reçue: ${ip}`);
+            console.log(`🌍 Headers:`, {
+                'x-forwarded-for': req.headers['x-forwarded-for'],
+                'x-real-ip': req.headers['x-real-ip'],
+                'cf-connecting-ip': req.headers['cf-connecting-ip'],
+                'remoteAddress': req.connection?.remoteAddress,
+            });
 
+            // ✅ Vérifier si c'est une requête locale
             const isLocalRequest = ip === '127.0.0.1' ||
                 ip === '::1' ||
-                ip === 'localhost';
+                ip === 'localhost' ||
+                ip === '0:0:0:0:0:0:0:1' ||
+                ip.startsWith('192.168') ||
+                ip.startsWith('10.') ||
+                ip.startsWith('172.');
 
             let result;
             if (isLocalRequest) {
+                // ✅ Pour les requêtes locales, utiliser l'IP publique du serveur
+                console.log('📍 Requête locale détectée, utilisation de l\'IP du serveur');
                 result = await this.exchangeRateService.getCurrencyByIp('server', countryId);
             } else {
+                // ✅ Utiliser l'IP du client
+                console.log(`🌍 Requête distante avec IP: ${ip}`);
                 result = await this.exchangeRateService.getCurrencyByIp(ip, countryId);
             }
 
