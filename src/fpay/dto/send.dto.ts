@@ -1,6 +1,6 @@
 // src/modules/fpay/dto/send.dto.ts
 
-import { IsString, IsNotEmpty, IsNumber, IsOptional, Min, Length, Matches, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, Min, Length, Matches, IsUUID, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -13,7 +13,6 @@ export class FpaySendDto {
     @IsNotEmpty()
     userId: string;
 
-   
     @ApiProperty({
         example: 100,
         description: 'Montant à envoyer'
@@ -49,4 +48,19 @@ export class FpaySendDto {
     @IsString()
     @IsOptional()
     countryCode?: string;
+
+    // ✅ AJOUT DU paymentMethod
+    @ApiProperty({
+        example: 'MOBILE_MONEY',
+        description: 'Méthode de paiement (MOBILE_MONEY, CASH, BANK_TRANSFER, CARD)',
+        required: false,
+        enum: ['MOBILE_MONEY', 'CASH', 'BANK_TRANSFER', 'CARD'],
+        default: 'MOBILE_MONEY'
+    })
+    @IsString()
+    @IsOptional()
+    @IsIn(['MOBILE_MONEY', 'CASH', 'BANK_TRANSFER', 'CARD'], {
+        message: 'paymentMethod doit être: MOBILE_MONEY, CASH, BANK_TRANSFER ou CARD'
+    })
+    paymentMethod?: string;
 }

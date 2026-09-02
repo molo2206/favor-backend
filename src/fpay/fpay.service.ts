@@ -83,6 +83,8 @@ export class FpayService {
     private readonly fpayApiUrl: string;
     private readonly apiKey: string;
     private readonly logisticApiKey: string;
+    private readonly parrainageApiKey: string;
+    private readonly fideliteApiKey: string;
     private readonly appUrl: string;
 
     constructor(
@@ -96,6 +98,9 @@ export class FpayService {
         const apiKey = this.configService.get<string>('FPAY_API_KEY_HELP');
         const logisticApiKey = this.configService.get<string>('FPAY_API_KEY_LOGISTIC');
         const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+        const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE');
+        const fideliteApiKey = this.configService.get<string>('FPAY_API_KEY_FIDELITE');
+
 
         if (!fpayApiUrl) {
             throw new Error('FPAY_API_URL is not defined in environment variables');
@@ -107,10 +112,20 @@ export class FpayService {
             throw new Error('FPAY_API_KEY_LOGISTIC is not defined in environment variables');
         }
 
+        if (!parrainageApiKey) {
+            throw new Error('FPAY_API_KEY_PARRAINAGE is not defined in environment variables');
+        }
+
+        if (!fideliteApiKey) {
+            throw new Error('FPAY_API_KEY_FIDELITE is not defined in environment variables');
+        }
+
         this.fpayApiUrl = fpayApiUrl;
         this.apiKey = apiKey;
         this.logisticApiKey = logisticApiKey;
         this.appUrl = appUrl;
+        this.parrainageApiKey = parrainageApiKey;
+        this.fideliteApiKey = fideliteApiKey;
     }
 
     private getHeaders() {
@@ -661,6 +676,216 @@ export class FpayService {
                 description: sendDto.description || `Envoi vers ${recipientPhoneOrCode}`,
                 currency: sendDto.currency || 'USD',
                 countryCode: sendDto.countryCode || 'CD',
+            };
+
+            const response = await firstValueFrom(
+                this.httpService.post<FpayResponse<PaymentResponseDto>>(
+                    url,
+                    sendData,
+                    { headers: this.getLogisticHeaders() }
+                )
+            );
+
+            this.logger.log(`✅ Envoi LOGISTIC réussi: ${response.data.data.transaction.reference}`);
+            return response.data;
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur d'envoi LOGISTIC: ${error.message}`);
+            throw this.handleError(error);
+        }
+    }
+
+    async makeSendparrainage(
+        sendDto: FpaySendDto,
+        currentUser: UserEntity,
+    ): Promise<FpayResponse<PaymentResponseDto>> {
+        try {
+            if (!currentUser) {
+                throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+            }
+
+            let cleanApiKey = this.parrainageApiKey;
+            if (cleanApiKey.startsWith('Bearer ')) {
+                cleanApiKey = cleanApiKey.substring(7);
+            }
+
+            let recipientPhoneOrCode: string | null = null;
+
+            try {
+                const apiKeyParts = cleanApiKey.split('.');
+                if (apiKeyParts.length === 3) {
+                    const payloadJson = Buffer.from(apiKeyParts[1], 'base64').toString('utf-8');
+                    const payload = JSON.parse(payloadJson);
+                    recipientPhoneOrCode = payload.phone || payload.sub;
+                }
+            } catch (error) {
+                this.logger.error(`❌ Erreur lors du décodage de l'API Key PARRAINAGE: ${error.message}`);
+            }
+
+            if (!recipientPhoneOrCode) {
+                throw new HttpException(
+                    'Impossible d\'extraire le destinataire de l\'API Key PARRAINAGE',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            const client = await this.userRepository.findOne({
+                where: { userIdFpay: sendDto.userId },
+            });
+
+            if (!client) {
+                throw new HttpException(
+                    `Client avec l'ID ${sendDto.userId} non trouvé`,
+                    HttpStatus.NOT_FOUND,
+                );
+            }
+
+            if (!client.userIdFpay) {
+                throw new HttpException(
+                    'Le client n\'a pas de compte FPay lié',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            if (client.phone === recipientPhoneOrCode) {
+                throw new HttpException(
+                    'Vous ne pouvez pas vous envoyer d\'argent à vous-même',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ Vérifier le paymentMethod
+            const validPaymentMethods = ['MOBILE_MONEY', 'CASH', 'BANK_TRANSFER', 'CARD'];
+            const paymentMethod = sendDto.paymentMethod || 'MOBILE_MONEY';
+
+            if (!validPaymentMethods.includes(paymentMethod)) {
+                throw new HttpException(
+                    `paymentMethod invalide. Valeurs acceptées: ${validPaymentMethods.join(', ')}`,
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            this.logger.log(`📤 Envoi PARRAINAGE: ${client.phone} → ${recipientPhoneOrCode} (${paymentMethod})`);
+
+            const url = `${this.fpayApiUrl}/api/external/send/parrainage`; // ✅ Nouvelle URL
+            const sendData = {
+                userId: sendDto.userId,
+                amount: sendDto.amount,
+                description: sendDto.description || `Envoi de parrainage vers ${recipientPhoneOrCode}`,
+                currency: sendDto.currency || 'USD',
+                countryCode: sendDto.countryCode || 'CD',
+                paymentMethod: paymentMethod,
+            };
+
+            // ✅ Utiliser les headers pour parrainage
+            const headers = {
+                'Authorization': this.parrainageApiKey,
+                'Content-Type': 'application/json',
+            };
+
+            this.logger.log(`📤 Appel API PARRAINAGE: ${url}`);
+            this.logger.log(`📤 Payload:`, JSON.stringify(sendData, null, 2));
+
+            const response = await firstValueFrom(
+                this.httpService.post<FpayResponse<PaymentResponseDto>>(
+                    url,
+                    sendData,
+                    { headers: headers }
+                )
+            );
+
+            this.logger.log(`✅ Envoi PARRAINAGE réussi: ${response.data.data?.transaction?.reference || 'OK'}`);
+            return response.data;
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur d'envoi PARRAINAGE: ${error.message}`);
+
+            if (error.response) {
+                this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
+            }
+
+            throw this.handleError(error);
+        }
+    }
+
+    async makeSendFavorhelp(
+        sendDto: FpaySendDto,
+        currentUser: UserEntity,
+    ): Promise<FpayResponse<PaymentResponseDto>> {
+        try {
+            if (!currentUser) {
+                throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+            }
+
+            let cleanApiKey = this.apiKey;
+            if (cleanApiKey.startsWith('Bearer ')) {
+                cleanApiKey = cleanApiKey.substring(7);
+            }
+
+            let recipientPhoneOrCode: string | null = null;
+
+            try {
+                const apiKeyParts = cleanApiKey.split('.');
+                if (apiKeyParts.length === 3) {
+                    const payloadJson = Buffer.from(apiKeyParts[1], 'base64').toString('utf-8');
+                    const payload = JSON.parse(payloadJson);
+                    recipientPhoneOrCode = payload.phone || payload.sub;
+                }
+            } catch (error) {
+                this.logger.error(`❌ Erreur lors du décodage de l'API Key LOGISTIC: ${error.message}`);
+            }
+
+            if (!recipientPhoneOrCode) {
+                throw new HttpException(
+                    'Impossible d\'extraire le destinataire de l\'API Key LOGISTIC',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            const client = await this.userRepository.findOne({
+                where: { userIdFpay: sendDto.userId },
+            });
+
+            if (!client) {
+                throw new HttpException(
+                    `Client avec l'ID ${sendDto.userId} non trouvé`,
+                    HttpStatus.NOT_FOUND,
+                );
+            }
+
+            if (!client.userIdFpay) {
+                throw new HttpException(
+                    'Le client n\'a pas de compte FPay lié',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            if (client.phone === recipientPhoneOrCode) {
+                throw new HttpException(
+                    'Vous ne pouvez pas vous envoyer d\'argent à vous-même',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            this.logger.log(`📤 Envoi LOGISTIC: ${client.phone} → ${recipientPhoneOrCode}`);
+            const validPaymentMethods = ['MOBILE_MONEY', 'CASH', 'BANK_TRANSFER', 'CARD'];
+            const paymentMethod = sendDto.paymentMethod || 'MOBILE_MONEY';
+
+            if (!validPaymentMethods.includes(paymentMethod)) {
+                throw new HttpException(
+                    `paymentMethod invalide. Valeurs acceptées: ${validPaymentMethods.join(', ')}`,
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            const url = `${this.fpayApiUrl}/api/external/send/parrainage`; // ✅ Nouvelle URL
+            const sendData = {
+                userId: sendDto.userId,
+                amount: sendDto.amount,
+                description: sendDto.description || `Envoi de parrainage vers ${recipientPhoneOrCode}`,
+                currency: sendDto.currency || 'USD',
+                countryCode: sendDto.countryCode || 'CD',
+                paymentMethod: paymentMethod,
             };
 
             const response = await firstValueFrom(

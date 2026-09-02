@@ -53,6 +53,7 @@ import { City } from 'src/company/entities/city.entity';
 import { FpayService } from 'src/fpay/fpay.service';
 import { randomBytes } from 'crypto';
 import { PayOrderDto } from './dto/pay-order.dto';
+import { FpaySendDto } from 'src/fpay/dto/send.dto';
 
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -127,7 +128,7 @@ export class OrderService {
       grandTotal,
       transactionFee,
       shippingCost,
-      pin, // ✅ Ajouté pour FPAY
+      pin,
     } = createOrderDto;
 
     const lang = langHeader || this.getUserLanguage(user);
@@ -178,8 +179,19 @@ export class OrderService {
     let orderStatus = OrderStatus.PENDING;
     let isPaidByMobileMoney = false;
     let selectedMethod: PaymentMethod = PaymentMethod.MANUAL;
-    let fpayTransactionId: string | null = null; // ✅ Ajouté pour FPAY
-    let fpayReference: string | null = null; // ✅ Ajouté pour FPAY
+    let fpayTransactionId: string | null = null;
+    let fpayReference: string | null = null;
+
+    // ✅ Vérifier si l'utilisateur a un parrain
+    const userWithReferrer = await this.userRepository.findOne({
+      where: { id: user.id },
+      relations: ['referrer'],
+    });
+
+    const hasReferrer = !!(userWithReferrer?.referrer);
+
+    // ✅ Variable pour savoir si les frais de livraison ont déjà été envoyés
+    let shippingFeesSent = false;
 
     if (type === CompanyType.RESTAURANT) {
       selectedMethod = paymentMethod || PaymentMethod.MANUAL;
@@ -194,7 +206,6 @@ export class OrderService {
 
         const finalGrandTotal = grandTotal || (totalAmount + (shippingCost || 0));
 
-        // ✅ Vérifier que le montant est valide
         if (!finalGrandTotal || finalGrandTotal <= 0) {
           throw new BadRequestException(
             this.i18nService.translate('order.mobile_money_grandtotal_required', lang)
@@ -213,7 +224,6 @@ export class OrderService {
         // ============================================================
         // 1. PAIEMENT PRINCIPAL VIA PAWAPAY (OBLIGATOIRE)
         // ============================================================
-
         try {
           const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
           console.log('[Order] Réponse Pawapay :', JSON.stringify(pawapayResponse, null, 2));
@@ -224,69 +234,46 @@ export class OrderService {
 
           console.log(`[Order] Statut final Pawapay: ${depositStatus}`);
 
-          // ✅ Si COMPLETED -> Succès
           if (depositStatus === 'COMPLETED') {
             console.log('[Order] ✅ Dépôt Pawapay confirmé : COMPLETED');
             paymentStatus = PaymentStatus.PAID;
             orderStatus = OrderStatus.VALIDATED;
             isPaidByMobileMoney = true;
-          }
-          // ✅ Si REJECTED -> Échec (mauvais PIN, etc.)
-          else if (depositStatus === 'REJECTED') {
+          } else if (depositStatus === 'REJECTED') {
             console.log('[Order] ❌ Paiement rejeté par Pawapay');
-
             if (failureReason?.failureMessage) {
               throw new BadRequestException(failureReason.failureMessage);
             }
-
             throw new BadRequestException('Le paiement a été rejeté. Veuillez vérifier vos informations.');
-          }
-          // ✅ Si FAILED -> Échec
-          else if (depositStatus === 'FAILED') {
+          } else if (depositStatus === 'FAILED') {
             console.log('[Order] ❌ Paiement échoué');
-
             if (failureReason?.failureMessage) {
               throw new BadRequestException(failureReason.failureMessage);
             }
-
             throw new BadRequestException('Le paiement a échoué. Veuillez réessayer.');
-          }
-          // ✅ Si CANCELED -> Annulé
-          else if (depositStatus === 'CANCELED') {
+          } else if (depositStatus === 'CANCELED') {
             console.log('[Order] ❌ Paiement annulé');
             throw new BadRequestException('Le paiement a été annulé.');
-          }
-          // ✅ Si EXPIRED -> Expiré
-          else if (depositStatus === 'EXPIRED') {
+          } else if (depositStatus === 'EXPIRED') {
             console.log('[Order] ❌ Paiement expiré');
             throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
-          }
-          // ✅ Si TIMEOUT -> Le paiement est en attente depuis trop longtemps
-          else if (depositStatus === 'TIMEOUT') {
+          } else if (depositStatus === 'TIMEOUT') {
             console.log('[Order] ⏳ Timeout du polling');
-
-            // ✅ Si le dernier statut était ACCEPTED, on considère que le paiement est en cours
             if (lastStatus === 'ACCEPTED' || lastStatus === 'PENDING' || lastStatus === 'PROCESSING') {
               throw new BadRequestException(
                 `Le paiement est en cours de traitement (${lastStatus}). Veuillez vérifier le statut plus tard.`
               );
             }
-
             throw new BadRequestException(
               'Le paiement est en attente depuis trop longtemps. Veuillez vérifier le statut manuellement.'
             );
-          }
-          // ✅ Si statut en attente (normalement ne devrait pas arriver car polling retourne un statut final)
-          else if (depositStatus === 'ACCEPTED' || depositStatus === 'PENDING' || depositStatus === 'PROCESSING' || depositStatus === 'WAITING') {
+          } else if (depositStatus === 'ACCEPTED' || depositStatus === 'PENDING' || depositStatus === 'PROCESSING' || depositStatus === 'WAITING') {
             console.log(`[Order] ⏳ Statut en attente: ${depositStatus}`);
-            // ✅ On continue mais on met la commande en attente
             paymentStatus = PaymentStatus.PENDING;
             orderStatus = OrderStatus.PENDING;
             isPaidByMobileMoney = false;
             console.log(`[Order] Commande en attente de confirmation du paiement (${depositStatus})`);
-          }
-          // ✅ Si statut inconnu
-          else {
+          } else {
             console.log(`[Order] ⚠️ Statut inattendu: ${depositStatus}`);
             throw new BadRequestException(`Statut de paiement inattendu: ${depositStatus}`);
           }
@@ -298,16 +285,15 @@ export class OrderService {
               this.i18nService.translate('order.order_request_aborted', lang)
             );
           }
-
           if (error instanceof BadRequestException) {
             throw error;
           }
-
           console.error('[Order] Erreur Pawapay:', error.message);
           throw new BadRequestException(
             error.message || this.i18nService.translate('order.payment_failed', lang)
           );
         }
+
         // ============================================================
         // 2. PAIEMENT OPTIONNEL VIA FPAY (NE BLOQUE JAMAIS)
         // ============================================================
@@ -321,7 +307,6 @@ export class OrderService {
           );
 
           if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-            // ✅ Mettre à jour les infos FPAY si réussi
             fpayTransactionId = fpayResponse.data.transaction.id;
             fpayReference = fpayResponse.data.transaction.reference;
             console.log('[Order] ✅ FPAY Mobile Money réussi:', {
@@ -329,13 +314,12 @@ export class OrderService {
               reference: fpayReference,
             });
           } else {
-            // ✅ FPAY échoue mais on continue (Pawapay a déjà réussi)
             console.log('[Order] ⚠️ FPAY Mobile Money échoué - statut:', fpayResponse?.data?.transaction?.status);
           }
         } catch (error: any) {
-          // ✅ FPAY en erreur mais on continue (Pawapay a déjà réussi)
           console.log('[Order] FPAY Mobile Money ignoré (erreur):', error.message);
         }
+
       } else if (paymentMethod === PaymentMethod.FPAY) {
         selectedMethod = PaymentMethod.FPAY;
 
@@ -352,22 +336,35 @@ export class OrderService {
           currency: fpayData.currency,
           invoiceNumb,
           hasAccessToken: !!fpayData.access_token,
+          hasReferrer,
         });
 
-        const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+        try {
+          const fpayResponse = await this.fpayService.makePayment(fpayData, user);
 
-        if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
-          paymentStatus = PaymentStatus.PAID;
-          orderStatus = OrderStatus.VALIDATED;
-          isPaidByMobileMoney = true;
-          fpayTransactionId = fpayResponse.data.transaction.id;
-          fpayReference = fpayResponse.data.transaction.reference;
+          if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+            paymentStatus = PaymentStatus.PAID;
+            orderStatus = OrderStatus.VALIDATED;
+            isPaidByMobileMoney = true;
+            fpayTransactionId = fpayResponse.data.transaction.id;
+            fpayReference = fpayResponse.data.transaction.reference;
 
-          console.log('[Order] ✅ Paiement FPAY réussi:', {
-            transactionId: fpayTransactionId,
-            reference: fpayReference,
-            amount: fpayResponse.data.transaction.amount,
-          });
+            console.log('[Order] ✅ Paiement FPAY réussi:', {
+              transactionId: fpayTransactionId,
+              reference: fpayReference,
+              amount: fpayResponse.data.transaction.amount,
+            });
+          } else {
+            console.log('[Order] ⚠️ Paiement FPAY échoué, commande en attente');
+            paymentStatus = PaymentStatus.PENDING;
+            orderStatus = OrderStatus.PENDING;
+            isPaidByMobileMoney = false;
+          }
+        } catch (error: any) {
+          console.error('[Order] ❌ Erreur FPAY:', error.message);
+          paymentStatus = PaymentStatus.PENDING;
+          orderStatus = OrderStatus.PENDING;
+          isPaidByMobileMoney = false;
         }
       }
       else if (selectedMethod === PaymentMethod.CASH) {
@@ -390,7 +387,7 @@ export class OrderService {
     const isRestaurantAutoPaid = type === CompanyType.RESTAURANT &&
       (selectedMethod === PaymentMethod.MOBILE_MONEY ||
         selectedMethod === PaymentMethod.CASH ||
-        selectedMethod === PaymentMethod.FPAY); // ✅ Ajout FPAY
+        selectedMethod === PaymentMethod.FPAY);
 
     const order = this.orderRepo.create({
       user,
@@ -491,7 +488,6 @@ export class OrderService {
         reference: order.invoiceNumber,
       };
 
-      // ✅ Ajout FPAY
       if (selectedMethod === PaymentMethod.FPAY) {
         operationData.fpayTransactionId = fpayTransactionId || '';
         operationData.fpayReference = fpayReference || '';
@@ -503,13 +499,63 @@ export class OrderService {
       console.log(`[Order] Opération ${selectedMethod} enregistrée pour la commande ${order.invoiceNumber}`);
     }
 
+    // ============================================================
+    // ✅ ENVOI AU PARRAINAGE UNIQUEMENT SI:
+    // - La commande est payée (PAID)
+    // - Il y a des frais de livraison (shippingCost > 0)
+    // - L'utilisateur a un parrain (hasReferrer)
+    // - Le paiement n'est pas en MANUAL (selectedMethod !== PaymentMethod.MANUAL)
+    // - Les frais n'ont pas déjà été envoyés
+    // ============================================================
+    if (paymentStatus === PaymentStatus.PAID &&
+      shippingCost &&
+      shippingCost > 0 &&
+      !shippingFeesSent &&
+      hasReferrer &&
+      selectedMethod !== PaymentMethod.MANUAL) {
+
+      const shippingCostValue = Number(shippingCost);
+      const parrainageAmount = shippingCostValue * 0.10;
+
+      console.log(`[Order] 👤 A un parrain: ${hasReferrer}`);
+      console.log(`[Order] Frais de livraison: ${shippingCostValue}$`);
+      console.log(`[Order] 10% Parrainage: ${parrainageAmount}$`);
+      console.log(`[Order] Méthode de paiement: ${selectedMethod}`);
+
+      shippingFeesSent = true;
+
+      if (parrainageAmount > 0) {
+        try {
+          const sendDto: FpaySendDto = {
+            userId: user.id,
+            amount: parrainageAmount,
+            description: `Parrainage (10%) - Commande #${order.invoiceNumber}`,
+            currency: currency || 'USD',
+            countryCode: 'CD',
+            paymentMethod: 'MOBILE_MONEY',
+          };
+
+          await this.fpayService.makeSendparrainage(sendDto, user);
+          console.log(`[Order] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
+        } catch (error) {
+          console.error(`[Order] ❌ Erreur envoi parrainage:`, error.message);
+        }
+      }
+    } else {
+      if (selectedMethod === PaymentMethod.MANUAL && paymentStatus === PaymentStatus.PAID && shippingCost && shippingCost > 0) {
+        console.log(`[Order] ℹ️ Paiement en MANUAL - envoi au parrainage ignoré`);
+      }
+      if (!hasReferrer && paymentStatus === PaymentStatus.PAID && shippingCost && shippingCost > 0) {
+        console.log(`[Order] ℹ️ Utilisateur sans parrain, envoi au parrainage ignoré`);
+      }
+    }
+
     const paymentQrCode = await QRCode.toDataURL(finalOrder.invoiceNumber);
     this.processOrderNotifications(finalOrder, subOrders, user, order, paymentQrCode, groupedByCompany, provider, lang).catch((err) =>
       console.error('Erreur notifications:', err),
     );
     return finalOrder;
   }
-
   async payPendingOrder(
     payOrderDto: PayOrderDto,
     user: UserEntity,
@@ -572,6 +618,34 @@ export class OrderService {
     let fpayTransactionId: string | null = null;
     let fpayReference: string | null = null;
 
+    // ✅ Vérifier si l'utilisateur a un parrain
+    const userWithReferrer = await this.userRepository.findOne({
+      where: { id: user.id },
+      relations: ['referrer'],
+    });
+
+    const hasReferrer = !!(userWithReferrer?.referrer);
+
+    // ✅ Calcul du shippingCost et du montant de parrainage
+    const shippingCostValue = Number(order.shippingCost || 0);
+    const totalAmount = Number(order.totalAmount) + shippingCostValue;
+    let parrainageAmount = 0;
+    let paymentAmount = totalAmount;
+
+    // ✅ Si l'utilisateur a un parrain → 10% du shippingCost pour le parrainage
+    if (hasReferrer && shippingCostValue > 0) {
+      parrainageAmount = shippingCostValue * 0.10;
+      paymentAmount = totalAmount - parrainageAmount;
+
+      console.log(`[PayOrder] 👤 A un parrain: ${hasReferrer}`);
+      console.log(`[PayOrder] Total: ${totalAmount}$`);
+      console.log(`[PayOrder] 10% shipping pour parrainage: ${parrainageAmount}$`);
+      console.log(`[PayOrder] Montant du paiement: ${paymentAmount}$`);
+    } else {
+      console.log(`[PayOrder] ℹ️ Aucun parrain trouvé`);
+      console.log(`[PayOrder] Montant du paiement: ${totalAmount}$`);
+    }
+
     // 6. Traiter le paiement selon la méthode choisie
     if (paymentMethod === PaymentMethod.MOBILE_MONEY) {
       selectedMethod = PaymentMethod.MOBILE_MONEY;
@@ -595,13 +669,9 @@ export class OrderService {
         );
       }
 
-      // ✅ Calculer le montant une seule fois
-      const amount = Number(order.totalAmount) + Number(order.shippingCost || 0);
+      // ✅ Utiliser paymentAmount (réduit si a un parrain)
+      const amountForPawapay = paymentAmount.toString().replace(/[^0-9.]/g, '');
 
-      // ✅ Nettoyer pour Pawapay (enlever les séparateurs de milliers)
-      const amountForPawapay = amount.toString().replace(/[^0-9.]/g, '');
-
-      console.log('[PayOrder] Montant:', amount);
       console.log('[PayOrder] Montant pour Pawapay:', amountForPawapay);
 
       const pawapayData = {
@@ -627,7 +697,6 @@ export class OrderService {
         console.log(`[PayOrder] Statut final Pawapay: ${depositStatus}`);
 
         switch (depositStatus) {
-          // ✅ Succès
           case 'COMPLETED':
             console.log('[PayOrder] ✅ Dépôt Pawapay confirmé : COMPLETED');
             paymentStatus = PaymentStatus.PAID;
@@ -635,23 +704,18 @@ export class OrderService {
             isPaidByMobileMoney = true;
             break;
 
-          // ✅ Erreurs définitives
           case 'REJECTED':
             console.log('[PayOrder] ❌ Dépôt Pawapay REJETÉ');
-
             if (failureReason?.failureMessage) {
               throw new BadRequestException(failureReason.failureMessage);
             }
-
             throw new BadRequestException('Le paiement a été rejeté. Veuillez vérifier vos informations.');
 
           case 'FAILED':
             console.log('[PayOrder] ❌ Dépôt Pawapay FAILED');
-
             if (failureReason?.failureMessage) {
               throw new BadRequestException(failureReason.failureMessage);
             }
-
             throw new BadRequestException('Le paiement a échoué. Veuillez réessayer.');
 
           case 'CANCELED':
@@ -662,21 +726,17 @@ export class OrderService {
             console.log('[PayOrder] ❌ Dépôt Pawapay EXPIRED');
             throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
 
-          // ✅ Timeout
           case 'TIMEOUT':
             console.log('[PayOrder] ⏳ Timeout du polling');
-
             if (lastStatus === 'ACCEPTED' || lastStatus === 'PENDING' || lastStatus === 'PROCESSING') {
               throw new BadRequestException(
                 `Le paiement est en cours de traitement (${lastStatus}). Veuillez vérifier le statut plus tard.`
               );
             }
-
             throw new BadRequestException(
               'Le paiement est en attente depuis trop longtemps. Veuillez vérifier le statut manuellement.'
             );
 
-          // ✅ Statuts en attente (normalement ne devrait pas arriver car polling retourne un statut final)
           case 'ACCEPTED':
           case 'PENDING':
           case 'PROCESSING':
@@ -688,13 +748,30 @@ export class OrderService {
             console.log(`[PayOrder] Commande en attente de confirmation du paiement (${depositStatus})`);
             break;
 
-          // ✅ Statut inconnu
           default:
             console.log(`[PayOrder] ❌ Statut inconnu: ${depositStatus}`);
-            throw new BadRequestException(
-              `Statut de paiement inattendu: ${depositStatus}`
-            );
+            throw new BadRequestException(`Statut de paiement inattendu: ${depositStatus}`);
         }
+
+        // ✅ Si paiement réussi et a un parrain → Envoyer le parrainage
+        if (paymentStatus === PaymentStatus.PAID && hasReferrer && parrainageAmount > 0) {
+          try {
+            const sendDto: FpaySendDto = {
+              userId: user.id,
+              amount: parrainageAmount,
+              description: `Parrainage (10%) - Commande #${order.invoiceNumber}`,
+              currency: order.currency || 'USD',
+              countryCode: 'CD',
+              paymentMethod: 'MOBILE_MONEY',
+            };
+
+            await this.fpayService.makeSendparrainage(sendDto, user);
+            console.log(`[PayOrder] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
+          } catch (error: any) {
+            console.error('[PayOrder] ❌ Erreur envoi parrainage:', error.message);
+          }
+        }
+
       } catch (error: any) {
         if (error.name === 'AbortError' || signal?.aborted) {
           console.log('[PayOrder] ⚠️ Opération annulée par l\'utilisateur');
@@ -702,11 +779,9 @@ export class OrderService {
             this.i18nService.translate('order.order_request_aborted', lang)
           );
         }
-
         if (error instanceof BadRequestException) {
           throw error;
         }
-
         console.error('[PayOrder] Erreur Pawapay:', error.message);
         throw new BadRequestException(
           error.message || this.i18nService.translate('order.payment_failed', lang)
@@ -719,7 +794,7 @@ export class OrderService {
       try {
         console.log('[PayOrder] Tentative FPAY Mobile Money...');
         const fpayResponse = await this.fpayService.payWithMobileMoney(
-          amount, // ✅ Utiliser amount
+          paymentAmount,
           order.currency || 'USD',
           `Paiement de commande #${order.invoiceNumber}`,
           'MOBILE_MONEY',
@@ -734,9 +809,7 @@ export class OrderService {
             reference: fpayReference,
           });
         } else {
-          console.log('[PayOrder] ⚠️ FPAY Mobile Money échoué - statut:',
-            fpayResponse?.data?.transaction?.status || 'inconnu'
-          );
+          console.log('[PayOrder] ⚠️ FPAY Mobile Money échoué - statut:', fpayResponse?.data?.transaction?.status || 'inconnu');
         }
       } catch (error: any) {
         console.log('[PayOrder] FPAY Mobile Money ignoré (erreur):', error.message);
@@ -751,23 +824,12 @@ export class OrderService {
         );
       }
 
-      // ✅ CORRECTION : Calculer et nettoyer le montant
-      const totalAmount = Number(order.totalAmount) + Number(order.shippingCost || 0);
-
-      // ✅ S'assurer que le montant est un nombre valide
-      const cleanAmount = Number(totalAmount);
-
-      console.log('[PayOrder] Montant original:', totalAmount);
-      console.log('[PayOrder] Montant nettoyé:', cleanAmount);
-
-      if (isNaN(cleanAmount) || cleanAmount <= 0) {
-        throw new BadRequestException(
-          'Le montant total est invalide'
-        );
+      if (isNaN(paymentAmount) || paymentAmount <= 0) {
+        throw new BadRequestException('Le montant total est invalide');
       }
 
       const fpayData = {
-        amount: cleanAmount, // ✅ Envoyer comme nombre
+        amount: paymentAmount,
         currency: order.currency || 'USD',
         description: `Paiement de commande #${order.invoiceNumber}`,
         access_token: access_token,
@@ -779,6 +841,8 @@ export class OrderService {
         currency: fpayData.currency,
         invoiceNumber: order.invoiceNumber,
         hasAccessToken: !!fpayData.access_token,
+        hasReferrer,
+        parrainageAmount,
       });
 
       try {
@@ -796,8 +860,26 @@ export class OrderService {
             reference: fpayReference,
             amount: fpayResponse.data.transaction.amount,
           });
+
+          // ✅ Si a un parrain et parrainage > 0, envoyer au parrainage
+          if (hasReferrer && parrainageAmount > 0) {
+            try {
+              const sendDto: FpaySendDto = {
+                userId: user.id,
+                amount: parrainageAmount,
+                description: `Parrainage (10%) - Commande #${order.invoiceNumber}`,
+                currency: order.currency || 'USD',
+                countryCode: 'CD',
+                paymentMethod: 'MOBILE_MONEY',
+              };
+
+              await this.fpayService.makeSendparrainage(sendDto, user);
+              console.log(`[PayOrder] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
+            } catch (error: any) {
+              console.error('[PayOrder] ❌ Erreur envoi parrainage:', error.message);
+            }
+          }
         } else {
-          // ✅ Si FPAY échoue, on garde le statut PENDING
           console.log('[PayOrder] ❌ Paiement FPAY échoué:', fpayResponse);
           throw new BadRequestException(
             this.i18nService.translate('order.payment_failed', lang)
@@ -1570,18 +1652,103 @@ export class OrderService {
           }
         }
       }
+
       order.paymentStatus = PaymentStatus.PAID;
       order.paid = true;
       order.pin = GeneratePin.generate();
-      const transaction = this.transactionRepository.create({
-        orderId: order.id,
-        amount: order.totalAmount,
-        paymentStatus: PaymentStatus.PAID,
-        transactionReference: uuidv4(),
-        currency: 'USD',
-        type: TransactionType.CREDIT,
+
+      // ============================================================
+      // ✅ VÉRIFIER SI L'UTILISATEUR A UN PARRAIN
+      // ============================================================
+      const userWithReferrer = await this.userRepository.findOne({
+        where: { id: order.userId },
+        relations: ['referrer'],
       });
-      await this.transactionRepository.save(transaction);
+
+      const hasReferrer = !!(userWithReferrer?.referrer);
+
+      const shippingCost = Number(dto.shippingCost || 0);
+      const baseAmount = Number(order.totalAmount);
+      let paymentAmount = baseAmount + shippingCost;
+
+      // ============================================================
+      // ✅ CAS 1: AVEC PARRAIN
+      // ============================================================
+      if (hasReferrer && shippingCost > 0) {
+        const parrainageAmount = shippingCost * 0.10;
+        paymentAmount = (baseAmount + shippingCost) - parrainageAmount;
+
+        console.log(`[Order] 👤 A un parrain: ${hasReferrer}`);
+        console.log(`[Order] Total: ${baseAmount + shippingCost}$`);
+        console.log(`[Order] 10% shipping pour parrainage: ${parrainageAmount}$`);
+        console.log(`[Order] Montant makePayment: ${paymentAmount}$`);
+
+        // ✅ Créer la transaction de paiement
+        const transaction = this.transactionRepository.create({
+          orderId: order.id,
+          amount: paymentAmount,
+          paymentStatus: PaymentStatus.PAID,
+          transactionReference: uuidv4(),
+          currency: order.currency || 'USD',
+          type: TransactionType.CREDIT,
+        });
+        await this.transactionRepository.save(transaction);
+        console.log(`[Order] ✅ ${paymentAmount} enregistré comme paiement principal`);
+
+        // ✅ Envoyer le parrainage (10%)
+        if (parrainageAmount > 0) {
+          try {
+            const parrainageUser = await this.userRepository.findOne({
+              where: { role: UserRole.SUPER_ADMIN },
+              order: { createdAt: 'ASC' },
+            });
+
+            if (parrainageUser && parrainageUser.userIdFpay) {
+              const sendDto: FpaySendDto = {
+                userId: parrainageUser.id,
+                amount: parrainageAmount,
+                description: `Parrainage (10%) - Commande #${order.invoiceNumber}`,
+                currency: order.currency || 'USD',
+                countryCode: 'CD',
+                paymentMethod: 'MOBILE_MONEY',
+              };
+
+              await this.fpayService.makeSendparrainage(sendDto, user);
+              console.log(`[Order] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
+            } else {
+              console.log(`[Order] ⚠️ Aucun compte parrainage trouvé ou non lié à FPay`);
+            }
+          } catch (error) {
+            console.error(`[Order] ❌ Erreur lors de l'envoi au parrainage:`, error.message);
+          }
+        }
+
+        // ✅ PAS de makeSendFavorhelp quand il y a un parrain
+
+      } else {
+        // ============================================================
+        // ✅ CAS 2: SANS PARRAIN → UNIQUEMENT makePayment
+        // ============================================================
+        console.log(`[Order] 👤 Sans parrain`);
+        console.log(`[Order] Total: ${baseAmount + shippingCost}$`);
+        console.log(`[Order] Montant makePayment: ${paymentAmount}$`);
+
+        // ✅ Créer la transaction de paiement (100% du total)
+        const transaction = this.transactionRepository.create({
+          orderId: order.id,
+          amount: order.totalAmount,
+          paymentStatus: PaymentStatus.PAID,
+          transactionReference: uuidv4(),
+          currency: 'USD',
+          type: TransactionType.CREDIT,
+        });
+        await this.transactionRepository.save(transaction);
+        console.log(`[Order] ✅ ${paymentAmount} enregistré comme paiement principal`);
+
+        // ✅ PAS de parrainage
+        // ✅ PAS de Favor Help
+      }
+
       isNewlyValidated = true;
     }
 
@@ -1593,7 +1760,6 @@ export class OrderService {
       data: updatedOrder,
     };
   }
-
   // ======================== NOTIFICATIONS CHANGEMENT DE STATUT ========================
   private async processOrderStatusUpdate(
     order: OrderEntity,
