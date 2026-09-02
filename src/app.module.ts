@@ -85,6 +85,7 @@ import { MealsModule } from './voyage/meal/meals.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { I18nModule } from './libs/common/src';
 import { FpayModule } from './fpay/fpay.module';
+import { ExchangeRateModule } from './Exchange/exchange-rate.module';
 // import { WhatsAppModule } from './users/utility/helpers/whatsapp.module';
 
 @Module({
@@ -202,6 +203,7 @@ import { FpayModule } from './fpay/fpay.module';
     I18nModule,
     CommonModule,
     FpayModule,
+    ExchangeRateModule
     // WhatsAppModule
   ],
   controllers: [AppController],
