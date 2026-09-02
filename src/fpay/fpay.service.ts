@@ -809,11 +809,10 @@ export class FpayService {
                 this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
             }
 
-            // ✅ TOUJOURS retourner un objet avec success: false, ne jamais throw
+            // ✅ Retourner un objet sans la propriété 'error'
             return {
                 success: false,
                 message: error.message || 'Erreur lors de l\'envoi du parrainage',
-                error: error.response?.data || null,
             };
         }
     }
