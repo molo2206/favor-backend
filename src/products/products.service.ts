@@ -2856,9 +2856,7 @@ export class ProductService {
       },
     };
   }
-  /**
- * Récupère les produits de type restaurant par jour de la semaine avec rotation
- */
+
   async getRestaurantProductsByDay(
     day?: string,
     lang: string = 'fr',
@@ -2886,13 +2884,11 @@ export class ProductService {
     };
     day?: string;
   }> {
-    // Paramètres de pagination
     const page = Math.max(filters?.page || 1, 1);
     const limit = Math.min(filters?.limit || 20, 100);
     const includeSpecs = filters?.includeSpecifications !== false;
     const includeVars = filters?.includeVariations !== false;
 
-    // ✅ Définition des jours de la semaine
     const daysOfWeek = [
       { key: 'monday', label: 'Lundi', order: 1 },
       { key: 'tuesday', label: 'Mardi', order: 2 },
@@ -2903,7 +2899,6 @@ export class ProductService {
       { key: 'sunday', label: 'Dimanche', order: 7 },
     ];
 
-    // ✅ Construction de la requête principale
     const queryBuilder = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.company', 'company')
@@ -2922,14 +2917,12 @@ export class ProductService {
         companyStatus: CompanyStatus.VALIDATED,
       });
 
-    // ✅ Charger les spécifications seulement si demandé
     if (includeSpecs) {
       queryBuilder
         .leftJoinAndSelect('product.specificationValues', 'specificationValues')
         .leftJoinAndSelect('specificationValues.specification', 'specification');
     }
 
-    // ✅ Charger les variations seulement si demandé
     if (includeVars) {
       queryBuilder
         .leftJoinAndSelect('product.variations', 'variations')
@@ -2944,7 +2937,6 @@ export class ProductService {
         );
     }
 
-    // ✅ Appliquer les filtres
     if (filters) {
       if (filters.categoryId) {
         queryBuilder.andWhere(
@@ -2952,31 +2944,26 @@ export class ProductService {
           { categoryId: filters.categoryId },
         );
       }
-
       if (filters.brandId) {
         queryBuilder.andWhere('product.brand_id = :brandId', {
           brandId: filters.brandId,
         });
       }
-
       if (filters.companyId) {
         queryBuilder.andWhere('product.companyId = :companyId', {
           companyId: filters.companyId,
         });
       }
-
       if (filters.countryId) {
         queryBuilder.andWhere('company.countryId = :countryId', {
           countryId: filters.countryId,
         });
       }
-
       if (filters.cityId) {
         queryBuilder.andWhere('company.cityId = :cityId', {
           cityId: filters.cityId,
         });
       }
-
       if (filters.minPrice !== undefined) {
         queryBuilder.andWhere('product.price >= :minPrice', {
           minPrice: filters.minPrice,
@@ -2987,7 +2974,6 @@ export class ProductService {
           maxPrice: filters.maxPrice,
         });
       }
-
       if (filters.search && filters.search.trim() !== '') {
         queryBuilder.andWhere('LOWER(product.name) LIKE :search', {
           search: `%${filters.search.toLowerCase().trim()}%`,
@@ -2995,49 +2981,33 @@ export class ProductService {
       }
     }
 
-    // ✅ Appliquer le tri
     queryBuilder.orderBy('product.createdAt', 'DESC');
 
-    // ✅ Exécuter la requête
     const products = await queryBuilder.getMany();
 
-    // ✅ Fonction de rotation des produits
+    // ✅ Fonction de rotation avec seed basé sur la date
     const rotateProducts = (productList: Product[], dayIndex: number): Product[] => {
       if (productList.length === 0) return [];
+
+      // ✅ Seed basé sur la date du jour + l'index du jour
+      const today = new Date();
+      const dateSeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+      const seed = dateSeed + dayIndex;
 
       const sorted = [...productList];
       sorted.sort((a, b) => (b.price || 0) - (a.price || 0));
 
-      const rotationFactor = dayIndex + 1;
-      const half = Math.ceil(sorted.length / 2);
-      const firstHalf = sorted.slice(0, half);
-      const secondHalf = sorted.slice(half);
-
-      const interleaved: Product[] = [];
-      const maxLength = Math.max(firstHalf.length, secondHalf.length);
-
-      for (let i = 0; i < maxLength; i++) {
-        if (i < firstHalf.length) {
-          const index = (i + rotationFactor) % firstHalf.length;
-          interleaved.push(firstHalf[index]);
-        }
-        if (i < secondHalf.length) {
-          const index = (i + rotationFactor * 2) % secondHalf.length;
-          interleaved.push(secondHalf[index]);
-        }
+      // ✅ Utiliser le seed pour mélanger de manière déterministe
+      const shuffled = [...sorted];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const pseudoRandom = (seed * 9301 + 49297) % 233280;
+        const j = (pseudoRandom % (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
 
-      const final: Product[] = [];
-      const step = Math.max(1, Math.floor(interleaved.length / 7));
-      for (let i = 0; i < interleaved.length; i++) {
-        const sourceIndex = (i * step + dayIndex * 3) % interleaved.length;
-        final.push(interleaved[sourceIndex]);
-      }
-
-      return final;
+      return shuffled;
     };
 
-    // ✅ Si un jour spécifique est demandé
     if (day) {
       const dayKey = day.toLowerCase();
       const dayIndex = daysOfWeek.findIndex((d) => d.key === dayKey);
@@ -3055,7 +3025,6 @@ export class ProductService {
       const start = (page - 1) * limit;
       const paginatedProducts = rotatedProducts.slice(start, start + limit);
 
-      // ✅ Ajouter le jour et la position à chaque produit
       const dataWithDay = paginatedProducts.map((product, index) => ({
         ...product,
         day: dayKey,
@@ -3076,8 +3045,6 @@ export class ProductService {
       };
     }
 
-    // ✅ Si aucun jour spécifique, retourner tous les jours en liste plate
-    // 1. D'abord, générer toutes les listes rotées pour chaque jour
     const allRotatedProducts: { product: Product; day: string; dayIndex: number }[] = [];
 
     for (let i = 0; i < daysOfWeek.length; i++) {
@@ -3093,14 +3060,10 @@ export class ProductService {
       });
     }
 
-    // 2. Calculer le total avant pagination
     const totalCount = allRotatedProducts.length;
-
-    // 3. Appliquer la pagination sur l'ensemble
     const start = (page - 1) * limit;
     const paginatedAll = allRotatedProducts.slice(start, start + limit);
 
-    // 4. Ajouter la position à chaque produit paginé
     const dataWithDay = paginatedAll.map((item, index) => ({
       ...item.product,
       day: item.day,
