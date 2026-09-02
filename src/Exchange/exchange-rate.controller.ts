@@ -57,47 +57,63 @@ export class ExchangeRateController {
         @Query('countryId') countryId?: string,
     ) {
         try {
-            const lang = this.extractLanguage(req);
-
-            // ✅ Récupérer l'IP du serveur/client
+            // Récupérer l'IP du client
             let ip = req.headers['x-forwarded-for'] as string ||
                 req.headers['x-real-ip'] as string ||
-                req.headers['cf-connecting-ip'] as string || // Cloudflare
                 req.connection?.remoteAddress ||
-                req.socket?.remoteAddress ||
                 req.ip ||
                 '127.0.0.1';
 
-            // ✅ Si plusieurs IPs (proxy), prendre la première
             if (ip && ip.includes(',')) {
                 ip = ip.split(',')[0].trim();
             }
 
-            // ✅ Enlever le préfixe IPv6 si présent
             ip = ip.replace(/^::ffff:/, '');
 
+            const host = req.get('host');
+            const protocol = req.protocol;
+            const baseUrl = `${protocol}://${host}`;
+
+            console.log(`🌍 Domaine: ${baseUrl}`);
             console.log(`🌍 IP détectée: ${ip}`);
 
-            const result = await this.exchangeRateService.getCurrencyByIp(ip, countryId);
+            const isLocalRequest = ip === '127.0.0.1' ||
+                ip === '::1' ||
+                ip === 'localhost';
+
+            let result;
+            if (isLocalRequest) {
+                result = await this.exchangeRateService.getCurrencyByIp('server', countryId);
+            } else {
+                result = await this.exchangeRateService.getCurrencyByIp(ip, countryId);
+            }
 
             return {
-                message: await this.i18n.translate('currency_retrieved', lang),
-                data: result.data
+                message: 'Devises récupérées avec succès',
+                data: {
+                    ...result.data,
+                    server: baseUrl,
+                    environment: process.env.NODE_ENV || 'development',
+                }
             };
         } catch (error) {
             console.error('❌ Erreur:', error);
+
             return {
-                message: 'Erreur lors de la récupération de la devise',
+                message: 'Erreur lors de la récupération de la devise, valeur par défaut',
                 data: {
                     defaultCurrency: 'USD',
                     currencies: [{ currency: 'USD', value: 1, status: true }],
                     countryCode: 'US',
                     countryName: 'États-Unis (défaut)',
-                    ip: req.ip || '127.0.0.1'
+                    ip: req.ip || '127.0.0.1',
+                    server: `${req.protocol}://${req.get('host')}`,
+                    environment: process.env.NODE_ENV || 'development',
                 }
             };
         }
     }
+
     /**
      * Créer un taux de change
      */
