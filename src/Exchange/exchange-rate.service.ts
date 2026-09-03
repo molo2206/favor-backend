@@ -14,6 +14,7 @@ import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios'; // ✅ Ajout
 import { Country } from 'src/company/entities/country.entity';
 import * as os from 'os';
+import { UserSettingsEntity } from 'src/users/entities/user-settings.entity';
 
 const countryCurrencyMap: Record<string, {
     countryId: string;
@@ -68,6 +69,8 @@ export class ExchangeRateService {
         @InjectRepository(Country) // ✅ Ajout
         private readonly countryRepository: Repository<Country>, // ✅ Ajout
         private readonly httpService: HttpService, // ✅ Ajout
+        @InjectRepository(UserSettingsEntity)
+        private readonly userSettingsRepo: Repository<UserSettingsEntity>,
     ) { }
 
     /**
