@@ -34,6 +34,7 @@ import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/company_has_userResource.entity';
 import { City } from 'src/company/entities/city.entity';
 import { FpayModule } from 'src/fpay/fpay.module';
+import { ReferralEntity } from 'src/users/entities/referral.entity';
 
 @Module({
   imports: [
@@ -53,7 +54,8 @@ import { FpayModule } from 'src/fpay/fpay.module';
       UserSettingsEntity,
       BranchEntity,
       CompanyHasUserResource,
-      City
+      City,
+      ReferralEntity
     ]),
     PawapayModule,
     AddressUserModule,
