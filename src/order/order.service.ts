@@ -109,34 +109,30 @@ export class OrderService {
     return supported.includes(lang) ? lang : 'fr';
   }
 
-  /**
- * Met à jour le parrainage avec le montant et le statut
- */
   private async updateReferralWithAmount(
     referrerId: string,
     referredId: string,
     amount: number,
     invoiceNumber: string,
-    currency?: string,  // ✅ Optionnel
+    currency?: string,  // ✅ Devise de la commande
   ): Promise<void> {
     // ✅ Forcer une devise valide
     const validCurrency = currency || 'USD';
 
     try {
-      // ✅ 1. Rechercher un parrainage déjà COMPLETED
-      const referral = await this.referralRepo.findOne({
+      // ✅ 1. Rechercher un parrainage existant avec la MÊME devise
+      let referral = await this.referralRepo.findOne({
         where: {
           referrerId: referrerId,
           referredId: referredId,
-          status: ReferralStatus.COMPLETED,  // ✅ Recherche sur COMPLETED
+          currency: validCurrency,
         },
       });
 
       if (referral) {
-        // ✅ 2. Mise à jour du parrainage existant
-        referral.rewardAmount = amount;
-        referral.currency = validCurrency;
-        referral.status = ReferralStatus.COMPLETED;  // ✅ Reste COMPLETED
+        // ✅ 2. Mise à jour du parrainage existant - ADDITION par devise
+        referral.rewardAmount = Number(referral.rewardAmount) + amount;
+        referral.status = ReferralStatus.COMPLETED;
         referral.completedAt = new Date();
 
         referral.metadata = {
@@ -145,12 +141,13 @@ export class OrderService {
           rewardedAt: new Date().toISOString(),
           amount: amount,
           currency: validCurrency,
+          totalAmount: referral.rewardAmount,  // ✅ Montant total additionné
         };
 
         await this.referralRepo.save(referral);
-        console.log(`✅ Parrainage mis à jour pour ${referrerId}: ${amount} ${validCurrency} récompensé (COMPLETED)`);
+        console.log(`✅ Parrainage mis à jour pour ${referrerId}: ${referral.rewardAmount} ${validCurrency} (COMPLETED) - Additionné`);
       } else {
-        // ✅ 3. Création d'un nouveau parrainage (si jamais il n'existe pas)
+        // ✅ 3. Création d'un nouveau parrainage avec cette devise
         const newReferral = this.referralRepo.create({
           referrerId: referrerId,
           referredId: referredId,
@@ -165,6 +162,7 @@ export class OrderService {
             rewardedAt: new Date().toISOString(),
             amount: amount,
             currency: validCurrency,
+            totalAmount: amount,
           },
         });
 
@@ -175,7 +173,6 @@ export class OrderService {
       console.error(`❌ Erreur lors de la mise à jour du parrainage:`, error.message);
     }
   }
-
   // ======================== CRÉATION DE COMMANDE ========================
   async createOrder(
     createOrderDto: CreateOrderDto,
