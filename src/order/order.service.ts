@@ -219,7 +219,7 @@ export class OrderService {
 
         console.log(`📝 Calcul: ${oldAmount} + ${amount} = ${newAmount}`);
 
-        referral.rewardAmount = newAmount;
+        referral.rewardAmount = Number(referral.rewardAmount) + amount;
         referral.status = ReferralStatus.COMPLETED;
         referral.completedAt = new Date();
 

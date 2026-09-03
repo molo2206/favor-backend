@@ -2362,7 +2362,6 @@ export class UsersService {
       return null;
     }
   }
-
   async getReferralPoints(
     userId: string,
     lang: string = 'fr',
@@ -2388,11 +2387,12 @@ export class UsersService {
     // ✅ Historique des parrainages
     const history = user.referralHistory?.map((referral) => {
       const referred = referral.referred;
-      let rewardAmount = 0;
       let orderDetails: any[] = [];
       let validatedOrdersLength = 0;
-      // ✅ Utiliser la devise du parrainage
-      let rewardCurrency = referral.currency || 'USD';
+
+      // ✅ Le montant vient de referral.rewardAmount
+      const rewardAmount = Number(referral.rewardAmount) || 0;
+      const rewardCurrency = referral.currency || 'USD';
 
       if (referred && referred.orders && referred.orders.length > 0) {
         const validatedOrders = referred.orders.filter(
@@ -2400,50 +2400,24 @@ export class UsersService {
         );
         validatedOrdersLength = validatedOrders.length;
 
-        // ✅ Regrouper les commandes par devise
-        const ordersByCurrency: Record<string, any[]> = {};
-        validatedOrders.forEach(order => {
-          const currency = order.currency || 'USD';
-          if (!ordersByCurrency[currency]) {
-            ordersByCurrency[currency] = [];
-          }
-          ordersByCurrency[currency].push(order);
-        });
+        orderDetails = validatedOrders.map((order) => ({
+          orderId: order.id,
+          shippingCost: order.shippingCost || 0,
+          currency: order.currency || 'USD',
+          reward: (Number(order.shippingCost || 0) * 0.10),
+          rewardCurrency: rewardCurrency,
+          createdAt: order.createdAt,
+          status: order.status,
+        }));
+      }
 
-        // ✅ Calculer les récompenses par devise
-        Object.entries(ordersByCurrency).forEach(([currency, orders]) => {
-          const totalShippingCost = orders.reduce(
-            (sum, order) => sum + Number(order.shippingCost || 0),
-            0
-          );
-          const reward = totalShippingCost * 0.10;
-
-          // ✅ Ajouter les détails des commandes
-          orders.forEach(order => {
-            orderDetails.push({
-              orderId: order.id,
-              shippingCost: order.shippingCost || 0,
-              currency: currency,
-              reward: (Number(order.shippingCost || 0) * 0.10),
-              rewardCurrency: currency,
-              createdAt: order.createdAt,
-              status: order.status,
-            });
-          });
-
-          // ✅ Ajouter au total par devise
-          if (reward > 0) {
-            if (!rewardsByCurrency[currency]) {
-              rewardsByCurrency[currency] = 0;
-            }
-            rewardsByCurrency[currency] += reward;
-
-            // ✅ Si la devise correspond à celle du parrainage, l'ajouter au total
-            if (currency === rewardCurrency) {
-              rewardAmount += reward;
-            }
-          }
-        });
+      // ✅ Ajouter au total par devise
+      if (rewardAmount > 0) {
+        if (!rewardsByCurrency[rewardCurrency]) {
+          rewardsByCurrency[rewardCurrency] = 0;
+        }
+        rewardsByCurrency[rewardCurrency] += rewardAmount;
+        totalPoints += rewardAmount;
       }
 
       return {
@@ -2453,25 +2427,22 @@ export class UsersService {
         referredPhone: referred?.phone || 'Non renseigné',
         referredId: referred?.id || null,
         status: referral.status,
-        rewardAmount: Math.round(rewardAmount * 100) / 100,
-        rewardCurrency: rewardCurrency, // ✅ Devise du parrainage
+        rewardAmount: Math.round(rewardAmount * 100) / 100, // ✅ De referral.rewardAmount
+        rewardCurrency: rewardCurrency,
         rewardType: 'POINTS (10% shipping - VALIDATED)',
         createdAt: referral.createdAt,
         completedAt: referral.completedAt || null,
         orders: orderDetails,
         totalValidatedOrders: validatedOrdersLength,
         referralCurrency: referral.currency || 'USD',
+        // ✅ Ajouter les métadonnées pour référence
+        metadata: referral.metadata,
       };
     }) || [];
 
-    // ✅ Mettre à jour les points (total par devise)
-    let totalPointsAllCurrencies = 0;
-    Object.values(rewardsByCurrency).forEach(amount => {
-      totalPointsAllCurrencies += amount;
-    });
-
-    if (Math.round(totalPointsAllCurrencies * 100) / 100 !== user.referralPoints) {
-      user.referralPoints = Math.round(totalPointsAllCurrencies * 100) / 100;
+    // ✅ Mise à jour des points
+    if (Math.round(totalPoints * 100) / 100 !== user.referralPoints) {
+      user.referralPoints = Math.round(totalPoints * 100) / 100;
       await this.usersRepository.save(user);
     }
 
@@ -2482,18 +2453,15 @@ export class UsersService {
         (order) => order.status === OrderStatus.VALIDATED
       ) || [];
 
-      // ✅ Regrouper par devise
-      const ordersByCurrency: Record<string, any[]> = {};
-      validatedOrders.forEach(order => {
-        const currency = order.currency || 'USD';
-        if (!ordersByCurrency[currency]) {
-          ordersByCurrency[currency] = [];
-        }
-        ordersByCurrency[currency].push(order);
-      });
+      const totalShippingCost = validatedOrders.reduce(
+        (sum, order) => sum + Number(order.shippingCost || 0),
+        0
+      );
 
-      // ✅ Calculer les totaux par devise
-      const result = {
+      const mainCurrency = referral.currency || 'USD';
+      const pointsEarned = Number(referral.rewardAmount) || 0;
+
+      return {
         id: referred?.id || null,
         fullName: referred?.fullName || 'Utilisateur inconnu',
         email: referred?.email || null,
@@ -2501,41 +2469,13 @@ export class UsersService {
         status: referral.status,
         totalOrders: referred?.orders?.length || 0,
         totalValidatedOrders: validatedOrders.length,
-        totalShippingCost: 0,
-        currency: 'USD',
-        pointsEarned: 0,
-        pointsCurrency: 'USD',
+        totalShippingCost: Math.round(totalShippingCost * 100) / 100,
+        currency: mainCurrency,
+        pointsEarned: Math.round(pointsEarned * 100) / 100, // ✅ De referral.rewardAmount
+        pointsCurrency: mainCurrency,
         createdAt: referral.createdAt,
         completedAt: referral.completedAt || null,
-        breakdown: [] as { currency: string; shippingCost: number; pointsEarned: number }[],
       };
-
-      // ✅ Calculer par devise
-      Object.entries(ordersByCurrency).forEach(([currency, orders]) => {
-        const totalShipping = orders.reduce(
-          (sum, order) => sum + Number(order.shippingCost || 0),
-          0
-        );
-        const points = totalShipping * 0.10;
-
-        result.breakdown.push({
-          currency: currency,
-          shippingCost: Math.round(totalShipping * 100) / 100,
-          pointsEarned: Math.round(points * 100) / 100,
-        });
-
-        // ✅ Si c'est la première devise ou la devise principale
-        if (!result.currency || currency === 'USD') {
-          result.totalShippingCost += totalShipping;
-          result.pointsEarned += points;
-        }
-      });
-
-      // ✅ Arrondir les valeurs
-      result.totalShippingCost = Math.round(result.totalShippingCost * 100) / 100;
-      result.pointsEarned = Math.round(result.pointsEarned * 100) / 100;
-
-      return result;
     }) || [];
 
     // ✅ Construire les récompenses par devise
@@ -2552,13 +2492,13 @@ export class UsersService {
     return {
       message: await this.i18n.translate('referral_points_retrieved', lang),
       data: {
-        referralPoints: Math.round(totalPointsAllCurrencies * 100) / 100,
-        totalReferralRewards: Math.round(totalPointsAllCurrencies * 100) / 100,
+        referralPoints: Math.round(totalPoints * 100) / 100,
+        totalReferralRewards: Math.round(totalPoints * 100) / 100,
         referralCount: user.referralCount || 0,
         referralCode: user.referralCode || 'Non généré',
         referralLink: referralLink || 'Non disponible',
         referralActive: user.referralActive !== false,
-        rewardsByCurrency: rewardsByCurrencyArray, // ✅ Récompenses par devise
+        rewardsByCurrency: rewardsByCurrencyArray,
         defaultCurrency: 'USD',
         history,
         referredUsers,
