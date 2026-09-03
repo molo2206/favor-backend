@@ -114,13 +114,21 @@ export class OrderService {
     referredId: string,
     amount: number,
     invoiceNumber: string,
-    currency?: string,  // ✅ Devise de la commande
+    currency?: string,
   ): Promise<void> {
-    // ✅ Forcer une devise valide
+    // ✅ UTILISER LA DEVISE DE LA COMMANDE (ou USD par défaut)
     const validCurrency = currency || 'USD';
 
+    console.log(`📝 ========== UPDATE REFERRAL WITH AMOUNT ==========`);
+    console.log(`📝 ReferrerId: ${referrerId}`);
+    console.log(`📝 ReferredId: ${referredId}`);
+    console.log(`📝 Amount: ${amount}`);
+    console.log(`📝 InvoiceNumber: ${invoiceNumber}`);
+    console.log(`📝 Currency reçue: ${currency}`);
+    console.log(`📝 Currency utilisée: ${validCurrency}`);
+
     try {
-      // ✅ 1. Rechercher un parrainage existant avec la MÊME devise
+      // ✅ Rechercher un parrainage existant avec la MÊME devise
       let referral = await this.referralRepo.findOne({
         where: {
           referrerId: referrerId,
@@ -129,8 +137,13 @@ export class OrderService {
         },
       });
 
+      console.log(`📝 Parrainage trouvé avec ${validCurrency}: ${referral ? 'OUI ✅' : 'NON ❌'}`);
+
       if (referral) {
-        // ✅ 2. Mise à jour du parrainage existant - ADDITION par devise
+        console.log(`📝 Parrainage existant: rewardAmount=${referral.rewardAmount}, currency=${referral.currency}, status=${referral.status}`);
+
+        // ✅ Mise à jour du parrainage existant - ADDITION par devise
+        const oldAmount = referral.rewardAmount;
         referral.rewardAmount = Number(referral.rewardAmount) + amount;
         referral.status = ReferralStatus.COMPLETED;
         referral.completedAt = new Date();
@@ -141,13 +154,15 @@ export class OrderService {
           rewardedAt: new Date().toISOString(),
           amount: amount,
           currency: validCurrency,
-          totalAmount: referral.rewardAmount,  // ✅ Montant total additionné
+          totalAmount: referral.rewardAmount,
         };
 
         await this.referralRepo.save(referral);
-        console.log(`✅ Parrainage mis à jour pour ${referrerId}: ${referral.rewardAmount} ${validCurrency} (COMPLETED) - Additionné`);
+        console.log(`✅ Parrainage mis à jour pour ${referrerId}: ${oldAmount} + ${amount} = ${referral.rewardAmount} ${validCurrency} (COMPLETED) - Additionné ✅`);
       } else {
-        // ✅ 3. Création d'un nouveau parrainage avec cette devise
+        console.log(`📝 Création d'un nouveau parrainage avec ${validCurrency}`);
+
+        // ✅ Création d'un nouveau parrainage avec la devise de la commande
         const newReferral = this.referralRepo.create({
           referrerId: referrerId,
           referredId: referredId,
@@ -167,11 +182,15 @@ export class OrderService {
         });
 
         await this.referralRepo.save(newReferral);
-        console.log(`✅ Nouveau parrainage créé pour ${referrerId}: ${amount} ${validCurrency} récompensé (COMPLETED)`);
+        console.log(`✅ Nouveau parrainage créé pour ${referrerId}: ${amount} ${validCurrency} récompensé (COMPLETED) ✅`);
+        console.log(`📝 Nouvel ID: ${newReferral.id}`);
       }
     } catch (error) {
       console.error(`❌ Erreur lors de la mise à jour du parrainage:`, error.message);
+      console.error(`❌ Stack:`, error.stack);
     }
+
+    console.log(`📝 ==============================================`);
   }
   // ======================== CRÉATION DE COMMANDE ========================
   async createOrder(
