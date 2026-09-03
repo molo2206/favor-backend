@@ -2379,7 +2379,7 @@ export class UsersService {
     }
 
     let totalPoints = 0;
-    const rewardsByCurrency: Record<string, number> = {}; // ✅ Regrouper par devise
+    const rewardsByCurrency: Record<string, number> = {};
 
     // ✅ Historique des parrainages
     const history = user.referralHistory?.map((referral) => {
@@ -2387,7 +2387,7 @@ export class UsersService {
       let rewardAmount = 0;
       let orderDetails: any[] = [];
       let validatedOrdersLength = 0;
-      let rewardCurrency = referral.currency || 'USD'; // ✅ Devise du parrainage
+      let rewardCurrency = referral.currency || 'USD';
 
       if (referred && referred.orders && referred.orders.length > 0) {
         const validatedOrders = referred.orders.filter(
@@ -2410,7 +2410,7 @@ export class UsersService {
           0
         );
         rewardAmount = totalShippingCost * 0.10;
-        rewardCurrency = validatedOrders[0]?.currency || 'USD';
+        rewardCurrency = validatedOrders[0]?.currency || referral.currency || 'USD';
       }
 
       // ✅ Ajouter au total par devise
@@ -2436,7 +2436,6 @@ export class UsersService {
         completedAt: referral.completedAt || null,
         orders: orderDetails,
         totalValidatedOrders: validatedOrdersLength,
-        // ✅ Ajouter la devise du parrainage
         referralCurrency: referral.currency || 'USD',
       };
     }) || [];
@@ -2460,7 +2459,7 @@ export class UsersService {
       );
 
       // ✅ Déterminer la devise principale
-      const mainCurrency = validatedOrders[0]?.currency || 'USD';
+      const mainCurrency = validatedOrders[0]?.currency || referral.currency || 'USD';
 
       return {
         id: referred?.id || null,
@@ -2499,16 +2498,13 @@ export class UsersService {
         referralCode: user.referralCode || 'Non généré',
         referralLink: referralLink || 'Non disponible',
         referralActive: user.referralActive !== false,
-        // ✅ Ajout des récompenses par devise
-        rewardsByCurrency: rewardsByCurrencyArray,
-        // ✅ Devise principale (USD par défaut)
+        rewardsByCurrency: rewardsByCurrencyArray, // ✅ Récompenses par devise
         defaultCurrency: 'USD',
         history,
         referredUsers,
       },
     };
   }
-  
   async sendOtp(email: string, lang: string = 'fr'): Promise<any> {
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
 
