@@ -402,14 +402,14 @@ export class ExchangeRateService {
                             code: 'BJ'
                         },
                         'AE': {
-                            currencies: ['USD', 'USD'],
-                            defaultCurrency: 'USD',
+                            currencies: ['USD'],          // ✅ Seulement USD
+                            defaultCurrency: 'USD',      // ✅ USD par défaut
                             name: 'United Arab Emirates',
                             code: 'AE'
                         },
                         'ARE': {
-                            currencies: ['USD', 'USD'],
-                            defaultCurrency: 'USD',
+                            currencies: ['USD'],          // ✅ Seulement USD
+                            defaultCurrency: 'USD',      // ✅ USD par défaut
                             name: 'United Arab Emirates',
                             code: 'AE'
                         },
@@ -543,7 +543,7 @@ export class ExchangeRateService {
             }
             // ✅ Priorité 2 : Devise par défaut du pays
             else if (countryCode === 'AE' || countryCode === 'ARE') {
-                defaultCurrency = 'AED';
+                defaultCurrency = 'USD';  // ✅ USD pour les Émirats Arabes Unis
             } else if (countryCode === 'CD' || countryCode === 'COD') {
                 defaultCurrency = 'CDF';
             } else if (countryCode === 'BJ' || countryCode === 'BEN') {
@@ -561,7 +561,7 @@ export class ExchangeRateService {
             return {
                 message: 'Devises récupérées avec succès',
                 data: {
-                    defaultCurrency,  // ✅ Contient la devise de l'utilisateur si disponible
+                    defaultCurrency,
                     currencies: finalCurrencies,
                     countryCode: countryCode || 'CD',
                     countryName: countryName || 'République Démocratique du Congo',
