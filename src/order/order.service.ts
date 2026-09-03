@@ -230,7 +230,7 @@ export class OrderService {
     if (signal?.aborted) {
       throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
     }
-    const accessToken = createOrderDto.access_token;
+
     const hasEmailCurrentUser = user.email && user.email.trim() !== '';
     const hasPhoneCurrentUser = user.phone && user.phone.trim() !== '';
     if (!hasEmailCurrentUser && !hasPhoneCurrentUser) {
@@ -413,8 +413,6 @@ export class OrderService {
                 fpayTransactionId = fpayResponse.data.transaction.id;
                 fpayReference = fpayResponse.data.transaction.reference;
                 console.log(`[Order] ✅ Paiement Favor Help réussi: ${paymentAmount} ${orderCurrency}`);
-
-                // ✅ On enregistre les infos pour l'opération plus tard
                 console.log(`[Order] Paiement Favor Help réussi pour la commande #${invoiceNumb}`);
               } else {
                 console.log('[Order] ⚠️ Paiement Favor Help échoué - statut:', fpayResponse?.data?.transaction?.status || 'inconnu');
