@@ -718,14 +718,15 @@ export class FpayService {
                 };
             }
 
-            // ✅ 2. Récupérer l'API Key du DESTINATAIRE depuis sendDto.userId
-            // sendDto.userId contient le userIdFpay du parrain (destinataire)
-            let recipientApiKey = sendDto.userId;  // ✅ API Key du parrain
+            // ✅ 2. Récupérer l'API Key du DESTINATAIRE
+            // Si sendDto.userId est fourni, l'utiliser, sinon utiliser la clé PARRAINAGE du .env
+            let recipientApiKey = sendDto.userId || this.parrainageApiKey;
+
             if (!recipientApiKey) {
-                this.logger.error('❌ userId du destinataire non fourni');
+                this.logger.error('❌ Aucune API Key destinataire disponible');
                 return {
                     success: false,
-                    message: 'userId du destinataire manquant',
+                    message: 'Aucune API Key destinataire disponible',
                 };
             }
 
@@ -757,9 +758,10 @@ export class FpayService {
 
             this.logger.log(`📤 ========== ENVOI PARRAINAGE ==========`);
             this.logger.log(`📤 === PAYEUR (FAVOR HELP) ===`);
-            this.logger.log(`📤 API Key HELP: ${payerApiKey.substring(0, 50)}...`);
+            this.logger.log(`📤 API Key HELP: ${cleanPayerApiKey.substring(0, 50)}...`);
             this.logger.log(`📤 === DESTINATAIRE (PARRAIN) ===`);
-            this.logger.log(`📤 API Key PARRAIN: ${recipientApiKey.substring(0, 50)}...`);
+            this.logger.log(`📤 API Key PARRAIN: ${cleanRecipientApiKey.substring(0, 50)}...`);
+            this.logger.log(`📤 Source destinataire: ${sendDto.userId ? 'userId fourni' : 'clé .env'}`);
             this.logger.log(`📤 === INFORMATIONS TRANSFERT ===`);
             this.logger.log(`📤 Montant: ${sendDto.amount} ${currency}`);
             this.logger.log(`📤 PaymentMethod: ${paymentMethod}`);
@@ -787,7 +789,7 @@ export class FpayService {
             };
 
             this.logger.log(`📤 Appel API PARRAINAGE: ${url}`);
-            this.logger.log(`📤 Headers Authorization: ${payerApiKey.substring(0, 50)}...`);
+            this.logger.log(`📤 Headers Authorization: ${cleanPayerApiKey.substring(0, 50)}...`);
             this.logger.log(`📤 Payload COMPLET:`, JSON.stringify(sendData, null, 2));
 
             const response = await firstValueFrom(
