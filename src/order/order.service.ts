@@ -587,7 +587,7 @@ export class OrderService {
     signal?: AbortSignal,
     langHeader?: string,
   ): Promise<OrderEntity> {
-    const { orderId, paymentMethod, provider, phone, access_token } = payOrderDto;
+    const { orderId, paymentMethod, provider, phone, access_token, transactionFee } = payOrderDto;
     const lang = langHeader || this.getUserLanguage(user);
 
     if (signal?.aborted) {
@@ -652,8 +652,9 @@ export class OrderService {
     const hasReferrer = !!(userWithReferrer?.referrer);
 
     // ✅ Calcul du shippingCost, transactionFee et du montant total
+    // transactionFee peut venir de payOrderDto ou de order.transactionFee
     const shippingCostValue = Number(order.shippingCost || 0);
-    const transactionFeeValue = Number(order.transactionFee || 0);
+    const transactionFeeValue = Number(transactionFee || order.transactionFee || 0);
     const totalAmount = Number(order.totalAmount) + shippingCostValue + transactionFeeValue;
     let parrainageAmount = 0;
     let paymentAmount = totalAmount;
@@ -799,7 +800,7 @@ export class OrderService {
               console.log(`[PayOrder] ✅ Paiement Favor Help réussi: ${paymentAmount} ${order.currency}`);
 
               // ✅ Créer la transaction de paiement
-              const operationAmount = order.grandTotal || (Number(order.totalAmount) + Number(order.shippingCost || 0) + Number(order.transactionFee || 0));
+              const operationAmount = order.grandTotal || (Number(order.totalAmount) + Number(order.shippingCost || 0) + Number(transactionFeeValue || 0));
               const designation = this.i18nService.translate('order.payment_designation', lang, {
                 invoiceNumber: order.invoiceNumber,
                 method: selectedMethod,
@@ -928,7 +929,7 @@ export class OrderService {
           });
 
           // ✅ 2. Créer la transaction de paiement
-          const operationAmount = order.grandTotal || (Number(order.totalAmount) + Number(order.shippingCost || 0) + Number(order.transactionFee || 0));
+          const operationAmount = order.grandTotal || (Number(order.totalAmount) + Number(order.shippingCost || 0) + Number(transactionFeeValue || 0));
           const designation = this.i18nService.translate('order.payment_designation', lang, {
             invoiceNumber: order.invoiceNumber,
             method: selectedMethod,

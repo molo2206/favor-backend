@@ -1,5 +1,6 @@
 // pay-order.dto.ts
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { PaymentMethod } from 'src/operation/enum/payment-method.enum';
 
 
@@ -23,4 +24,10 @@ export class PayOrderDto {
     @IsOptional()
     @IsString()
     access_token?: string; // Pour FPAY
+
+    @IsOptional()
+    @IsNumber()
+    @Min(0)
+    @Type(() => Number)
+    transactionFee?: number;
 }
