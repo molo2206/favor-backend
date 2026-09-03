@@ -708,7 +708,7 @@ export class FpayService {
             }
 
             // ✅ 1. API Key du PAYEUR (celui qui envoie l'argent)
-            const payerApiKey = this.apiKey;  // ✅ FPAY_API_KEY_HELP
+            let payerApiKey = this.apiKey;  // ✅ FPAY_API_KEY_HELP
             if (!payerApiKey) {
                 this.logger.error('❌ API Key HELP (payeur) non configurée');
                 return {
@@ -718,13 +718,25 @@ export class FpayService {
             }
 
             // ✅ 2. API Key du DESTINATAIRE (celui qui reçoit l'argent)
-            const recipientApiKey = this.parrainageApiKey;  // ✅ FPAY_API_KEY_PARRAINAGE
+            let recipientApiKey = this.parrainageApiKey;  // ✅ FPAY_API_KEY_PARRAINAGE
             if (!recipientApiKey) {
                 this.logger.error('❌ API Key PARRAINAGE (destinataire) non configurée');
                 return {
                     success: false,
                     message: 'Configuration API Key PARRAINAGE manquante',
                 };
+            }
+
+            // ✅ Nettoyer l'API Key du destinataire pour le body (enlever "Bearer ")
+            let cleanRecipientApiKey = recipientApiKey;
+            if (cleanRecipientApiKey.startsWith('Bearer ')) {
+                cleanRecipientApiKey = cleanRecipientApiKey.substring(7);
+            }
+
+            // ✅ Nettoyer l'API Key du payeur pour le log
+            let cleanPayerApiKey = payerApiKey;
+            if (cleanPayerApiKey.startsWith('Bearer ')) {
+                cleanPayerApiKey = cleanPayerApiKey.substring(7);
             }
 
             // ✅ 3. Vérifier le paymentMethod
@@ -742,17 +754,17 @@ export class FpayService {
             const currency = sendDto.currency || 'USD';
 
             this.logger.log(`📤 Envoi PARRAINAGE:`);
-            this.logger.log(`📤 Payeur (API Key HELP): ${this.apiKey.substring(0, 30)}...`);
-            this.logger.log(`📤 Destinataire (API Key PARRAINAGE): ${this.parrainageApiKey.substring(0, 30)}...`);
+            this.logger.log(`📤 Payeur (API Key HELP): ${cleanPayerApiKey.substring(0, 30)}...`);
+            this.logger.log(`📤 Destinataire (API Key PARRAINAGE): ${cleanRecipientApiKey.substring(0, 30)}...`);
             this.logger.log(`📤 Montant: ${sendDto.amount} ${currency}`);
             this.logger.log(`📤 PaymentMethod: ${paymentMethod}`);
 
             // ✅ 5. Appel à l'API externe
             const url = `${this.fpayApiUrl}/api/external/send/parrainage`;
 
-            // ✅ 6. Payload : on envoie l'API Key du destinataire (PARRAINAGE)
+            // ✅ 6. Payload : on envoie l'API Key brute du destinataire (sans "Bearer ")
             const sendData = {
-                toApiKey: this.parrainageApiKey,  // ✅ API Key du DESTINATAIRE (PARRAINAGE)
+                toApiKey: cleanRecipientApiKey,  // ✅ API Key brute - sans "Bearer "
                 amount: sendDto.amount,
                 description: sendDto.description || `Envoi de parrainage`,
                 currency: currency,
@@ -760,14 +772,14 @@ export class FpayService {
                 paymentMethod: paymentMethod,
             };
 
-            // ✅ 7. Headers : Authorization avec l'API Key du payeur (HELP)
+            // ✅ 7. Headers : Authorization avec l'API Key du payeur (avec "Bearer ")
             const headers = {
-                'Authorization': this.apiKey,  // ✅ API Key du PAYEUR (HELP)
+                'Authorization': payerApiKey,  // ✅ Garder "Bearer " pour le header
                 'Content-Type': 'application/json',
             };
 
             this.logger.log(`📤 Appel API PARRAINAGE: ${url}`);
-            this.logger.log(`📤 Headers: Authorization: ${this.apiKey.substring(0, 30)}...`);
+            this.logger.log(`📤 Headers: Authorization: ${cleanPayerApiKey.substring(0, 30)}...`);
             this.logger.log(`📤 Payload:`, JSON.stringify(sendData, null, 2));
 
             const response = await firstValueFrom(
