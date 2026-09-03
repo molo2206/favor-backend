@@ -603,6 +603,8 @@ export class UsersService {
       .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
       .leftJoinAndSelect('userPlatformRoles.role', 'role')
       .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+      .leftJoinAndSelect('defaultAddress.country', 'defaultAddressCountry')
+      .leftJoinAndSelect('defaultAddress.city', 'defaultAddressCity')
       .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
       .leftJoinAndSelect(
         'userCompanyResources.resource',
@@ -693,6 +695,8 @@ export class UsersService {
         .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
         .leftJoinAndSelect('userPlatformRoles.role', 'role')
         .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+        .leftJoinAndSelect('defaultAddress.country', 'defaultAddressCountry')
+        .leftJoinAndSelect('defaultAddress.city', 'defaultAddressCity')
         .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
         .leftJoinAndSelect(
           'userCompanyResources.resource',
