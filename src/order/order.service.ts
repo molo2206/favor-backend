@@ -117,21 +117,26 @@ export class OrderService {
     referredId: string,
     amount: number,
     invoiceNumber: string,
-    currency: string = 'USD',  // ✅ Ajout du paramètre currency
+    currency?: string,  // ✅ Optionnel
   ): Promise<void> {
+    // ✅ Forcer une devise valide
+    const validCurrency = currency || 'USD';
+
     try {
+      // ✅ 1. Rechercher un parrainage déjà COMPLETED
       const referral = await this.referralRepo.findOne({
         where: {
           referrerId: referrerId,
           referredId: referredId,
-          status: ReferralStatus.PENDING,
+          status: ReferralStatus.COMPLETED,  // ✅ Recherche sur COMPLETED
         },
       });
 
       if (referral) {
+        // ✅ 2. Mise à jour du parrainage existant
         referral.rewardAmount = amount;
-        referral.currency = currency;  // ✅ Mise à jour de la devise
-        referral.status = ReferralStatus.REWARDED;
+        referral.currency = validCurrency;
+        referral.status = ReferralStatus.COMPLETED;  // ✅ Reste COMPLETED
         referral.completedAt = new Date();
 
         referral.metadata = {
@@ -139,31 +144,32 @@ export class OrderService {
           orderInvoice: invoiceNumber,
           rewardedAt: new Date().toISOString(),
           amount: amount,
-          currency: currency,
+          currency: validCurrency,
         };
 
         await this.referralRepo.save(referral);
-        console.log(`✅ Parrainage mis à jour pour ${referrerId}: ${amount} ${currency} récompensé`);
+        console.log(`✅ Parrainage mis à jour pour ${referrerId}: ${amount} ${validCurrency} récompensé (COMPLETED)`);
       } else {
+        // ✅ 3. Création d'un nouveau parrainage (si jamais il n'existe pas)
         const newReferral = this.referralRepo.create({
           referrerId: referrerId,
           referredId: referredId,
           referralCode: `REF-${Date.now()}`,
-          status: ReferralStatus.REWARDED,
+          status: ReferralStatus.COMPLETED,
           rewardAmount: amount,
-          currency: currency,  // ✅ Devise
+          currency: validCurrency,
           rewardType: 'POINTS',
           completedAt: new Date(),
           metadata: {
             orderInvoice: invoiceNumber,
             rewardedAt: new Date().toISOString(),
             amount: amount,
-            currency: currency,
+            currency: validCurrency,
           },
         });
 
         await this.referralRepo.save(newReferral);
-        console.log(`✅ Nouveau parrainage créé pour ${referrerId}: ${amount} ${currency} récompensé`);
+        console.log(`✅ Nouveau parrainage créé pour ${referrerId}: ${amount} ${validCurrency} récompensé (COMPLETED)`);
       }
     } catch (error) {
       console.error(`❌ Erreur lors de la mise à jour du parrainage:`, error.message);
