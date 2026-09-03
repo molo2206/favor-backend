@@ -96,9 +96,10 @@ export class FpayService {
     ) {
         const fpayApiUrl = this.configService.get<string>('FPAY_API_URL');
         const apiKey = this.configService.get<string>('FPAY_API_KEY_HELP');
+        const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE');
         const logisticApiKey = this.configService.get<string>('FPAY_API_KEY_LOGISTIC');
         const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
-        const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE');
+
         const fideliteApiKey = this.configService.get<string>('FPAY_API_KEY_FIDELITE');
 
 
@@ -733,7 +734,7 @@ export class FpayService {
                 cleanRecipientApiKey = cleanRecipientApiKey.substring(7);
             }
 
-            // ✅ Nettoyer l'API Key du payeur pour le log
+            // ✅ Nettoyer l'API Key du payeur pour le header (enlever "Bearer " pour l'affichage)
             let cleanPayerApiKey = payerApiKey;
             if (cleanPayerApiKey.startsWith('Bearer ')) {
                 cleanPayerApiKey = cleanPayerApiKey.substring(7);
@@ -753,16 +754,22 @@ export class FpayService {
             // ✅ 4. Déterminer la devise
             const currency = sendDto.currency || 'USD';
 
-            this.logger.log(`📤 Envoi PARRAINAGE:`);
-            this.logger.log(`📤 Payeur (API Key HELP): ${cleanPayerApiKey.substring(0, 30)}...`);
-            this.logger.log(`📤 Destinataire (API Key PARRAINAGE): ${cleanRecipientApiKey.substring(0, 30)}...`);
+            // ✅ 5. AFFICHER LES TOKENS COMPLETS DANS LES LOGS
+            this.logger.log(`📤 ========== ENVOI PARRAINAGE ==========`);
+            this.logger.log(`📤 Payeur (API Key HELP) COMPLETE: ${payerApiKey}`);
+            this.logger.log(`📤 Payeur (sans Bearer): ${cleanPayerApiKey}`);
+            this.logger.log(`📤 Destinataire (API Key PARRAINAGE) COMPLETE: ${recipientApiKey}`);
+            this.logger.log(`📤 Destinataire (sans Bearer): ${cleanRecipientApiKey}`);
             this.logger.log(`📤 Montant: ${sendDto.amount} ${currency}`);
             this.logger.log(`📤 PaymentMethod: ${paymentMethod}`);
+            this.logger.log(`📤 Description: ${sendDto.description}`);
+            this.logger.log(`📤 CountryCode: ${sendDto.countryCode || 'CD'}`);
+            this.logger.log(`📤 =========================================`);
 
-            // ✅ 5. Appel à l'API externe
+            // ✅ 6. Appel à l'API externe
             const url = `${this.fpayApiUrl}/api/external/send/parrainage`;
 
-            // ✅ 6. Payload : on envoie l'API Key brute du destinataire (sans "Bearer ")
+            // ✅ 7. Payload : on envoie l'API Key brute du destinataire (sans "Bearer ")
             const sendData = {
                 toApiKey: cleanRecipientApiKey,  // ✅ API Key brute - sans "Bearer "
                 amount: sendDto.amount,
@@ -772,15 +779,15 @@ export class FpayService {
                 paymentMethod: paymentMethod,
             };
 
-            // ✅ 7. Headers : Authorization avec l'API Key du payeur (avec "Bearer ")
+            // ✅ 8. Headers : Authorization avec l'API Key du payeur (avec "Bearer ")
             const headers = {
                 'Authorization': payerApiKey,  // ✅ Garder "Bearer " pour le header
                 'Content-Type': 'application/json',
             };
 
             this.logger.log(`📤 Appel API PARRAINAGE: ${url}`);
-            this.logger.log(`📤 Headers: Authorization: ${cleanPayerApiKey.substring(0, 30)}...`);
-            this.logger.log(`📤 Payload:`, JSON.stringify(sendData, null, 2));
+            this.logger.log(`📤 Headers Authorization: ${payerApiKey}`);
+            this.logger.log(`📤 Payload COMPLET:`, JSON.stringify(sendData, null, 2));
 
             const response = await firstValueFrom(
                 this.httpService.post<FpayResponse<PaymentResponseDto>>(
@@ -791,6 +798,8 @@ export class FpayService {
             );
 
             this.logger.log(`✅ Envoi PARRAINAGE réussi: ${response.data.data?.transaction?.reference || 'OK'}`);
+            this.logger.log(`✅ Réponse complète:`, JSON.stringify(response.data, null, 2));
+
             return {
                 success: true,
                 message: 'Parrainage envoyé avec succès',
@@ -802,6 +811,12 @@ export class FpayService {
 
             if (error.response) {
                 this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
+                this.logger.error(`📦 Status: ${error.response.status}`);
+                this.logger.error(`📦 Headers: ${JSON.stringify(error.response.headers)}`);
+            }
+
+            if (error.request) {
+                this.logger.error(`📦 Request: ${JSON.stringify(error.request)}`);
             }
 
             return {
