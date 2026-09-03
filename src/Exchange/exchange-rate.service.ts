@@ -27,8 +27,8 @@ const countryCurrencyMap: Record<string, {
         countryId: '335d0a51-bbfc-4154-a4a8-d16e617d1cbb',
         countryCode: 'AE',
         countryName: 'United Arab Emirates',
-        currencies: ['USD', 'AED'],
-        defaultCurrency: 'AED'
+        currencies: ['USD', 'USD'],
+        defaultCurrency: 'USD'
     },
     '7c014a21-a990-45d8-b1eb-d7e39af32b3b': {
         countryId: '7c014a21-a990-45d8-b1eb-d7e39af32b3b',
