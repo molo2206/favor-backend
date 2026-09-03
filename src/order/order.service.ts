@@ -400,50 +400,6 @@ export class OrderService {
               } else {
                 console.log('[Order] ⚠️ Paiement Favor Help échoué - statut:', fpayResponse?.data?.transaction?.status || 'inconnu');
               }
-              // Dans createOrder, remplacer le bloc d'envoi du parrainage par :
-
-              // ✅ 2. Envoyer le parrainage (10%) - UNIQUEMENT SI PARRAIN
-              if (hasReferrer && parrainageAmount > 0) {
-                console.log(`[Order] 👤 A un parrain: ${hasReferrer}`);
-                console.log(`[Order] 10% shipping pour parrainage: ${parrainageAmount}$`);
-
-                const sendDto: FpaySendDto = {
-                  amount: parrainageAmount,
-                  description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${invoiceNumb}`,
-                  currency: orderCurrency || 'USD',
-                  countryCode: 'CD',
-                  paymentMethod: 'MOBILE_MONEY',
-                };
-
-                // ✅ Appel à makeSendparrainage (HELP → PARRAINAGE) - NON BLOQUANT
-                this.fpayService.makeSendparrainage(sendDto, user)
-                  .then(async (result) => {
-                    if (result && result.success) {
-                      console.log(`[Order] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
-
-                      // ✅ Mettre à jour le parrainage dans la base de données
-                      const referrerId = userWithReferrer?.referrer?.id;
-                      if (referrerId) {
-                        await this.updateReferralWithAmount(
-                          referrerId,
-                          user.id,
-                          parrainageAmount,
-                          invoiceNumb,
-                          currency
-                        );
-                      }
-                    } else if (result) {
-                      console.log(`[Order] ⚠️ Parrainage non envoyé: ${result.message}`);
-                    }
-                  })
-                  .catch(error => {
-                    console.error(`[Order] ❌ Erreur envoi parrainage:`, error.message);
-                  });
-
-                console.log(`[Order] 📤 Envoi parrainage en cours (non bloquant)...`);
-              } else {
-                console.log(`[Order] 👤 Sans parrain - Pas de parrainage envoyé`);
-              }
             } catch (error: any) {
               console.error('[Order] ❌ Erreur paiement Favor Help:', error.message);
             }
@@ -501,49 +457,6 @@ export class OrderService {
               reference: fpayReference,
               amount: fpayResponse.data.transaction.amount,
             });
-
-            // ✅ 2. Envoyer le parrainage (10%) - UNIQUEMENT SI PARRAIN
-            if (hasReferrer && parrainageAmount > 0) {
-              console.log(`[Order] 👤 A un parrain: ${hasReferrer}`);
-              console.log(`[Order] 10% shipping pour parrainage: ${parrainageAmount}$`);
-
-              const sendDto: FpaySendDto = {
-                amount: parrainageAmount,
-                description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${invoiceNumb}`,
-                currency: orderCurrency || 'USD',
-                countryCode: 'CD',
-                paymentMethod: 'MOBILE_MONEY',
-              };
-
-              // ✅ Appel à makeSendparrainage (HELP → PARRAINAGE) - NON BLOQUANT
-              this.fpayService.makeSendparrainage(sendDto, user)
-                .then(async (result) => {
-                  if (result && result.success) {
-                    console.log(`[Order] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
-
-                    // ✅ Mettre à jour le parrainage dans la base de données
-                    const referrerId = userWithReferrer?.referrer?.id;
-                    if (referrerId) {
-                      await this.updateReferralWithAmount(
-                        referrerId,
-                        user.id,
-                        parrainageAmount,
-                        invoiceNumb,
-                        currency
-                      );
-                    }
-                  } else if (result) {
-                    console.log(`[Order] ⚠️ Parrainage non envoyé: ${result.message}`);
-                  }
-                })
-                .catch(error => {
-                  console.error(`[Order] ❌ Erreur envoi parrainage:`, error.message);
-                });
-
-              console.log(`[Order] 📤 Envoi parrainage en cours (non bloquant)...`);
-            } else {
-              console.log(`[Order] 👤 Sans parrain - Pas de parrainage envoyé`);
-            }
           } else {
             console.log('[Order] ⚠️ Paiement FPAY échoué, commande en attente');
             paymentStatus = PaymentStatus.PENDING;
@@ -697,6 +610,51 @@ export class OrderService {
       await this.operationRepo.save(operation);
       console.log(`[Order] Opération ${selectedMethod} enregistrée pour la commande ${order.invoiceNumber}`);
     }
+
+    // ============================================================
+    // ✅ ENVOYER LE PARRAINAGE (10%) - UNIQUEMENT SI PARRAIN
+    // ============================================================
+    if (hasReferrer && parrainageAmount > 0 && paymentStatus === PaymentStatus.PAID) {
+      console.log(`[Order] 👤 A un parrain: ${hasReferrer}`);
+      console.log(`[Order] 10% shipping pour parrainage: ${parrainageAmount}$`);
+
+      const sendDto: FpaySendDto = {
+        amount: parrainageAmount,
+        description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${invoiceNumb}`,
+        currency: orderCurrency || 'USD',
+        countryCode: 'CD',
+        paymentMethod: 'MOBILE_MONEY',
+      };
+
+      // ✅ Appel à makeSendparrainage (HELP → PARRAINAGE) - NON BLOQUANT
+      this.fpayService.makeSendparrainage(sendDto, user)
+        .then(async (result) => {
+          if (result && result.success) {
+            console.log(`[Order] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
+
+            const referrerId = userWithReferrer?.referrer?.id;
+            if (referrerId) {
+              await this.updateReferralWithAmount(
+                referrerId,
+                user.id,
+                parrainageAmount,
+                invoiceNumb,
+                orderCurrency
+              );
+            }
+          } else if (result) {
+            console.log(`[Order] ⚠️ Parrainage non envoyé: ${result.message}`);
+          }
+        })
+        .catch(error => {
+          console.error(`[Order] ❌ Erreur envoi parrainage:`, error.message);
+        });
+
+      console.log(`[Order] 📤 Envoi parrainage en cours (non bloquant)...`);
+    } else if (parrainageAmount > 0) {
+      console.log(`[Order] 👤 Sans parrain - Pas de parrainage envoyé`);
+    }
+
     const paymentQrCode = await QRCode.toDataURL(finalOrder.invoiceNumber);
     this.processOrderNotifications(finalOrder, subOrders, user, order, paymentQrCode, groupedByCompany, provider, lang).catch((err) =>
       console.error('Erreur notifications:', err),
@@ -1807,11 +1765,9 @@ export class OrderService {
         throw new BadRequestException(this.i18nService.translate('order.shipping_cost_required_for_validation', lang));
       }
       order.shippingCost = dto.shippingCost;
-      // ✅ Ajout de transactionFee dans grandTotal
       order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost) + Number(order.transactionFee || 0);
     } else if (dto.shippingCost !== undefined) {
       order.shippingCost = dto.shippingCost;
-      // ✅ Ajout de transactionFee dans grandTotal
       order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost) + Number(order.transactionFee || 0);
     }
 
@@ -1895,7 +1851,6 @@ export class OrderService {
       const shippingCost = Number(dto.shippingCost || 0);
       const transactionFee = Number(order.transactionFee || 0);
       const baseAmount = Number(order.totalAmount);
-      // ✅ Ajout de transactionFee dans le total
       const totalWithFees = baseAmount + shippingCost + transactionFee;
       let paymentAmount = totalWithFees;
 
@@ -1943,14 +1898,26 @@ export class OrderService {
                 description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${order.invoiceNumber}`,
                 currency: order.currency || 'USD',
                 countryCode: 'CD',
-                paymentMethod: 'MOBILE_MONEY',
+                paymentMethod: 'CASH',
               };
 
               // ✅ Appel à makeSendparrainage (HELP → PARRAINAGE) - NON BLOQUANT
               this.fpayService.makeSendparrainage(sendDto, user)
-                .then(result => {
+                .then(async (result) => {
                   if (result && result.success) {
                     console.log(`[Order] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
+
+                    // ✅ Mettre à jour le parrainage dans la base de données
+                    const referrerId = userWithReferrer?.referrer?.id;
+                    if (referrerId) {
+                      await this.updateReferralWithAmount(
+                        referrerId,
+                        order.userId,
+                        parrainageAmount,
+                        order.invoiceNumber,
+                        order.currency
+                      );
+                    }
                   } else if (result) {
                     console.log(`[Order] ⚠️ Parrainage non envoyé: ${result.message}`);
                   }
