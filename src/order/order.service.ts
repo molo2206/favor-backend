@@ -107,7 +107,7 @@ export class OrderService {
     const lang = user.settings?.language || 'fr';
     const supported = ['fr', 'en', 'sw', 'es', 'ar'];
     return supported.includes(lang) ? lang : 'fr';
-  },
+  }
 
   /**
  * Met à jour le parrainage avec le montant et le statut
