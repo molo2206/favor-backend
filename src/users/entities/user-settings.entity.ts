@@ -71,4 +71,12 @@ export class UserSettingsEntity {
   @ManyToOne(() => UserEntity, (user) => user.settings, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: UserEntity;
+
+  @Column({
+    type: 'varchar',
+    length: 10,
+    default: 'USD',
+    nullable: true
+  })
+  currency: string;
 }

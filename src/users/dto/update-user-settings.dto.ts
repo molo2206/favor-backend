@@ -1,15 +1,13 @@
 // src/users/dto/update-user-settings.dto.ts
-import { IsOptional, IsString, IsBoolean, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsBoolean } from 'class-validator';
 
 export class UpdateUserSettingsDto {
   @IsOptional()
   @IsString()
-  @IsIn(['fr', 'en', 'es', 'ar'], { message: 'Langue non supportée' })
   language?: string;
 
   @IsOptional()
   @IsString()
-  @IsIn(['light', 'dark', 'system'])
   theme?: string;
 
   @IsOptional()
@@ -31,4 +29,9 @@ export class UpdateUserSettingsDto {
   @IsOptional()
   @IsString()
   lastDevice?: string;
+
+  // ✅ AJOUT DU CHAMP CURRENCY (sans validation @IsIn)
+  @IsOptional()
+  @IsString()
+  currency?: string;
 }
