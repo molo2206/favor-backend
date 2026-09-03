@@ -306,7 +306,11 @@ export class ExchangeRateService {
         return '127.0.0.1';
     }
 
-    async getCurrencyByIp(ip: string, countryId?: string): Promise<{
+    async getCurrencyByIp(
+        ip: string,
+        countryId?: string,
+        userId?: string  // ✅ Ajout du userId pour récupérer la devise de l'utilisateur
+    ): Promise<{
         message: string;
         data: {
             defaultCurrency: string;
@@ -328,6 +332,7 @@ export class ExchangeRateService {
             let countryCode: string | undefined;
             let countryName: string | undefined;
             let defaultCurrency: string = 'USD';
+            let userCurrency: string | undefined;
 
             // ✅ Récupérer l'IP publique du serveur
             const serverPublicIp = await this.getServerPublicIp();
@@ -337,8 +342,21 @@ export class ExchangeRateService {
             console.log(`🖥️ IP Locale du serveur: ${serverLocalIp}`);
             console.log(`🌍 IP du client: ${ip}`);
             console.log(`📍 CountryId fourni: ${countryId || 'Aucun'}`);
+            console.log(`👤 UserId fourni: ${userId || 'Aucun'}`);
 
-            // ✅ PRIORITÉ : Si countryId est fourni, l'utiliser en premier
+            // ✅ 1. Récupérer la devise de l'utilisateur depuis user_settings
+            if (userId) {
+                const userSettings = await this.userSettingsRepo.findOne({
+                    where: { userId: userId },
+                    select: ['currency'],
+                });
+                if (userSettings?.currency) {
+                    userCurrency = userSettings.currency;
+                    console.log(`💱 Devise de l'utilisateur: ${userCurrency}`);
+                }
+            }
+
+            // ✅ 2. PRIORITÉ : Si countryId est fourni, l'utiliser pour le pays
             if (countryId) {
                 const country = await this.countryRepository.findOne({
                     where: { id: countryId },
@@ -416,9 +434,8 @@ export class ExchangeRateService {
                 }
             }
 
-            // ✅ Si countryId n'est PAS fourni OU pays non trouvé, alors détection par IP
+            // ✅ 3. Si countryId n'est PAS fourni, détection par IP
             if (!countryCode) {
-                // ✅ Utiliser l'IP du client pour la détection
                 let ipToUse = ip;
 
                 if (ipToUse === 'server' || ipToUse === '127.0.0.1' || ipToUse === '::1' || ipToUse === 'localhost') {
@@ -427,7 +444,7 @@ export class ExchangeRateService {
 
                 console.log(`🌍 Détection du pays avec l'IP: ${ipToUse}`);
 
-                // ✅ Vérifier d'abord si l'IP est dans les plages de la RDC
+                // ✅ Vérifier les plages IP de la RDC
                 const ipParts = ipToUse.split('.');
                 if (ipParts.length === 4) {
                     const firstOctet = parseInt(ipParts[0]);
@@ -493,7 +510,7 @@ export class ExchangeRateService {
                 }
             }
 
-            // ✅ Récupérer TOUTES les devises (SANS FILTRE PAYS)
+            // ✅ 4. Récupérer TOUTES les devises (SANS FILTRE PAYS)
             const allExchangeRates = await this.exchangeRateRepo
                 .createQueryBuilder('rate')
                 .where('rate.deleted = :deleted', { deleted: false })
@@ -516,15 +533,14 @@ export class ExchangeRateService {
                 finalCurrencies = [{ currency: 'USD', value: 1, status: true }];
             }
 
-            // ✅ Déterminer la devise par défaut
-            // Si USD existe, le mettre par défaut
-            const usdCurrency = finalCurrencies.find(c => c.currency === 'USD');
-            if (usdCurrency) {
-                defaultCurrency = 'USD';
+            // ✅ 5. Déterminer la devise par défaut
+            // ✅ Priorité 1 : Devise de l'utilisateur (si elle existe dans les devises disponibles)
+            if (userCurrency && finalCurrencies.some(c => c.currency === userCurrency)) {
+                defaultCurrency = userCurrency;
+                console.log(`💱 Devise par défaut = devise de l'utilisateur: ${defaultCurrency}`);
             }
-
-            // ✅ Si un pays spécifique a une devise par défaut différente
-            if (countryCode === 'AE' || countryCode === 'ARE') {
+            // ✅ Priorité 2 : Devise par défaut du pays
+            else if (countryCode === 'AE' || countryCode === 'ARE') {
                 defaultCurrency = 'AED';
             } else if (countryCode === 'CD' || countryCode === 'COD') {
                 defaultCurrency = 'CDF';
@@ -534,12 +550,16 @@ export class ExchangeRateService {
                 defaultCurrency = 'UGX';
             } else if (countryCode === 'BI') {
                 defaultCurrency = 'BIF';
+            } else {
+                defaultCurrency = 'USD';
             }
+
+            console.log(`💰 Devise par défaut finale: ${defaultCurrency}`);
 
             return {
                 message: 'Devises récupérées avec succès',
                 data: {
-                    defaultCurrency,
+                    defaultCurrency,  // ✅ Contient la devise de l'utilisateur si disponible
                     currencies: finalCurrencies,
                     countryCode: countryCode || 'CD',
                     countryName: countryName || 'République Démocratique du Congo',

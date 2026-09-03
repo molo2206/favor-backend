@@ -13,6 +13,7 @@ import {
     ValidationPipe,
     Req,
     ForbiddenException,
+    Headers,
 } from '@nestjs/common';
 import { ExchangeRateService } from './exchange-rate.service';
 import { UserRole } from 'src/users/enum/user-role-enum';
@@ -25,12 +26,19 @@ import { AuditAction } from 'src/audit/decorator/audit.decorator';
 import { ActionType } from 'src/audit/enum/action-type.enum';
 import { CreateExchangeRateDto } from './dto/create-exchange-rate.dto';
 import { UpdateExchangeRateDto } from './dto/update-exchange-rate.dto';
+import { JwtService } from '@nestjs/jwt';
+import { UserSettingsEntity } from 'src/users/entities/user-settings.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 @Controller('exchange-rates')
 export class ExchangeRateController {
     constructor(
         private readonly exchangeRateService: ExchangeRateService,
         private readonly i18n: I18nService,
+        private readonly jwtService: JwtService,
+        @InjectRepository(UserSettingsEntity)
+        private readonly userSettingsRepo: Repository<UserSettingsEntity>,
     ) { }
 
     private extractLanguage(req: Request): string {
@@ -55,6 +63,7 @@ export class ExchangeRateController {
     async getCurrencyByIp(
         @Req() req: Request,
         @Query('countryId') countryId?: string,
+        @Headers('authorization') authHeader?: string,
     ) {
         try {
             // ✅ Récupérer l'IP du client depuis différents headers
@@ -85,14 +94,36 @@ export class ExchangeRateController {
 
             console.log(`🌍 Domaine: ${baseUrl}`);
             console.log(`🌍 IP brute reçue: ${ip}`);
-            console.log(`🌍 Headers:`, {
-                'x-forwarded-for': req.headers['x-forwarded-for'],
-                'x-real-ip': req.headers['x-real-ip'],
-                'cf-connecting-ip': req.headers['cf-connecting-ip'],
-                'remoteAddress': req.connection?.remoteAddress,
-            });
 
-            // ✅ Vérifier si c'est une requête locale
+            // ✅ 1. Extraire le token JWT et récupérer l'utilisateur
+            let userId: string | undefined;
+            let userCurrency: string | undefined;
+
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                const token = authHeader.substring(7);
+                try {
+                    const decoded = this.jwtService.decode(token) as any;
+                    if (decoded && decoded.id) {
+                        userId = decoded.id;
+                        console.log(`👤 Utilisateur connecté: ${userId}`);
+
+                        const userSettings = await this.userSettingsRepo.findOne({
+                            where: { userId: userId },
+                            select: ['currency'],
+                        });
+                        if (userSettings?.currency) {
+                            userCurrency = userSettings.currency;
+                            console.log(`💱 Devise de l'utilisateur: ${userCurrency}`);
+                        }
+                    }
+                } catch (error) {
+                    console.log('⚠️ Token invalide ou expiré, utilisation par défaut');
+                }
+            } else {
+                console.log('👤 Utilisateur non connecté');
+            }
+
+            // ✅ 2. Vérifier si c'est une requête locale
             const isLocalRequest = ip === '127.0.0.1' ||
                 ip === '::1' ||
                 ip === 'localhost' ||
@@ -103,21 +134,28 @@ export class ExchangeRateController {
 
             let result;
             if (isLocalRequest) {
-                // ✅ Pour les requêtes locales, utiliser l'IP publique du serveur
                 console.log('📍 Requête locale détectée, utilisation de l\'IP du serveur');
-                result = await this.exchangeRateService.getCurrencyByIp('server', countryId);
+                result = await this.exchangeRateService.getCurrencyByIp('server', countryId, userId);
             } else {
-                // ✅ Utiliser l'IP du client
                 console.log(`🌍 Requête distante avec IP: ${ip}`);
-                result = await this.exchangeRateService.getCurrencyByIp(ip, countryId);
+                result = await this.exchangeRateService.getCurrencyByIp(ip, countryId, userId);
+            }
+
+            // ✅ 3. Si l'utilisateur a une devise et qu'elle est disponible, la mettre par défaut
+            let defaultCurrency = result.data.defaultCurrency;
+            if (userCurrency && result.data.currencies.some(c => c.currency === userCurrency)) {
+                defaultCurrency = userCurrency;
+                console.log(`💱 Devise par défaut = devise de l'utilisateur: ${defaultCurrency}`);
             }
 
             return {
                 message: 'Devises récupérées avec succès',
                 data: {
                     ...result.data,
+                    defaultCurrency,
                     server: baseUrl,
                     environment: process.env.NODE_ENV || 'development',
+                    isAuthenticated: !!userId,
                 }
             };
         } catch (error) {
@@ -133,10 +171,12 @@ export class ExchangeRateController {
                     ip: req.ip || '127.0.0.1',
                     server: `${req.protocol}://${req.get('host')}`,
                     environment: process.env.NODE_ENV || 'development',
+                    isAuthenticated: false,
                 }
             };
         }
     }
+
 
     /**
      * Créer un taux de change
