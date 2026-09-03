@@ -389,7 +389,7 @@ export class OrderService {
                 amount: parrainageAmount,
                 description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${invoiceNumb}`,
                 currency: currency || 'USD',
-                countryCode: 'COD',
+                countryCode: 'CD',
                 paymentMethod: 'MOBILE_MONEY',
               };
 
@@ -824,7 +824,7 @@ export class OrderService {
                   amount: parrainageAmount,
                   description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${order.invoiceNumber}`,
                   currency: order.currency || 'USD',
-                  countryCode: 'COD',
+                  countryCode: 'CD',
                   paymentMethod: 'MOBILE_MONEY',
                 };
 
@@ -1775,7 +1775,7 @@ export class OrderService {
                 amount: parrainageAmount,
                 description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${order.invoiceNumber}`,
                 currency: order.currency || 'USD',
-                countryCode: 'COD',
+                countryCode: 'CD',
                 paymentMethod: PaymentMethod.CASH
               };
 
