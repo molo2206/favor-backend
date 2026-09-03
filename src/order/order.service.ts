@@ -418,9 +418,10 @@ export class OrderService {
           }
         } catch (error: any) {
           console.error('[Order] ❌ Erreur FPAY:', error.message);
-          paymentStatus = PaymentStatus.PENDING;
-          orderStatus = OrderStatus.PENDING;
-          isPaidByMobileMoney = false;
+          // ✅ Relancer l'erreur pour annuler la création de la commande
+          throw new BadRequestException(
+            error.message || this.i18nService.translate('order.payment_failed', lang)
+          );
         }
       }
       else if (selectedMethod === PaymentMethod.CASH) {
