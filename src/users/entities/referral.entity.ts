@@ -58,6 +58,10 @@ export class ReferralEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   rewardAmount: number;
 
+  // ✅ AJOUT DU CHAMP CURRENCY
+  @Column({ type: 'varchar', length: 10, default: 'USD' })
+  currency: string;
+
   // Type de récompense (points, argent, etc.)
   @Column({ type: 'varchar', length: 50, default: 'POINTS' })
   rewardType: string;

@@ -517,7 +517,6 @@ export class ExchangeRateService {
             const allExchangeRates = await this.exchangeRateRepo
                 .createQueryBuilder('rate')
                 .where('rate.deleted = :deleted', { deleted: false })
-                .andWhere('rate.status = :status', { status: true })
                 .select(['rate.currency', 'rate.value', 'rate.status'])
                 .orderBy('rate.currency', 'ASC')
                 .getMany();

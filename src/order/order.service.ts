@@ -54,6 +54,7 @@ import { FpayService } from 'src/fpay/fpay.service';
 import { randomBytes } from 'crypto';
 import { PayOrderDto } from './dto/pay-order.dto';
 import { FpaySendDto } from 'src/fpay/dto/send.dto';
+import { ReferralEntity, ReferralStatus } from 'src/users/entities/referral.entity';
 
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -98,12 +99,75 @@ export class OrderService {
     private readonly i18nService: I18nService,
     private readonly fpayService: FpayService,
     @InjectRepository(CompanyHasUserResource) private readonly companyHasUserResourceRepo: Repository<CompanyHasUserResource>,
+    @InjectRepository(ReferralEntity)
+    private readonly referralRepo: Repository<ReferralEntity>,
   ) { }
 
   private getUserLanguage(user: UserEntity): string {
     const lang = user.settings?.language || 'fr';
     const supported = ['fr', 'en', 'sw', 'es', 'ar'];
     return supported.includes(lang) ? lang : 'fr';
+  },
+
+  /**
+ * Met à jour le parrainage avec le montant et le statut
+ */
+  private async updateReferralWithAmount(
+    referrerId: string,
+    referredId: string,
+    amount: number,
+    invoiceNumber: string,
+    currency: string = 'USD',  // ✅ Ajout du paramètre currency
+  ): Promise<void> {
+    try {
+      const referral = await this.referralRepo.findOne({
+        where: {
+          referrerId: referrerId,
+          referredId: referredId,
+          status: ReferralStatus.PENDING,
+        },
+      });
+
+      if (referral) {
+        referral.rewardAmount = amount;
+        referral.currency = currency;  // ✅ Mise à jour de la devise
+        referral.status = ReferralStatus.REWARDED;
+        referral.completedAt = new Date();
+
+        referral.metadata = {
+          ...referral.metadata,
+          orderInvoice: invoiceNumber,
+          rewardedAt: new Date().toISOString(),
+          amount: amount,
+          currency: currency,
+        };
+
+        await this.referralRepo.save(referral);
+        console.log(`✅ Parrainage mis à jour pour ${referrerId}: ${amount} ${currency} récompensé`);
+      } else {
+        const newReferral = this.referralRepo.create({
+          referrerId: referrerId,
+          referredId: referredId,
+          referralCode: `REF-${Date.now()}`,
+          status: ReferralStatus.REWARDED,
+          rewardAmount: amount,
+          currency: currency,  // ✅ Devise
+          rewardType: 'POINTS',
+          completedAt: new Date(),
+          metadata: {
+            orderInvoice: invoiceNumber,
+            rewardedAt: new Date().toISOString(),
+            amount: amount,
+            currency: currency,
+          },
+        });
+
+        await this.referralRepo.save(newReferral);
+        console.log(`✅ Nouveau parrainage créé pour ${referrerId}: ${amount} ${currency} récompensé`);
+      }
+    } catch (error) {
+      console.error(`❌ Erreur lors de la mise à jour du parrainage:`, error.message);
+    }
   }
 
   // ======================== CRÉATION DE COMMANDE ========================
@@ -333,6 +397,50 @@ export class OrderService {
               } else {
                 console.log('[Order] ⚠️ Paiement Favor Help échoué - statut:', fpayResponse?.data?.transaction?.status || 'inconnu');
               }
+              // Dans createOrder, remplacer le bloc d'envoi du parrainage par :
+
+              // ✅ 2. Envoyer le parrainage (10%) - UNIQUEMENT SI PARRAIN
+              if (hasReferrer && parrainageAmount > 0) {
+                console.log(`[Order] 👤 A un parrain: ${hasReferrer}`);
+                console.log(`[Order] 10% shipping pour parrainage: ${parrainageAmount}$`);
+
+                const sendDto: FpaySendDto = {
+                  amount: parrainageAmount,
+                  description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${invoiceNumb}`,
+                  currency: orderCurrency || 'USD',
+                  countryCode: 'CD',
+                  paymentMethod: 'MOBILE_MONEY',
+                };
+
+                // ✅ Appel à makeSendparrainage (HELP → PARRAINAGE) - NON BLOQUANT
+                this.fpayService.makeSendparrainage(sendDto, user)
+                  .then(async (result) => {
+                    if (result && result.success) {
+                      console.log(`[Order] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
+
+                      // ✅ Mettre à jour le parrainage dans la base de données
+                      const referrerId = userWithReferrer?.referrer?.id;
+                      if (referrerId) {
+                        await this.updateReferralWithAmount(
+                          referrerId,
+                          user.id,
+                          parrainageAmount,
+                          invoiceNumb,
+                          currency
+                        );
+                      }
+                    } else if (result) {
+                      console.log(`[Order] ⚠️ Parrainage non envoyé: ${result.message}`);
+                    }
+                  })
+                  .catch(error => {
+                    console.error(`[Order] ❌ Erreur envoi parrainage:`, error.message);
+                  });
+
+                console.log(`[Order] 📤 Envoi parrainage en cours (non bloquant)...`);
+              } else {
+                console.log(`[Order] 👤 Sans parrain - Pas de parrainage envoyé`);
+              }
             } catch (error: any) {
               console.error('[Order] ❌ Erreur paiement Favor Help:', error.message);
             }
@@ -406,9 +514,21 @@ export class OrderService {
 
               // ✅ Appel à makeSendparrainage (HELP → PARRAINAGE) - NON BLOQUANT
               this.fpayService.makeSendparrainage(sendDto, user)
-                .then(result => {
+                .then(async (result) => {
                   if (result && result.success) {
                     console.log(`[Order] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
+
+                    // ✅ Mettre à jour le parrainage dans la base de données
+                    const referrerId = userWithReferrer?.referrer?.id;
+                    if (referrerId) {
+                      await this.updateReferralWithAmount(
+                        referrerId,
+                        user.id,
+                        parrainageAmount,
+                        invoiceNumb,
+                        currency
+                      );
+                    }
                   } else if (result) {
                     console.log(`[Order] ⚠️ Parrainage non envoyé: ${result.message}`);
                   }
@@ -825,6 +945,8 @@ export class OrderService {
               await this.operationRepo.save(operation);
               console.log(`[PayOrder] Opération ${selectedMethod} enregistrée pour la commande ${order.invoiceNumber}`);
 
+              // Dans payPendingOrder, remplacer le bloc d'envoi du parrainage par :
+
               // ============================================================
               // ✅ ENVOYER LE PARRAINAGE (10%) - UNIQUEMENT SI PARRAIN
               // ============================================================
@@ -842,9 +964,21 @@ export class OrderService {
 
                 // ✅ Appel à makeSendparrainage (HELP → PARRAINAGE) - NON BLOQUANT
                 this.fpayService.makeSendparrainage(sendDto, user)
-                  .then(result => {
+                  .then(async (result) => {
                     if (result && result.success) {
                       console.log(`[PayOrder] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
+
+                      // ✅ Mettre à jour le parrainage dans la base de données
+                      const referrerId = userWithReferrer?.referrer?.id;
+                      if (referrerId) {
+                        await this.updateReferralWithAmount(
+                          referrerId,
+                          user.id,
+                          parrainageAmount,
+                          order.invoiceNumber,
+                          order.currency
+                        );
+                      }
                     } else if (result) {
                       console.log(`[PayOrder] ⚠️ Parrainage non envoyé: ${result.message}`);
                     }
@@ -955,7 +1089,9 @@ export class OrderService {
           await this.operationRepo.save(operation);
           console.log(`[PayOrder] Opération ${selectedMethod} enregistrée pour la commande ${order.invoiceNumber}`);
 
-          // ✅ 3. Envoyer le parrainage (10%) - UNIQUEMENT SI PARRAIN
+          // ============================================================
+          // ✅ ENVOYER LE PARRAINAGE (10%) - UNIQUEMENT SI PARRAIN
+          // ============================================================
           if (hasReferrer && parrainageAmount > 0) {
             console.log(`[PayOrder] 👤 A un parrain: ${hasReferrer}`);
             console.log(`[PayOrder] 10% shipping pour parrainage: ${parrainageAmount}$`);
@@ -970,9 +1106,21 @@ export class OrderService {
 
             // ✅ Appel à makeSendparrainage (HELP → PARRAINAGE) - NON BLOQUANT
             this.fpayService.makeSendparrainage(sendDto, user)
-              .then(result => {
+              .then(async (result) => {
                 if (result && result.success) {
                   console.log(`[PayOrder] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
+
+                  // ✅ Mettre à jour le parrainage dans la base de données
+                  const referrerId = userWithReferrer?.referrer?.id;
+                  if (referrerId) {
+                    await this.updateReferralWithAmount(
+                      referrerId,
+                      user.id,
+                      parrainageAmount,
+                      order.invoiceNumber,
+                      order.currency
+                    );
+                  }
                 } else if (result) {
                   console.log(`[PayOrder] ⚠️ Parrainage non envoyé: ${result.message}`);
                 }
