@@ -718,17 +718,18 @@ export class FpayService {
                 };
             }
 
-            // ✅ 2. API Key du DESTINATAIRE (celui qui reçoit l'argent)
-            let recipientApiKey = this.parrainageApiKey;  // ✅ FPAY_API_KEY_PARRAINAGE
+            // ✅ 2. Récupérer l'API Key du DESTINATAIRE depuis sendDto.userId
+            // sendDto.userId contient le userIdFpay du parrain (destinataire)
+            let recipientApiKey = sendDto.userId;  // ✅ API Key du parrain
             if (!recipientApiKey) {
-                this.logger.error('❌ API Key PARRAINAGE (destinataire) non configurée');
+                this.logger.error('❌ userId du destinataire non fourni');
                 return {
                     success: false,
-                    message: 'Configuration API Key PARRAINAGE manquante',
+                    message: 'userId du destinataire manquant',
                 };
             }
 
-            // ✅ Nettoyer l'API Key du destinataire pour le body (enlever "Bearer ")
+            // ✅ Nettoyer l'API Key du destinataire pour le body (enlever "Bearer " si présent)
             let cleanRecipientApiKey = recipientApiKey;
             if (cleanRecipientApiKey.startsWith('Bearer ')) {
                 cleanRecipientApiKey = cleanRecipientApiKey.substring(7);
@@ -754,14 +755,11 @@ export class FpayService {
             // ✅ 4. Déterminer la devise
             const currency = sendDto.currency || 'USD';
 
-            // ✅ 5. AFFICHER LES TOKENS COMPLETS DANS LES LOGS
             this.logger.log(`📤 ========== ENVOI PARRAINAGE ==========`);
             this.logger.log(`📤 === PAYEUR (FAVOR HELP) ===`);
-            this.logger.log(`📤 API Key HELP COMPLETE: ${payerApiKey}`);
-            this.logger.log(`📤 API Key HELP (sans Bearer): ${cleanPayerApiKey}`);
-            this.logger.log(`📤 === DESTINATAIRE (PARRAINAGE) ===`);
-            this.logger.log(`📤 API Key PARRAINAGE COMPLETE: ${recipientApiKey}`);
-            this.logger.log(`📤 API Key PARRAINAGE (sans Bearer): ${cleanRecipientApiKey}`);
+            this.logger.log(`📤 API Key HELP: ${payerApiKey.substring(0, 50)}...`);
+            this.logger.log(`📤 === DESTINATAIRE (PARRAIN) ===`);
+            this.logger.log(`📤 API Key PARRAIN: ${recipientApiKey.substring(0, 50)}...`);
             this.logger.log(`📤 === INFORMATIONS TRANSFERT ===`);
             this.logger.log(`📤 Montant: ${sendDto.amount} ${currency}`);
             this.logger.log(`📤 PaymentMethod: ${paymentMethod}`);
@@ -769,12 +767,12 @@ export class FpayService {
             this.logger.log(`📤 CountryCode: ${sendDto.countryCode || 'CD'}`);
             this.logger.log(`📤 =========================================`);
 
-            // ✅ 6. Appel à l'API externe
+            // ✅ 5. Appel à l'API externe
             const url = `${this.fpayApiUrl}/api/external/send/parrainage`;
 
-            // ✅ 7. Payload : on envoie l'API Key brute du destinataire (sans "Bearer ")
+            // ✅ 6. Payload : on envoie l'API Key brute du destinataire (sans "Bearer ")
             const sendData = {
-                toApiKey: cleanRecipientApiKey,  // ✅ API Key brute - sans "Bearer "
+                toApiKey: cleanRecipientApiKey,  // ✅ API Key du parrain - sans "Bearer "
                 amount: sendDto.amount,
                 description: sendDto.description || `Envoi de parrainage`,
                 currency: currency,
@@ -782,15 +780,14 @@ export class FpayService {
                 paymentMethod: paymentMethod,
             };
 
-            // ✅ 8. Headers : Authorization avec l'API Key du payeur (avec "Bearer ")
+            // ✅ 7. Headers : Authorization avec l'API Key du payeur (avec "Bearer ")
             const headers = {
                 'Authorization': payerApiKey,  // ✅ Garder "Bearer " pour le header
                 'Content-Type': 'application/json',
             };
 
             this.logger.log(`📤 Appel API PARRAINAGE: ${url}`);
-            this.logger.log(`📤 Headers Authorization: ${payerApiKey}`);
-            this.logger.log(`📤 Headers Authorization (sans Bearer): ${cleanPayerApiKey}`);
+            this.logger.log(`📤 Headers Authorization: ${payerApiKey.substring(0, 50)}...`);
             this.logger.log(`📤 Payload COMPLET:`, JSON.stringify(sendData, null, 2));
 
             const response = await firstValueFrom(
@@ -829,6 +826,7 @@ export class FpayService {
             };
         }
     }
+
     async makeSendFavorhelp(
         sendDto: FpaySendDto,
         currentUser: UserEntity,
