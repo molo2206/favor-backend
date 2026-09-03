@@ -15,6 +15,49 @@ import { HttpService } from '@nestjs/axios'; // ✅ Ajout
 import { Country } from 'src/company/entities/country.entity';
 import * as os from 'os';
 
+const countryCurrencyMap: Record<string, {
+    countryId: string;
+    countryCode: string;
+    countryName: string;
+    currencies: string[];
+    defaultCurrency: string;
+}> = {
+    '335d0a51-bbfc-4154-a4a8-d16e617d1cbb': {
+        countryId: '335d0a51-bbfc-4154-a4a8-d16e617d1cbb',
+        countryCode: 'AE',
+        countryName: 'United Arab Emirates',
+        currencies: ['USD', 'AED'],
+        defaultCurrency: 'AED'
+    },
+    '7c014a21-a990-45d8-b1eb-d7e39af32b3b': {
+        countryId: '7c014a21-a990-45d8-b1eb-d7e39af32b3b',
+        countryCode: 'CD',
+        countryName: 'Congo, The Democratic Republic of the Congo',
+        currencies: ['USD', 'CDF'],
+        defaultCurrency: 'CDF'
+    },
+    '65a607df-4a32-451d-8eb0-3247dfc46052': {
+        countryId: '65a607df-4a32-451d-8eb0-3247dfc46052',
+        countryCode: 'BE',
+        countryName: 'Benin',
+        currencies: ['USD', 'XOF'],
+        defaultCurrency: 'XOF'
+    },
+    '0ef48b5c-7308-49d9-850a-0dbbfe109e01': {
+        countryId: '0ef48b5c-7308-49d9-850a-0dbbfe109e01',
+        countryCode: 'UG',
+        countryName: 'Uganda',
+        currencies: ['USD', 'UGX'],
+        defaultCurrency: 'UGX'
+    },
+    'b18a4df0-ea5c-4328-93a6-6072874b43e5': {
+        countryId: 'b18a4df0-ea5c-4328-93a6-6072874b43e5',
+        countryCode: 'BI',
+        countryName: 'Burundi',
+        currencies: ['USD', 'BIF'],
+        defaultCurrency: 'BIF'
+    }
+};
 @Injectable()
 export class ExchangeRateService {
     private readonly logger = new Logger(ExchangeRateService.name);
@@ -294,7 +337,7 @@ export class ExchangeRateService {
             console.log(`🖥️ IP Locale du serveur: ${serverLocalIp}`);
             console.log(`🌍 IP du client: ${ip}`);
 
-            // ✅ Si countryId est fourni, récupérer le pays
+            // ✅ Si countryId est fourni, récupérer le pays (uniquement pour le nom et le code)
             if (countryId) {
                 const country = await this.countryRepository.findOne({
                     where: { id: countryId },
@@ -303,9 +346,10 @@ export class ExchangeRateService {
                 if (country && country.code) {
                     countryCode = country.code;
                     countryName = country.name;
+                    console.log(`🌍 Pays trouvé: ${country.name} (${country.code})`);
                 }
             } else {
-                // ✅ Utiliser l'IP du client pour la détection
+                // ✅ Utiliser l'IP du client pour la détection (uniquement pour le nom et le code)
                 let ipToUse = ip;
 
                 if (ipToUse === 'server' || ipToUse === '127.0.0.1' || ipToUse === '::1' || ipToUse === 'localhost') {
@@ -335,9 +379,7 @@ export class ExchangeRateService {
                 if (!countryCode) {
                     try {
                         const response = await firstValueFrom(
-                            this.httpService.get(`https://ipapi.co/${ipToUse}/json/`, {
-                                timeout: 5000,
-                            }),
+                            this.httpService.get(`https://ipapi.co/${ipToUse}/json/`, { timeout: 5000 }),
                         );
 
                         const countryIso = response.data?.country;
@@ -347,16 +389,14 @@ export class ExchangeRateService {
 
                         if (countryIso) {
                             countryCode = countryIso;
-                            countryName = detectedCountryName;
+                            countryName = detectedCountryName || countryIso;
                         }
                     } catch (apiError) {
                         console.error('❌ Erreur API ipapi:', apiError.message);
 
                         try {
                             const fallbackResponse = await firstValueFrom(
-                                this.httpService.get(`http://ip-api.com/json/${ipToUse}`, {
-                                    timeout: 5000,
-                                }),
+                                this.httpService.get(`http://ip-api.com/json/${ipToUse}`, { timeout: 5000 }),
                             );
 
                             if (fallbackResponse.data?.status === 'success') {
@@ -367,7 +407,7 @@ export class ExchangeRateService {
 
                                 if (countryIso) {
                                     countryCode = countryIso;
-                                    countryName = detectedCountryName;
+                                    countryName = detectedCountryName || countryIso;
                                 }
                             }
                         } catch (fallbackError) {
@@ -375,9 +415,16 @@ export class ExchangeRateService {
                         }
                     }
                 }
+
+                // Si toujours pas de pays détecté, utiliser CD par défaut
+                if (!countryCode) {
+                    countryCode = 'CD';
+                    countryName = 'République Démocratique du Congo';
+                    console.log(`🌍 Aucun pays détecté, utilisation de CD par défaut`);
+                }
             }
 
-            // ✅ Récupérer TOUTES les devises de la table exchange_rate (sans filtre pays)
+            // ✅ Récupérer TOUTES les devises de la table exchange_rate (SANS FILTRE PAYS)
             const allExchangeRates = await this.exchangeRateRepo
                 .createQueryBuilder('rate')
                 .where('rate.deleted = :deleted', { deleted: false })
@@ -386,7 +433,7 @@ export class ExchangeRateService {
                 .orderBy('rate.currency', 'ASC')
                 .getMany();
 
-            console.log(`📊 Devises trouvées: ${allExchangeRates.map(r => r.currency).join(', ')}`);
+            console.log(`📊 Toutes les devises trouvées: ${allExchangeRates.map(r => r.currency).join(', ')}`);
 
             let finalCurrencies: { currency: string; value: number; status: boolean }[] = [];
 
@@ -415,19 +462,15 @@ export class ExchangeRateService {
             }
 
             // ✅ Déterminer la devise par défaut
-            if (countryCode) {
-                // Si pays détecté, prendre sa devise par défaut
-                const countryCurrencyMap: Record<string, { defaultCurrency: string }> = {
-                    'CD': { defaultCurrency: 'CDF' },
-                    'COD': { defaultCurrency: 'CDF' },
-                    'BJ': { defaultCurrency: 'XOF' },
-                    'BEN': { defaultCurrency: 'XOF' },
-                };
+            // La devise par défaut est toujours USD (ou la première devise disponible)
+            if (finalCurrencies.length > 0) {
+                defaultCurrency = finalCurrencies[0].currency;
+            }
 
-                const countryData = countryCurrencyMap[countryCode];
-                if (countryData) {
-                    defaultCurrency = countryData.defaultCurrency;
-                }
+            // Si USD existe, le mettre par défaut
+            const usdCurrency = finalCurrencies.find(c => c.currency === 'USD');
+            if (usdCurrency) {
+                defaultCurrency = 'USD';
             }
 
             return {
@@ -448,29 +491,11 @@ export class ExchangeRateService {
         } catch (error) {
             console.error('❌ Erreur getCurrencyByIp:', error);
 
-            // Fallback en cas d'erreur
-            const defaultRate = await this.exchangeRateRepo.findOne({
-                where: { currency: 'USD', deleted: false, status: true },
-                select: ['currency', 'value', 'status'],
-            });
-
-            let defaultCurrencies: { currency: string; value: number; status: boolean }[] = [];
-
-            if (defaultRate) {
-                defaultCurrencies = [{
-                    currency: defaultRate.currency,
-                    value: Number(defaultRate.value),
-                    status: defaultRate.status
-                }];
-            } else {
-                defaultCurrencies = [{ currency: 'USD', value: 1, status: true }];
-            }
-
             return {
                 message: 'Erreur lors de la récupération, valeur par défaut',
                 data: {
                     defaultCurrency: 'USD',
-                    currencies: defaultCurrencies,
+                    currencies: [{ currency: 'USD', value: 1, status: true }],
                     countryCode: 'CD',
                     countryName: 'République Démocratique du Congo',
                     ip: ip || '127.0.0.1'
