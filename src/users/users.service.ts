@@ -2379,6 +2379,7 @@ export class UsersService {
     }
 
     let totalPoints = 0;
+    const rewardsByCurrency: Record<string, number> = {}; // ✅ Regrouper par devise
 
     // ✅ Historique des parrainages
     const history = user.referralHistory?.map((referral) => {
@@ -2386,6 +2387,7 @@ export class UsersService {
       let rewardAmount = 0;
       let orderDetails: any[] = [];
       let validatedOrdersLength = 0;
+      let rewardCurrency = referral.currency || 'USD'; // ✅ Devise du parrainage
 
       if (referred && referred.orders && referred.orders.length > 0) {
         const validatedOrders = referred.orders.filter(
@@ -2396,7 +2398,9 @@ export class UsersService {
         orderDetails = validatedOrders.map((order) => ({
           orderId: order.id,
           shippingCost: order.shippingCost || 0,
+          currency: order.currency || 'USD', // ✅ Devise de la commande
           reward: (Number(order.shippingCost || 0) * 0.10),
+          rewardCurrency: order.currency || 'USD',
           createdAt: order.createdAt,
           status: order.status,
         }));
@@ -2406,9 +2410,17 @@ export class UsersService {
           0
         );
         rewardAmount = totalShippingCost * 0.10;
+        rewardCurrency = validatedOrders[0]?.currency || 'USD';
       }
 
-      totalPoints += rewardAmount;
+      // ✅ Ajouter au total par devise
+      if (rewardAmount > 0) {
+        if (!rewardsByCurrency[rewardCurrency]) {
+          rewardsByCurrency[rewardCurrency] = 0;
+        }
+        rewardsByCurrency[rewardCurrency] += rewardAmount;
+        totalPoints += rewardAmount;
+      }
 
       return {
         id: referral.id,
@@ -2418,11 +2430,14 @@ export class UsersService {
         referredId: referred?.id || null,
         status: referral.status,
         rewardAmount: Math.round(rewardAmount * 100) / 100,
+        rewardCurrency: rewardCurrency, // ✅ Devise de la récompense
         rewardType: 'POINTS (10% shipping - VALIDATED)',
         createdAt: referral.createdAt,
         completedAt: referral.completedAt || null,
         orders: orderDetails,
-        totalValidatedOrders: validatedOrdersLength, // ✅ Utiliser la variable
+        totalValidatedOrders: validatedOrdersLength,
+        // ✅ Ajouter la devise du parrainage
+        referralCurrency: referral.currency || 'USD',
       };
     }) || [];
 
@@ -2444,6 +2459,9 @@ export class UsersService {
         0
       );
 
+      // ✅ Déterminer la devise principale
+      const mainCurrency = validatedOrders[0]?.currency || 'USD';
+
       return {
         id: referred?.id || null,
         fullName: referred?.fullName || 'Utilisateur inconnu',
@@ -2453,11 +2471,19 @@ export class UsersService {
         totalOrders: referred?.orders?.length || 0,
         totalValidatedOrders: validatedOrders.length,
         totalShippingCost: Math.round(totalShippingCost * 100) / 100,
+        currency: mainCurrency, // ✅ Devise principale
         pointsEarned: Math.round(totalShippingCost * 0.10 * 100) / 100,
+        pointsCurrency: mainCurrency, // ✅ Devise des points
         createdAt: referral.createdAt,
         completedAt: referral.completedAt || null,
       };
     }) || [];
+
+    // ✅ Construire les récompenses par devise
+    const rewardsByCurrencyArray = Object.entries(rewardsByCurrency).map(([currency, amount]) => ({
+      currency: currency,
+      amount: Math.round(amount * 100) / 100,
+    }));
 
     const baseUrl = 'https://favorhelp.com';
     const referralLink = user.referralCode
@@ -2473,12 +2499,16 @@ export class UsersService {
         referralCode: user.referralCode || 'Non généré',
         referralLink: referralLink || 'Non disponible',
         referralActive: user.referralActive !== false,
+        // ✅ Ajout des récompenses par devise
+        rewardsByCurrency: rewardsByCurrencyArray,
+        // ✅ Devise principale (USD par défaut)
+        defaultCurrency: 'USD',
         history,
         referredUsers,
       },
     };
   }
-
+  
   async sendOtp(email: string, lang: string = 'fr'): Promise<any> {
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
 
