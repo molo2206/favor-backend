@@ -198,9 +198,10 @@ export class OrderService {
 
     const hasReferrer = !!(userWithReferrer?.referrer);
 
-    // ✅ Calcul du shippingCost et du montant de parrainage
+    // ✅ Calcul du shippingCost, transactionFee et du montant total
     const shippingCostValue = Number(shippingCost || 0);
-    const totalAmountValue = Number(totalAmount) + shippingCostValue;
+    const transactionFeeValue = Number(transactionFee || 0);
+    const totalAmountValue = Number(totalAmount) + shippingCostValue + transactionFeeValue;
     let parrainageAmount = 0;
     let paymentAmount = totalAmountValue;
 
@@ -232,7 +233,7 @@ export class OrderService {
           throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
         }
 
-        const finalGrandTotal = grandTotal || (totalAmount + (shippingCost || 0));
+        const finalGrandTotal = grandTotal || (totalAmount + (shippingCost || 0) + (transactionFee || 0));
 
         if (!finalGrandTotal || finalGrandTotal <= 0) {
           throw new BadRequestException(
@@ -462,7 +463,7 @@ export class OrderService {
       user,
       totalAmount,
       currency: orderCurrency,
-      grandTotal: isRestaurantAutoPaid ? (grandTotal ?? Number(totalAmount) + (shippingCost ?? 0)) : Number(totalAmount),
+      grandTotal: isRestaurantAutoPaid ? (grandTotal ?? Number(totalAmount) + (shippingCost ?? 0) + (transactionFee ?? 0)) : Number(totalAmount),
       addressUser,
       type,
       invoiceNumber: invoiceNumb,
@@ -544,7 +545,7 @@ export class OrderService {
     // ✅ CRÉER L'OPÉRATION FINANCIÈRE (après la création de la commande)
     // ============================================================
     if (paymentStatus === PaymentStatus.PAID && type === CompanyType.RESTAURANT) {
-      const operationAmount = isRestaurantAutoPaid ? (grandTotal ?? Number(totalAmount) + (shippingCost ?? 0)) : Number(totalAmount);
+      const operationAmount = isRestaurantAutoPaid ? (grandTotal ?? Number(totalAmount) + (shippingCost ?? 0) + (transactionFee ?? 0)) : Number(totalAmount);
       const designation = this.i18nService.translate('order.payment_designation', lang, {
         invoiceNumber: order.invoiceNumber,
         method: selectedMethod,
@@ -650,9 +651,10 @@ export class OrderService {
 
     const hasReferrer = !!(userWithReferrer?.referrer);
 
-    // ✅ Calcul du shippingCost et du montant de parrainage
+    // ✅ Calcul du shippingCost, transactionFee et du montant total
     const shippingCostValue = Number(order.shippingCost || 0);
-    const totalAmount = Number(order.totalAmount) + shippingCostValue;
+    const transactionFeeValue = Number(order.transactionFee || 0);
+    const totalAmount = Number(order.totalAmount) + shippingCostValue + transactionFeeValue;
     let parrainageAmount = 0;
     let paymentAmount = totalAmount;
 
@@ -797,7 +799,7 @@ export class OrderService {
               console.log(`[PayOrder] ✅ Paiement Favor Help réussi: ${paymentAmount} ${order.currency}`);
 
               // ✅ Créer la transaction de paiement
-              const operationAmount = order.grandTotal || order.totalAmount;
+              const operationAmount = order.grandTotal || (Number(order.totalAmount) + Number(order.shippingCost || 0) + Number(order.transactionFee || 0));
               const designation = this.i18nService.translate('order.payment_designation', lang, {
                 invoiceNumber: order.invoiceNumber,
                 method: selectedMethod,
@@ -926,7 +928,7 @@ export class OrderService {
           });
 
           // ✅ 2. Créer la transaction de paiement
-          const operationAmount = order.grandTotal || order.totalAmount;
+          const operationAmount = order.grandTotal || (Number(order.totalAmount) + Number(order.shippingCost || 0) + Number(order.transactionFee || 0));
           const designation = this.i18nService.translate('order.payment_designation', lang, {
             invoiceNumber: order.invoiceNumber,
             method: selectedMethod,
@@ -1653,10 +1655,12 @@ export class OrderService {
         throw new BadRequestException(this.i18nService.translate('order.shipping_cost_required_for_validation', lang));
       }
       order.shippingCost = dto.shippingCost;
-      order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost);
+      // ✅ Ajout de transactionFee dans grandTotal
+      order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost) + Number(order.transactionFee || 0);
     } else if (dto.shippingCost !== undefined) {
       order.shippingCost = dto.shippingCost;
-      order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost);
+      // ✅ Ajout de transactionFee dans grandTotal
+      order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost) + Number(order.transactionFee || 0);
     }
 
     order.status = dto.status;
@@ -1737,8 +1741,11 @@ export class OrderService {
       const hasReferrer = !!(userWithReferrer?.referrer);
 
       const shippingCost = Number(dto.shippingCost || 0);
+      const transactionFee = Number(order.transactionFee || 0);
       const baseAmount = Number(order.totalAmount);
-      let paymentAmount = baseAmount + shippingCost;
+      // ✅ Ajout de transactionFee dans le total
+      const totalWithFees = baseAmount + shippingCost + transactionFee;
+      let paymentAmount = totalWithFees;
 
       // ============================================================
       // ✅ 1. PAYER FAVOR HELP AVEC payWithMobileMoney (TOUJOURS)
@@ -1748,7 +1755,7 @@ export class OrderService {
           paymentAmount,
           order.currency || 'USD',
           `Paiement de commande #${order.invoiceNumber}`,
-          PaymentMethod.CASH,
+          'MOBILE_MONEY',
           lang
         );
 
@@ -1772,10 +1779,9 @@ export class OrderService {
           // ============================================================
           if (hasReferrer && shippingCost > 0) {
             const parrainageAmount = shippingCost * 0.10;
-            paymentAmount = (baseAmount + shippingCost) - parrainageAmount;
 
             console.log(`[Order] 👤 A un parrain: ${hasReferrer}`);
-            console.log(`[Order] Total: ${baseAmount + shippingCost}$`);
+            console.log(`[Order] Total: ${totalWithFees}$`);
             console.log(`[Order] 10% shipping pour parrainage: ${parrainageAmount}$`);
             console.log(`[Order] Montant payé: ${paymentAmount}$`);
 
@@ -1785,7 +1791,7 @@ export class OrderService {
                 description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${order.invoiceNumber}`,
                 currency: order.currency || 'USD',
                 countryCode: 'CD',
-                paymentMethod: PaymentMethod.CASH
+                paymentMethod: 'MOBILE_MONEY',
               };
 
               // ✅ Appel à makeSendparrainage (HELP → PARRAINAGE) - NON BLOQUANT

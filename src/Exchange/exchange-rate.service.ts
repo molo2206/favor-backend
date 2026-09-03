@@ -403,13 +403,13 @@ export class ExchangeRateService {
                         },
                         'AE': {
                             currencies: ['USD', 'AED'],
-                            defaultCurrency: 'AED',
+                            defaultCurrency: 'USD',
                             name: 'United Arab Emirates',
                             code: 'AE'
                         },
                         'ARE': {
-                            currencies: ['USD', 'AED'],
-                            defaultCurrency: 'AED',
+                            currencies: ['USD', 'USD'],
+                            defaultCurrency: 'USD',
                             name: 'United Arab Emirates',
                             code: 'AE'
                         },
