@@ -402,7 +402,7 @@ export class ExchangeRateService {
                             code: 'BJ'
                         },
                         'AE': {
-                            currencies: ['USD', 'AED'],
+                            currencies: ['USD', 'USD'],
                             defaultCurrency: 'USD',
                             name: 'United Arab Emirates',
                             code: 'AE'
