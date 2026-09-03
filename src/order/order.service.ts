@@ -695,7 +695,7 @@ export class OrderService {
         );
       }
 
-      // ✅ Utiliser paymentAmount (réduit si a un parrain)
+      // ✅ Utiliser paymentAmount (réduit si a un parrain) - inclut déjà transactionFee
       const amountForPawapay = paymentAmount.toString().replace(/[^0-9.]/g, '');
 
       console.log('[PayOrder] Montant pour Pawapay:', amountForPawapay);
@@ -786,7 +786,7 @@ export class OrderService {
           try {
             console.log('[PayOrder] Tentative paiement Favor Help...');
             const fpayResponse = await this.fpayService.payWithMobileMoney(
-              paymentAmount,
+              paymentAmount,  // ✅ Inclut déjà transactionFee
               order.currency || 'USD',
               `Paiement de commande #${order.invoiceNumber}`,
               'MOBILE_MONEY',
@@ -894,7 +894,7 @@ export class OrderService {
       }
 
       const fpayData = {
-        amount: paymentAmount,
+        amount: paymentAmount,  // ✅ Inclut déjà transactionFee
         currency: order.currency || 'USD',
         description: `Paiement de commande #${order.invoiceNumber}`,
         access_token: access_token,
