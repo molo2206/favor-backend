@@ -734,7 +734,7 @@ export class FpayService {
                 cleanRecipientApiKey = cleanRecipientApiKey.substring(7);
             }
 
-            // ✅ Nettoyer l'API Key du payeur pour le header (enlever "Bearer " pour l'affichage)
+            // ✅ Nettoyer l'API Key du payeur pour le log
             let cleanPayerApiKey = payerApiKey;
             if (cleanPayerApiKey.startsWith('Bearer ')) {
                 cleanPayerApiKey = cleanPayerApiKey.substring(7);
@@ -756,10 +756,13 @@ export class FpayService {
 
             // ✅ 5. AFFICHER LES TOKENS COMPLETS DANS LES LOGS
             this.logger.log(`📤 ========== ENVOI PARRAINAGE ==========`);
-            this.logger.log(`📤 Payeur (API Key HELP) COMPLETE: ${payerApiKey}`);
-            this.logger.log(`📤 Payeur (sans Bearer): ${cleanPayerApiKey}`);
-            this.logger.log(`📤 Destinataire (API Key PARRAINAGE) COMPLETE: ${recipientApiKey}`);
-            this.logger.log(`📤 Destinataire (sans Bearer): ${cleanRecipientApiKey}`);
+            this.logger.log(`📤 === PAYEUR (FAVOR HELP) ===`);
+            this.logger.log(`📤 API Key HELP COMPLETE: ${payerApiKey}`);
+            this.logger.log(`📤 API Key HELP (sans Bearer): ${cleanPayerApiKey}`);
+            this.logger.log(`📤 === DESTINATAIRE (PARRAINAGE) ===`);
+            this.logger.log(`📤 API Key PARRAINAGE COMPLETE: ${recipientApiKey}`);
+            this.logger.log(`📤 API Key PARRAINAGE (sans Bearer): ${cleanRecipientApiKey}`);
+            this.logger.log(`📤 === INFORMATIONS TRANSFERT ===`);
             this.logger.log(`📤 Montant: ${sendDto.amount} ${currency}`);
             this.logger.log(`📤 PaymentMethod: ${paymentMethod}`);
             this.logger.log(`📤 Description: ${sendDto.description}`);
@@ -787,6 +790,7 @@ export class FpayService {
 
             this.logger.log(`📤 Appel API PARRAINAGE: ${url}`);
             this.logger.log(`📤 Headers Authorization: ${payerApiKey}`);
+            this.logger.log(`📤 Headers Authorization (sans Bearer): ${cleanPayerApiKey}`);
             this.logger.log(`📤 Payload COMPLET:`, JSON.stringify(sendData, null, 2));
 
             const response = await firstValueFrom(
@@ -825,7 +829,6 @@ export class FpayService {
             };
         }
     }
-
     async makeSendFavorhelp(
         sendDto: FpaySendDto,
         currentUser: UserEntity,
