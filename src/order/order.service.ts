@@ -303,6 +303,13 @@ export class OrderService {
       relations: ['referrer'],
     });
 
+    console.log(`🔍 ========== DEBUG PARRAINAGE ==========`);
+    console.log(`🔍 user.id: ${user.id}`);
+    console.log(`🔍 user.referredBy: ${user.referredBy}`);
+    console.log(`🔍 userWithReferrer.referrer: ${userWithReferrer?.referrer?.id || 'null'}`);
+    console.log(`🔍 userWithReferrer.referrer?.fullName: ${userWithReferrer?.referrer?.fullName || 'null'}`);
+    console.log(`🔍 hasReferrer: ${!!(userWithReferrer?.referrer)}`);
+    console.log(`🔍 =========================================`);
     const hasReferrer = !!(userWithReferrer?.referrer);
 
     // ✅ Calcul du shippingCost, transactionFee et du montant total
