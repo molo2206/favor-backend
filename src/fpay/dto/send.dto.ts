@@ -5,13 +5,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class FpaySendDto {
-    @ApiProperty({
-        example: '3a4a6098-622a-47f4-a10a-76cc00cf1aea',
-        description: 'ID du client payeur (expéditeur)'
-    })
-    @IsUUID()
-    @IsNotEmpty()
-    userId: string;
 
     @ApiProperty({
         example: 100,

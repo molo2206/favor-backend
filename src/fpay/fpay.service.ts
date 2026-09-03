@@ -707,56 +707,27 @@ export class FpayService {
                 };
             }
 
-            let cleanApiKey = this.parrainageApiKey;
-            if (cleanApiKey.startsWith('Bearer ')) {
-                cleanApiKey = cleanApiKey.substring(7);
-            }
-
-            let recipientPhoneOrCode: string | null = null;
-
-            try {
-                const apiKeyParts = cleanApiKey.split('.');
-                if (apiKeyParts.length === 3) {
-                    const payloadJson = Buffer.from(apiKeyParts[1], 'base64').toString('utf-8');
-                    const payload = JSON.parse(payloadJson);
-                    recipientPhoneOrCode = payload.phone || payload.sub;
-                }
-            } catch (error) {
-                this.logger.error(`❌ Erreur lors du décodage de l'API Key PARRAINAGE: ${error.message}`);
+            // ✅ 1. API Key du PAYEUR (celui qui envoie l'argent)
+            const payerApiKey = this.apiKey;  // ✅ FPAY_API_KEY_HELP
+            if (!payerApiKey) {
+                this.logger.error('❌ API Key HELP (payeur) non configurée');
                 return {
                     success: false,
-                    message: 'Erreur de configuration de l\'API Key PARRAINAGE',
+                    message: 'Configuration API Key HELP manquante',
                 };
             }
 
-            if (!recipientPhoneOrCode) {
+            // ✅ 2. API Key du DESTINATAIRE (celui qui reçoit l'argent)
+            const recipientApiKey = this.parrainageApiKey;  // ✅ FPAY_API_KEY_PARRAINAGE
+            if (!recipientApiKey) {
+                this.logger.error('❌ API Key PARRAINAGE (destinataire) non configurée');
                 return {
                     success: false,
-                    message: 'Impossible d\'extraire le destinataire de l\'API Key PARRAINAGE',
+                    message: 'Configuration API Key PARRAINAGE manquante',
                 };
             }
 
-            // ✅ Récupérer le client par son userIdFpay
-            const client = await this.userRepository.findOne({
-                where: { userIdFpay: sendDto.userId },
-            });
-
-            if (!client) {
-                this.logger.warn(`⚠️ Client avec userIdFpay ${sendDto.userId} non trouvé`);
-                return {
-                    success: false,
-                    message: `Client avec userIdFpay ${sendDto.userId} non trouvé`,
-                };
-            }
-
-            if (client.phone === recipientPhoneOrCode) {
-                return {
-                    success: false,
-                    message: 'Vous ne pouvez pas vous envoyer d\'argent à vous-même',
-                };
-            }
-
-            // ✅ Vérifier le paymentMethod
+            // ✅ 3. Vérifier le paymentMethod
             const validPaymentMethods = ['MOBILE_MONEY', 'CASH', 'BANK_TRANSFER', 'CARD'];
             const paymentMethod = sendDto.paymentMethod || 'MOBILE_MONEY';
 
@@ -767,24 +738,36 @@ export class FpayService {
                 };
             }
 
-            this.logger.log(`📤 Envoi PARRAINAGE: ${client.phone} → ${recipientPhoneOrCode} (${paymentMethod})`);
+            // ✅ 4. Déterminer la devise
+            const currency = sendDto.currency || 'USD';
 
+            this.logger.log(`📤 Envoi PARRAINAGE:`);
+            this.logger.log(`📤 Payeur (API Key HELP): ${this.apiKey.substring(0, 30)}...`);
+            this.logger.log(`📤 Destinataire (API Key PARRAINAGE): ${this.parrainageApiKey.substring(0, 30)}...`);
+            this.logger.log(`📤 Montant: ${sendDto.amount} ${currency}`);
+            this.logger.log(`📤 PaymentMethod: ${paymentMethod}`);
+
+            // ✅ 5. Appel à l'API externe
             const url = `${this.fpayApiUrl}/api/external/send/parrainage`;
+
+            // ✅ 6. Payload : on envoie l'API Key du destinataire (PARRAINAGE)
             const sendData = {
-                userId: sendDto.userId,
+                toApiKey: this.parrainageApiKey,  // ✅ API Key du DESTINATAIRE (PARRAINAGE)
                 amount: sendDto.amount,
-                description: sendDto.description || `Envoi de parrainage vers ${recipientPhoneOrCode}`,
-                currency: sendDto.currency || 'USD',
+                description: sendDto.description || `Envoi de parrainage`,
+                currency: currency,
                 countryCode: sendDto.countryCode || 'CD',
                 paymentMethod: paymentMethod,
             };
 
+            // ✅ 7. Headers : Authorization avec l'API Key du payeur (HELP)
             const headers = {
-                'Authorization': this.parrainageApiKey,
+                'Authorization': this.apiKey,  // ✅ API Key du PAYEUR (HELP)
                 'Content-Type': 'application/json',
             };
 
             this.logger.log(`📤 Appel API PARRAINAGE: ${url}`);
+            this.logger.log(`📤 Headers: Authorization: ${this.apiKey.substring(0, 30)}...`);
             this.logger.log(`📤 Payload:`, JSON.stringify(sendData, null, 2));
 
             const response = await firstValueFrom(
@@ -809,7 +792,6 @@ export class FpayService {
                 this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
             }
 
-            // ✅ Retourner un objet sans la propriété 'error'
             return {
                 success: false,
                 message: error.message || 'Erreur lors de l\'envoi du parrainage',
