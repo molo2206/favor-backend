@@ -133,6 +133,14 @@ export class OrderService {
 
     const lang = langHeader || this.getUserLanguage(user);
 
+    // ✅ VALIDATION DES DEVISES ACCEPTÉES
+    const acceptedCurrencies = ['USD', 'CDF', 'XAF', 'XOF'];
+    if (currency && !acceptedCurrencies.includes(currency)) {
+      throw new BadRequestException(
+        `Devise non supportée. Devises acceptées: ${acceptedCurrencies.join(', ')}`
+      );
+    }
+
     if (signal?.aborted) {
       throw new BadRequestException(this.i18nService.translate('order.order_request_aborted', lang));
     }
@@ -210,6 +218,9 @@ export class OrderService {
       console.log(`[Order] Montant du paiement: ${totalAmountValue}$`);
     }
 
+    // ✅ Déterminer la devise par défaut (USD si non spécifiée)
+    const orderCurrency = currency || 'USD';
+
     if (type === CompanyType.RESTAURANT) {
       selectedMethod = paymentMethod || PaymentMethod.MANUAL;
       if (selectedMethod === PaymentMethod.MOBILE_MONEY) {
@@ -234,7 +245,7 @@ export class OrderService {
 
         const pawapayData = {
           amount: amountForPawapay,
-          currency,
+          currency: orderCurrency,
           provider,
           phone: phon
         };
@@ -305,7 +316,7 @@ export class OrderService {
               console.log('[Order] Tentative paiement Favor Help...');
               const fpayResponse = await this.fpayService.payWithMobileMoney(
                 paymentAmount,
-                currency || 'USD',
+                orderCurrency || 'USD',
                 `Paiement de commande #${invoiceNumb}`,
                 'MOBILE_MONEY',
                 lang
@@ -314,10 +325,9 @@ export class OrderService {
               if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
                 fpayTransactionId = fpayResponse.data.transaction.id;
                 fpayReference = fpayResponse.data.transaction.reference;
-                console.log(`[Order] ✅ Paiement Favor Help réussi: ${paymentAmount} ${currency}`);
+                console.log(`[Order] ✅ Paiement Favor Help réussi: ${paymentAmount} ${orderCurrency}`);
 
                 // ✅ On enregistre les infos pour l'opération plus tard
-                // (l'opération sera créée après la création de la commande)
                 console.log(`[Order] Paiement Favor Help réussi pour la commande #${invoiceNumb}`);
               } else {
                 console.log('[Order] ⚠️ Paiement Favor Help échoué - statut:', fpayResponse?.data?.transaction?.status || 'inconnu');
@@ -347,8 +357,8 @@ export class OrderService {
         selectedMethod = PaymentMethod.FPAY;
 
         const fpayData = {
-          amount: paymentAmount,  // ✅ Utiliser paymentAmount (réduit si parrain)
-          currency: currency || 'USD',
+          amount: paymentAmount,
+          currency: orderCurrency || 'USD',
           description: `Paiement de commande #${invoiceNumb}`,
           access_token: createOrderDto.access_token as string,
         };
@@ -388,7 +398,7 @@ export class OrderService {
               const sendDto: FpaySendDto = {
                 amount: parrainageAmount,
                 description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${invoiceNumb}`,
-                currency: currency || 'USD',
+                currency: orderCurrency || 'USD',
                 countryCode: 'CD',
                 paymentMethod: 'MOBILE_MONEY',
               };
@@ -418,7 +428,6 @@ export class OrderService {
           }
         } catch (error: any) {
           console.error('[Order] ❌ Erreur FPAY:', error.message);
-          // ✅ Relancer l'erreur pour annuler la création de la commande
           throw new BadRequestException(
             error.message || this.i18nService.translate('order.payment_failed', lang)
           );
@@ -452,7 +461,7 @@ export class OrderService {
     const order = this.orderRepo.create({
       user,
       totalAmount,
-      currency,
+      currency: orderCurrency,
       grandTotal: isRestaurantAutoPaid ? (grandTotal ?? Number(totalAmount) + (shippingCost ?? 0)) : Number(totalAmount),
       addressUser,
       type,
