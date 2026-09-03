@@ -2709,6 +2709,8 @@ export class UsersService {
       .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
       .leftJoinAndSelect('userPlatformRoles.role', 'role')
       .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+      .leftJoinAndSelect('defaultAddress.country', 'defaultAddressCountry')  // ✅ Ajout du pays
+      .leftJoinAndSelect('defaultAddress.city', 'defaultAddressCity')        // ✅ Ajout de la ville
       .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
       .leftJoinAndSelect(
         'userCompanyResources.resource',
@@ -2776,6 +2778,8 @@ export class UsersService {
         .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
         .leftJoinAndSelect('userPlatformRoles.role', 'role')
         .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+        .leftJoinAndSelect('defaultAddress.country', 'defaultAddressCountry')
+        .leftJoinAndSelect('defaultAddress.city', 'defaultAddressCity')
         .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
         .leftJoinAndSelect(
           'userCompanyResources.resource',
@@ -2946,6 +2950,7 @@ export class UsersService {
       }),
     );
 
+    // ✅ defaultAddress avec country et city
     const defaultAddress = userWithoutPassword.defaultAddress
       ? {
         id: userWithoutPassword.defaultAddress.id,
@@ -2957,8 +2962,27 @@ export class UsersService {
         isDefault: userWithoutPassword.defaultAddress.isDefault,
         latitude: userWithoutPassword.defaultAddress.latitude,
         longitude: userWithoutPassword.defaultAddress.longitude,
+        countryId: userWithoutPassword.defaultAddress.countryId,
+        cityId: userWithoutPassword.defaultAddress.cityId,
         createdAt: userWithoutPassword.defaultAddress.createdAt,
         updatedAt: userWithoutPassword.defaultAddress.updatedAt,
+        country: userWithoutPassword.defaultAddress.country
+          ? {
+            id: userWithoutPassword.defaultAddress.country.id,
+            name: userWithoutPassword.defaultAddress.country.name,
+            code: userWithoutPassword.defaultAddress.country.code,
+            status: userWithoutPassword.defaultAddress.country.status,
+            createdAt: userWithoutPassword.defaultAddress.country.createdAt,
+            updatedAt: userWithoutPassword.defaultAddress.country.updatedAt,
+            flag: userWithoutPassword.defaultAddress.country.flag,
+          }
+          : null,
+        city: userWithoutPassword.defaultAddress.city
+          ? {
+            id: userWithoutPassword.defaultAddress.city.id,
+            name: userWithoutPassword.defaultAddress.city.name,
+          }
+          : null,
       }
       : null;
 
