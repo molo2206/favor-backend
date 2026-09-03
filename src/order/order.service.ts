@@ -109,6 +109,65 @@ export class OrderService {
     return supported.includes(lang) ? lang : 'fr';
   }
 
+  private async generateReferralCode(
+    userId: string,
+    existingCodes?: string[],
+  ): Promise<string> {
+    const userIdShort = userId.substring(0, 4).toUpperCase();
+
+    // ✅ Générer un code aléatoire
+    let code: string;
+    let exists = true;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    // ✅ Liste des codes à vérifier
+    const codesToCheck = existingCodes || [];
+
+    do {
+      // Générer une partie aléatoire
+      const random = Math.random()
+        .toString(36)
+        .substring(2, 8)
+        .toUpperCase()
+        .padStart(6, '0');
+
+      code = `${userIdShort}${random}`; // ✅ Sans REF et sans tirets
+
+      // Vérifier si le code existe déjà
+      const existingUser = await this.userRepository.findOne({
+        where: { referralCode: code },
+      });
+
+      exists = !!existingUser || codesToCheck.includes(code);
+      attempts++;
+
+    } while (exists && attempts < maxAttempts);
+
+    // ✅ Fallback si jamais collision après 10 tentatives
+    if (exists) {
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const randomSuffix = Math.random()
+        .toString(36)
+        .substring(2, 4)
+        .toUpperCase();
+      code = `${timestamp.slice(-6)}${randomSuffix}`; // ✅ Sans REF et sans tirets
+
+      // Vérifier une dernière fois le fallback
+      const existingUser = await this.userRepository.findOne({
+        where: { referralCode: code },
+      });
+
+      if (existingUser) {
+        // Fallback ultime avec UUID
+        const uuidPart = uuidv4().substring(0, 8).toUpperCase();
+        code = `${uuidPart}`; // ✅ Sans REF et sans tirets
+      }
+    }
+
+    return code;
+  }
+
   private async updateReferralWithAmount(
     referrerId: string,
     referredId: string,
@@ -185,7 +244,7 @@ export class OrderService {
         const newReferral = this.referralRepo.create({
           referrerId: referrerId,
           referredId: referredId,
-          referralCode: `REF-${Date.now()}`,
+          referralCode: `${Date.now()}`,
           status: ReferralStatus.COMPLETED,
           rewardAmount: amount,
           currency: validCurrency,
