@@ -336,8 +336,9 @@ export class ExchangeRateService {
             console.log(`🖥️ IP Publique du serveur: ${serverPublicIp}`);
             console.log(`🖥️ IP Locale du serveur: ${serverLocalIp}`);
             console.log(`🌍 IP du client: ${ip}`);
+            console.log(`📍 CountryId fourni: ${countryId || 'Aucun'}`);
 
-            // ✅ Si countryId est fourni, récupérer le pays (uniquement pour le nom et le code)
+            // ✅ PRIORITÉ : Si countryId est fourni, l'utiliser en premier
             if (countryId) {
                 const country = await this.countryRepository.findOne({
                     where: { id: countryId },
@@ -346,10 +347,78 @@ export class ExchangeRateService {
                 if (country && country.code) {
                     countryCode = country.code;
                     countryName = country.name;
-                    console.log(`🌍 Pays trouvé: ${country.name} (${country.code})`);
+                    console.log(`🌍 Pays trouvé via countryId: ${country.name} (${country.code})`);
+
+                    // ✅ Mapping des pays avec leurs devises
+                    const countryCurrencyMap: Record<string, {
+                        currencies: string[];
+                        defaultCurrency: string;
+                        name: string;
+                        code: string;
+                    }> = {
+                        'CD': {
+                            currencies: ['USD', 'CDF'],
+                            defaultCurrency: 'CDF',
+                            name: 'République Démocratique du Congo',
+                            code: 'CD'
+                        },
+                        'COD': {
+                            currencies: ['USD', 'CDF'],
+                            defaultCurrency: 'CDF',
+                            name: 'République Démocratique du Congo',
+                            code: 'CD'
+                        },
+                        'BJ': {
+                            currencies: ['USD', 'XOF'],
+                            defaultCurrency: 'XOF',
+                            name: 'Bénin',
+                            code: 'BJ'
+                        },
+                        'BEN': {
+                            currencies: ['USD', 'XOF'],
+                            defaultCurrency: 'XOF',
+                            name: 'Bénin',
+                            code: 'BJ'
+                        },
+                        'AE': {
+                            currencies: ['USD', 'AED'],
+                            defaultCurrency: 'AED',
+                            name: 'United Arab Emirates',
+                            code: 'AE'
+                        },
+                        'ARE': {
+                            currencies: ['USD', 'AED'],
+                            defaultCurrency: 'AED',
+                            name: 'United Arab Emirates',
+                            code: 'AE'
+                        },
+                        'UG': {
+                            currencies: ['USD', 'UGX'],
+                            defaultCurrency: 'UGX',
+                            name: 'Uganda',
+                            code: 'UG'
+                        },
+                        'BI': {
+                            currencies: ['USD', 'BIF'],
+                            defaultCurrency: 'BIF',
+                            name: 'Burundi',
+                            code: 'BI'
+                        }
+                    };
+
+                    const countryData = countryCurrencyMap[country.code];
+                    if (countryData) {
+                        defaultCurrency = countryData.defaultCurrency;
+                        console.log(`💰 Devise par défaut pour ${country.name}: ${defaultCurrency}`);
+                    }
+                } else {
+                    console.log(`⚠️ Pays avec ID ${countryId} non trouvé`);
                 }
-            } else {
-                // ✅ Utiliser l'IP du client pour la détection (uniquement pour le nom et le code)
+            }
+
+            // ✅ Si countryId n'est PAS fourni OU pays non trouvé, alors détection par IP
+            if (!countryCode) {
+                // ✅ Utiliser l'IP du client pour la détection
                 let ipToUse = ip;
 
                 if (ipToUse === 'server' || ipToUse === '127.0.0.1' || ipToUse === '::1' || ipToUse === 'localhost') {
@@ -424,7 +493,7 @@ export class ExchangeRateService {
                 }
             }
 
-            // ✅ Récupérer TOUTES les devises de la table exchange_rate (SANS FILTRE PAYS)
+            // ✅ Récupérer TOUTES les devises (SANS FILTRE PAYS)
             const allExchangeRates = await this.exchangeRateRepo
                 .createQueryBuilder('rate')
                 .where('rate.deleted = :deleted', { deleted: false })
@@ -444,33 +513,27 @@ export class ExchangeRateService {
                     status: rate.status
                 }));
             } else {
-                // Fallback si aucune devise n'est trouvée
-                const defaultRate = await this.exchangeRateRepo.findOne({
-                    where: { currency: 'USD', deleted: false, status: true },
-                    select: ['currency', 'value', 'status'],
-                });
-
-                if (defaultRate) {
-                    finalCurrencies = [{
-                        currency: defaultRate.currency,
-                        value: Number(defaultRate.value),
-                        status: defaultRate.status
-                    }];
-                } else {
-                    finalCurrencies = [{ currency: 'USD', value: 1, status: true }];
-                }
+                finalCurrencies = [{ currency: 'USD', value: 1, status: true }];
             }
 
             // ✅ Déterminer la devise par défaut
-            // La devise par défaut est toujours USD (ou la première devise disponible)
-            if (finalCurrencies.length > 0) {
-                defaultCurrency = finalCurrencies[0].currency;
-            }
-
             // Si USD existe, le mettre par défaut
             const usdCurrency = finalCurrencies.find(c => c.currency === 'USD');
             if (usdCurrency) {
                 defaultCurrency = 'USD';
+            }
+
+            // ✅ Si un pays spécifique a une devise par défaut différente
+            if (countryCode === 'AE' || countryCode === 'ARE') {
+                defaultCurrency = 'AED';
+            } else if (countryCode === 'CD' || countryCode === 'COD') {
+                defaultCurrency = 'CDF';
+            } else if (countryCode === 'BJ' || countryCode === 'BEN') {
+                defaultCurrency = 'XOF';
+            } else if (countryCode === 'UG') {
+                defaultCurrency = 'UGX';
+            } else if (countryCode === 'BI') {
+                defaultCurrency = 'BIF';
             }
 
             return {
