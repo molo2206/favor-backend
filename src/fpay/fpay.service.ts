@@ -1078,6 +1078,88 @@ export class FpayService {
         }
     }
 
+    async getLastPendingTransaction(
+        userId: string,
+        type?: 'DEPOSIT' | 'WITHDRAW' | 'TRANSFER' | 'PAYMENT' | 'REFUND',
+    ): Promise<any> {
+        try {
+            this.logger.log(`🔍 Recherche de la dernière transaction PENDING pour ${userId}${type ? ` (type: ${type})` : ''}`);
+
+            // ✅ Utiliser la fonction existante qui gère correctement la structure
+            const result = await this.getWalletBalanceAndTransactions(
+                userId,
+                1,          // page
+                10,         // limit
+                undefined,  // startDate
+                undefined,  // endDate
+                type,       // type
+                undefined,  // status (on va filtrer nous-mêmes)
+                undefined,  // movement
+                undefined,  // search
+            );
+
+            this.logger.log(`📦 Résultat:`, JSON.stringify(result, null, 2));
+
+            // ✅ Extraire les transactions (avec gestion des différentes structures)
+            let transactions: any[] = [];
+
+            if (result?.data?.transactions && Array.isArray(result.data.transactions)) {
+                transactions = result.data.transactions;
+            } else if (result?.data?.transactions?.data && Array.isArray(result.data.transactions.data)) {
+                transactions = result.data.transactions.data;
+            } else if (result?.data && Array.isArray(result.data)) {
+                transactions = result.data;
+            } else if (Array.isArray(result)) {
+                transactions = result;
+            }
+
+            if (!transactions || transactions.length === 0) {
+                this.logger.log(`ℹ️ Aucune transaction trouvée pour ${userId}`);
+                return null;
+            }
+
+            this.logger.log(`📊 ${transactions.length} transaction(s) trouvée(s)`);
+
+            // ✅ Filtrer par status PENDING
+            const pendingTransactions = transactions.filter(
+                (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
+            );
+
+            this.logger.log(`⏳ ${pendingTransactions.length} transaction(s) en PENDING`);
+
+            if (pendingTransactions.length === 0) {
+                return null;
+            }
+
+            // ✅ Trier par date (plus récent d'abord)
+            const sortedPending = pendingTransactions.sort((a: any, b: any) => {
+                const dateA = new Date(a.createdAt || a.created_at || 0);
+                const dateB = new Date(b.createdAt || b.created_at || 0);
+                return dateB.getTime() - dateA.getTime();
+            });
+
+            const lastPending = sortedPending[0];
+
+            this.logger.log(`✅ Dernière transaction PENDING: ${lastPending.id || 'N/A'}`);
+
+            return {
+                id: lastPending.id || lastPending.transactionId,
+                amount: lastPending.amount,
+                currency: lastPending.currency,
+                type: lastPending.type,
+                status: lastPending.status,
+                createdAt: lastPending.createdAt || lastPending.created_at,
+                description: lastPending.description,
+                reference: lastPending.reference,
+                ...lastPending,
+            };
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur: ${error.message}`);
+            return null;
+        }
+    }
+
     async requestDepositWithOtp(
         dto: {
             userId: string;
@@ -1130,25 +1212,47 @@ export class FpayService {
                     undefined,        // movement
                     undefined,        // search
                 );
-                this.logger.log(`📊 Transactions trouvées: ${JSON.stringify(transactionsData, null, 2)}`);
 
-                // ✅ Vérifier s'il y a des transactions en PENDING
-                const pendingTransactions = transactionsData?.data?.transactions?.data?.filter(
-                    (tx: any) => tx.status === 'PENDING'
-                ) || [];
+                this.logger.log(`📊 TransactionsData reçu:`, JSON.stringify(transactionsData, null, 2));
 
-                const pendingFromMain = transactionsData?.data?.filter?.(
-                    (tx: any) => tx.status === 'PENDING'
-                ) || [];
+                // ✅ Extraction CORRECTE des transactions
+                let allPending: any[] = [];
 
-                const allPending = [...pendingTransactions, ...pendingFromMain];
+                // Structure 1: data.transactions (tableau direct) - C'est la bonne !
+                if (transactionsData?.data?.transactions && Array.isArray(transactionsData.data.transactions)) {
+                    allPending = transactionsData.data.transactions.filter(
+                        (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
+                    );
+                    this.logger.log(`📊 Structure 1: data.transactions (${allPending.length} pending)`);
+                }
+                // Structure 2: data (tableau direct)
+                else if (transactionsData?.data && Array.isArray(transactionsData.data)) {
+                    allPending = transactionsData.data.filter(
+                        (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
+                    );
+                    this.logger.log(`📊 Structure 2: data (${allPending.length} pending)`);
+                }
+                // Structure 3: data.transactions.data (imbriqué)
+                else if (transactionsData?.data?.transactions?.data && Array.isArray(transactionsData.data.transactions.data)) {
+                    allPending = transactionsData.data.transactions.data.filter(
+                        (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
+                    );
+                    this.logger.log(`📊 Structure 3: data.transactions.data (${allPending.length} pending)`);
+                }
+                // Structure 4: response.data direct
+                else if (Array.isArray(transactionsData)) {
+                    allPending = transactionsData.filter(
+                        (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
+                    );
+                    this.logger.log(`📊 Structure 4: response.data (${allPending.length} pending)`);
+                }
 
                 if (allPending.length > 0) {
                     this.logger.log(`⚠️ ${allPending.length} transaction(s) en attente trouvée(s)`);
 
                     const pendingTx = allPending[0];
-                    const pendingAmount = pendingTx.amount || pendingTx.amount;
-                    const pendingCurrency = pendingTx.currency || pendingTx.currency;
+                    const pendingAmount = pendingTx.amount || 0;
+                    const pendingCurrency = pendingTx.currency || 'USD';
 
                     throw new HttpException(
                         {
@@ -1419,7 +1523,6 @@ export class FpayService {
             try {
                 this.logger.log(`🔄 Diminution des points de parrainage pour ${dto.userId}: ${dto.amount} ${dto.currency}`);
 
-                // ✅ Récupérer l'utilisateur avec son historique de parrainage
                 const userWithReferrals = await this.userRepository.findOne({
                     where: { userIdFpay: dto.userId },
                     relations: ['referralHistory'],
@@ -1428,11 +1531,9 @@ export class FpayService {
                 if (!userWithReferrals) {
                     this.logger.warn(`⚠️ Utilisateur non trouvé pour la diminution des points`);
                 } else {
-                    // ✅ Calculer le total des points dans cette devise
                     let totalPointsInCurrency = 0;
                     const referralsToUpdate: { id: string; amount: number; currency: string }[] = [];
 
-                    // ✅ Parcourir l'historique des parrainages pour trouver les points dans la devise
                     for (const referral of userWithReferrals.referralHistory || []) {
                         const referralCurrency = referral.currency || 'USD';
                         const referralAmount = Number(referral.rewardAmount) || 0;
@@ -1447,12 +1548,9 @@ export class FpayService {
                         }
                     }
 
-                    // ✅ Vérifier si l'utilisateur a assez de points
                     if (totalPointsInCurrency < dto.amount) {
                         this.logger.warn(`⚠️ Points insuffisants en ${dto.currency}. Disponible: ${totalPointsInCurrency}, Demandé: ${dto.amount}`);
-                        // On ne bloque pas le dépôt, on logge juste
                     } else {
-                        // ✅ Diminuer les points en commençant par les plus récents
                         let remainingAmount = dto.amount;
                         const sortedReferrals = referralsToUpdate.sort((a, b) => {
                             const refA = userWithReferrals.referralHistory?.find(r => r.id === a.id);
@@ -1481,7 +1579,6 @@ export class FpayService {
                             await this.referralRepository.save(referral);
                         }
 
-                        // ✅ Mettre à jour les points de l'utilisateur
                         const totalAllCurrencies = userWithReferrals.referralHistory?.reduce((sum, r) => {
                             return sum + (Number(r.rewardAmount) || 0);
                         }, 0) || 0;
@@ -1493,7 +1590,6 @@ export class FpayService {
                     }
                 }
             } catch (referralError) {
-                // ✅ Ne pas bloquer le dépôt si la diminution des points échoue
                 this.logger.error(`❌ Erreur lors de la diminution des points: ${referralError.message}`);
             }
 
@@ -1512,88 +1608,6 @@ export class FpayService {
             }
 
             throw this.handleError(error);
-        }
-    }
-
-    async getLastPendingTransaction(
-        userId: string,
-        type?: 'DEPOSIT' | 'WITHDRAW' | 'TRANSFER' | 'PAYMENT' | 'REFUND',
-    ): Promise<any> {
-        try {
-            this.logger.log(`🔍 Recherche de la dernière transaction PENDING pour ${userId}${type ? ` (type: ${type})` : ''}`);
-
-            // ✅ Utiliser la fonction existante qui gère correctement la structure
-            const result = await this.getWalletBalanceAndTransactions(
-                userId,
-                1,          // page
-                10,         // limit
-                undefined,  // startDate
-                undefined,  // endDate
-                type,       // type
-                undefined,  // status (on va filtrer nous-mêmes)
-                undefined,  // movement
-                undefined,  // search
-            );
-
-            this.logger.log(`📦 Résultat:`, JSON.stringify(result, null, 2));
-
-            // ✅ Extraire les transactions (avec gestion des différentes structures)
-            let transactions: any[] = [];
-
-            if (result?.data?.transactions && Array.isArray(result.data.transactions)) {
-                transactions = result.data.transactions;
-            } else if (result?.data?.transactions?.data && Array.isArray(result.data.transactions.data)) {
-                transactions = result.data.transactions.data;
-            } else if (result?.data && Array.isArray(result.data)) {
-                transactions = result.data;
-            } else if (Array.isArray(result)) {
-                transactions = result;
-            }
-
-            if (!transactions || transactions.length === 0) {
-                this.logger.log(`ℹ️ Aucune transaction trouvée pour ${userId}`);
-                return null;
-            }
-
-            this.logger.log(`📊 ${transactions.length} transaction(s) trouvée(s)`);
-
-            // ✅ Filtrer par status PENDING
-            const pendingTransactions = transactions.filter(
-                (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
-            );
-
-            this.logger.log(`⏳ ${pendingTransactions.length} transaction(s) en PENDING`);
-
-            if (pendingTransactions.length === 0) {
-                return null;
-            }
-
-            // ✅ Trier par date (plus récent d'abord)
-            const sortedPending = pendingTransactions.sort((a: any, b: any) => {
-                const dateA = new Date(a.createdAt || a.created_at || 0);
-                const dateB = new Date(b.createdAt || b.created_at || 0);
-                return dateB.getTime() - dateA.getTime();
-            });
-
-            const lastPending = sortedPending[0];
-
-            this.logger.log(`✅ Dernière transaction PENDING: ${lastPending.id || 'N/A'}`);
-
-            return {
-                id: lastPending.id || lastPending.transactionId,
-                amount: lastPending.amount,
-                currency: lastPending.currency,
-                type: lastPending.type,
-                status: lastPending.status,
-                createdAt: lastPending.createdAt || lastPending.created_at,
-                description: lastPending.description,
-                reference: lastPending.reference,
-                ...lastPending,
-            };
-
-        } catch (error) {
-            this.logger.error(`❌ Erreur: ${error.message}`);
-            return null;
         }
     }
 
