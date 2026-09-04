@@ -619,6 +619,8 @@ export class FpayController {
     // ============================================================
     // src/modules/fpay/fpay.controller.ts
 
+    // src/modules/fpay/fpay.controller.ts
+
     @Post('deposit/request')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
@@ -685,10 +687,15 @@ export class FpayController {
             }
 
             // ============================================================
-            // ✅ VÉRIFIER LES POINTS DE PARRAINAGE PAR DEVISE
+            // ✅ ✅ ✅ VÉRIFIER LES POINTS DE PARRAINAGE EN PREMIER
             // ============================================================
+            this.logger.log(`🔍 Vérification des points de parrainage pour l'utilisateur ${user.id} en ${currency}`);
+
             // Récupérer les points de parrainage de l'utilisateur
             const referralPoints = await this.usersService.getReferralPoints(user.id, lang);
+
+            // Log pour déboguer
+            this.logger.log(`📊 Points de parrainage: ${JSON.stringify(referralPoints.data.rewardsByCurrency)}`);
 
             // Chercher les points dans la devise demandée
             const pointsInCurrency = referralPoints.data.rewardsByCurrency?.find(
@@ -700,11 +707,12 @@ export class FpayController {
                 // Récupérer les devises disponibles
                 const availableCurrencies = referralPoints.data.rewardsByCurrency?.map((r: any) => r.currency).join(', ') || 'Aucune';
 
+                this.logger.warn(`❌ Aucun point en ${currency}. Devises disponibles: ${availableCurrencies}`);
+
                 throw new HttpException(
                     {
                         status: 'error',
-                        message: `Vous n'avez pas d'argent de parrainage en ${currency}. 
-                              Devises disponibles: ${availableCurrencies}`,
+                        message: `Vous n'avez pas de points de parrainage en ${currency}. Devises disponibles: ${availableCurrencies}`,
                         availableCurrencies: referralPoints.data.rewardsByCurrency || [],
                     },
                     HttpStatus.BAD_REQUEST,
@@ -713,12 +721,12 @@ export class FpayController {
 
             // ✅ Vérifier si l'utilisateur a assez de points dans cette devise
             if (pointsInCurrency.amount < body.amount) {
+                this.logger.warn(`❌ Points insuffisants en ${currency}: ${pointsInCurrency.amount} < ${body.amount}`);
+
                 throw new HttpException(
                     {
                         status: 'error',
-                        message: `Argent insuffisants en ${currency}. 
-                              Disponible: ${pointsInCurrency.amount.toFixed(2)} ${currency}, 
-                              Demandé: ${body.amount} ${currency}`,
+                        message: `Points insuffisants en ${currency}. Disponible: ${pointsInCurrency.amount.toFixed(2)} ${currency}, Demandé: ${body.amount} ${currency}`,
                         available: pointsInCurrency.amount,
                         requested: body.amount,
                         currency: currency,
@@ -730,7 +738,7 @@ export class FpayController {
             this.logger.log(`✅ Points de parrainage vérifiés: ${pointsInCurrency.amount} ${currency} disponibles`);
 
             // ============================================================
-            // ✅ SUITE DE LA LOGIQUE - APPEL AU SERVICE
+            // ✅ SUITE DE LA LOGIQUE - APPEL AU SERVICE (UNIQUEMENT SI POINTS SUFFISANTS)
             // ============================================================
             this.logger.log(`📤 Demande de dépôt: ${body.amount} ${currency} pour l'utilisateur ${user.id} (FPay ID: ${user.userIdFpay})`);
             this.logger.log(`📤 OTP fourni: ${body.otpCode ? '✅' : '❌'}`);
