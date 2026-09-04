@@ -1084,7 +1084,13 @@ export class FpayService {
         }
     }
 
+    // src/modules/fpay/fpay.service.ts
 
+    /**
+     * Demande de dépôt avec vérification OTP
+     * Étape 1: Envoie un OTP par SMS ou email
+     * Étape 2: Vérifie l'OTP et effectue la demande de dépôt
+     */
     async requestDepositWithOtp(
         dto: {
             userId: string;
@@ -1130,6 +1136,7 @@ export class FpayService {
                 const generatedOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
                 const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
+                // ✅ Récupérer l'utilisateur complet pour la relation
                 const user = await this.userRepository.findOne({
                     where: { userIdFpay: dto.userId },
                     select: ['id', 'email', 'phone', 'fullName'],
@@ -1142,7 +1149,18 @@ export class FpayService {
                     );
                 }
 
-                const destination = user.email || user.phone;
+                // ✅ Utiliser l'email ou le téléphone
+                let destination: string | null = null;
+                let destinationType: 'email' | 'sms' = 'email';
+
+                if (user.email) {
+                    destination = user.email;
+                    destinationType = 'email';
+                } else if (user.phone) {
+                    destination = user.phone;
+                    destinationType = 'sms';
+                }
+
                 if (!destination) {
                     throw new HttpException(
                         'Aucun email ou téléphone trouvé pour cet utilisateur. Veuillez mettre à jour votre profil.',
@@ -1150,21 +1168,28 @@ export class FpayService {
                     );
                 }
 
-                // ✅ Supprimer les anciens OTP non utilisés
+                this.logger.log(`📤 Destination: ${destination} (${destinationType})`);
+
+                // ✅ Marquer les anciens OTPs comme utilisés
                 await this.otpRepository.update(
                     { email: destination, isUsed: false },
                     { isUsed: true }
                 );
 
+                // ✅ Créer l'OTP avec la relation user
                 const otp = this.otpRepository.create({
                     email: destination,
                     otpCode: generatedOtpCode,
                     expiresAt: otpExpiry,
                     isUsed: false,
+                    user: user,  // ✅ Assigner l'utilisateur complet
                 });
                 await this.otpRepository.save(otp);
 
-                if (user.email) {
+                this.logger.log(`✅ OTP sauvegardé: ${generatedOtpCode} pour ${destination}`);
+
+                // ✅ Envoyer l'OTP
+                if (destinationType === 'email') {
                     const translations = {
                         title: 'Code de vérification pour votre dépôt',
                         description: 'Utilisez le code ci-dessous pour confirmer votre demande de dépôt sur FPay',
@@ -1176,7 +1201,7 @@ export class FpayService {
                     };
 
                     await this.mailService.sendHtmlEmail(
-                        user.email,
+                        destination,
                         'Code OTP pour votre dépôt FPay',
                         'sendOtp.html',
                         {
@@ -1186,22 +1211,22 @@ export class FpayService {
                             translations: translations,
                         },
                     );
-                    this.logger.log(`✅ OTP envoyé par email à ${user.email}`);
-                } else if (user.phone) {
+                    this.logger.log(`✅ OTP envoyé par email à ${destination}`);
+                } else {
                     const smsMessage = `Votre code OTP pour le dépôt FPay est: ${generatedOtpCode}. Valable 10 minutes.`;
-                    await this.smsHelper.sendSms(user.phone, smsMessage);
-                    this.logger.log(`✅ OTP envoyé par SMS à ${user.phone}`);
+                    await this.smsHelper.sendSms(destination, smsMessage);
+                    this.logger.log(`✅ OTP envoyé par SMS à ${destination}`);
                 }
 
                 return {
                     status: 'success',
-                    message: 'Un code OTP a été envoyé par ' + (user.email ? 'email' : 'SMS') + '. Veuillez le saisir pour confirmer votre demande de dépôt.',
+                    message: `Un code OTP a été envoyé par ${destinationType === 'email' ? 'email' : 'SMS'}. Veuillez le saisir pour confirmer votre demande de dépôt.`,
                     requiresOtp: true,
                     data: {
                         userId: dto.userId,
                         amount: dto.amount,
                         currency: dto.currency,
-                        destination: user.email ? 'email' : 'sms',
+                        destination: destinationType,
                     },
                 };
             }
@@ -1211,6 +1236,7 @@ export class FpayService {
             // ============================================================
             this.logger.log(`🔐 ÉTAPE 2 - Vérification OTP: ${dto.otpCode} pour ${dto.userId}`);
 
+            // ✅ Récupérer l'utilisateur
             const user = await this.userRepository.findOne({
                 where: { userIdFpay: dto.userId },
                 select: ['id', 'email', 'phone'],
@@ -1223,7 +1249,15 @@ export class FpayService {
                 );
             }
 
-            const destination = user.email || user.phone;
+            // ✅ Utiliser la même destination que l'ÉTAPE 1
+            let destination: string | null = null;
+
+            if (user.email) {
+                destination = user.email;
+            } else if (user.phone) {
+                destination = user.phone;
+            }
+
             if (!destination) {
                 throw new HttpException(
                     'Aucun email ou téléphone trouvé pour cet utilisateur. Veuillez mettre à jour votre profil.',
@@ -1231,9 +1265,11 @@ export class FpayService {
                 );
             }
 
-            // ✅ Vérifier l'OTP - avec vérification de sécurité
-            // On sait que dto.otpCode existe ici car hasOtp est true
-            const otpCode = dto.otpCode as string; // ✅ Casting sécurisé car on a vérifié
+            this.logger.log(`🔍 Recherche OTP avec destination: ${destination}`);
+            this.logger.log(`🔍 Code OTP: ${dto.otpCode}`);
+
+            // ✅ Vérifier l'OTP
+            const otpCode = dto.otpCode as string;
 
             const otpEntry = await this.otpRepository.findOne({
                 where: {
@@ -1241,15 +1277,41 @@ export class FpayService {
                     otpCode: otpCode.trim(),
                     isUsed: false,
                 },
+                relations: ['user'],  // ✅ Charger la relation user
             });
 
             if (!otpEntry) {
+                // ✅ Vérifier si l'OTP existe mais est utilisé
+                const existingOtp = await this.otpRepository.findOne({
+                    where: {
+                        email: destination,
+                        otpCode: otpCode.trim(),
+                    },
+                });
+
+                if (existingOtp) {
+                    this.logger.log(`⚠️ OTP trouvé mais isUsed=${existingOtp.isUsed}`);
+                    if (existingOtp.isUsed) {
+                        throw new HttpException(
+                            'Ce code OTP a déjà été utilisé.',
+                            HttpStatus.BAD_REQUEST,
+                        );
+                    }
+                    if (new Date() > existingOtp.expiresAt) {
+                        throw new HttpException(
+                            'Code OTP expiré. Veuillez refaire une demande.',
+                            HttpStatus.BAD_REQUEST,
+                        );
+                    }
+                }
+
                 throw new HttpException(
                     'Code OTP invalide. Veuillez vérifier le code saisi.',
                     HttpStatus.BAD_REQUEST,
                 );
             }
 
+            // ✅ Vérifier l'expiration
             if (new Date() > otpEntry.expiresAt) {
                 otpEntry.isUsed = true;
                 await this.otpRepository.save(otpEntry);
@@ -1260,6 +1322,7 @@ export class FpayService {
                 );
             }
 
+            // ✅ Marquer l'OTP comme utilisé
             otpEntry.isUsed = true;
             await this.otpRepository.save(otpEntry);
 
