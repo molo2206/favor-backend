@@ -168,111 +168,6 @@ export class OrderService {
     return code;
   }
 
-  private async updateReferralWithAmount(
-    referrerId: string,
-    referredId: string,
-    amount: number,
-    invoiceNumber: string,
-    currency?: string,
-  ): Promise<void> {
-    // ✅ UTILISER LA DEVISE DE LA COMMANDE (ou USD par défaut)
-    const validCurrency = currency || 'USD';
-
-    console.log(`📝 ========== UPDATE REFERRAL WITH AMOUNT ==========`);
-    console.log(`📝 ReferrerId: ${referrerId}`);
-    console.log(`📝 ReferredId: ${referredId}`);
-    console.log(`📝 Amount: ${amount}`);
-    console.log(`📝 InvoiceNumber: ${invoiceNumber}`);
-    console.log(`📝 Currency reçue: ${currency}`);
-    console.log(`📝 Currency utilisée: ${validCurrency}`);
-    console.log(`📝 Timestamp: ${new Date().toISOString()}`);
-
-    try {
-      // ✅ Rechercher un parrainage existant avec la MÊME devise
-      console.log(`📝 Recherche d'un parrainage avec:`);
-      console.log(`📝   - referrerId: ${referrerId}`);
-      console.log(`📝   - referredId: ${referredId}`);
-      console.log(`📝   - currency: ${validCurrency}`);
-
-      let referral = await this.referralRepo.findOne({
-        where: {
-          referrerId: referrerId,
-          referredId: referredId,
-          currency: validCurrency,
-        },
-      });
-
-      console.log(`📝 Parrainage trouvé avec ${validCurrency}: ${referral ? 'OUI ✅' : 'NON ❌'}`);
-
-      if (referral) {
-        console.log(`📝 === PARRAINAGE EXISTANT ===`);
-        console.log(`📝 ID: ${referral.id}`);
-        console.log(`📝 rewardAmount: ${referral.rewardAmount}`);
-        console.log(`📝 currency: ${referral.currency}`);
-        console.log(`📝 status: ${referral.status}`);
-        console.log(`📝 createdAt: ${referral.createdAt}`);
-        console.log(`📝 completedAt: ${referral.completedAt}`);
-
-        // ✅ Mise à jour du parrainage existant - ADDITION par devise
-        const oldAmount = referral.rewardAmount;
-        const newAmount = Number(referral.rewardAmount) + amount;
-
-        console.log(`📝 Calcul: ${oldAmount} + ${amount} = ${newAmount}`);
-
-        referral.rewardAmount = Number(referral.rewardAmount) + amount;
-        referral.status = ReferralStatus.COMPLETED;
-        referral.completedAt = new Date();
-
-        referral.metadata = {
-          ...referral.metadata,
-          orderInvoice: invoiceNumber,
-          rewardedAt: new Date().toISOString(),
-          amount: amount,
-          currency: validCurrency,
-          totalAmount: newAmount,
-          previousAmount: oldAmount,
-        };
-
-        await this.referralRepo.save(referral);
-        console.log(`✅ Parrainage mis à jour pour ${referrerId}: ${oldAmount} + ${amount} = ${referral.rewardAmount} ${validCurrency} (COMPLETED) - Additionné ✅`);
-        console.log(`📝 Nouveau total: ${referral.rewardAmount} ${validCurrency}`);
-      } else {
-        console.log(`📝 === AUCUN PARRAINAGE TROUVÉ ===`);
-        console.log(`📝 Création d'un nouveau parrainage avec ${validCurrency}`);
-
-        // ✅ Création d'un nouveau parrainage avec la devise de la commande
-        const newReferral = this.referralRepo.create({
-          referrerId: referrerId,
-          referredId: referredId,
-          referralCode: `${Date.now()}`,
-          status: ReferralStatus.COMPLETED,
-          rewardAmount: amount,
-          currency: validCurrency,
-          rewardType: 'POINTS',
-          completedAt: new Date(),
-          metadata: {
-            orderInvoice: invoiceNumber,
-            rewardedAt: new Date().toISOString(),
-            amount: amount,
-            currency: validCurrency,
-            totalAmount: amount,
-          },
-        });
-
-        await this.referralRepo.save(newReferral);
-        console.log(`✅ Nouveau parrainage créé pour ${referrerId}: ${amount} ${validCurrency} récompensé (COMPLETED) ✅`);
-        console.log(`📝 Nouvel ID: ${newReferral.id}`);
-        console.log(`📝 Nouveau total: ${amount} ${validCurrency}`);
-      }
-    } catch (error) {
-      console.error(`❌ Erreur lors de la mise à jour du parrainage:`);
-      console.error(`❌ Message: ${error.message}`);
-      console.error(`❌ Stack:`, error.stack);
-    }
-
-    console.log(`📝 ==============================================`);
-  }
-  // ======================== CRÉATION DE COMMANDE ========================
   async createOrder(
     createOrderDto: CreateOrderDto,
     user: UserEntity,
@@ -372,8 +267,8 @@ export class OrderService {
     const hasReferrer = !!(userWithReferrer?.referrer);
 
     // ✅ Calcul du shippingCost, transactionFee et du montant total
-    const shippingCostValue = Number(Number(shippingCost || 0).toFixed(3));
-    const transactionFeeValue = Number(Number(transactionFee || 0).toFixed(3));
+    const shippingCostValue = Number(shippingCost || 0);
+    const transactionFeeValue = Number(transactionFee || 0);
     const totalAmountValue = Number(totalAmount) + shippingCostValue + transactionFeeValue;
     let parrainageAmount = 0;
     let paymentAmount = totalAmountValue;
@@ -601,7 +496,7 @@ export class OrderService {
     // ============================================================
     const order = this.orderRepo.create({
       user,
-      totalAmount,
+      totalAmount: Number(totalAmount),
       currency: orderCurrency,
       grandTotal: isRestaurantAutoPaid ? (grandTotal ?? Number(totalAmount) + (shippingCost ?? 0) + (transactionFee ?? 0)) : Number(totalAmount),
       addressUser,
@@ -765,6 +660,112 @@ export class OrderService {
     );
     return finalOrder;
   }
+
+  private async updateReferralWithAmount(
+    referrerId: string,
+    referredId: string,
+    amount: number,
+    invoiceNumber: string,
+    currency?: string,
+  ): Promise<void> {
+    // ✅ UTILISER LA DEVISE DE LA COMMANDE (ou USD par défaut)
+    const validCurrency = currency || 'USD';
+
+    console.log(`📝 ========== UPDATE REFERRAL WITH AMOUNT ==========`);
+    console.log(`📝 ReferrerId: ${referrerId}`);
+    console.log(`📝 ReferredId: ${referredId}`);
+    console.log(`📝 Amount: ${amount}`);
+    console.log(`📝 InvoiceNumber: ${invoiceNumber}`);
+    console.log(`📝 Currency reçue: ${currency}`);
+    console.log(`📝 Currency utilisée: ${validCurrency}`);
+    console.log(`📝 Timestamp: ${new Date().toISOString()}`);
+
+    try {
+      // ✅ Rechercher un parrainage existant avec la MÊME devise
+      console.log(`📝 Recherche d'un parrainage avec:`);
+      console.log(`📝   - referrerId: ${referrerId}`);
+      console.log(`📝   - referredId: ${referredId}`);
+      console.log(`📝   - currency: ${validCurrency}`);
+
+      let referral = await this.referralRepo.findOne({
+        where: {
+          referrerId: referrerId,
+          referredId: referredId,
+          currency: validCurrency,
+        },
+      });
+
+      console.log(`📝 Parrainage trouvé avec ${validCurrency}: ${referral ? 'OUI ✅' : 'NON ❌'}`);
+
+      if (referral) {
+        console.log(`📝 === PARRAINAGE EXISTANT ===`);
+        console.log(`📝 ID: ${referral.id}`);
+        console.log(`📝 rewardAmount: ${referral.rewardAmount}`);
+        console.log(`📝 currency: ${referral.currency}`);
+        console.log(`📝 status: ${referral.status}`);
+        console.log(`📝 createdAt: ${referral.createdAt}`);
+        console.log(`📝 completedAt: ${referral.completedAt}`);
+
+        // ✅ Mise à jour du parrainage existant - ADDITION par devise
+        const oldAmount = referral.rewardAmount;
+        const newAmount = Number(referral.rewardAmount) + amount;
+
+        console.log(`📝 Calcul: ${oldAmount} + ${amount} = ${newAmount}`);
+
+        referral.rewardAmount = Number(referral.rewardAmount) + amount;
+        referral.status = ReferralStatus.COMPLETED;
+        referral.completedAt = new Date();
+
+        referral.metadata = {
+          ...referral.metadata,
+          orderInvoice: invoiceNumber,
+          rewardedAt: new Date().toISOString(),
+          amount: amount,
+          currency: validCurrency,
+          totalAmount: newAmount,
+          previousAmount: oldAmount,
+        };
+
+        await this.referralRepo.save(referral);
+        console.log(`✅ Parrainage mis à jour pour ${referrerId}: ${oldAmount} + ${amount} = ${referral.rewardAmount} ${validCurrency} (COMPLETED) - Additionné ✅`);
+        console.log(`📝 Nouveau total: ${referral.rewardAmount} ${validCurrency}`);
+      } else {
+        console.log(`📝 === AUCUN PARRAINAGE TROUVÉ ===`);
+        console.log(`📝 Création d'un nouveau parrainage avec ${validCurrency}`);
+
+        // ✅ Création d'un nouveau parrainage avec la devise de la commande
+        const newReferral = this.referralRepo.create({
+          referrerId: referrerId,
+          referredId: referredId,
+          referralCode: `${Date.now()}`,
+          status: ReferralStatus.COMPLETED,
+          rewardAmount: amount,
+          currency: validCurrency,
+          rewardType: 'POINTS',
+          completedAt: new Date(),
+          metadata: {
+            orderInvoice: invoiceNumber,
+            rewardedAt: new Date().toISOString(),
+            amount: amount,
+            currency: validCurrency,
+            totalAmount: amount,
+          },
+        });
+
+        await this.referralRepo.save(newReferral);
+        console.log(`✅ Nouveau parrainage créé pour ${referrerId}: ${amount} ${validCurrency} récompensé (COMPLETED) ✅`);
+        console.log(`📝 Nouvel ID: ${newReferral.id}`);
+        console.log(`📝 Nouveau total: ${amount} ${validCurrency}`);
+      }
+    } catch (error) {
+      console.error(`❌ Erreur lors de la mise à jour du parrainage:`);
+      console.error(`❌ Message: ${error.message}`);
+      console.error(`❌ Stack:`, error.stack);
+    }
+
+    console.log(`📝 ==============================================`);
+  }
+  // ======================== CRÉATION DE COMMANDE ========================
 
   async payPendingOrder(
     payOrderDto: PayOrderDto,
@@ -1918,6 +1919,7 @@ export class OrderService {
 
     let isNewlyValidated = false;
     if (dto.status === OrderStatus.VALIDATED) {
+      // ✅ DÉDUCTION DES STOCKS
       const deductedProductIds = new Set<string>();
       for (const item of order.orderItems) {
         if (!deductedProductIds.has(item.product.id)) {
@@ -1938,6 +1940,7 @@ export class OrderService {
         }
       }
 
+      // ✅ MISE À JOUR DU PAIEMENT
       order.paymentStatus = PaymentStatus.PAID;
       order.paid = true;
       order.pin = GeneratePin.generate();
@@ -1959,9 +1962,14 @@ export class OrderService {
       let paymentAmount = totalWithFees;
 
       // ============================================================
-      // ✅ 1. PAYER FAVOR HELP AVEC payWithMobileMoney (TOUJOURS)
+      // ✅ 1. PAIEMENT FAVOR HELP - AVEC GESTION D'ERREUR SANS BLOQUER
       // ============================================================
+      let fpaySuccess = false;
+      let fpayErrorMessage: string | null = null;
+
       try {
+        console.log(`[Order] 📤 Tentative paiement Favor Help pour la commande #${order.invoiceNumber}`);
+
         const fpayResponse = await this.fpayService.payWithMobileMoney(
           paymentAmount,
           order.currency || 'USD',
@@ -1971,6 +1979,7 @@ export class OrderService {
         );
 
         if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+          fpaySuccess = true;
           console.log(`[Order] ✅ Paiement Favor Help réussi: ${paymentAmount} ${order.currency}`);
 
           // ✅ Créer la transaction de paiement
@@ -1985,64 +1994,89 @@ export class OrderService {
           await this.transactionRepository.save(transaction);
           console.log(`[Order] ✅ ${paymentAmount} enregistré comme paiement principal`);
 
-          // ============================================================
-          // ✅ 2. ENVOYER LE PARRAINAGE (10%) - UNIQUEMENT SI PARRAIN
-          // ============================================================
-          if (hasReferrer && shippingCost > 0) {
-            const parrainageAmount = Number((shippingCost * 0.10).toFixed(3));
-
-            console.log(`[Order] 👤 A un parrain: ${hasReferrer}`);
-            console.log(`[Order] Total: ${totalWithFees}$`);
-            console.log(`[Order] 10% shipping pour parrainage: ${parrainageAmount}$`);
-            console.log(`[Order] Montant payé: ${paymentAmount}$`);
-
-            if (parrainageAmount > 0) {
-              const sendDto: FpaySendDto = {
-                amount: Number(parrainageAmount.toFixed(3)),
-                description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${order.invoiceNumber}`,
-                currency: order.currency || 'USD',
-                countryCode: 'CD',
-                paymentMethod: 'CASH',
-              };
-
-              // ✅ Appel à makeSendparrainage (HELP → PARRAINAGE) - NON BLOQUANT
-              this.fpayService.makeSendparrainage(sendDto, user)
-                .then(async (result) => {
-                  if (result && result.success) {
-                    console.log(`[Order] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
-
-                    // ✅ Mettre à jour le parrainage dans la base de données
-                    const referrerId = userWithReferrer?.referrer?.id;
-                    if (referrerId) {
-                      await this.updateReferralWithAmount(
-                        referrerId,
-                        order.userId,
-                        Number(parrainageAmount.toFixed(3)),
-                        order.invoiceNumber,
-                        order.currency
-                      );
-                    }
-                  } else if (result) {
-                    console.log(`[Order] ⚠️ Parrainage non envoyé: ${result.message}`);
-                  }
-                })
-                .catch(error => {
-                  console.error(`[Order] ❌ Erreur lors de l'envoi au parrainage:`, error.message);
-                });
-
-              console.log(`[Order] 📤 Envoi parrainage en cours (non bloquant)...`);
-            }
-          } else {
-            console.log(`[Order] 👤 Sans parrain - Pas de parrainage envoyé`);
-          }
-
         } else {
-          console.log(`[Order] ⚠️ Paiement Favor Help échoué - statut:`, fpayResponse?.data?.transaction?.status);
-          throw new BadRequestException('Le paiement Favor Help a échoué');
+          fpayErrorMessage = fpayResponse?.data?.transaction?.status || 'Statut inconnu';
+          console.log(`[Order] ⚠️ Paiement Favor Help échoué - statut: ${fpayErrorMessage}`);
         }
+
       } catch (error: any) {
-        console.error(`[Order] ❌ Erreur paiement Favor Help:`, error.message);
-        throw new BadRequestException(error.message || 'Erreur lors du paiement Favor Help');
+        fpayErrorMessage = error.message || 'Erreur inconnue';
+        console.error(`[Order] ❌ Erreur paiement Favor Help:`, fpayErrorMessage);
+        // ⚠️ ON NE RELANCE PAS L'ERREUR - La commande reste VALIDATED
+      }
+
+      // ============================================================
+      // ✅ 2. ENVOYER LE PARRAINAGE (10%) - UNIQUEMENT SI PARRAIN ET SI FPAY A RÉUSSI
+      // ============================================================
+      if (fpaySuccess && hasReferrer && shippingCost > 0) {
+        const parrainageAmount = Number((shippingCost * 0.10).toFixed(3));
+
+        console.log(`[Order] 👤 A un parrain: ${hasReferrer}`);
+        console.log(`[Order] 10% shipping pour parrainage: ${parrainageAmount}$`);
+
+        if (parrainageAmount > 0) {
+          const sendDto: FpaySendDto = {
+            amount: Number(parrainageAmount.toFixed(3)),
+            description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${order.invoiceNumber}`,
+            currency: order.currency || 'USD',
+            countryCode: 'CD',
+            paymentMethod: 'CASH',
+          };
+
+          // ✅ Appel à makeSendparrainage - NON BLOQUANT
+          this.fpayService.makeSendparrainage(sendDto, user)
+            .then(async (result) => {
+              if (result && result.success) {
+                console.log(`[Order] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
+
+                const referrerId = userWithReferrer?.referrer?.id;
+                if (referrerId) {
+                  await this.updateReferralWithAmount(
+                    referrerId,
+                    order.userId,
+                    Number(parrainageAmount.toFixed(3)),
+                    order.invoiceNumber,
+                    order.currency
+                  );
+                }
+              } else if (result) {
+                console.log(`[Order] ⚠️ Parrainage non envoyé: ${result.message}`);
+              }
+            })
+            .catch(error => {
+              console.error(`[Order] ❌ Erreur lors de l'envoi au parrainage:`, error.message);
+            });
+
+          console.log(`[Order] 📤 Envoi parrainage en cours (non bloquant)...`);
+        }
+      } else if (hasReferrer && shippingCost > 0 && !fpaySuccess) {
+        console.log(`[Order] ⚠️ Parrainage non envoyé car le paiement FPay a échoué`);
+      } else {
+        console.log(`[Order] 👤 Sans parrain - Pas de parrainage envoyé`);
+      }
+
+      // ============================================================
+      // ✅ 3. SI FPAY A ÉCHOUÉ, ON ENREGISTRE UNE TRANSACTION EN ATTENTE
+      // ============================================================
+      if (!fpaySuccess) {
+        console.log(`[Order] ⚠️ Paiement FPay en échec, création d'une transaction PENDING pour retrait ultérieur`);
+
+        try {
+          const transaction = this.transactionRepository.create({
+            orderId: order.id,
+            amount: order.totalAmount,
+            paymentStatus: PaymentStatus.PAID,
+            transactionReference: uuidv4(),
+            currency: 'USD',
+            type: TransactionType.CREDIT,
+          });
+
+          await this.transactionRepository.save(transaction);
+          console.log(`[Order] ✅ Transaction PENDING enregistrée pour retrait ultérieur`);
+
+        } catch (txError: any) {
+          console.error(`[Order] ❌ Erreur lors de l'enregistrement de la transaction PENDING:`, txError.message);
+        }
       }
 
       isNewlyValidated = true;
