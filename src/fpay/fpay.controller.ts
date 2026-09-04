@@ -859,4 +859,72 @@ export class FpayController {
             );
         }
     }
+
+    @Get('transactions/pending')
+    @PermissionsApi_Key('view_transactions')
+    async getLastPendingTransaction(
+        @Query('userId') userId: string,
+        @Query('type') type?: 'DEPOSIT' | 'WITHDRAW' | 'TRANSFER' | 'PAYMENT' | 'REFUND',
+        @Query('walletId') walletId?: string,
+    ) {
+        // ✅ Validation des paramètres
+        if (!userId) {
+            throw new HttpException(
+                {
+                    statusCode: HttpStatus.BAD_REQUEST,
+                    message: 'Le paramètre userId est requis',
+                    code: 'MISSING_USER_ID',
+                },
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
+        try {
+            // ✅ Appeler le service
+            const result = await this.fpayService.getLastPendingTransaction(userId, type);
+
+            if (!result) {
+                return {
+                    status: 'success',
+                    message: 'Aucune transaction en attente trouvée',
+                    data: null,
+                };
+            }
+
+            return {
+                status: 'success',
+                message: 'Dernière transaction en attente récupérée avec succès',
+                data: {
+                    id: result.id,
+                    amount: result.amount,
+                    currency: result.currency,
+                    type: result.type,
+                    status: result.status,
+                    createdAt: result.createdAt,
+                    description: result.description || null,
+                    reference: result.reference || null,
+                    walletId: result.walletId || null,
+                    userId: result.userId || null,
+                    metadata: result.metadata || null,
+                },
+            };
+
+        } catch (error) {
+            // ✅ Gérer les erreurs
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error(`❌ Erreur dans getLastPendingTransaction: ${error.message}`);
+
+            throw new HttpException(
+                {
+                    statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+                    message: 'Erreur lors de la récupération de la transaction',
+                    code: 'FETCH_PENDING_TRANSACTION_ERROR',
+                },
+                HttpStatus.INTERNAL_SERVER_ERROR,
+            );
+        }
+    }
 }
