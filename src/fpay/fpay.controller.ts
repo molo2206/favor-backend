@@ -687,33 +687,57 @@ export class FpayController {
             }
 
             // ============================================================
-            // ✅ ✅ ✅ VÉRIFIER LES POINTS DE PARRAINAGE EN PREMIER
+            // ✅ VÉRIFIER LES POINTS DE PARRAINAGE PAR DEVISE
             // ============================================================
             this.logger.log(`🔍 Vérification des points de parrainage pour l'utilisateur ${user.id} en ${currency}`);
 
             // Récupérer les points de parrainage de l'utilisateur
             const referralPoints = await this.usersService.getReferralPoints(user.id, lang);
 
-            // Log pour déboguer
-            this.logger.log(`📊 Points de parrainage: ${JSON.stringify(referralPoints.data.rewardsByCurrency)}`);
+            // ✅ Vérifier que la réponse contient les données
+            if (!referralPoints || !referralPoints.data) {
+                this.logger.error(`❌ Erreur: getReferralPoints a retourné: ${JSON.stringify(referralPoints)}`);
+                throw new HttpException(
+                    'Impossible de récupérer les points de parrainage',
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                );
+            }
 
-            // Chercher les points dans la devise demandée
-            const pointsInCurrency = referralPoints.data.rewardsByCurrency?.find(
+            // ✅ Vérifier que rewardsByCurrency existe et n'est pas null
+            const rewardsByCurrency = referralPoints.data.rewardsByCurrency || [];
+
+            this.logger.log(`📊 Points de parrainage trouvés: ${JSON.stringify(rewardsByCurrency)}`);
+
+            // ✅ Vérifier si des points existent
+            if (rewardsByCurrency.length === 0) {
+                this.logger.warn(`❌ Aucun point de parrainage trouvé pour l'utilisateur ${user.id}`);
+                throw new HttpException(
+                    {
+                        status: 'error',
+                        message: 'Vous n\'avez pas encore de points de parrainage. Commencez à parrainer pour gagner des points.',
+                        availableCurrencies: [],
+                    },
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ Chercher les points dans la devise demandée
+            const pointsInCurrency = rewardsByCurrency.find(
                 (r: any) => r.currency === currency
             );
 
             // ✅ Vérifier si l'utilisateur a des points dans cette devise
             if (!pointsInCurrency || pointsInCurrency.amount <= 0) {
-                // Récupérer les devises disponibles
-                const availableCurrencies = referralPoints.data.rewardsByCurrency?.map((r: any) => r.currency).join(', ') || 'Aucune';
+                // Récupérer les devises disponibles avec leurs montants
+                const availableCurrenciesList = rewardsByCurrency.map((r: any) => `${r.currency} (${r.amount.toFixed(2)})`).join(', ') || 'Aucune';
 
-                this.logger.warn(`❌ Aucun point en ${currency}. Devises disponibles: ${availableCurrencies}`);
+                this.logger.warn(`❌ Aucun point en ${currency}. Devises disponibles: ${availableCurrenciesList}`);
 
                 throw new HttpException(
                     {
                         status: 'error',
-                        message: `Vous n'avez pas de points de parrainage en ${currency}. Devises disponibles: ${availableCurrencies}`,
-                        availableCurrencies: referralPoints.data.rewardsByCurrency || [],
+                        message: `Vous n'avez pas de points de parrainage en ${currency}. Devises disponibles: ${availableCurrenciesList}`,
+                        availableCurrencies: rewardsByCurrency,
                     },
                     HttpStatus.BAD_REQUEST,
                 );
@@ -738,7 +762,7 @@ export class FpayController {
             this.logger.log(`✅ Points de parrainage vérifiés: ${pointsInCurrency.amount} ${currency} disponibles`);
 
             // ============================================================
-            // ✅ SUITE DE LA LOGIQUE - APPEL AU SERVICE (UNIQUEMENT SI POINTS SUFFISANTS)
+            // ✅ SUITE DE LA LOGIQUE - APPEL AU SERVICE
             // ============================================================
             this.logger.log(`📤 Demande de dépôt: ${body.amount} ${currency} pour l'utilisateur ${user.id} (FPay ID: ${user.userIdFpay})`);
             this.logger.log(`📤 OTP fourni: ${body.otpCode ? '✅' : '❌'}`);
