@@ -1284,6 +1284,8 @@ export class FpayService {
                 relations: ['user'],
             });
 
+            // src/modules/fpay/fpay.service.ts - requestDepositWithOtp
+
             // ✅ Si l'OTP n'existe pas OU est invalide OU expiré
             if (!otpEntry) {
                 // ✅ Vérifier si l'OTP existe mais est utilisé
@@ -1297,23 +1299,34 @@ export class FpayService {
                 if (existingOtp) {
                     this.logger.log(`⚠️ OTP trouvé mais isUsed=${existingOtp.isUsed}`);
                     if (existingOtp.isUsed) {
+                        // ✅ Throw HttpException directement
                         throw new HttpException(
-                            'Ce code OTP a déjà été utilisé. Veuillez faire une nouvelle demande.',
+                            {
+                                statusCode: HttpStatus.BAD_REQUEST,
+                                message: 'Ce code OTP a déjà été utilisé. Veuillez faire une nouvelle demande.',
+                                code: 'OTP_ALREADY_USED',
+                                canResend: true,
+                            },
                             HttpStatus.BAD_REQUEST,
                         );
                     }
                     if (new Date() > existingOtp.expiresAt) {
                         throw new HttpException(
-                            'Ce code OTP a expiré. Veuillez faire une nouvelle demande pour recevoir un nouveau code.',
+                            {
+                                statusCode: HttpStatus.BAD_REQUEST,
+                                message: 'Ce code OTP a expiré. Veuillez faire une nouvelle demande pour recevoir un nouveau code.',
+                                code: 'OTP_EXPIRED',
+                                canResend: true,
+                            },
                             HttpStatus.BAD_REQUEST,
                         );
                     }
                 }
 
-                // ✅ OTP invalide - Proposer de renvoyer un nouveau code
+                // ✅ OTP invalide - Throw HttpException directement
                 throw new HttpException(
                     {
-                        status: 'error',
+                        statusCode: HttpStatus.BAD_REQUEST,
                         message: 'Code OTP invalide. Veuillez vérifier le code saisi ou faire une nouvelle demande pour recevoir un nouveau code.',
                         code: 'INVALID_OTP',
                         canResend: true,
@@ -1321,7 +1334,6 @@ export class FpayService {
                     HttpStatus.BAD_REQUEST,
                 );
             }
-
             // ✅ Vérifier l'expiration
             if (new Date() > otpEntry.expiresAt) {
                 otpEntry.isUsed = true;
@@ -1510,6 +1522,39 @@ export class FpayService {
     // src/modules/fpay/fpay.service.ts
 
     private handleError(error: any): HttpException {
+        // ✅ Si l'erreur est déjà une HttpException, on la retourne
+        if (error instanceof HttpException) {
+            return error;
+        }
+
+        // ✅ Si c'est une erreur avec un message personnalisé (comme OTP)
+        if (error.message) {
+            // ✅ Vérifier si l'erreur contient des codes OTP
+            if (error.code === 'INVALID_OTP' || error.message.includes('OTP')) {
+                return new HttpException(
+                    {
+                        statusCode: HttpStatus.BAD_REQUEST,
+                        message: error.message,
+                        code: error.code || 'INVALID_OTP',
+                        canResend: true,
+                        timestamp: new Date().toISOString(),
+                    },
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ Si c'est une erreur avec un message simple
+            return new HttpException(
+                {
+                    statusCode: HttpStatus.BAD_REQUEST,
+                    message: error.message,
+                    timestamp: new Date().toISOString(),
+                },
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
+        // ✅ Erreur avec réponse HTTP
         if (error.response) {
             const status = error.response.status || HttpStatus.INTERNAL_SERVER_ERROR;
             const message = error.response.data?.message || error.response.message || 'FPAY API error';
@@ -1527,6 +1572,7 @@ export class FpayService {
             );
         }
 
+        // ✅ Service indisponible
         if (error.request) {
             this.logger.error('❌ Service FPay indisponible');
             return new HttpException(
@@ -1539,28 +1585,7 @@ export class FpayService {
             );
         }
 
-        // ✅ Si l'erreur est déjà un HttpException, on la retourne
-        if (error instanceof HttpException) {
-            return error;
-        }
-
-        // ✅ Si c'est une erreur avec un message personnalisé
-        if (error.message) {
-            // ✅ Vérifier si l'erreur contient un code
-            if (error.code === 'INVALID_OTP' || error.message.includes('OTP')) {
-                return new HttpException(
-                    {
-                        statusCode: HttpStatus.BAD_REQUEST,
-                        message: error.message,
-                        code: error.code || 'INVALID_OTP',
-                        canResend: true,
-                        timestamp: new Date().toISOString(),
-                    },
-                    HttpStatus.BAD_REQUEST,
-                );
-            }
-        }
-
+        // ✅ Erreur interne par défaut
         return new HttpException(
             {
                 statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
