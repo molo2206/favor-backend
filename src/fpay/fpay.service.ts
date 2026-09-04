@@ -1507,10 +1507,12 @@ export class FpayService {
         }
     }
 
+    // src/modules/fpay/fpay.service.ts
+
     private handleError(error: any): HttpException {
         if (error.response) {
             const status = error.response.status || HttpStatus.INTERNAL_SERVER_ERROR;
-            const message = error.response.data?.message || 'FPAY API error';
+            const message = error.response.data?.message || error.response.message || 'FPAY API error';
 
             this.logger.error(`❌ FPAY API Error: ${status} - ${message}`);
 
@@ -1535,6 +1537,28 @@ export class FpayService {
                 },
                 HttpStatus.SERVICE_UNAVAILABLE,
             );
+        }
+
+        // ✅ Si l'erreur est déjà un HttpException, on la retourne
+        if (error instanceof HttpException) {
+            return error;
+        }
+
+        // ✅ Si c'est une erreur avec un message personnalisé
+        if (error.message) {
+            // ✅ Vérifier si l'erreur contient un code
+            if (error.code === 'INVALID_OTP' || error.message.includes('OTP')) {
+                return new HttpException(
+                    {
+                        statusCode: HttpStatus.BAD_REQUEST,
+                        message: error.message,
+                        code: error.code || 'INVALID_OTP',
+                        canResend: true,
+                        timestamp: new Date().toISOString(),
+                    },
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
         }
 
         return new HttpException(
