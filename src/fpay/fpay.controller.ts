@@ -861,27 +861,41 @@ export class FpayController {
     }
 
     @Get('transactions/pending')
-    @PermissionsApi_Key('view_transactions')
+    @UseGuards(AuthentificationGuard)  // ✅ Ajouter le guard d'authentification
     async getLastPendingTransaction(
-        @Query('userId') userId: string,
+        @CurrentUser() user: UserEntity,  // ✅ Récupérer l'utilisateur connecté
         @Query('type') type?: 'DEPOSIT' | 'WITHDRAW' | 'TRANSFER' | 'PAYMENT' | 'REFUND',
         @Query('walletId') walletId?: string,
     ) {
-        // ✅ Validation des paramètres
-        if (!userId) {
-            throw new HttpException(
-                {
-                    statusCode: HttpStatus.BAD_REQUEST,
-                    message: 'Le paramètre userId est requis',
-                    code: 'MISSING_USER_ID',
-                },
-                HttpStatus.BAD_REQUEST,
-            );
-        }
-
         try {
-            // ✅ Appeler le service
-            const result = await this.fpayService.getLastPendingTransaction(userId, type);
+            // ✅ Vérifier que l'utilisateur est connecté
+            if (!user) {
+                throw new HttpException(
+                    {
+                        statusCode: HttpStatus.UNAUTHORIZED,
+                        message: 'Utilisateur non authentifié',
+                        code: 'UNAUTHORIZED',
+                    },
+                    HttpStatus.UNAUTHORIZED,
+                );
+            }
+
+            // ✅ Récupérer le userIdFpay de l'utilisateur connecté
+            const userIdFpay = user.userIdFpay;
+
+            if (!userIdFpay) {
+                throw new HttpException(
+                    {
+                        statusCode: HttpStatus.BAD_REQUEST,
+                        message: 'Aucun compte FPay lié à cet utilisateur',
+                        code: 'NO_FPAY_ACCOUNT',
+                    },
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ Appeler le service avec l'ID FPay de l'utilisateur connecté
+            const result = await this.fpayService.getLastPendingTransaction(userIdFpay, type);
 
             if (!result) {
                 return {
