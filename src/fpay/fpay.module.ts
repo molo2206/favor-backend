@@ -11,8 +11,8 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { OtpEntity } from 'src/otp/entities/otp.entity';
 import { MailService } from 'src/email/email.service';
 import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
-import { UsersService } from 'src/users/users.service'; // ✅ IMPORTER UsersService
 import { I18nService } from 'src/libs/common/src';
+import { UsersModule } from 'src/users/users.module';  // ✅ IMPORTER UsersModule
 
 @Module({
     imports: [
@@ -32,14 +32,15 @@ import { I18nService } from 'src/libs/common/src';
             }),
             inject: [ConfigService],
         }),
+        UsersModule,  // ✅ IMPORTER UsersModule (qui exporte UsersService et les repositories)
     ],
     controllers: [FpayController],
     providers: [
         FpayService,
-        UsersService,      // ✅ AJOUTER UsersService
         MailService,
         SmsHelper,
         I18nService,
+        // ❌ SUPPRIMER UsersService d'ici car il est fourni par UsersModule
     ],
     exports: [FpayService, JwtModule],
 })
