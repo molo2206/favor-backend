@@ -1120,18 +1120,16 @@ export class FpayService {
 
                 // ✅ Récupérer les transactions de l'utilisateur
                 const transactionsData = await this.getWalletBalanceAndTransactions(
-                    dto.userId,
-                    undefined,
-                    1,
-                    10,
-                    undefined,
-                    undefined,
-                    'DEPOSIT',
-                    'PENDING',
-                    undefined,
-                    undefined,
+                    dto.userId,       // userId
+                    1,                // page
+                    10,               // limit
+                    undefined,        // startDate
+                    undefined,        // endDate
+                    'DEPOSIT',        // type
+                    'PENDING',        // status
+                    undefined,        // movement
+                    undefined,        // search
                 );
-
                 this.logger.log(`📊 Transactions trouvées: ${JSON.stringify(transactionsData, null, 2)}`);
 
                 // ✅ Vérifier s'il y a des transactions en PENDING
