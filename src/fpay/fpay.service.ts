@@ -1084,13 +1084,7 @@ export class FpayService {
         }
     }
 
-    // src/modules/fpay/fpay.service.ts
 
-    /**
-     * Demande de dépôt avec vérification OTP - Version complète
-     * Étape 1: Envoie un OTP par SMS ou email
-     * Étape 2: Vérifie l'OTP et effectue la demande de dépôt
-     */
     async requestDepositWithOtp(
         dto: {
             userId: string;
@@ -1128,11 +1122,14 @@ export class FpayService {
             // ============================================================
             // ÉTAPE 1: Vérifier si l'OTP est fourni
             // ============================================================
-            if (!dto.otpCode) {
-                const generatedOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
-                const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+            const hasOtp = dto.otpCode && dto.otpCode.trim() !== '';
 
-                // ✅ Récupérer l'utilisateur pour avoir son email/phone
+            if (!hasOtp) {
+                this.logger.log(`📱 ÉTAPE 1 - Envoi OTP pour ${dto.userId}`);
+
+                const generatedOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
+                const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
                 const user = await this.userRepository.findOne({
                     where: { userIdFpay: dto.userId },
                     select: ['id', 'email', 'phone', 'fullName'],
@@ -1153,7 +1150,12 @@ export class FpayService {
                     );
                 }
 
-                // ✅ Sauvegarder l'OTP
+                // ✅ Supprimer les anciens OTP non utilisés
+                await this.otpRepository.update(
+                    { email: destination, isUsed: false },
+                    { isUsed: true }
+                );
+
                 const otp = this.otpRepository.create({
                     email: destination,
                     otpCode: generatedOtpCode,
@@ -1162,7 +1164,6 @@ export class FpayService {
                 });
                 await this.otpRepository.save(otp);
 
-                // ✅ Envoyer l'OTP par email ou SMS
                 if (user.email) {
                     const translations = {
                         title: 'Code de vérification pour votre dépôt',
@@ -1208,9 +1209,8 @@ export class FpayService {
             // ============================================================
             // ÉTAPE 2: Vérifier l'OTP
             // ============================================================
-            this.logger.log(`🔐 Vérification OTP pour la demande de dépôt`);
+            this.logger.log(`🔐 ÉTAPE 2 - Vérification OTP: ${dto.otpCode} pour ${dto.userId}`);
 
-            // ✅ Récupérer l'utilisateur
             const user = await this.userRepository.findOne({
                 where: { userIdFpay: dto.userId },
                 select: ['id', 'email', 'phone'],
@@ -1231,11 +1231,14 @@ export class FpayService {
                 );
             }
 
-            // ✅ Vérifier l'OTP
+            // ✅ Vérifier l'OTP - avec vérification de sécurité
+            // On sait que dto.otpCode existe ici car hasOtp est true
+            const otpCode = dto.otpCode as string; // ✅ Casting sécurisé car on a vérifié
+
             const otpEntry = await this.otpRepository.findOne({
                 where: {
                     email: destination,
-                    otpCode: dto.otpCode,
+                    otpCode: otpCode.trim(),
                     isUsed: false,
                 },
             });
@@ -1248,13 +1251,15 @@ export class FpayService {
             }
 
             if (new Date() > otpEntry.expiresAt) {
+                otpEntry.isUsed = true;
+                await this.otpRepository.save(otpEntry);
+
                 throw new HttpException(
                     'Code OTP expiré. Veuillez refaire une demande pour recevoir un nouveau code.',
                     HttpStatus.BAD_REQUEST,
                 );
             }
 
-            // ✅ Marquer l'OTP comme utilisé
             otpEntry.isUsed = true;
             await this.otpRepository.save(otpEntry);
 
