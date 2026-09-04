@@ -11,6 +11,7 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { OtpEntity } from 'src/otp/entities/otp.entity';
 import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 import { MailService } from 'src/email/email.service';
+import { I18nService } from 'src/libs/common/src';
 
 @Module({
     imports: [
@@ -29,7 +30,7 @@ import { MailService } from 'src/email/email.service';
         }),
     ],
     controllers: [FpayController],
-    providers: [FpayService, SmsHelper, MailService],
+    providers: [FpayService, SmsHelper, MailService, I18nService],
     exports: [FpayService, JwtModule],
 })
 export class FpayModule { }

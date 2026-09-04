@@ -17,6 +17,7 @@ import { OtpEntity } from 'src/otp/entities/otp.entity';
 import { Validator } from 'class-validator';
 import { MailService } from 'src/email/email.service';
 import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
+import { I18nService } from 'src/libs/common/src';
 
 export interface WalletBalanceResponse {
     success: boolean;
@@ -1083,6 +1084,13 @@ export class FpayService {
         }
     }
 
+    // src/modules/fpay/fpay.service.ts
+
+    /**
+     * Demande de dépôt avec vérification OTP - Version complète
+     * Étape 1: Envoie un OTP par SMS ou email
+     * Étape 2: Vérifie l'OTP et effectue la demande de dépôt
+     */
     async requestDepositWithOtp(
         dto: {
             userId: string;
@@ -1094,6 +1102,28 @@ export class FpayService {
     ): Promise<any> {
         try {
             this.logger.log(`📤 Demande de dépôt avec OTP: ${dto.amount} ${dto.currency} pour ${dto.userId}`);
+
+            // ✅ Validation initiale
+            if (!dto.userId) {
+                throw new HttpException(
+                    'L\'ID de l\'utilisateur est requis',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            if (!dto.amount || dto.amount <= 0) {
+                throw new HttpException(
+                    'Le montant doit être supérieur à 0',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            if (!dto.currency) {
+                throw new HttpException(
+                    'La devise est obligatoire',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
 
             // ============================================================
             // ÉTAPE 1: Vérifier si l'OTP est fourni
@@ -1110,7 +1140,7 @@ export class FpayService {
 
                 if (!user) {
                     throw new HttpException(
-                        await this.i18n.translate('fpay.deposit.user_not_found', lang),
+                        'Utilisateur non trouvé. Veuillez vérifier vos identifiants.',
                         HttpStatus.NOT_FOUND,
                     );
                 }
@@ -1118,7 +1148,7 @@ export class FpayService {
                 const destination = user.email || user.phone;
                 if (!destination) {
                     throw new HttpException(
-                        await this.i18n.translate('fpay.deposit.no_email_or_phone', lang),
+                        'Aucun email ou téléphone trouvé pour cet utilisateur. Veuillez mettre à jour votre profil.',
                         HttpStatus.BAD_REQUEST,
                     );
                 }
@@ -1133,20 +1163,20 @@ export class FpayService {
                 await this.otpRepository.save(otp);
 
                 // ✅ Envoyer l'OTP par email ou SMS
-                if (user.email && validator.isEmail(user.email)) {
+                if (user.email && Validator.isEmail(user.email)) {
                     const translations = {
-                        title: await this.i18n.translate('fpay.deposit.otp_email_title', lang),
-                        description: await this.i18n.translate('fpay.deposit.otp_email_description', lang),
-                        label: await this.i18n.translate('fpay.deposit.otp_email_label', lang),
-                        expiry: await this.i18n.translate('fpay.deposit.otp_email_expiry', lang, { minutes: 10 }),
-                        footerCopyright: await this.i18n.translate('user.otp_email_footer_copyright', lang),
-                        footerSecurity: await this.i18n.translate('user.otp_email_footer_security', lang),
-                        legalNote: await this.i18n.translate('user.otp_email_legal_note', lang),
+                        title: 'Code de vérification pour votre dépôt',
+                        description: 'Utilisez le code ci-dessous pour confirmer votre demande de dépôt sur FPay',
+                        label: 'VOTRE CODE DE VÉRIFICATION',
+                        expiry: 'Ce code expire dans 10 minutes',
+                        footerCopyright: `© ${new Date().getFullYear()} FavorHelp. Tous droits réservés.`,
+                        footerSecurity: 'Protection des données | Email sécurisé',
+                        legalNote: 'Favor Help — Écosystème digital par Favor Group | RCCM: 21-A-770 | N° IMPÔT: A2156062L | National ID: 19-G4701-N74976H',
                     };
 
                     await this.mailService.sendHtmlEmail(
                         user.email,
-                        await this.i18n.translate('fpay.deposit.otp_email_subject', lang) || 'Code OTP pour votre dépôt FPay',
+                        'Code OTP pour votre dépôt FPay',
                         'sendOtp.html',
                         {
                             otpCode: generatedOtpCode,
@@ -1157,16 +1187,14 @@ export class FpayService {
                     );
                     this.logger.log(`✅ OTP envoyé par email à ${user.email}`);
                 } else if (user.phone) {
-                    const smsMessage = await this.i18n.translate('fpay.deposit.otp_sms_body', lang, {
-                        otpCode: generatedOtpCode,
-                    });
-                    await this.smsService.sendSms(user.phone, smsMessage);
+                    const smsMessage = `Votre code OTP pour le dépôt FPay est: ${generatedOtpCode}. Valable 10 minutes.`;
+                    await this.smsHelper.sendSms(user.phone, smsMessage);
                     this.logger.log(`✅ OTP envoyé par SMS à ${user.phone}`);
                 }
 
                 return {
                     status: 'success',
-                    message: await this.i18n.translate('fpay.deposit.otp_sent', lang),
+                    message: 'Un code OTP a été envoyé par ' + (user.email ? 'email' : 'SMS') + '. Veuillez le saisir pour confirmer votre demande de dépôt.',
                     requiresOtp: true,
                     data: {
                         userId: dto.userId,
@@ -1190,7 +1218,7 @@ export class FpayService {
 
             if (!user) {
                 throw new HttpException(
-                    await this.i18n.translate('fpay.deposit.user_not_found', lang),
+                    'Utilisateur non trouvé. Veuillez vérifier vos identifiants.',
                     HttpStatus.NOT_FOUND,
                 );
             }
@@ -1198,7 +1226,7 @@ export class FpayService {
             const destination = user.email || user.phone;
             if (!destination) {
                 throw new HttpException(
-                    await this.i18n.translate('fpay.deposit.no_email_or_phone', lang),
+                    'Aucun email ou téléphone trouvé pour cet utilisateur. Veuillez mettre à jour votre profil.',
                     HttpStatus.BAD_REQUEST,
                 );
             }
@@ -1212,9 +1240,16 @@ export class FpayService {
                 },
             });
 
-            if (!otpEntry || new Date() > otpEntry.expiresAt) {
+            if (!otpEntry) {
                 throw new HttpException(
-                    await this.i18n.translate('fpay.deposit.otp_invalid', lang),
+                    'Code OTP invalide. Veuillez vérifier le code saisi.',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            if (new Date() > otpEntry.expiresAt) {
+                throw new HttpException(
+                    'Code OTP expiré. Veuillez refaire une demande pour recevoir un nouveau code.',
                     HttpStatus.BAD_REQUEST,
                 );
             }
@@ -1229,6 +1264,13 @@ export class FpayService {
             // ÉTAPE 3: Effectuer la demande de dépôt
             // ============================================================
             const url = `${this.fpayApiUrl}/wallet/deposit/request`;
+
+            this.logger.log(`📤 Appel API FPay: ${url}`);
+            this.logger.log(`📤 Payload: ${JSON.stringify({
+                userId: dto.userId,
+                amount: dto.amount,
+                currency: dto.currency,
+            })}`);
 
             const response = await firstValueFrom(
                 this.httpService.post(
@@ -1246,13 +1288,18 @@ export class FpayService {
 
             return {
                 status: 'success',
-                message: await this.i18n.translate('fpay.deposit.request_success', lang) || 'Demande de dépôt enregistrée avec succès',
+                message: `Demande de dépôt de ${dto.amount} ${dto.currency} enregistrée avec succès. Référence: ${response.data.data?.transaction?.reference || 'N/A'}`,
                 data: response.data.data,
                 requiresOtp: false,
             };
 
         } catch (error) {
             this.logger.error(`❌ Erreur demande de dépôt: ${error.message}`);
+
+            if (error.response) {
+                this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
+            }
+
             throw this.handleError(error);
         }
     }
