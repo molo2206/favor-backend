@@ -143,5 +143,22 @@
   "referral.status_pending": "En attente",
   "referral.status_completed": "Complété",
   "referral.status_rewarded": "Récompensé",
-  "referral.status_expired": "Expiré"
+  "referral.status_expired": "Expiré",
+  "fpay.deposit.otp_email_title": "Code de vérification pour votre dépôt",
+  "fpay.deposit.otp_email_description": "Utilisez le code ci-dessous pour confirmer votre demande de dépôt sur FPay",
+  "fpay.deposit.otp_email_label": "VOTRE CODE DE VÉRIFICATION",
+  "fpay.deposit.otp_email_expiry": "Ce code expire dans {{minutes}} minutes",
+  "fpay.deposit.otp_sms_body": "Votre code OTP pour le dépôt FPay est : {{otpCode}}. Valable 10 minutes.",
+  "fpay.deposit.otp_sent": "Un code OTP a été envoyé avec succès",
+  "fpay.deposit.requires_link": "Vous devez d'abord lier votre compte FPay pour effectuer un dépôt. Utilisez /fpay/open pour vous connecter.",
+  "fpay.deposit.request_success": "Demande de dépôt enregistrée avec succès",
+  "fpay.deposit.confirm_success": "Dépôt confirmé avec succès",
+  "fpay.deposit.cancel_success": "Demande de dépôt annulée avec succès",
+  "fpay.deposit.request_failed": "Échec de la demande de dépôt",
+  "fpay.deposit.confirm_failed": "Échec de la confirmation du dépôt",
+  "fpay.deposit.cancel_failed": "Échec de l'annulation du dépôt",
+  "fpay.deposit.user_not_found": "Utilisateur non trouvé",
+  "fpay.deposit.otp_invalid": "Code OTP invalide ou expiré. Veuillez refaire une demande.",
+  "fpay.deposit.otp_required": "Le code OTP est requis pour confirmer votre demande",
+  "fpay.deposit.no_email_or_phone": "Aucun email ou téléphone trouvé pour cet utilisateur"
 }

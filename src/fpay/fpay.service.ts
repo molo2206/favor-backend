@@ -1088,7 +1088,7 @@ export class FpayService {
             userId: string;
             amount: number;
             currency: string;
-            otpCode?: string;  // ✅ Optionnel pour la première étape
+            otpCode?: string;
         },
         lang: string = 'fr',
     ): Promise<any> {
@@ -1099,19 +1099,18 @@ export class FpayService {
             // ÉTAPE 1: Vérifier si l'OTP est fourni
             // ============================================================
             if (!dto.otpCode) {
-                // ✅ Générer un OTP
                 const generatedOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
                 const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
                 // ✅ Récupérer l'utilisateur pour avoir son email/phone
                 const user = await this.userRepository.findOne({
                     where: { userIdFpay: dto.userId },
-                    select: ['email', 'phone', 'fullName'],
+                    select: ['id', 'email', 'phone', 'fullName'],
                 });
 
                 if (!user) {
                     throw new HttpException(
-                        'Utilisateur non trouvé',
+                        await this.i18n.translate('fpay.deposit.user_not_found', lang),
                         HttpStatus.NOT_FOUND,
                     );
                 }
@@ -1119,12 +1118,12 @@ export class FpayService {
                 const destination = user.email || user.phone;
                 if (!destination) {
                     throw new HttpException(
-                        'Aucun email ou téléphone trouvé pour cet utilisateur',
+                        await this.i18n.translate('fpay.deposit.no_email_or_phone', lang),
                         HttpStatus.BAD_REQUEST,
                     );
                 }
 
-                // ✅ Sauvegarder l'OTP (à adapter avec votre table OTP)
+                // ✅ Sauvegarder l'OTP
                 const otp = this.otpRepository.create({
                     email: destination,
                     otpCode: generatedOtpCode,
@@ -1134,30 +1133,40 @@ export class FpayService {
                 await this.otpRepository.save(otp);
 
                 // ✅ Envoyer l'OTP par email ou SMS
-                if (user.email) {
+                if (user.email && validator.isEmail(user.email)) {
+                    const translations = {
+                        title: await this.i18n.translate('fpay.deposit.otp_email_title', lang),
+                        description: await this.i18n.translate('fpay.deposit.otp_email_description', lang),
+                        label: await this.i18n.translate('fpay.deposit.otp_email_label', lang),
+                        expiry: await this.i18n.translate('fpay.deposit.otp_email_expiry', lang, { minutes: 10 }),
+                        footerCopyright: await this.i18n.translate('user.otp_email_footer_copyright', lang),
+                        footerSecurity: await this.i18n.translate('user.otp_email_footer_security', lang),
+                        legalNote: await this.i18n.translate('user.otp_email_legal_note', lang),
+                    };
+
                     await this.mailService.sendHtmlEmail(
                         user.email,
-                        'Code OTP pour votre dépôt FPay',
+                        await this.i18n.translate('fpay.deposit.otp_email_subject', lang) || 'Code OTP pour votre dépôt FPay',
                         'sendOtp.html',
                         {
                             otpCode: generatedOtpCode,
                             year: new Date().getFullYear(),
                             lang: lang,
-                            user: {
-                                fullName: user.fullName || 'Utilisateur',
-                            },
+                            translations: translations,
                         },
                     );
+                    this.logger.log(`✅ OTP envoyé par email à ${user.email}`);
                 } else if (user.phone) {
-                    const smsMessage = `Votre code OTP pour le dépôt FPay est: ${generatedOtpCode}. Valable 10 minutes.`;
-                    await this.smsHelper.sendSms(user.phone, smsMessage);
+                    const smsMessage = await this.i18n.translate('fpay.deposit.otp_sms_body', lang, {
+                        otpCode: generatedOtpCode,
+                    });
+                    await this.smsService.sendSms(user.phone, smsMessage);
+                    this.logger.log(`✅ OTP envoyé par SMS à ${user.phone}`);
                 }
-
-                this.logger.log(`✅ OTP envoyé à ${destination}`);
 
                 return {
                     status: 'success',
-                    message: 'Un code OTP a été envoyé par ' + (user.email ? 'email' : 'SMS') + '. Veuillez le saisir pour confirmer votre demande de dépôt.',
+                    message: await this.i18n.translate('fpay.deposit.otp_sent', lang),
                     requiresOtp: true,
                     data: {
                         userId: dto.userId,
@@ -1176,12 +1185,12 @@ export class FpayService {
             // ✅ Récupérer l'utilisateur
             const user = await this.userRepository.findOne({
                 where: { userIdFpay: dto.userId },
-                select: ['email', 'phone'],
+                select: ['id', 'email', 'phone'],
             });
 
             if (!user) {
                 throw new HttpException(
-                    'Utilisateur non trouvé',
+                    await this.i18n.translate('fpay.deposit.user_not_found', lang),
                     HttpStatus.NOT_FOUND,
                 );
             }
@@ -1189,7 +1198,7 @@ export class FpayService {
             const destination = user.email || user.phone;
             if (!destination) {
                 throw new HttpException(
-                    'Aucun email ou téléphone trouvé pour cet utilisateur',
+                    await this.i18n.translate('fpay.deposit.no_email_or_phone', lang),
                     HttpStatus.BAD_REQUEST,
                 );
             }
@@ -1205,7 +1214,7 @@ export class FpayService {
 
             if (!otpEntry || new Date() > otpEntry.expiresAt) {
                 throw new HttpException(
-                    'Code OTP invalide ou expiré. Veuillez refaire une demande.',
+                    await this.i18n.translate('fpay.deposit.otp_invalid', lang),
                     HttpStatus.BAD_REQUEST,
                 );
             }
@@ -1222,7 +1231,7 @@ export class FpayService {
             const url = `${this.fpayApiUrl}/wallet/deposit/request`;
 
             const response = await firstValueFrom(
-                this.httpService.post<DepositRequestResponse>(
+                this.httpService.post(
                     url,
                     {
                         userId: dto.userId,
@@ -1233,11 +1242,11 @@ export class FpayService {
                 )
             );
 
-            this.logger.log(`✅ Demande de dépôt enregistrée: ${response.data.data.transaction.reference}`);
+            this.logger.log(`✅ Demande de dépôt enregistrée: ${response.data.data?.transaction?.reference || 'OK'}`);
 
             return {
                 status: 'success',
-                message: response.data.message || 'Demande de dépôt enregistrée avec succès',
+                message: await this.i18n.translate('fpay.deposit.request_success', lang) || 'Demande de dépôt enregistrée avec succès',
                 data: response.data.data,
                 requiresOtp: false,
             };
