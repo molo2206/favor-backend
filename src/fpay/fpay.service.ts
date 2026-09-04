@@ -1522,42 +1522,44 @@ export class FpayService {
         try {
             this.logger.log(`🔍 Recherche de la dernière transaction PENDING pour ${userId}${type ? ` (type: ${type})` : ''}`);
 
-            // ✅ Appel à l'API FPay pour récupérer les transactions
-            const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
-
-            const params = new URLSearchParams();
-            params.set('userId', userId);
-            params.set('page', '1');
-            params.set('limit', '5'); // On récupère les 5 dernières transactions
-
-            if (type) {
-                params.set('type', type);
-            }
-
-            // ✅ Filtrer par status PENDING
-            // Note: L'API peut ne pas supporter le filtrage par status, on le fera côté code
-
-            const fullUrl = `${url}?${params.toString()}`;
-
-            this.logger.log(`🔗 Appel API: ${fullUrl}`);
-
-            const response = await firstValueFrom(
-                this.httpService.get(
-                    fullUrl,
-                    { headers: this.getHeaders() }
-                )
+            // ✅ Utiliser la fonction existante qui gère correctement la structure
+            const result = await this.getWalletBalanceAndTransactions(
+                userId,
+                1,          // page
+                10,         // limit
+                undefined,  // startDate
+                undefined,  // endDate
+                type,       // type
+                undefined,  // status (on va filtrer nous-mêmes)
+                undefined,  // movement
+                undefined,  // search
             );
 
-            // ✅ Extraire les transactions du tableau
-            let transactions = response.data?.data?.transactions?.data ||
-                response.data?.data ||
-                [];
+            this.logger.log(`📦 Résultat:`, JSON.stringify(result, null, 2));
+
+            // ✅ Extraire les transactions (avec gestion des différentes structures)
+            let transactions: any[] = [];
+
+            if (result?.data?.transactions && Array.isArray(result.data.transactions)) {
+                transactions = result.data.transactions;
+            } else if (result?.data?.transactions?.data && Array.isArray(result.data.transactions.data)) {
+                transactions = result.data.transactions.data;
+            } else if (result?.data && Array.isArray(result.data)) {
+                transactions = result.data;
+            } else if (Array.isArray(result)) {
+                transactions = result;
+            }
+
+            if (!transactions || transactions.length === 0) {
+                this.logger.log(`ℹ️ Aucune transaction trouvée pour ${userId}`);
+                return null;
+            }
 
             this.logger.log(`📊 ${transactions.length} transaction(s) trouvée(s)`);
 
-            // ✅ Filtrer pour ne garder que celles en PENDING
+            // ✅ Filtrer par status PENDING
             const pendingTransactions = transactions.filter(
-                (tx: any) => tx.status === 'PENDING'
+                (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
             );
 
             this.logger.log(`⏳ ${pendingTransactions.length} transaction(s) en PENDING`);
@@ -1566,15 +1568,16 @@ export class FpayService {
                 return null;
             }
 
-            // ✅ Trier par date de création (du plus récent au plus ancien)
+            // ✅ Trier par date (plus récent d'abord)
             const sortedPending = pendingTransactions.sort((a: any, b: any) => {
-                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                const dateA = new Date(a.createdAt || a.created_at || 0);
+                const dateB = new Date(b.createdAt || b.created_at || 0);
+                return dateB.getTime() - dateA.getTime();
             });
 
-            // ✅ Retourner la plus récente
             const lastPending = sortedPending[0];
 
-            this.logger.log(`✅ Dernière transaction PENDING: ${lastPending.id || 'N/A'} - ${lastPending.amount} ${lastPending.currency}`);
+            this.logger.log(`✅ Dernière transaction PENDING: ${lastPending.id || 'N/A'}`);
 
             return {
                 id: lastPending.id || lastPending.transactionId,
@@ -1582,21 +1585,14 @@ export class FpayService {
                 currency: lastPending.currency,
                 type: lastPending.type,
                 status: lastPending.status,
-                createdAt: lastPending.createdAt,
+                createdAt: lastPending.createdAt || lastPending.created_at,
                 description: lastPending.description,
                 reference: lastPending.reference,
-                // ✅ Ajouter toutes les informations utiles
                 ...lastPending,
             };
 
         } catch (error) {
-            this.logger.error(`❌ Erreur lors de la récupération de la dernière transaction PENDING: ${error.message}`);
-
-            if (error.response) {
-                this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
-            }
-
-            // ✅ Retourner null en cas d'erreur (ne pas bloquer le processus)
+            this.logger.error(`❌ Erreur: ${error.message}`);
             return null;
         }
     }
