@@ -974,53 +974,109 @@ export class FpayService {
         search?: string,
     ): Promise<any> {
         try {
-            this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}, walletId=${walletId || 'non fourni'}`);
+            // Validation initiale
+            if (!userId || userId.trim() === '') {
+                throw new Error('userId est requis');
+            }
 
-            const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
+            // Nettoyer userId
+            userId = userId.trim();
 
+            // Validation des paramètres de pagination
+            page = Math.max(1, page);
+            limit = Math.min(100, Math.max(1, limit));
+
+            // Construction des paramètres
             const params = new URLSearchParams();
             params.set('userId', userId);
 
+            // Gestion de walletId
             if (walletId && walletId.trim() !== '') {
-                params.set('walletId', walletId);
+                params.set('walletId', walletId.trim());
+            } else {
+                // Si walletId n'est pas fourni, on peut soit :
+                // - Ne pas l'ajouter du tout
+                // - Utiliser un walletId par défaut
+                this.logger.warn('⚠️ walletId non fourni, envoi sans walletId');
             }
 
             params.set('page', page.toString());
             params.set('limit', limit.toString());
 
-            if (startDate) params.set('startDate', startDate);
-            if (endDate) params.set('endDate', endDate);
-            if (type) params.set('type', type);
-            if (status) params.set('status', status);
-            if (movement) params.set('movement', movement);
-            if (search) params.set('search', search);
+            // Gestion des dates
+            if (startDate) {
+                const formattedDate = this.formatDate(startDate);
+                if (formattedDate) {
+                    params.set('startDate', formattedDate);
+                }
+            }
 
-            const fullUrl = `${url}?${params.toString()}`;
+            if (endDate) {
+                const formattedDate = this.formatDate(endDate);
+                if (formattedDate) {
+                    params.set('endDate', formattedDate);
+                }
+            }
 
-            this.logger.log(`🔗 Appel API: ${fullUrl}`);
+            // Filtres optionnels
+            if (type) params.set('type', type.trim());
+            if (status) params.set('status', status.trim());
+            if (movement) params.set('movement', movement.trim());
+            if (search) params.set('search', search.trim());
+
+            // Log détaillé
+            const fullUrl = `${this.fpayApiUrl}/wallet/balance-transactions?${params.toString()}`;
+            this.logger.log(`🔗 URL complète: ${fullUrl}`);
+            this.logger.log(`📝 Paramètres envoyés: ${JSON.stringify(Object.fromEntries(params))}`);
 
             const response = await firstValueFrom(
-                this.httpService.get(
-                    fullUrl,
-                    { headers: this.getHeaders() }
-                )
+                this.httpService.get(fullUrl, {
+                    headers: this.getHeaders()
+                })
             );
-
-            this.logger.log(`✅ Balance et transactions récupérées avec succès`);
 
             return response.data;
 
         } catch (error) {
+            // Gestion d'erreur améliorée
             this.logger.error(`❌ Erreur: ${error.message}`);
 
             if (error.response) {
-                this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
+                this.logger.error(`📦 Statut: ${error.response.status}`);
+                this.logger.error(`📦 Données d'erreur: ${JSON.stringify(error.response.data)}`);
+                this.logger.error(`📦 Headers: ${JSON.stringify(error.response.headers)}`);
+
+                // Analyse spécifique du 400
+                if (error.response.status === 400) {
+                    const errorData = error.response.data;
+                    if (errorData.message) {
+                        this.logger.error(`🔍 Message d'erreur: ${errorData.message}`);
+                    }
+                    if (errorData.errors) {
+                        this.logger.error(`🔍 Détails des erreurs: ${JSON.stringify(errorData.errors)}`);
+                    }
+                }
             }
 
-            throw this.handleError(error);
+            throw new Error(`Erreur lors de la récupération des transactions: ${error.message}`);
         }
     }
 
+    // Méthode utilitaire pour formater les dates
+    private formatDate(dateString: string): string | null {
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) {
+                this.logger.warn(`⚠️ Date invalide: ${dateString}`);
+                return null;
+            }
+            // Format YYYY-MM-DD
+            return date.toISOString().split('T')[0];
+        } catch (error) {
+            this.logger.warn(`⚠️ Erreur de formatage de date: ${dateString}`);
+            return null;
+        }
+    }
     getApiKey(): string {
         return this.apiKey;
     }

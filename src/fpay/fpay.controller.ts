@@ -450,40 +450,72 @@ export class FpayController {
         @Query('movement') movement?: string,
         @Query('search') search?: string,
     ) {
+        // Vérification de l'utilisateur
         if (!user) {
             throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
         }
 
-        // ✅ Vérifier que l'utilisateur a un compte FPay lié
+        // Vérification du lien FPay
         if (!user.userIdFpay || !user.isLink) {
             throw new HttpException(
-                'Vous devez d\'abord lier votre compte FPay pour accéder à vos transactions. Utilisez /fpay/open pour vous connecter.',
+                'Vous devez d\'abord lier votre compte FPay. Utilisez /fpay/open pour vous connecter.',
                 HttpStatus.BAD_REQUEST,
             );
         }
 
-        this.logger.log(`📊 Récupération balance/transactions pour l'utilisateur: ${user.id} (FPay ID: ${user.userIdFpay})`);
-
+        // Validation des paramètres
         const pageNum = page ? parseInt(page, 10) : 1;
         const limitNum = limit ? parseInt(limit, 10) : 10;
 
-        // ✅ Utiliser userIdFpay de l'utilisateur connecté
-        const result = await this.fpayService.getWalletBalanceAndTransactions(
-            user.userIdFpay,  // ✅ "b6e103b2-f734-4f12-8947-961423f2a2e8"
-            walletId,
-            pageNum,
-            limitNum,
-            startDate,
-            endDate,
-            type,
-            status,
-            movement,
-            search,
-        );
+        if (isNaN(pageNum) || pageNum < 1) {
+            throw new HttpException('Le paramètre page doit être un nombre positif', HttpStatus.BAD_REQUEST);
+        }
 
-        return result;
+        if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+            throw new HttpException('Le paramètre limit doit être entre 1 et 100', HttpStatus.BAD_REQUEST);
+        }
+
+        // Validation des dates
+        if (startDate) {
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!dateRegex.test(startDate)) {
+                throw new HttpException('Le format de startDate doit être YYYY-MM-DD', HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        if (endDate) {
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!dateRegex.test(endDate)) {
+                throw new HttpException('Le format de endDate doit être YYYY-MM-DD', HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        this.logger.log(`📊 Récupération pour user: ${user.id} (FPay ID: ${user.userIdFpay})`);
+
+        try {
+            const result = await this.fpayService.getWalletBalanceAndTransactions(
+                user.userIdFpay,
+                walletId,
+                pageNum,
+                limitNum,
+                startDate,
+                endDate,
+                type,
+                status,
+                movement,
+                search,
+            );
+
+            return result;
+        } catch (error) {
+            this.logger.error(`❌ Erreur dans le controller: ${error.message}`);
+            throw new HttpException(
+                error.message || 'Erreur lors de la récupération des transactions',
+                HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
     }
-
+    
     @Get('open')
     @UseGuards(AuthentificationGuard)
     @ApiBearerAuth()
