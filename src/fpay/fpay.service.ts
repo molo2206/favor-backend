@@ -974,109 +974,71 @@ export class FpayService {
         search?: string,
     ): Promise<any> {
         try {
-            // Validation initiale
+            // ✅ VALIDATION DU userId
             if (!userId || userId.trim() === '') {
                 throw new Error('userId est requis');
             }
 
-            // Nettoyer userId
-            userId = userId.trim();
+            this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}`);
 
-            // Validation des paramètres de pagination
-            page = Math.max(1, page);
-            limit = Math.min(100, Math.max(1, limit));
+            const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
 
-            // Construction des paramètres
-            const params = new URLSearchParams();
-            params.set('userId', userId);
+            // ✅ CONSTRUCTION MANUELLE DES PARAMÈTRES
+            let queryParams = `userId=${encodeURIComponent(userId.trim())}`;
 
-            // Gestion de walletId
+            // Ajouter les paramètres optionnels
             if (walletId && walletId.trim() !== '') {
-                params.set('walletId', walletId.trim());
-            } else {
-                // Si walletId n'est pas fourni, on peut soit :
-                // - Ne pas l'ajouter du tout
-                // - Utiliser un walletId par défaut
-                this.logger.warn('⚠️ walletId non fourni, envoi sans walletId');
+                queryParams += `&walletId=${encodeURIComponent(walletId.trim())}`;
             }
 
-            params.set('page', page.toString());
-            params.set('limit', limit.toString());
+            queryParams += `&page=${page}&limit=${limit}`;
 
-            // Gestion des dates
-            if (startDate) {
-                const formattedDate = this.formatDate(startDate);
-                if (formattedDate) {
-                    params.set('startDate', formattedDate);
-                }
-            }
+            if (startDate) queryParams += `&startDate=${encodeURIComponent(startDate)}`;
+            if (endDate) queryParams += `&endDate=${encodeURIComponent(endDate)}`;
+            if (type) queryParams += `&type=${encodeURIComponent(type)}`;
+            if (status) queryParams += `&status=${encodeURIComponent(status)}`;
+            if (movement) queryParams += `&movement=${encodeURIComponent(movement)}`;
+            if (search) queryParams += `&search=${encodeURIComponent(search)}`;
 
-            if (endDate) {
-                const formattedDate = this.formatDate(endDate);
-                if (formattedDate) {
-                    params.set('endDate', formattedDate);
-                }
-            }
+            const fullUrl = `${url}?${queryParams}`;
 
-            // Filtres optionnels
-            if (type) params.set('type', type.trim());
-            if (status) params.set('status', status.trim());
-            if (movement) params.set('movement', movement.trim());
-            if (search) params.set('search', search.trim());
+            this.logger.log(`🔗 Appel API: ${fullUrl}`);
+            this.logger.log(`📝 Paramètres: ${queryParams}`);
 
-            // Log détaillé
-            const fullUrl = `${this.fpayApiUrl}/wallet/balance-transactions?${params.toString()}`;
-            this.logger.log(`🔗 URL complète: ${fullUrl}`);
-            this.logger.log(`📝 Paramètres envoyés: ${JSON.stringify(Object.fromEntries(params))}`);
+            // ✅ AJOUT DES HEADERS COMPLETS
+            const headers = this.getHeaders();
+            this.logger.log(`📋 Headers: ${JSON.stringify(headers)}`);
 
             const response = await firstValueFrom(
-                this.httpService.get(fullUrl, {
-                    headers: this.getHeaders()
-                })
+                this.httpService.get(fullUrl, { headers })
             );
+
+            this.logger.log(`✅ Balance et transactions récupérées avec succès`);
+            this.logger.log(`📊 Nombre de transactions: ${response.data?.data?.transactions?.length || 0}`);
 
             return response.data;
 
         } catch (error) {
-            // Gestion d'erreur améliorée
             this.logger.error(`❌ Erreur: ${error.message}`);
 
             if (error.response) {
-                this.logger.error(`📦 Statut: ${error.response.status}`);
-                this.logger.error(`📦 Données d'erreur: ${JSON.stringify(error.response.data)}`);
-                this.logger.error(`📦 Headers: ${JSON.stringify(error.response.headers)}`);
+                this.logger.error(`📦 Status: ${error.response.status}`);
+                this.logger.error(`📦 Data: ${JSON.stringify(error.response.data)}`);
 
-                // Analyse spécifique du 400
+                // ✅ ANALYSE SPÉCIFIQUE POUR USERID
                 if (error.response.status === 400) {
-                    const errorData = error.response.data;
-                    if (errorData.message) {
-                        this.logger.error(`🔍 Message d'erreur: ${errorData.message}`);
-                    }
-                    if (errorData.errors) {
-                        this.logger.error(`🔍 Détails des erreurs: ${JSON.stringify(errorData.errors)}`);
+                    const errorMsg = error.response.data?.message || '';
+                    if (errorMsg.includes('user') || errorMsg.includes('User')) {
+                        this.logger.error(`🔍 Le userId "${userId}" semble invalide ou inexistant`);
+                        this.logger.error(`💡 Vérifiez que l'utilisateur existe dans le système FPay`);
                     }
                 }
             }
 
-            throw new Error(`Erreur lors de la récupération des transactions: ${error.message}`);
+            throw this.handleError(error);
         }
     }
 
-    // Méthode utilitaire pour formater les dates
-    private formatDate(dateString: string): string | null {
-        try {
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) {
-                this.logger.warn(`⚠️ Date invalide: ${dateString}`);
-                return null;
-            }
-            // Format YYYY-MM-DD
-            return date.toISOString().split('T')[0];
-        } catch (error) {
-            this.logger.warn(`⚠️ Erreur de formatage de date: ${dateString}`);
-            return null;
-        }
-    }
     getApiKey(): string {
         return this.apiKey;
     }

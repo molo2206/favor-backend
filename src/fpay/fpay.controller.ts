@@ -450,68 +450,109 @@ export class FpayController {
         @Query('movement') movement?: string,
         @Query('search') search?: string,
     ) {
-        // Vérification de l'utilisateur
-        if (!user) {
-            throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
-        }
-
-        // Vérification du lien FPay
-        if (!user.userIdFpay || !user.isLink) {
-            throw new HttpException(
-                'Vous devez d\'abord lier votre compte FPay. Utilisez /fpay/open pour vous connecter.',
-                HttpStatus.BAD_REQUEST,
-            );
-        }
-
-        // Validation des paramètres
-        const pageNum = page ? parseInt(page, 10) : 1;
-        const limitNum = limit ? parseInt(limit, 10) : 10;
-
-        if (isNaN(pageNum) || pageNum < 1) {
-            throw new HttpException('Le paramètre page doit être un nombre positif', HttpStatus.BAD_REQUEST);
-        }
-
-        if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
-            throw new HttpException('Le paramètre limit doit être entre 1 et 100', HttpStatus.BAD_REQUEST);
-        }
-
-        // Validation des dates
-        if (startDate) {
-            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-            if (!dateRegex.test(startDate)) {
-                throw new HttpException('Le format de startDate doit être YYYY-MM-DD', HttpStatus.BAD_REQUEST);
-            }
-        }
-
-        if (endDate) {
-            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-            if (!dateRegex.test(endDate)) {
-                throw new HttpException('Le format de endDate doit être YYYY-MM-DD', HttpStatus.BAD_REQUEST);
-            }
-        }
-
-        this.logger.log(`📊 Récupération pour user: ${user.id} (FPay ID: ${user.userIdFpay})`);
-
         try {
-            const result = await this.fpayService.getWalletBalanceAndTransactions(
-                user.userIdFpay,
-                walletId,
-                pageNum,
-                limitNum,
-                startDate,
-                endDate,
-                type,
-                status,
-                movement,
-                search,
-            );
+            // ✅ VÉRIFICATION DE L'UTILISATEUR
+            if (!user) {
+                throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
+            }
 
-            return result;
+            // ✅ VÉRIFICATION DU LIEN FPAY
+            if (!user.userIdFpay || !user.isLink) {
+                throw new HttpException(
+                    'Vous devez d\'abord lier votre compte FPay pour accéder à vos transactions. Utilisez /fpay/open pour vous connecter.',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ LOG DÉTAILLÉ DE L'UTILISATEUR
+            this.logger.log(`📊 Utilisateur connecté:`);
+            this.logger.log(`  - ID interne: ${user.id}`);
+            this.logger.log(`  - FPay ID: ${user.userIdFpay}`);
+            this.logger.log(`  - Email: ${user.email}`);
+            this.logger.log(`  - isLink: ${user.isLink}`);
+
+            // ✅ VALIDATION DU userIdFpay
+            if (!user.userIdFpay || user.userIdFpay.trim() === '') {
+                throw new HttpException(
+                    'L\'ID FPay de l\'utilisateur est invalide',
+                    HttpStatus.BAD_REQUEST
+                );
+            }
+
+            // ✅ LOG DES PARAMÈTRES REÇUS
+            this.logger.log(`📝 Paramètres reçus:`);
+            this.logger.log(`  - walletId: ${walletId || 'non fourni'}`);
+            this.logger.log(`  - page: ${page || '1'}`);
+            this.logger.log(`  - limit: ${limit || '10'}`);
+            this.logger.log(`  - type: ${type || 'non fourni'}`);
+            this.logger.log(`  - status: ${status || 'non fourni'}`);
+            this.logger.log(`  - movement: ${movement || 'non fourni'}`);
+
+            const pageNum = page ? parseInt(page, 10) : 1;
+            const limitNum = limit ? parseInt(limit, 10) : 10;
+
+            // ✅ APPEL AU SERVICE AVEC TRY-CATCH
+            try {
+                const result = await this.fpayService.getWalletBalanceAndTransactions(
+                    user.userIdFpay.trim(),
+                    walletId,
+                    pageNum,
+                    limitNum,
+                    startDate,
+                    endDate,
+                    type,
+                    status,
+                    movement,
+                    search,
+                );
+
+                // ✅ VÉRIFICATION DU RÉSULTAT
+                if (!result || !result.data) {
+                    this.logger.warn(`⚠️ Aucune donnée retournée pour l'utilisateur ${user.userIdFpay}`);
+                    return {
+                        message: 'Aucune transaction trouvée',
+                        data: {
+                            transactions: [],
+                            total: 0,
+                            page: pageNum,
+                            limit: limitNum
+                        }
+                    };
+                }
+
+                this.logger.log(`✅ Transactions récupérées: ${result.data?.transactions?.length || 0}`);
+                return result;
+
+            } catch (serviceError) {
+                this.logger.error(`❌ Erreur du service FPay: ${serviceError.message}`);
+
+                // ✅ SI ERREUR 400, PROPOSER UNE SOLUTION
+                if (serviceError.message.includes('400')) {
+                    this.logger.error(`💡 L'utilisateur ${user.userIdFpay} n'a peut-être pas de transactions`);
+                    this.logger.error(`💡 Vérifiez que l'utilisateur existe dans FPay`);
+
+                    // Retourner un résultat vide plutôt qu'une erreur
+                    return {
+                        message: 'Aucune transaction trouvée pour cet utilisateur',
+                        data: {
+                            transactions: [],
+                            total: 0,
+                            page: pageNum,
+                            limit: limitNum
+                        }
+                    };
+                }
+
+                throw serviceError;
+            }
+
         } catch (error) {
-            this.logger.error(`❌ Erreur dans le controller: ${error.message}`);
+            this.logger.error(`❌ Erreur générale: ${error.message}`);
+            this.logger.error(`   Stack: ${error.stack}`);
+
             throw new HttpException(
                 error.message || 'Erreur lors de la récupération des transactions',
-                HttpStatus.INTERNAL_SERVER_ERROR
+                error.status || HttpStatus.INTERNAL_SERVER_ERROR
             );
         }
     }
