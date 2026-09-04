@@ -18,6 +18,7 @@ import { Validator } from 'class-validator';
 import { MailService } from 'src/email/email.service';
 import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 import { I18nService } from 'src/libs/common/src';
+import { ReferralEntity } from 'src/users/entities/referral.entity';
 
 export interface WalletBalanceResponse {
     success: boolean;
@@ -140,6 +141,9 @@ export class FpayService {
         private readonly smsHelper: SmsHelper,
         private readonly mailService: MailService,
         private readonly jwtService: JwtService,
+
+        @InjectRepository(ReferralEntity)  // ✅ Ajouter
+        private readonly referralRepository: Repository<ReferralEntity>,
     ) {
         const fpayApiUrl = this.configService.get<string>('FPAY_API_URL');
         const apiKey = this.configService.get<string>('FPAY_API_KEY_HELP');
@@ -1182,7 +1186,7 @@ export class FpayService {
                     otpCode: generatedOtpCode,
                     expiresAt: otpExpiry,
                     isUsed: false,
-                    user: user,  // ✅ Assigner l'utilisateur complet
+                    user: user,
                 });
                 await this.otpRepository.save(otp);
 
@@ -1277,9 +1281,10 @@ export class FpayService {
                     otpCode: otpCode.trim(),
                     isUsed: false,
                 },
-                relations: ['user'],  // ✅ Charger la relation user
+                relations: ['user'],
             });
 
+            // ✅ Si l'OTP n'existe pas OU est invalide OU expiré
             if (!otpEntry) {
                 // ✅ Vérifier si l'OTP existe mais est utilisé
                 const existingOtp = await this.otpRepository.findOne({
@@ -1293,20 +1298,26 @@ export class FpayService {
                     this.logger.log(`⚠️ OTP trouvé mais isUsed=${existingOtp.isUsed}`);
                     if (existingOtp.isUsed) {
                         throw new HttpException(
-                            'Ce code OTP a déjà été utilisé.',
+                            'Ce code OTP a déjà été utilisé. Veuillez faire une nouvelle demande.',
                             HttpStatus.BAD_REQUEST,
                         );
                     }
                     if (new Date() > existingOtp.expiresAt) {
                         throw new HttpException(
-                            'Code OTP expiré. Veuillez refaire une demande.',
+                            'Ce code OTP a expiré. Veuillez faire une nouvelle demande pour recevoir un nouveau code.',
                             HttpStatus.BAD_REQUEST,
                         );
                     }
                 }
 
+                // ✅ OTP invalide - Proposer de renvoyer un nouveau code
                 throw new HttpException(
-                    'Code OTP invalide. Veuillez vérifier le code saisi.',
+                    {
+                        status: 'error',
+                        message: 'Code OTP invalide. Veuillez vérifier le code saisi ou faire une nouvelle demande pour recevoir un nouveau code.',
+                        code: 'INVALID_OTP',
+                        canResend: true,
+                    },
                     HttpStatus.BAD_REQUEST,
                 );
             }
@@ -1317,7 +1328,12 @@ export class FpayService {
                 await this.otpRepository.save(otpEntry);
 
                 throw new HttpException(
-                    'Code OTP expiré. Veuillez refaire une demande pour recevoir un nouveau code.',
+                    {
+                        status: 'error',
+                        message: 'Code OTP expiré. Veuillez faire une nouvelle demande pour recevoir un nouveau code.',
+                        code: 'OTP_EXPIRED',
+                        canResend: true,
+                    },
                     HttpStatus.BAD_REQUEST,
                 );
             }
@@ -1368,6 +1384,125 @@ export class FpayService {
                 this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
             }
 
+            throw this.handleError(error);
+        }
+    }
+
+    async decreaseReferralPoints(
+        userId: string,
+        amount: number,
+        currency: string,
+        lang: string = 'fr',
+    ): Promise<{ success: boolean; message: string; remainingPoints: number; currency: string }> {
+        try {
+            this.logger.log(`📉 Diminution des points de parrainage: ${amount} ${currency} pour l'utilisateur ${userId}`);
+
+            // ✅ Vérifier que l'utilisateur existe
+            const user = await this.userRepository.findOne({
+                where: { id: userId },
+                relations: ['referralHistory'],
+            });
+
+            if (!user) {
+                throw new HttpException(
+                    'Utilisateur non trouvé',
+                    HttpStatus.NOT_FOUND,
+                );
+            }
+
+            // ✅ Calculer le total des points dans cette devise
+            let totalPointsInCurrency = 0;
+            const referralsToUpdate: { id: string; amount: number; currency: string }[] = [];
+
+            // ✅ Parcourir l'historique des parrainages pour trouver les points dans la devise
+            for (const referral of user.referralHistory || []) {
+                const referralCurrency = referral.currency || 'USD';
+                const referralAmount = Number(referral.rewardAmount) || 0;
+
+                if (referralCurrency === currency && referralAmount > 0) {
+                    totalPointsInCurrency += referralAmount;
+                    referralsToUpdate.push({
+                        id: referral.id,
+                        amount: referralAmount,
+                        currency: referralCurrency,
+                    });
+                }
+            }
+
+            // ✅ Vérifier si l'utilisateur a assez de points
+            if (totalPointsInCurrency < amount) {
+                throw new HttpException(
+                    `Points insuffisants en ${currency}. Disponible: ${totalPointsInCurrency.toFixed(2)} ${currency}, Demandé: ${amount} ${currency}`,
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ Diminuer les points en commençant par les plus récents
+            let remainingAmount = amount;
+            const updatedReferrals: any[] = [];
+
+            // Trier par date de création (du plus récent au plus ancien)
+            const sortedReferrals = referralsToUpdate.sort((a, b) => {
+                const refA = user.referralHistory?.find(r => r.id === a.id);
+                const refB = user.referralHistory?.find(r => r.id === b.id);
+                return (refB?.createdAt?.getTime() || 0) - (refA?.createdAt?.getTime() || 0);
+            });
+
+            for (const referralInfo of sortedReferrals) {
+                if (remainingAmount <= 0) break;
+
+                const referral = user.referralHistory?.find(r => r.id === referralInfo.id);
+                if (!referral) continue;
+
+                const currentAmount = Number(referral.rewardAmount) || 0;
+
+                if (currentAmount <= remainingAmount) {
+                    // ✅ Supprimer entièrement ce parrainage
+                    referral.rewardAmount = 0;
+                    remainingAmount -= currentAmount;
+                } else {
+                    // ✅ Diminuer partiellement
+                    referral.rewardAmount = currentAmount - remainingAmount;
+                    remainingAmount = 0;
+                }
+
+                updatedReferrals.push({
+                    id: referral.id,
+                    oldAmount: currentAmount,
+                    newAmount: referral.rewardAmount,
+                    currency: referral.currency,
+                });
+
+                await this.referralRepository.save(referral);
+            }
+
+            // ✅ Recalculer le total des points restants
+            let remainingTotal = 0;
+            for (const referral of user.referralHistory || []) {
+                if (referral.currency === currency) {
+                    remainingTotal += Number(referral.rewardAmount) || 0;
+                }
+            }
+
+            // ✅ Mettre à jour les points de l'utilisateur
+            const totalAllCurrencies = user.referralHistory?.reduce((sum, r) => {
+                return sum + (Number(r.rewardAmount) || 0);
+            }, 0) || 0;
+
+            user.referralPoints = totalAllCurrencies;
+            await this.userRepository.save(user);
+
+            this.logger.log(`✅ Points diminués: ${amount} ${currency}. Restant: ${remainingTotal.toFixed(2)} ${currency}`);
+
+            return {
+                success: true,
+                message: `${amount} ${currency} points de parrainage ont été déduits avec succès.`,
+                remainingPoints: remainingTotal,
+                currency: currency,
+            };
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur lors de la diminution des points: ${error.message}`);
             throw this.handleError(error);
         }
     }

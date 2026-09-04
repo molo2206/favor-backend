@@ -789,4 +789,74 @@ export class FpayController {
             );
         }
     }
+
+    @Post('deposit/decrease-points')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Diminuer les points de parrainage',
+        description: 'Diminue les points de parrainage d\'un utilisateur selon la devise et le montant'
+    })
+    async decreasePoints(
+        @Body() body: {
+            userId: string;
+            amount: number;
+            currency: string;
+        },
+        @Headers('lang') langHeader?: string,
+    ): Promise<any> {
+        try {
+            // ✅ Validations
+            if (!body.userId) {
+                throw new HttpException(
+                    'L\'ID de l\'utilisateur est requis',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            if (!body.amount || body.amount <= 0) {
+                throw new HttpException(
+                    'Le montant doit être supérieur à 0',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            if (!body.currency) {
+                throw new HttpException(
+                    'La devise est obligatoire',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            const lang = langHeader || 'fr';
+            const currency = body.currency.toUpperCase();
+
+            this.logger.log(`📉 Diminution des points: ${body.amount} ${currency} pour l'utilisateur ${body.userId}`);
+
+            // ✅ Appeler la fonction de diminution
+            const result = await this.fpayService.decreaseReferralPoints(
+                body.userId,
+                body.amount,
+                currency,
+                lang,
+            );
+
+            return {
+                status: 'success',
+                data: result,
+            };
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur diminution des points: ${error.message}`);
+            if (error instanceof HttpException) {
+                throw error;
+            }
+            throw new HttpException(
+                {
+                    status: 'error',
+                    message: error.message || 'Erreur lors de la diminution des points',
+                },
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+    }
 }
