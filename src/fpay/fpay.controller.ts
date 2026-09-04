@@ -613,6 +613,8 @@ export class FpayController {
     // ============================================================
     // 8. DEMANDE DE DEPÔT
     // ============================================================
+    // src/modules/fpay/fpay.controller.ts
+
     @Post('deposit/request')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
@@ -632,6 +634,7 @@ export class FpayController {
         @Body() body: {
             amount: number;
             currency: string;
+            otpCode?: string;  // ✅ AJOUTER otpCode dans le body
         },
         @Ip() ipAddress: string,
         @Headers('lang') langHeader?: string,
@@ -677,13 +680,15 @@ export class FpayController {
             }
 
             this.logger.log(`📤 Demande de dépôt: ${body.amount} ${body.currency} pour l'utilisateur ${user.id} (FPay ID: ${user.userIdFpay})`);
+            this.logger.log(`📤 OTP fourni: ${body.otpCode ? '✅' : '❌'}`);
 
-            // ✅ Utiliser userIdFpay de l'utilisateur connecté
+            // ✅ Utiliser userIdFpay de l'utilisateur connecté et passer otpCode
             return await this.fpayService.requestDepositWithOtp({
                 userId: user.userIdFpay,
                 amount: body.amount,
                 currency: body.currency.toUpperCase(),
-            });
+                otpCode: body.otpCode,  // ✅ PASSER L'OTP
+            }, lang);  // ✅ PASSER LA LANGUE
 
         } catch (error) {
             this.logger.error(`❌ Erreur demande de dépôt: ${error.message}`);
