@@ -372,8 +372,8 @@ export class OrderService {
     const hasReferrer = !!(userWithReferrer?.referrer);
 
     // ✅ Calcul du shippingCost, transactionFee et du montant total
-    const shippingCostValue = Number(shippingCost || 0);
-    const transactionFeeValue = Number(transactionFee || 0);
+    const shippingCostValue = Number(Number(shippingCost || 0).toFixed(3));
+    const transactionFeeValue = Number(Number(transactionFee || 0).toFixed(3));
     const totalAmountValue = Number(totalAmount) + shippingCostValue + transactionFeeValue;
     let parrainageAmount = 0;
     let paymentAmount = totalAmountValue;
@@ -1868,11 +1868,11 @@ export class OrderService {
       if (dto.shippingCost === undefined || dto.shippingCost === null) {
         throw new BadRequestException(this.i18nService.translate('order.shipping_cost_required_for_validation', lang));
       }
-      order.shippingCost = dto.shippingCost;
-      order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost) + Number(order.transactionFee || 0);
+      order.shippingCost = Number(Number(dto.shippingCost).toFixed(3));
+      order.grandTotal = Number((Number(order.totalAmount) + Number(dto.shippingCost) + Number(order.transactionFee || 0)).toFixed(3));
     } else if (dto.shippingCost !== undefined) {
-      order.shippingCost = dto.shippingCost;
-      order.grandTotal = Number(order.totalAmount) + Number(dto.shippingCost) + Number(order.transactionFee || 0);
+      order.shippingCost = Number(Number(dto.shippingCost).toFixed(3));
+      order.grandTotal = Number((Number(order.totalAmount) + Number(dto.shippingCost) + Number(order.transactionFee || 0)).toFixed(3));
     }
 
     order.status = dto.status;
@@ -1952,10 +1952,10 @@ export class OrderService {
 
       const hasReferrer = !!(userWithReferrer?.referrer);
 
-      const shippingCost = Number(dto.shippingCost || 0);
-      const transactionFee = Number(order.transactionFee || 0);
-      const baseAmount = Number(order.totalAmount);
-      const totalWithFees = baseAmount + shippingCost + transactionFee;
+      const shippingCost = Number(Number(dto.shippingCost || 0).toFixed(3));
+      const transactionFee = Number(Number(order.transactionFee || 0).toFixed(3));
+      const baseAmount = Number(Number(order.totalAmount).toFixed(3));
+      const totalWithFees = Number((baseAmount + shippingCost + transactionFee).toFixed(3));
       let paymentAmount = totalWithFees;
 
       // ============================================================
@@ -1976,7 +1976,7 @@ export class OrderService {
           // ✅ Créer la transaction de paiement
           const transaction = this.transactionRepository.create({
             orderId: order.id,
-            amount: paymentAmount,
+            amount: Number(paymentAmount.toFixed(3)),
             paymentStatus: PaymentStatus.PAID,
             transactionReference: uuidv4(),
             currency: order.currency || 'USD',
@@ -1989,7 +1989,7 @@ export class OrderService {
           // ✅ 2. ENVOYER LE PARRAINAGE (10%) - UNIQUEMENT SI PARRAIN
           // ============================================================
           if (hasReferrer && shippingCost > 0) {
-            const parrainageAmount = shippingCost * 0.10;
+            const parrainageAmount = Number((shippingCost * 0.10).toFixed(3));
 
             console.log(`[Order] 👤 A un parrain: ${hasReferrer}`);
             console.log(`[Order] Total: ${totalWithFees}$`);
@@ -1998,7 +1998,7 @@ export class OrderService {
 
             if (parrainageAmount > 0) {
               const sendDto: FpaySendDto = {
-                amount: parrainageAmount,
+                amount: Number(parrainageAmount.toFixed(3)),
                 description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${order.invoiceNumber}`,
                 currency: order.currency || 'USD',
                 countryCode: 'CD',
@@ -2017,7 +2017,7 @@ export class OrderService {
                       await this.updateReferralWithAmount(
                         referrerId,
                         order.userId,
-                        parrainageAmount,
+                        Number(parrainageAmount.toFixed(3)),
                         order.invoiceNumber,
                         order.currency
                       );
@@ -2246,7 +2246,6 @@ export class OrderService {
       message: this.i18nService.translate('order.invoice_generated_success', lang),
     };
   }
-
   // ======================== MODIFICATION DE COMMANDE ========================
   // Dans le service OrderService
 
