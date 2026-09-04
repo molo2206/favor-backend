@@ -13,6 +13,10 @@ import { AuthLoginDto } from './dto/link-user.dto';
 import * as jwt from 'jsonwebtoken';
 import { FpayPaymentDto } from './dto/payment.dto';
 import { JwtService } from '@nestjs/jwt';
+import { OtpEntity } from 'src/otp/entities/otp.entity';
+import { Validator } from 'class-validator';
+import { MailService } from 'src/email/email.service';
+import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 
 export interface WalletBalanceResponse {
     success: boolean;
@@ -77,6 +81,43 @@ interface LinkUserResponse {
     };
 }
 
+export interface DepositRequestDto {
+    userId: string;
+    amount: number;
+    currency: string;
+}
+
+export interface DepositRequestResponse {
+    message: string;
+    data: {
+        transaction: {
+            id: string;
+            userId: string;
+            walletId: string;
+            amount: number;
+            type: string;
+            status: string;
+            reference: string;
+            description: string;
+            movement: string;
+            currency: string;
+            createdAt: string;
+            updatedAt: string;
+        };
+        wallet: {
+            id: string;
+            userId: string;
+            balance: number;
+            currency: string;
+            isActive: boolean;
+            createdAt: string;
+            updatedAt: string;
+        };
+        requiresValidation: boolean;
+    };
+}
+
+
 @Injectable()
 export class FpayService {
     private readonly logger = new Logger(FpayService.name);
@@ -92,6 +133,11 @@ export class FpayService {
         private readonly configService: ConfigService,
         @InjectRepository(UserEntity)
         private readonly userRepository: Repository<UserEntity>,
+
+        @InjectRepository(OtpEntity)
+        private readonly otpRepository: Repository<OtpEntity>,
+        private readonly smsHelper: SmsHelper,
+        private readonly mailService: MailService,
         private readonly jwtService: JwtService,
     ) {
         const fpayApiUrl = this.configService.get<string>('FPAY_API_URL');
@@ -142,10 +188,6 @@ export class FpayService {
             'Content-Type': 'application/json',
         };
     }
-
-    // ============================================================
-    // 1. AUTHENTIFICATION EN 2 ÉTAPES (AVEC OTP)
-    // ============================================================
 
     async login(
         authDto: AuthLoginDto,
@@ -238,9 +280,6 @@ export class FpayService {
         }
     }
 
-    // ============================================================
-    // 2. LIAISON DIRECTE AVEC ACCESS_TOKEN (NOUVEAU)
-    // ============================================================
     async linkUserWithToken(
         accessToken: string,
         systemUserId: string,
@@ -348,9 +387,6 @@ export class FpayService {
             };
         }
     }
-    // ============================================================
-    // 3. SAUVEGARDE DU userIdFpay (LE LIEN)
-    // ============================================================
 
     async saveFpayUserId(systemUserId: string, fpayUserId: string): Promise<void> {
         try {
@@ -487,9 +523,6 @@ export class FpayService {
         }
     }
 
-    // ============================================================
-    // 4. PAIEMENT
-    // ============================================================
     async makePayment(
         paymentDto: FpayPaymentDto,
         currentUser: UserEntity,
@@ -605,9 +638,6 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
-    // ============================================================
-    // 5. ENVOI (LOGISTIC)
-    // ============================================================
 
     async makeSend(
         sendDto: FpaySendDto,
@@ -986,8 +1016,6 @@ export class FpayService {
         }
     }
 
-
-
     getApiKey(): string {
         return this.apiKey;
     }
@@ -995,10 +1023,6 @@ export class FpayService {
     getFpayApiUrl(): string {
         return this.fpayApiUrl;
     }
-
-    // ============================================================
-    // 6. PROCESSUS COMPLET
-    // ============================================================
 
     async processFullPayment(
         authDto: AuthLoginDto,
@@ -1030,13 +1054,6 @@ export class FpayService {
         }
     }
 
-    // ============================================================
-    // 7. GESTION DES ERREURS
-    // ============================================================
-
-    // ============================================================
-    // 8. RÉCUPÉRATION D'UNE TRANSACTION PAR ID
-    // ============================================================
     async getTransactionById(transactionId: string): Promise<any> {
         try {
             this.logger.log(`🔍 Récupération de la transaction: ${transactionId}`);
@@ -1062,6 +1079,171 @@ export class FpayService {
 
         } catch (error) {
             this.logger.error(`❌ Erreur récupération transaction: ${error.message}`);
+            throw this.handleError(error);
+        }
+    }
+
+    async requestDepositWithOtp(
+        dto: {
+            userId: string;
+            amount: number;
+            currency: string;
+            otpCode?: string;  // ✅ Optionnel pour la première étape
+        },
+        lang: string = 'fr',
+    ): Promise<any> {
+        try {
+            this.logger.log(`📤 Demande de dépôt avec OTP: ${dto.amount} ${dto.currency} pour ${dto.userId}`);
+
+            // ============================================================
+            // ÉTAPE 1: Vérifier si l'OTP est fourni
+            // ============================================================
+            if (!dto.otpCode) {
+                // ✅ Générer un OTP
+                const generatedOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
+                const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+                // ✅ Récupérer l'utilisateur pour avoir son email/phone
+                const user = await this.userRepository.findOne({
+                    where: { userIdFpay: dto.userId },
+                    select: ['email', 'phone', 'fullName'],
+                });
+
+                if (!user) {
+                    throw new HttpException(
+                        'Utilisateur non trouvé',
+                        HttpStatus.NOT_FOUND,
+                    );
+                }
+
+                const destination = user.email || user.phone;
+                if (!destination) {
+                    throw new HttpException(
+                        'Aucun email ou téléphone trouvé pour cet utilisateur',
+                        HttpStatus.BAD_REQUEST,
+                    );
+                }
+
+                // ✅ Sauvegarder l'OTP (à adapter avec votre table OTP)
+                const otp = this.otpRepository.create({
+                    email: destination,
+                    otpCode: generatedOtpCode,
+                    expiresAt: otpExpiry,
+                    isUsed: false,
+                });
+                await this.otpRepository.save(otp);
+
+                // ✅ Envoyer l'OTP par email ou SMS
+                if (user.email) {
+                    await this.mailService.sendHtmlEmail(
+                        user.email,
+                        'Code OTP pour votre dépôt FPay',
+                        'sendOtp.html',
+                        {
+                            otpCode: generatedOtpCode,
+                            year: new Date().getFullYear(),
+                            lang: lang,
+                            user: {
+                                fullName: user.fullName || 'Utilisateur',
+                            },
+                        },
+                    );
+                } else if (user.phone) {
+                    const smsMessage = `Votre code OTP pour le dépôt FPay est: ${generatedOtpCode}. Valable 10 minutes.`;
+                    await this.smsHelper.sendSms(user.phone, smsMessage);
+                }
+
+                this.logger.log(`✅ OTP envoyé à ${destination}`);
+
+                return {
+                    status: 'success',
+                    message: 'Un code OTP a été envoyé par ' + (user.email ? 'email' : 'SMS') + '. Veuillez le saisir pour confirmer votre demande de dépôt.',
+                    requiresOtp: true,
+                    data: {
+                        userId: dto.userId,
+                        amount: dto.amount,
+                        currency: dto.currency,
+                        destination: user.email ? 'email' : 'sms',
+                    },
+                };
+            }
+
+            // ============================================================
+            // ÉTAPE 2: Vérifier l'OTP
+            // ============================================================
+            this.logger.log(`🔐 Vérification OTP pour la demande de dépôt`);
+
+            // ✅ Récupérer l'utilisateur
+            const user = await this.userRepository.findOne({
+                where: { userIdFpay: dto.userId },
+                select: ['email', 'phone'],
+            });
+
+            if (!user) {
+                throw new HttpException(
+                    'Utilisateur non trouvé',
+                    HttpStatus.NOT_FOUND,
+                );
+            }
+
+            const destination = user.email || user.phone;
+            if (!destination) {
+                throw new HttpException(
+                    'Aucun email ou téléphone trouvé pour cet utilisateur',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ Vérifier l'OTP
+            const otpEntry = await this.otpRepository.findOne({
+                where: {
+                    email: destination,
+                    otpCode: dto.otpCode,
+                    isUsed: false,
+                },
+            });
+
+            if (!otpEntry || new Date() > otpEntry.expiresAt) {
+                throw new HttpException(
+                    'Code OTP invalide ou expiré. Veuillez refaire une demande.',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ Marquer l'OTP comme utilisé
+            otpEntry.isUsed = true;
+            await this.otpRepository.save(otpEntry);
+
+            this.logger.log(`✅ OTP vérifié avec succès`);
+
+            // ============================================================
+            // ÉTAPE 3: Effectuer la demande de dépôt
+            // ============================================================
+            const url = `${this.fpayApiUrl}/wallet/deposit/request`;
+
+            const response = await firstValueFrom(
+                this.httpService.post<DepositRequestResponse>(
+                    url,
+                    {
+                        userId: dto.userId,
+                        amount: dto.amount,
+                        currency: dto.currency,
+                    },
+                    { headers: this.getHeaders() }
+                )
+            );
+
+            this.logger.log(`✅ Demande de dépôt enregistrée: ${response.data.data.transaction.reference}`);
+
+            return {
+                status: 'success',
+                message: response.data.message || 'Demande de dépôt enregistrée avec succès',
+                data: response.data.data,
+                requiresOtp: false,
+            };
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur demande de dépôt: ${error.message}`);
             throw this.handleError(error);
         }
     }

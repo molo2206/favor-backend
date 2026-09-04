@@ -609,4 +609,94 @@ export class FpayController {
 
         return this.fpayService.getTransactionById(transactionId);
     }
+
+    // ============================================================
+    // 8. DEMANDE DE DEPÔT
+    // ============================================================
+    @Post('deposit/request')
+    @UseGuards(AuthentificationGuard)
+    @HttpCode(HttpStatus.OK)
+    @ApiBearerAuth()
+    @ApiOperation({
+        summary: 'Demande de dépôt',
+        description: 'Crée une transaction de dépôt en attente de validation'
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Demande de dépôt enregistrée avec succès',
+    })
+    @ApiResponse({ status: 400, description: 'Données invalides' })
+    @ApiResponse({ status: 401, description: 'Non autorisé' })
+    async requestDeposit(
+        @CurrentUser() user: UserEntity,
+        @Body() body: {
+            amount: number;
+            currency: string;
+        },
+        @Ip() ipAddress: string,
+        @Headers('lang') langHeader?: string,
+    ): Promise<any> {
+        try {
+            // ✅ Vérifier que l'utilisateur est authentifié
+            if (!user) {
+                throw new HttpException(
+                    'Utilisateur non authentifié',
+                    HttpStatus.UNAUTHORIZED,
+                );
+            }
+
+            // ✅ Validations
+            if (!body.amount || body.amount <= 0) {
+                throw new HttpException(
+                    'Le montant doit être supérieur à 0',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            if (!body.currency) {
+                throw new HttpException(
+                    'La devise est obligatoire',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            const lang = langHeader || 'fr';
+
+            // ✅ Vérifier que l'utilisateur a un compte FPay lié
+            if (!user.userIdFpay) {
+                this.logger.warn(`⚠️ L'utilisateur ${user.id} n'a pas de compte FPay lié`);
+
+                throw new HttpException(
+                    {
+                        status: 'error',
+                        message: 'Vous devez d\'abord lier votre compte FPay pour effectuer un dépôt',
+                        requiresLink: true,
+                    },
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            this.logger.log(`📤 Demande de dépôt: ${body.amount} ${body.currency} pour l'utilisateur ${user.id} (FPay ID: ${user.userIdFpay})`);
+
+            // ✅ Utiliser userIdFpay de l'utilisateur connecté
+            return await this.fpayService.requestDepositWithOtp({
+                userId: user.userIdFpay,
+                amount: body.amount,
+                currency: body.currency.toUpperCase(),
+            });
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur demande de dépôt: ${error.message}`);
+            if (error instanceof HttpException) {
+                throw error;
+            }
+            throw new HttpException(
+                {
+                    status: 'error',
+                    message: error.message || 'Erreur lors de la demande de dépôt',
+                },
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+    }
 }

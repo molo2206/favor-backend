@@ -8,6 +8,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { FpayService } from './fpay.service';
 import { FpayController } from './fpay.controller';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { OtpEntity } from 'src/otp/entities/otp.entity';
+import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
+import { MailService } from 'src/email/email.service';
 
 @Module({
     imports: [
@@ -16,7 +19,7 @@ import { UserEntity } from 'src/users/entities/user.entity';
             maxRedirects: 5,
         }),
         ConfigModule,
-        TypeOrmModule.forFeature([UserEntity]),
+        TypeOrmModule.forFeature([UserEntity, OtpEntity]),
         JwtModule.registerAsync({
             useFactory: (configService: ConfigService) => ({
                 secret: configService.get<string>('ACCESS_TOKEN_SECRET_KEY'),
@@ -26,7 +29,7 @@ import { UserEntity } from 'src/users/entities/user.entity';
         }),
     ],
     controllers: [FpayController],
-    providers: [FpayService],
-    exports: [FpayService, JwtModule], // ✅ AJOUTER JwtModule dans exports
+    providers: [FpayService, SmsHelper, MailService],
+    exports: [FpayService, JwtModule],
 })
 export class FpayModule { }
