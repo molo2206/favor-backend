@@ -435,11 +435,11 @@ export class FpayController {
     @ApiBearerAuth()
     @ApiOperation({
         summary: 'Récupérer la balance et les transactions du wallet',
-        description: 'Récupère la balance et les transactions du wallet de l\'utilisateur connecté. walletId est optionnel.'
+        description: 'Récupère la balance et les transactions du wallet par défaut de l\'utilisateur connecté'
     })
     async getWalletBalanceAndTransactions(
         @CurrentUser() user: UserEntity,
-        @Query('walletId') walletId?: string, // ✅ GARDER OPTIONNEL
+        // ❌ SUPPRIMEZ walletId des paramètres
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('startDate') startDate?: string,
@@ -449,32 +449,26 @@ export class FpayController {
         @Query('movement') movement?: string,
         @Query('search') search?: string,
     ) {
-        // ✅ VÉRIFICATIONS
         if (!user) {
             throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
         }
 
         if (!user.userIdFpay || !user.isLink) {
             throw new HttpException(
-                'Vous devez d\'abord lier votre compte FPay',
-                HttpStatus.BAD_REQUEST
+                'Vous devez d\'abord lier votre compte FPay pour accéder à vos transactions. Utilisez /fpay/open pour vous connecter.',
+                HttpStatus.BAD_REQUEST,
             );
         }
 
-        // ✅ LOG DU WALLET (si fourni)
-        if (walletId) {
-            this.logger.log(`📊 walletId spécifié: ${walletId}`);
-        } else {
-            this.logger.log(`📊 Utilisation du wallet par défaut`);
-        }
+        this.logger.log(`📊 Récupération balance/transactions pour l'utilisateur: ${user.id} (FPay ID: ${user.userIdFpay})`);
 
         const pageNum = page ? parseInt(page, 10) : 1;
         const limitNum = limit ? parseInt(limit, 10) : 10;
 
-        // ✅ APPEL AVEC walletId OPTIONNEL
+        // ✅ APPEL SANS walletId
         const result = await this.fpayService.getWalletBalanceAndTransactions(
             user.userIdFpay,
-            walletId, // ✅ PEUT ÊTRE undefined
+            // ❌ PAS de walletId ici
             pageNum,
             limitNum,
             startDate,

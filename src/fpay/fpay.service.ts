@@ -963,7 +963,7 @@ export class FpayService {
 
     async getWalletBalanceAndTransactions(
         userId: string,
-        walletId?: string, // ✅ OPTIONNEL
+        // ❌ SUPPRIMEZ walletId des paramètres
         page: number = 1,
         limit: number = 10,
         startDate?: string,
@@ -982,20 +982,13 @@ export class FpayService {
 
             const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
 
+            // ✅ CONSTRUCTION DES PARAMÈTRES SANS walletId
             const params = new URLSearchParams();
             params.set('userId', userId.trim());
-
-            // ✅ SEULEMENT SI walletId EST FOURNI
-            if (walletId && walletId.trim() !== '') {
-                params.set('walletId', walletId.trim());
-                this.logger.log(`📊 walletId spécifié: ${walletId}`);
-            } else {
-                this.logger.log(`📊 Utilisation du wallet par défaut (pas de walletId)`);
-            }
-
             params.set('page', page.toString());
             params.set('limit', limit.toString());
 
+            // ✅ FILTRES OPTIONNELS
             if (startDate) params.set('startDate', startDate);
             if (endDate) params.set('endDate', endDate);
             if (type) params.set('type', type);
