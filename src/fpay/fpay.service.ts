@@ -974,47 +974,39 @@ export class FpayService {
         search?: string,
     ): Promise<any> {
         try {
-            // ✅ VALIDATION DU userId
-            if (!userId || userId.trim() === '') {
-                throw new Error('userId est requis');
-            }
-
-            this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}`);
+            this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}, walletId=${walletId || 'non fourni'}`);
 
             const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
 
-            // ✅ CONSTRUCTION MANUELLE DES PARAMÈTRES
-            let queryParams = `userId=${encodeURIComponent(userId.trim())}`;
+            const params = new URLSearchParams();
+            params.set('userId', userId);
 
-            // Ajouter les paramètres optionnels
             if (walletId && walletId.trim() !== '') {
-                queryParams += `&walletId=${encodeURIComponent(walletId.trim())}`;
+                params.set('walletId', walletId);
             }
 
-            queryParams += `&page=${page}&limit=${limit}`;
+            params.set('page', page.toString());
+            params.set('limit', limit.toString());
 
-            if (startDate) queryParams += `&startDate=${encodeURIComponent(startDate)}`;
-            if (endDate) queryParams += `&endDate=${encodeURIComponent(endDate)}`;
-            if (type) queryParams += `&type=${encodeURIComponent(type)}`;
-            if (status) queryParams += `&status=${encodeURIComponent(status)}`;
-            if (movement) queryParams += `&movement=${encodeURIComponent(movement)}`;
-            if (search) queryParams += `&search=${encodeURIComponent(search)}`;
+            if (startDate) params.set('startDate', startDate);
+            if (endDate) params.set('endDate', endDate);
+            if (type) params.set('type', type);
+            if (status) params.set('status', status);
+            if (movement) params.set('movement', movement);
+            if (search) params.set('search', search);
 
-            const fullUrl = `${url}?${queryParams}`;
+            const fullUrl = `${url}?${params.toString()}`;
 
             this.logger.log(`🔗 Appel API: ${fullUrl}`);
-            this.logger.log(`📝 Paramètres: ${queryParams}`);
-
-            // ✅ AJOUT DES HEADERS COMPLETS
-            const headers = this.getHeaders();
-            this.logger.log(`📋 Headers: ${JSON.stringify(headers)}`);
 
             const response = await firstValueFrom(
-                this.httpService.get(fullUrl, { headers })
+                this.httpService.get(
+                    fullUrl,
+                    { headers: this.getHeaders() }
+                )
             );
 
             this.logger.log(`✅ Balance et transactions récupérées avec succès`);
-            this.logger.log(`📊 Nombre de transactions: ${response.data?.data?.transactions?.length || 0}`);
 
             return response.data;
 
@@ -1022,17 +1014,7 @@ export class FpayService {
             this.logger.error(`❌ Erreur: ${error.message}`);
 
             if (error.response) {
-                this.logger.error(`📦 Status: ${error.response.status}`);
-                this.logger.error(`📦 Data: ${JSON.stringify(error.response.data)}`);
-
-                // ✅ ANALYSE SPÉCIFIQUE POUR USERID
-                if (error.response.status === 400) {
-                    const errorMsg = error.response.data?.message || '';
-                    if (errorMsg.includes('user') || errorMsg.includes('User')) {
-                        this.logger.error(`🔍 Le userId "${userId}" semble invalide ou inexistant`);
-                        this.logger.error(`💡 Vérifiez que l'utilisateur existe dans le système FPay`);
-                    }
-                }
+                this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
             }
 
             throw this.handleError(error);
