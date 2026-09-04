@@ -1163,7 +1163,7 @@ export class FpayService {
                 await this.otpRepository.save(otp);
 
                 // ✅ Envoyer l'OTP par email ou SMS
-                if (user.email && Validator.isEmail(user.email)) {
+                if (user.email) {
                     const translations = {
                         title: 'Code de vérification pour votre dépôt',
                         description: 'Utilisez le code ci-dessous pour confirmer votre demande de dépôt sur FPay',
