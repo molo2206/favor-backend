@@ -963,7 +963,6 @@ export class FpayService {
 
     async getWalletBalanceAndTransactions(
         userId: string,
-        // ❌ SUPPRIMEZ walletId des paramètres
         page: number = 1,
         limit: number = 10,
         startDate?: string,
@@ -982,13 +981,11 @@ export class FpayService {
 
             const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
 
-            // ✅ CONSTRUCTION DES PARAMÈTRES SANS walletId
             const params = new URLSearchParams();
             params.set('userId', userId.trim());
             params.set('page', page.toString());
             params.set('limit', limit.toString());
 
-            // ✅ FILTRES OPTIONNELS
             if (startDate) params.set('startDate', startDate);
             if (endDate) params.set('endDate', endDate);
             if (type) params.set('type', type);
@@ -997,28 +994,20 @@ export class FpayService {
             if (search) params.set('search', search);
 
             const fullUrl = `${url}?${params.toString()}`;
-
             this.logger.log(`🔗 Appel API: ${fullUrl}`);
 
             const response = await firstValueFrom(
-                this.httpService.get(
-                    fullUrl,
-                    { headers: this.getHeaders() }
-                )
+                this.httpService.get(fullUrl, { headers: this.getHeaders() })
             );
 
             this.logger.log(`✅ Balance et transactions récupérées avec succès`);
-            this.logger.log(`📊 Nombre de transactions: ${response.data?.data?.transactions?.length || 0}`);
-
             return response.data;
 
         } catch (error) {
             this.logger.error(`❌ Erreur: ${error.message}`);
-
             if (error.response) {
                 this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
             }
-
             throw this.handleError(error);
         }
     }
