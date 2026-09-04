@@ -9,8 +9,9 @@ import { FpayService } from './fpay.service';
 import { FpayController } from './fpay.controller';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { OtpEntity } from 'src/otp/entities/otp.entity';
-import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 import { MailService } from 'src/email/email.service';
+import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
+import { UsersService } from 'src/users/users.service'; // ✅ IMPORTER UsersService
 import { I18nService } from 'src/libs/common/src';
 
 @Module({
@@ -20,7 +21,10 @@ import { I18nService } from 'src/libs/common/src';
             maxRedirects: 5,
         }),
         ConfigModule,
-        TypeOrmModule.forFeature([UserEntity, OtpEntity]),
+        TypeOrmModule.forFeature([
+            UserEntity,
+            OtpEntity,
+        ]),
         JwtModule.registerAsync({
             useFactory: (configService: ConfigService) => ({
                 secret: configService.get<string>('ACCESS_TOKEN_SECRET_KEY'),
@@ -30,7 +34,13 @@ import { I18nService } from 'src/libs/common/src';
         }),
     ],
     controllers: [FpayController],
-    providers: [FpayService, SmsHelper, MailService, I18nService],
+    providers: [
+        FpayService,
+        UsersService,      // ✅ AJOUTER UsersService
+        MailService,
+        SmsHelper,
+        I18nService,
+    ],
     exports: [FpayService, JwtModule],
 })
 export class FpayModule { }

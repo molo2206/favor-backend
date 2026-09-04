@@ -17,13 +17,17 @@ import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator
 import { UserEntity } from 'src/users/entities/user.entity';
 import { AuthLoginDto } from './dto/link-user.dto';
 import * as crypto from 'crypto';
+import { UsersService } from 'src/users/users.service';
 
 @ApiTags('FPAY')
 @Controller('fpay')
 export class FpayController {
     private readonly logger = new Logger(FpayController.name);
 
-    constructor(private readonly fpayService: FpayService) { }
+    constructor(
+        private readonly fpayService: FpayService,
+        private readonly usersService: UsersService, // ✅ AJOUTER L'INJECTION
+    ) { }
 
     // ============================================================
     // 1. AUTHENTIFICATION - REDIRIGE VERS FPAY
@@ -634,7 +638,7 @@ export class FpayController {
         @Body() body: {
             amount: number;
             currency: string;
-            otpCode?: string;  // ✅ AJOUTER otpCode dans le body
+            otpCode?: string;
         },
         @Ip() ipAddress: string,
         @Headers('lang') langHeader?: string,
@@ -664,6 +668,7 @@ export class FpayController {
             }
 
             const lang = langHeader || 'fr';
+            const currency = body.currency.toUpperCase();
 
             // ✅ Vérifier que l'utilisateur a un compte FPay lié
             if (!user.userIdFpay) {
@@ -679,16 +684,64 @@ export class FpayController {
                 );
             }
 
-            this.logger.log(`📤 Demande de dépôt: ${body.amount} ${body.currency} pour l'utilisateur ${user.id} (FPay ID: ${user.userIdFpay})`);
+            // ============================================================
+            // ✅ VÉRIFIER LES POINTS DE PARRAINAGE PAR DEVISE
+            // ============================================================
+            // Récupérer les points de parrainage de l'utilisateur
+            const referralPoints = await this.usersService.getReferralPoints(user.id, lang);
+
+            // Chercher les points dans la devise demandée
+            const pointsInCurrency = referralPoints.data.rewardsByCurrency?.find(
+                (r: any) => r.currency === currency
+            );
+
+            // ✅ Vérifier si l'utilisateur a des points dans cette devise
+            if (!pointsInCurrency || pointsInCurrency.amount <= 0) {
+                // Récupérer les devises disponibles
+                const availableCurrencies = referralPoints.data.rewardsByCurrency?.map((r: any) => r.currency).join(', ') || 'Aucune';
+
+                throw new HttpException(
+                    {
+                        status: 'error',
+                        message: `Vous n'avez pas d'argent de parrainage en ${currency}. 
+                              Devises disponibles: ${availableCurrencies}`,
+                        availableCurrencies: referralPoints.data.rewardsByCurrency || [],
+                    },
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ Vérifier si l'utilisateur a assez de points dans cette devise
+            if (pointsInCurrency.amount < body.amount) {
+                throw new HttpException(
+                    {
+                        status: 'error',
+                        message: `Argent insuffisants en ${currency}. 
+                              Disponible: ${pointsInCurrency.amount.toFixed(2)} ${currency}, 
+                              Demandé: ${body.amount} ${currency}`,
+                        available: pointsInCurrency.amount,
+                        requested: body.amount,
+                        currency: currency,
+                    },
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            this.logger.log(`✅ Points de parrainage vérifiés: ${pointsInCurrency.amount} ${currency} disponibles`);
+
+            // ============================================================
+            // ✅ SUITE DE LA LOGIQUE - APPEL AU SERVICE
+            // ============================================================
+            this.logger.log(`📤 Demande de dépôt: ${body.amount} ${currency} pour l'utilisateur ${user.id} (FPay ID: ${user.userIdFpay})`);
             this.logger.log(`📤 OTP fourni: ${body.otpCode ? '✅' : '❌'}`);
 
             // ✅ Utiliser userIdFpay de l'utilisateur connecté et passer otpCode
             return await this.fpayService.requestDepositWithOtp({
                 userId: user.userIdFpay,
                 amount: body.amount,
-                currency: body.currency.toUpperCase(),
-                otpCode: body.otpCode,  // ✅ PASSER L'OTP
-            }, lang);  // ✅ PASSER LA LANGUE
+                currency: currency,
+                otpCode: body.otpCode,
+            }, lang);
 
         } catch (error) {
             this.logger.error(`❌ Erreur demande de dépôt: ${error.message}`);
