@@ -430,17 +430,16 @@ export class FpayController {
     // ============================================================
     // 6. WALLET BALANCE & TRANSACTIONS
     // ============================================================
-
     @Get('wallet/balance-transactions')
     @UseGuards(AuthentificationGuard)
     @ApiBearerAuth()
     @ApiOperation({
         summary: 'Récupérer la balance et les transactions du wallet',
-        description: 'Récupère la balance et les transactions du wallet de l\'utilisateur connecté'
+        description: 'Récupère la balance et les transactions du wallet de l\'utilisateur connecté. walletId est optionnel.'
     })
     async getWalletBalanceAndTransactions(
         @CurrentUser() user: UserEntity,
-        @Query('walletId') walletId?: string,
+        @Query('walletId') walletId?: string, // ✅ GARDER OPTIONNEL
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('startDate') startDate?: string,
@@ -450,113 +449,45 @@ export class FpayController {
         @Query('movement') movement?: string,
         @Query('search') search?: string,
     ) {
-        try {
-            // ✅ VÉRIFICATION DE L'UTILISATEUR
-            if (!user) {
-                throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
-            }
+        // ✅ VÉRIFICATIONS
+        if (!user) {
+            throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
+        }
 
-            // ✅ VÉRIFICATION DU LIEN FPAY
-            if (!user.userIdFpay || !user.isLink) {
-                throw new HttpException(
-                    'Vous devez d\'abord lier votre compte FPay pour accéder à vos transactions. Utilisez /fpay/open pour vous connecter.',
-                    HttpStatus.BAD_REQUEST,
-                );
-            }
-
-            // ✅ LOG DÉTAILLÉ DE L'UTILISATEUR
-            this.logger.log(`📊 Utilisateur connecté:`);
-            this.logger.log(`  - ID interne: ${user.id}`);
-            this.logger.log(`  - FPay ID: ${user.userIdFpay}`);
-            this.logger.log(`  - Email: ${user.email}`);
-            this.logger.log(`  - isLink: ${user.isLink}`);
-
-            // ✅ VALIDATION DU userIdFpay
-            if (!user.userIdFpay || user.userIdFpay.trim() === '') {
-                throw new HttpException(
-                    'L\'ID FPay de l\'utilisateur est invalide',
-                    HttpStatus.BAD_REQUEST
-                );
-            }
-
-            // ✅ LOG DES PARAMÈTRES REÇUS
-            this.logger.log(`📝 Paramètres reçus:`);
-            this.logger.log(`  - walletId: ${walletId || 'non fourni'}`);
-            this.logger.log(`  - page: ${page || '1'}`);
-            this.logger.log(`  - limit: ${limit || '10'}`);
-            this.logger.log(`  - type: ${type || 'non fourni'}`);
-            this.logger.log(`  - status: ${status || 'non fourni'}`);
-            this.logger.log(`  - movement: ${movement || 'non fourni'}`);
-
-            const pageNum = page ? parseInt(page, 10) : 1;
-            const limitNum = limit ? parseInt(limit, 10) : 10;
-
-            // ✅ APPEL AU SERVICE AVEC TRY-CATCH
-            try {
-                const result = await this.fpayService.getWalletBalanceAndTransactions(
-                    user.userIdFpay.trim(),
-                    walletId,
-                    pageNum,
-                    limitNum,
-                    startDate,
-                    endDate,
-                    type,
-                    status,
-                    movement,
-                    search,
-                );
-
-                // ✅ VÉRIFICATION DU RÉSULTAT
-                if (!result || !result.data) {
-                    this.logger.warn(`⚠️ Aucune donnée retournée pour l'utilisateur ${user.userIdFpay}`);
-                    return {
-                        message: 'Aucune transaction trouvée',
-                        data: {
-                            transactions: [],
-                            total: 0,
-                            page: pageNum,
-                            limit: limitNum
-                        }
-                    };
-                }
-
-                this.logger.log(`✅ Transactions récupérées: ${result.data?.transactions?.length || 0}`);
-                return result;
-
-            } catch (serviceError) {
-                this.logger.error(`❌ Erreur du service FPay: ${serviceError.message}`);
-
-                // ✅ SI ERREUR 400, PROPOSER UNE SOLUTION
-                if (serviceError.message.includes('400')) {
-                    this.logger.error(`💡 L'utilisateur ${user.userIdFpay} n'a peut-être pas de transactions`);
-                    this.logger.error(`💡 Vérifiez que l'utilisateur existe dans FPay`);
-
-                    // Retourner un résultat vide plutôt qu'une erreur
-                    return {
-                        message: 'Aucune transaction trouvée pour cet utilisateur',
-                        data: {
-                            transactions: [],
-                            total: 0,
-                            page: pageNum,
-                            limit: limitNum
-                        }
-                    };
-                }
-
-                throw serviceError;
-            }
-
-        } catch (error) {
-            this.logger.error(`❌ Erreur générale: ${error.message}`);
-            this.logger.error(`   Stack: ${error.stack}`);
-
+        if (!user.userIdFpay || !user.isLink) {
             throw new HttpException(
-                error.message || 'Erreur lors de la récupération des transactions',
-                error.status || HttpStatus.INTERNAL_SERVER_ERROR
+                'Vous devez d\'abord lier votre compte FPay',
+                HttpStatus.BAD_REQUEST
             );
         }
+
+        // ✅ LOG DU WALLET (si fourni)
+        if (walletId) {
+            this.logger.log(`📊 walletId spécifié: ${walletId}`);
+        } else {
+            this.logger.log(`📊 Utilisation du wallet par défaut`);
+        }
+
+        const pageNum = page ? parseInt(page, 10) : 1;
+        const limitNum = limit ? parseInt(limit, 10) : 10;
+
+        // ✅ APPEL AVEC walletId OPTIONNEL
+        const result = await this.fpayService.getWalletBalanceAndTransactions(
+            user.userIdFpay,
+            walletId, // ✅ PEUT ÊTRE undefined
+            pageNum,
+            limitNum,
+            startDate,
+            endDate,
+            type,
+            status,
+            movement,
+            search,
+        );
+
+        return result;
     }
-    
+
     @Get('open')
     @UseGuards(AuthentificationGuard)
     @ApiBearerAuth()

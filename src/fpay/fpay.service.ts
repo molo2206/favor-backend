@@ -963,7 +963,7 @@ export class FpayService {
 
     async getWalletBalanceAndTransactions(
         userId: string,
-        walletId?: string,
+        walletId?: string, // ✅ OPTIONNEL
         page: number = 1,
         limit: number = 10,
         startDate?: string,
@@ -974,15 +974,23 @@ export class FpayService {
         search?: string,
     ): Promise<any> {
         try {
-            this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}, walletId=${walletId || 'non fourni'}`);
+            if (!userId || userId.trim() === '') {
+                throw new Error('userId est requis');
+            }
+
+            this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}`);
 
             const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
 
             const params = new URLSearchParams();
-            params.set('userId', userId);
+            params.set('userId', userId.trim());
 
+            // ✅ SEULEMENT SI walletId EST FOURNI
             if (walletId && walletId.trim() !== '') {
-                params.set('walletId', walletId);
+                params.set('walletId', walletId.trim());
+                this.logger.log(`📊 walletId spécifié: ${walletId}`);
+            } else {
+                this.logger.log(`📊 Utilisation du wallet par défaut (pas de walletId)`);
             }
 
             params.set('page', page.toString());
@@ -1007,6 +1015,7 @@ export class FpayService {
             );
 
             this.logger.log(`✅ Balance et transactions récupérées avec succès`);
+            this.logger.log(`📊 Nombre de transactions: ${response.data?.data?.transactions?.length || 0}`);
 
             return response.data;
 
@@ -1020,7 +1029,6 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
-
     getApiKey(): string {
         return this.apiKey;
     }
