@@ -2390,7 +2390,6 @@ export class UsersService {
       let orderDetails: any[] = [];
       let validatedOrdersLength = 0;
 
-      // ✅ Le montant vient de referral.rewardAmount
       const rewardAmount = Number(referral.rewardAmount) || 0;
       const rewardCurrency = referral.currency || 'USD';
 
@@ -2411,7 +2410,6 @@ export class UsersService {
         }));
       }
 
-      // ✅ Ajouter au total par devise
       if (rewardAmount > 0) {
         if (!rewardsByCurrency[rewardCurrency]) {
           rewardsByCurrency[rewardCurrency] = 0;
@@ -2427,7 +2425,7 @@ export class UsersService {
         referredPhone: referred?.phone || 'Non renseigné',
         referredId: referred?.id || null,
         status: referral.status,
-        rewardAmount: Math.round(rewardAmount * 100) / 100, // ✅ De referral.rewardAmount
+        rewardAmount: Math.round(rewardAmount * 100) / 100,
         rewardCurrency: rewardCurrency,
         rewardType: 'POINTS (10% shipping - VALIDATED)',
         createdAt: referral.createdAt,
@@ -2435,7 +2433,6 @@ export class UsersService {
         orders: orderDetails,
         totalValidatedOrders: validatedOrdersLength,
         referralCurrency: referral.currency || 'USD',
-        // ✅ Ajouter les métadonnées pour référence
         metadata: referral.metadata,
       };
     }) || [];
@@ -2446,37 +2443,107 @@ export class UsersService {
       await this.usersRepository.save(user);
     }
 
-    // ✅ Liste des utilisateurs parrainés
-    const referredUsers = user.referralHistory?.map((referral) => {
+    // ✅ Liste des utilisateurs parrainés GROUPÉS par id (UNE SEULE DEVISE)
+    const referredUsersMap = new Map<string, {
+      id: string;
+      fullName: string;
+      email: string | null;
+      phone: string | null;
+      status: string;
+      totalOrders: number;
+      totalValidatedOrders: number;
+      totalShippingCost: number;
+      currency: string;
+      pointsEarned: number;
+      pointsCurrency: string;
+      createdAt: Date;
+      completedAt: Date | null;
+    }>();
+
+    // ✅ Parcourir l'historique des parrainages pour regrouper
+    for (const referral of user.referralHistory || []) {
       const referred = referral.referred;
-      const validatedOrders = referred?.orders?.filter(
+      if (!referred) continue;
+
+      const referredId = referred.id;
+      const currency = referral.currency || 'USD';
+      const pointsEarned = Number(referral.rewardAmount) || 0;
+
+      // ✅ Calculer le total des commandes validées
+      const validatedOrders = referred.orders?.filter(
         (order) => order.status === OrderStatus.VALIDATED
       ) || [];
-
       const totalShippingCost = validatedOrders.reduce(
         (sum, order) => sum + Number(order.shippingCost || 0),
         0
       );
 
-      const mainCurrency = referral.currency || 'USD';
-      const pointsEarned = Number(referral.rewardAmount) || 0;
+      // ✅ Si l'utilisateur n'existe pas encore dans la map, le créer
+      if (!referredUsersMap.has(referredId)) {
+        referredUsersMap.set(referredId, {
+          id: referredId,
+          fullName: referred.fullName || 'Utilisateur inconnu',
+          email: referred.email || null,
+          phone: referred.phone || null,
+          status: referral.status,
+          totalOrders: referred.orders?.length || 0,
+          totalValidatedOrders: validatedOrders.length,
+          totalShippingCost: 0,
+          currency: currency,
+          pointsEarned: 0,
+          pointsCurrency: currency,
+          createdAt: referral.createdAt,
+          completedAt: referral.completedAt || null,
+        });
+      }
 
+      // ✅ Mettre à jour les données de l'utilisateur
+      const userEntry = referredUsersMap.get(referredId)!;
+
+      // ✅ Additionner les frais de livraison (toutes devises confondues)
+      userEntry.totalShippingCost += totalShippingCost;
+
+      // ✅ Mettre à jour la devise et les points selon la devise la plus récente
+      // Si le parrainage est plus récent, on prend sa devise et ses points
+      if (referral.createdAt > userEntry.createdAt) {
+        userEntry.currency = currency;
+        userEntry.pointsCurrency = currency;
+        userEntry.pointsEarned = pointsEarned; // ✅ On remplace, on n'additionne pas
+      } else if (referral.createdAt.getTime() === userEntry.createdAt.getTime()) {
+        // Si même date, on additionne (cas rare)
+        userEntry.pointsEarned += pointsEarned;
+      }
+
+      // ✅ Mettre à jour le statut si plus récent
+      if (referral.completedAt && (!userEntry.completedAt || referral.completedAt > userEntry.completedAt)) {
+        userEntry.completedAt = referral.completedAt;
+      }
+      if (referral.createdAt > userEntry.createdAt) {
+        userEntry.createdAt = referral.createdAt;
+      }
+    }
+
+    // ✅ Construire la liste des utilisateurs parrainés groupés
+    const referredUsers = Array.from(referredUsersMap.values()).map((entry) => {
       return {
-        id: referred?.id || null,
-        fullName: referred?.fullName || 'Utilisateur inconnu',
-        email: referred?.email || null,
-        phone: referred?.phone || null,
-        status: referral.status,
-        totalOrders: referred?.orders?.length || 0,
-        totalValidatedOrders: validatedOrders.length,
-        totalShippingCost: Math.round(totalShippingCost * 100) / 100,
-        currency: mainCurrency,
-        pointsEarned: Math.round(pointsEarned * 100) / 100, // ✅ De referral.rewardAmount
-        pointsCurrency: mainCurrency,
-        createdAt: referral.createdAt,
-        completedAt: referral.completedAt || null,
+        id: entry.id,
+        fullName: entry.fullName,
+        email: entry.email,
+        phone: entry.phone,
+        status: entry.status,
+        totalOrders: entry.totalOrders,
+        totalValidatedOrders: entry.totalValidatedOrders,
+        totalShippingCost: Math.round(entry.totalShippingCost * 100) / 100,
+        currency: entry.currency,
+        pointsEarned: Math.round(entry.pointsEarned * 100) / 100,
+        pointsCurrency: entry.currency,
+        createdAt: entry.createdAt,
+        completedAt: entry.completedAt,
       };
-    }) || [];
+    });
+
+    // ✅ Trier par date de création (du plus récent au plus ancien)
+    referredUsers.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     // ✅ Construire les récompenses par devise
     const rewardsByCurrencyArray = Object.entries(rewardsByCurrency).map(([currency, amount]) => ({
@@ -2501,7 +2568,7 @@ export class UsersService {
         rewardsByCurrency: rewardsByCurrencyArray,
         defaultCurrency: 'USD',
         history,
-        referredUsers,
+        referredUsers, // ✅ Maintenant groupé par utilisateur avec une seule devise
       },
     };
   }
