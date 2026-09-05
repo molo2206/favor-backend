@@ -1173,7 +1173,9 @@ export class FpayService {
         try {
             this.logger.log(`📤 Demande de dépôt avec OTP: ${dto.amount} ${dto.currency} pour ${dto.userId}`);
 
-            // ✅ Validation initiale
+            // ============================================================
+            // VALIDATIONS INITIALES
+            // ============================================================
             if (!dto.userId) {
                 throw new HttpException(
                     'L\'ID de l\'utilisateur (bénéficiaire) est requis',
@@ -1195,46 +1197,59 @@ export class FpayService {
                 );
             }
 
-            // ✅ VÉRIFIER LE TOKEN DU PAYEUR (passé en paramètre)
+            // ============================================================
+            // ✅ VÉRIFIER LE TOKEN DU PAYEUR (vérification locale JWT)
+            // ============================================================
             let payerId: string | null = null;
             let payerData: any = null;
 
             if (payerToken) {
                 try {
-                    // ✅ Extraire et vérifier le token JWT
+                    // ✅ Extraire le token
                     const cleanToken = payerToken.startsWith('Bearer ')
                         ? payerToken.substring(7)
                         : payerToken;
 
-                    // ✅ Utiliser la clé API PARRAINAGE pour vérifier le token
-                    const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE');
+                    // ✅ Récupérer la clé FPAY_API_KEY_PARRAINAGE comme secret
+                    const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE') || '';
+                    const cleanSecret = parrainageApiKey.startsWith('Bearer ')
+                        ? parrainageApiKey.substring(7)
+                        : parrainageApiKey;
 
-                    if (!parrainageApiKey) {
-                        this.logger.warn('⚠️ FPAY_API_KEY_PARRAINAGE non configurée');
+                    // ✅ Vérifier le JWT localement
+                    const decoded = jwt.verify(cleanToken, cleanSecret) as any;
+
+                    // ✅ Extraire l'ID (plusieurs champs possibles)
+                    payerId = decoded.userId || decoded.id || decoded.sub;
+                    payerData = decoded;
+
+                    if (payerId) {
+                        this.logger.log(`✅ Payeur identifié via JWT: ${payerId}`);
+                        this.logger.log(`📋 Infos payeur: ${decoded.email}, ${decoded.role}`);
                     } else {
-                        // ✅ Appel à l'API FPay pour vérifier le token
-                        const verifyUrl = `${this.fpayApiUrl}/auth/verify-token`;
-                        const verifyResponse = await firstValueFrom(
-                            this.httpService.post(
-                                verifyUrl,
-                                { accessToken: cleanToken },
-                                { headers: { 'Authorization': `Bearer ${parrainageApiKey}` } }
-                            )
-                        );
-
-                        if (verifyResponse.data?.data?.id) {
-                            payerId = verifyResponse.data.data.id;
-                            payerData = verifyResponse.data.data;
-                            this.logger.log(`✅ Payeur identifié via token: ${payerId}`);
-                        }
+                        this.logger.warn(`⚠️ Token valide mais aucun ID trouvé`);
                     }
                 } catch (tokenError: any) {
-                    this.logger.warn(`⚠️ Erreur lors de la vérification du token payeur: ${tokenError.message}`);
+                    this.logger.warn(`⚠️ Erreur lors de la vérification du token JWT: ${tokenError.message}`);
+
+                    // ✅ Fallback: essayer de décoder sans vérifier
+                    try {
+                        const cleanToken = payerToken.startsWith('Bearer ')
+                            ? payerToken.substring(7)
+                            : payerToken;
+                        const decoded = jwt.decode(cleanToken) as any;
+                        payerId = decoded?.userId || decoded?.id || decoded?.sub;
+                        if (payerId) {
+                            this.logger.log(`ℹ️ Payeur extrait (sans vérification): ${payerId}`);
+                        }
+                    } catch (e) {
+                        // Ignorer
+                    }
                 }
             }
 
             if (!payerId) {
-                this.logger.log(`ℹ️ Aucun payeur identifié via token, dépôt sans payeur spécifique`);
+                this.logger.log(`ℹ️ Aucun payeur identifié, dépôt sans payeur spécifique`);
             }
 
             // ============================================================
@@ -1343,6 +1358,8 @@ export class FpayService {
                     );
                 }
 
+                this.logger.log(`📤 Destination: ${destination} (${destinationType})`);
+
                 await this.otpRepository.update(
                     { email: destination, isUsed: false },
                     { isUsed: true }
@@ -1356,6 +1373,8 @@ export class FpayService {
                     user: user,
                 });
                 await this.otpRepository.save(otp);
+
+                this.logger.log(`✅ OTP sauvegardé: ${generatedOtpCode} pour ${destination}`);
 
                 if (destinationType === 'email') {
                     const translations = {
@@ -1379,9 +1398,11 @@ export class FpayService {
                             translations: translations,
                         },
                     );
+                    this.logger.log(`✅ OTP envoyé par email à ${destination}`);
                 } else {
                     const smsMessage = `Votre code OTP pour le dépôt FPay est: ${generatedOtpCode}. Valable 10 minutes.`;
                     await this.smsHelper.sendSms(destination, smsMessage);
+                    this.logger.log(`✅ OTP envoyé par SMS à ${destination}`);
                 }
 
                 return {
@@ -1429,6 +1450,9 @@ export class FpayService {
                 );
             }
 
+            this.logger.log(`🔍 Recherche OTP avec destination: ${destination}`);
+            this.logger.log(`🔍 Code OTP: ${dto.otpCode}`);
+
             const otpCode = dto.otpCode as string;
 
             const otpEntry = await this.otpRepository.findOne({
@@ -1449,6 +1473,7 @@ export class FpayService {
                 });
 
                 if (existingOtp) {
+                    this.logger.log(`⚠️ OTP trouvé mais isUsed=${existingOtp.isUsed}`);
                     if (existingOtp.isUsed) {
                         throw new HttpException(
                             {
@@ -1522,11 +1547,25 @@ export class FpayService {
             this.logger.log(`📤 Appel API FPay: ${url}`);
             this.logger.log(`📤 Payload: ${JSON.stringify(payload)}`);
 
+            // ✅ Utiliser l'API Key PARRAINAGE pour l'appel
+            const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE') || '';
+            const cleanApiKey = parrainageApiKey.startsWith('Bearer ')
+                ? parrainageApiKey
+                : `Bearer ${parrainageApiKey}`;
+
+            const headers = {
+                'Authorization': cleanApiKey,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            };
+
+            this.logger.log(`📤 Headers: Authorization: ${cleanApiKey.substring(0, 50)}...`);
+
             const response = await firstValueFrom(
                 this.httpService.post(
                     url,
                     payload,
-                    { headers: this.getHeaders() }
+                    { headers: headers }
                 )
             );
 
@@ -1584,8 +1623,10 @@ export class FpayService {
                             if (currentAmount <= remainingAmount) {
                                 referral.rewardAmount = 0;
                                 remainingAmount -= currentAmount;
+                                this.logger.log(`✅ Parrainage ${referral.id}: ${currentAmount} ${referralInfo.currency} entièrement déduit`);
                             } else {
                                 referral.rewardAmount = currentAmount - remainingAmount;
+                                this.logger.log(`✅ Parrainage ${referral.id}: ${currentAmount} → ${referral.rewardAmount} ${referralInfo.currency} (partiel)`);
                                 remainingAmount = 0;
                             }
 
