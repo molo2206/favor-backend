@@ -1097,6 +1097,32 @@ export class FpayService {
                 undefined,
             );
 
+            // ✅ Récupérer toutes les devises des wallets
+            const allCurrencies: string[] = [];
+
+            if (result?.data?.wallets && Array.isArray(result.data.wallets)) {
+                result.data.wallets.forEach((wallet: any) => {
+                    if (wallet.currency && !allCurrencies.includes(wallet.currency)) {
+                        allCurrencies.push(wallet.currency);
+                    }
+                });
+            }
+
+            // ✅ Si pas de wallets, ajouter USD par défaut
+            if (allCurrencies.length === 0) {
+                allCurrencies.push('USD');
+            }
+
+            // ✅ Initialiser toutes les devises avec tableau vide
+            const allByCurrency: { [currency: string]: any[] } = {};
+            const totalsByCurrency: { [currency: string]: number } = {};
+
+            allCurrencies.forEach((currency) => {
+                allByCurrency[currency] = [];
+                totalsByCurrency[currency] = 0;
+            });
+
+            // ✅ Extraire les transactions
             let transactions: any[] = [];
 
             if (result?.data?.transactions && Array.isArray(result.data.transactions)) {
@@ -1109,42 +1135,13 @@ export class FpayService {
                 transactions = result;
             }
 
-            // ✅ Récupérer toutes les devises des wallets de l'utilisateur
-            const allCurrencies: string[] = [];
-
-            if (result?.data?.wallets && Array.isArray(result.data.wallets)) {
-                result.data.wallets.forEach((wallet: any) => {
-                    if (wallet.currency && !allCurrencies.includes(wallet.currency)) {
-                        allCurrencies.push(wallet.currency);
-                    }
-                });
-            }
-
-            // ✅ Ajouter les devises des transactions (si pas déjà dans les wallets)
-            transactions.forEach((tx: any) => {
-                const currency = tx.currency || 'USD';
-                if (!allCurrencies.includes(currency)) {
-                    allCurrencies.push(currency);
-                }
-            });
-
-            this.logger.log(`💰 Devises disponibles: ${allCurrencies.join(', ')}`);
-
+            // ✅ Si pas de transactions du tout
             if (!transactions || transactions.length === 0) {
-                // ✅ Retourner toutes les devises avec des tableaux vides
-                const emptyData: { [currency: string]: any[] } = {};
-                const emptyTotals: { [currency: string]: number } = {};
-
-                allCurrencies.forEach((currency) => {
-                    emptyData[currency] = [];
-                    emptyTotals[currency] = 0;
-                });
-
                 return {
                     success: true,
                     message: 'Aucune transaction trouvée',
-                    data: emptyData,
-                    totalsByCurrency: emptyTotals,
+                    data: allByCurrency,
+                    totalsByCurrency: totalsByCurrency,
                     currencies: allCurrencies,
                     currenciesWithData: [],
                     count: 0,
@@ -1155,17 +1152,6 @@ export class FpayService {
             const pendingTransactions = transactions.filter(
                 (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
             );
-
-            this.logger.log(`⏳ ${pendingTransactions.length} transaction(s) en PENDING`);
-
-            // ✅ Initialiser toutes les devises avec un tableau vide
-            const allByCurrency: { [currency: string]: any[] } = {};
-            const totalsByCurrency: { [currency: string]: number } = {};
-
-            allCurrencies.forEach((currency) => {
-                allByCurrency[currency] = [];
-                totalsByCurrency[currency] = 0;
-            });
 
             // ✅ Remplir les transactions PENDING par devise
             pendingTransactions.forEach((tx: any) => {
@@ -1182,7 +1168,7 @@ export class FpayService {
                 totalsByCurrency[currency] += (tx.amount || 0);
             });
 
-            // ✅ Formater toutes les transactions par devise
+            // ✅ Formater
             const formattedData: { [currency: string]: any[] } = {};
 
             allCurrencies.forEach((currency) => {
@@ -1211,12 +1197,11 @@ export class FpayService {
                 (currency) => allByCurrency[currency].length > 0
             );
 
-            this.logger.log(`✅ Devises avec transactions: ${currenciesWithData.join(', ')}`);
-            this.logger.log(`📊 Totaux par devise: ${JSON.stringify(totalsByCurrency)}`);
-
             return {
                 success: true,
-                message: `${totalCount} transaction(s) en attente sur ${allCurrencies.length} devise(s)`,
+                message: totalCount === 0
+                    ? 'Aucune transaction en attente'
+                    : `${totalCount} transaction(s) en attente sur ${allCurrencies.length} devise(s)`,
                 data: formattedData,
                 totalsByCurrency: totalsByCurrency,
                 currencies: allCurrencies,
