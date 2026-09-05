@@ -1085,7 +1085,6 @@ export class FpayService {
         try {
             this.logger.log(`🔍 Recherche des transactions PENDING pour ${userId}${type ? ` (type: ${type})` : ''}`);
 
-            // ✅ Appel avec plus de transactions
             const result = await this.getWalletBalanceAndTransactions(
                 userId,
                 1,
@@ -1098,27 +1097,16 @@ export class FpayService {
                 undefined,
             );
 
-            // ✅ LOG DU RÉSULTAT COMPLET
-            this.logger.log(`📦 Résultat complet: ${JSON.stringify(result, null, 2)}`);
-
-            // ✅ Extraire les transactions
             let transactions: any[] = [];
 
             if (result?.data?.transactions && Array.isArray(result.data.transactions)) {
                 transactions = result.data.transactions;
-                this.logger.log(`✅ Structure 1: data.transactions (${transactions.length})`);
             } else if (result?.data?.transactions?.data && Array.isArray(result.data.transactions.data)) {
                 transactions = result.data.transactions.data;
-                this.logger.log(`✅ Structure 2: data.transactions.data (${transactions.length})`);
             } else if (result?.data && Array.isArray(result.data)) {
                 transactions = result.data;
-                this.logger.log(`✅ Structure 3: data (${transactions.length})`);
             } else if (Array.isArray(result)) {
                 transactions = result;
-                this.logger.log(`✅ Structure 4: result (${transactions.length})`);
-            } else {
-                this.logger.warn(`⚠️ Structure de résultat non reconnue`);
-                this.logger.warn(`⚠️ Type: ${typeof result}, Keys: ${Object.keys(result || {})}`);
             }
 
             if (!transactions || transactions.length === 0) {
@@ -1131,16 +1119,10 @@ export class FpayService {
                 };
             }
 
-            // ✅ LOG DES TRANSACTIONS TROUVÉES
-            this.logger.log(`📊 ${transactions.length} transaction(s) trouvée(s)`);
-            this.logger.log(`📊 Première transaction: ${JSON.stringify(transactions[0], null, 2)}`);
-
             // ✅ Filtrer par status PENDING
             const pendingTransactions = transactions.filter(
                 (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
             );
-
-            this.logger.log(`⏳ ${pendingTransactions.length} transaction(s) en PENDING`);
 
             if (pendingTransactions.length === 0) {
                 this.logger.log(`ℹ️ Aucune transaction en PENDING`);
@@ -1152,21 +1134,27 @@ export class FpayService {
                 };
             }
 
-            // ✅ LOG DES TRANSACTIONS PENDING
-            this.logger.log(`📊 Transactions PENDING: ${JSON.stringify(pendingTransactions, null, 2)}`);
-
-            // ✅ Grouper par devise
+            // ✅ Grouper par devise et récupérer la plus récente de chaque devise
             const latestByCurrency: { [currency: string]: any } = {};
             const totalsByCurrency: { [currency: string]: number } = {};
+            const allByCurrency: { [currency: string]: any[] } = {};
 
             pendingTransactions.forEach((tx: any) => {
                 const currency = tx.currency || 'USD';
 
+                // ✅ Toutes les transactions par devise
+                if (!allByCurrency[currency]) {
+                    allByCurrency[currency] = [];
+                }
+                allByCurrency[currency].push(tx);
+
+                // ✅ Cumul des montants par devise
                 if (!totalsByCurrency[currency]) {
                     totalsByCurrency[currency] = 0;
                 }
                 totalsByCurrency[currency] += (tx.amount || 0);
 
+                // ✅ La plus récente par devise
                 const txDate = new Date(tx.createdAt || tx.created_at || 0);
 
                 if (!latestByCurrency[currency]) {
@@ -1183,35 +1171,71 @@ export class FpayService {
                 }
             });
 
-            // ✅ Formater la réponse
+            const currencies = Object.keys(latestByCurrency);
+
+            this.logger.log(`✅ Devises trouvées: ${currencies.join(', ')}`);
+            this.logger.log(`📊 Totaux par devise: ${JSON.stringify(totalsByCurrency)}`);
+
+            // ✅ Si une seule devise, retourner toutes les transactions en attente
+            if (currencies.length === 1) {
+                const currency = currencies[0];
+                const allTxs = allByCurrency[currency] || [];
+
+                this.logger.log(`✅ Une seule devise (${currency}), retour de ${allTxs.length} transaction(s)`);
+
+                // ✅ Retourner toutes les transactions de cette devise
+                const formattedTxs = allTxs.map((tx: any) => ({
+                    id: tx.id || tx.transactionId,
+                    amount: tx.amount,
+                    currency: tx.currency,
+                    type: tx.type,
+                    status: tx.status,
+                    createdAt: tx.createdAt || tx.created_at,
+                    description: tx.description,
+                    reference: tx.reference,
+                    walletId: tx.walletId,
+                    userId: tx.userId,
+                    movement: tx.movement,
+                    paymentMethod: tx.paymentMethod,
+                    external_reference: tx.external_reference,
+                    metadata: tx.metadata || null,
+                    ...tx,
+                }));
+
+                return {
+                    success: true,
+                    message: `${allTxs.length} transaction(s) en attente en ${currency}`,
+                    data: formattedTxs,
+                    totalsByCurrency: totalsByCurrency,
+                    currency: currency,
+                    count: allTxs.length,
+                };
+            }
+
+            // ✅ Si plusieurs devises, retourner la plus récente de chaque devise
             const formattedData: { [currency: string]: any } = {};
-            const currencies = Object.keys(latestByCurrency).sort();
 
             currencies.forEach((currency) => {
                 const tx = latestByCurrency[currency];
-
-                // ✅ S'assurer que toutes les propriétés sont extraites
                 formattedData[currency] = {
-                    id: tx.id || tx.transactionId || null,
-                    amount: tx.amount || 0,
-                    currency: tx.currency || currency,
-                    type: tx.type || null,
-                    status: tx.status || null,
-                    createdAt: tx.createdAt || tx.created_at || null,
-                    description: tx.description || null,
-                    reference: tx.reference || null,
-                    walletId: tx.walletId || null,
-                    userId: tx.userId || null,
-                    movement: tx.movement || null,
-                    paymentMethod: tx.paymentMethod || null,
-                    external_reference: tx.external_reference || null,
-                    // ✅ Garder toutes les propriétés originales
+                    id: tx.id || tx.transactionId,
+                    amount: tx.amount,
+                    currency: tx.currency,
+                    type: tx.type,
+                    status: tx.status,
+                    createdAt: tx.createdAt || tx.created_at,
+                    description: tx.description,
+                    reference: tx.reference,
+                    walletId: tx.walletId,
+                    userId: tx.userId,
+                    movement: tx.movement,
+                    paymentMethod: tx.paymentMethod,
+                    metadata: tx.metadata || null,
                     ...tx,
                 };
             });
 
-            this.logger.log(`✅ Devises trouvées: ${currencies.join(', ')}`);
-            this.logger.log(`📊 Totaux par devise: ${JSON.stringify(totalsByCurrency)}`);
+            this.logger.log(`✅ Plusieurs devises (${currencies.length}), retour groupé`);
 
             return {
                 success: true,
@@ -1222,13 +1246,11 @@ export class FpayService {
 
         } catch (error) {
             this.logger.error(`❌ Erreur: ${error.message}`);
-            this.logger.error(`❌ Stack: ${error.stack}`);
             return {
                 success: false,
                 message: error.message || 'Erreur lors de la récupération',
                 data: {},
                 totalsByCurrency: {},
-                error: error.message,
             };
         }
     }
