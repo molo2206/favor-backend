@@ -1237,17 +1237,6 @@ export class FpayService {
             this.logger.log(`📤 Demande de dépôt avec OTP: ${dto.amount} ${dto.currency} pour ${dto.userId}`);
 
             // ============================================================
-            // LOG DE LA CONFIGURATION
-            // ============================================================
-            console.log('============================================');
-            console.log('🔍 VÉRIFICATION DE LA CONFIGURATION');
-            console.log('============================================');
-            console.log(`📌 FPAY_API_URL: ${this.configService.get<string>('FPAY_API_URL')}`);
-            console.log(`📌 FPAY_API_KEY_PARRAINAGE existe: ${!!this.configService.get<string>('FPAY_API_KEY_PARRAINAGE')}`);
-            console.log(`📌 FPAY_API_KEY_HELP existe: ${!!this.configService.get<string>('FPAY_API_KEY_HELP')}`);
-            console.log('============================================');
-
-            // ============================================================
             // VALIDATIONS INITIALES
             // ============================================================
             if (!dto.userId) {
@@ -1565,10 +1554,11 @@ export class FpayService {
             this.logger.log(`✅ OTP vérifié avec succès`);
 
             // ============================================================
-            // ÉTAPE 3: Effectuer la demande de dépôt
+            // ÉTAPE 3: Effectuer la demande de dépôt (API Key dans le body)
             // ============================================================
             const url = `${this.fpayApiUrl}/wallet/deposit/request`;
 
+            // ✅ L'API Key est dans le body (comme attendu par FPay)
             const payload: any = {
                 userId: dto.userId,
                 amount: dto.amount,
@@ -1579,53 +1569,19 @@ export class FpayService {
             this.logger.log(`📤 Appel API FPay: ${url}`);
             this.logger.log(`📤 Payload: ${JSON.stringify(payload)}`);
 
-            // ✅ AFFICHER LE CONTENU DU TOKEN AVANT ENVOI
-            const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE') || '';
-
-            console.log('============================================');
-            console.log('🔑 CONTENU DU TOKEN FPAY_API_KEY_PARRAINAGE');
-            console.log('============================================');
-            console.log(`📌 Longueur: ${parrainageApiKey.length}`);
-            console.log(`📌 Début: ${parrainageApiKey.substring(0, 50)}...`);
-            console.log(`📌 Fin: ...${parrainageApiKey.substring(parrainageApiKey.length - 30)}`);
-            console.log(`📌 Contient "Bearer "?: ${parrainageApiKey.includes('Bearer ')}`);
-            console.log(`📌 Commence par "Bearer "?: ${parrainageApiKey.startsWith('Bearer ')}`);
-            console.log(`📌 Est un JWT valide?: ${parrainageApiKey.includes('.')}`);
-            console.log('============================================');
-
-            // ✅ Décoder le token pour voir son contenu
-            try {
-                let tokenToDecode = parrainageApiKey;
-                if (tokenToDecode.startsWith('Bearer ')) {
-                    tokenToDecode = tokenToDecode.substring(7);
-                }
-                const decoded = jwt.decode(tokenToDecode) as any;
-                console.log('📋 PAYLOAD DU TOKEN:');
-                console.log(JSON.stringify(decoded, null, 2));
-                console.log('============================================');
-                console.log(`👤 userId: ${decoded?.userId || decoded?.id || decoded?.sub}`);
-                console.log(`📧 Email: ${decoded?.email}`);
-                console.log(`🔑 Permissions: ${decoded?.permissions}`);
-                console.log(`⏰ Expire le: ${decoded?.exp ? new Date(decoded.exp * 1000).toISOString() : 'N/A'}`);
-                console.log('============================================');
-            } catch (err) {
-                console.error('❌ Erreur décodage token:', err.message);
-            }
-
-            // ✅ Utiliser FPAY_API_KEY_PARRAINAGE comme Authorization header
-            const cleanApiKey = parrainageApiKey.startsWith('Bearer ')
-                ? parrainageApiKey
-                : `Bearer ${parrainageApiKey}`;
-
-            console.log(`📤 Header Authorization final: ${cleanApiKey.substring(0, 60)}...`);
+            // ✅ Auth du service avec FPAY_API_KEY_HELP (headers)
+            const helpApiKey = this.configService.get<string>('FPAY_API_KEY_HELP') || '';
+            const cleanHelpApiKey = helpApiKey.startsWith('Bearer ')
+                ? helpApiKey
+                : `Bearer ${helpApiKey}`;
 
             const headers = {
-                'Authorization': cleanApiKey,
+                'Authorization': cleanHelpApiKey,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
             };
 
-            this.logger.log(`📤 Headers: Authorization: ${cleanApiKey.substring(0, 50)}...`);
+            this.logger.log(`📤 Headers: Authorization: ${cleanHelpApiKey.substring(0, 50)}...`);
 
             const response = await firstValueFrom(
                 this.httpService.post(
