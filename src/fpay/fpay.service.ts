@@ -1237,6 +1237,17 @@ export class FpayService {
             this.logger.log(`📤 Demande de dépôt avec OTP: ${dto.amount} ${dto.currency} pour ${dto.userId}`);
 
             // ============================================================
+            // LOG DE LA CONFIGURATION
+            // ============================================================
+            console.log('============================================');
+            console.log('🔍 VÉRIFICATION DE LA CONFIGURATION');
+            console.log('============================================');
+            console.log(`📌 FPAY_API_URL: ${this.configService.get<string>('FPAY_API_URL')}`);
+            console.log(`📌 FPAY_API_KEY_PARRAINAGE existe: ${!!this.configService.get<string>('FPAY_API_KEY_PARRAINAGE')}`);
+            console.log(`📌 FPAY_API_KEY_HELP existe: ${!!this.configService.get<string>('FPAY_API_KEY_HELP')}`);
+            console.log('============================================');
+
+            // ============================================================
             // VALIDATIONS INITIALES
             // ============================================================
             if (!dto.userId) {
@@ -1269,15 +1280,15 @@ export class FpayService {
             }
 
             // ============================================================
-            // ✅ VÉRIFICATION DES TRANSACTIONS EN ATTENTE
+            // ✅ VÉRIFICATION DES TRANSACTIONS EN ATTENTE PAR DEVISE
             // ============================================================
             try {
-                this.logger.log(`🔍 Vérification des transactions en attente pour ${dto.userId}`);
+                this.logger.log(`🔍 Vérification des transactions en attente pour ${dto.userId} en ${dto.currency}`);
 
                 const transactionsData = await this.getWalletBalanceAndTransactions(
                     dto.userId,
                     1,
-                    10,
+                    100,
                     undefined,
                     undefined,
                     'DEPOSIT',
@@ -1306,18 +1317,28 @@ export class FpayService {
                     );
                 }
 
-                if (allPending.length > 0) {
-                    const pendingTx = allPending[0];
+                // ✅ Filtrer les transactions PENDING par DEVISE
+                const pendingInCurrency = allPending.filter(
+                    (tx: any) => (tx.currency || 'USD') === dto.currency
+                );
+
+                this.logger.log(`⏳ ${pendingInCurrency.length} transaction(s) en attente en ${dto.currency}`);
+
+                if (pendingInCurrency.length > 0) {
+                    const pendingTx = pendingInCurrency[0];
+                    this.logger.warn(`❌ Transaction en attente trouvée en ${dto.currency}: ${pendingTx.reference}`);
+
                     throw new HttpException(
                         {
                             statusCode: HttpStatus.BAD_REQUEST,
-                            message: `Vous avez déjà une demande de dépôt en cours de ${pendingTx.amount} ${pendingTx.currency}. Veuillez attendre sa finalisation.`,
-                            code: 'PENDING_TRANSACTION_EXISTS',
+                            message: `Vous avez déjà une demande de dépôt en cours en ${dto.currency} de ${pendingTx.amount} ${dto.currency}. Veuillez attendre sa finalisation avant de faire une nouvelle demande dans cette devise.`,
+                            code: 'PENDING_TRANSACTION_EXISTS_IN_CURRENCY',
                             pendingTransaction: {
                                 id: pendingTx.id,
                                 amount: pendingTx.amount,
                                 currency: pendingTx.currency,
                                 status: pendingTx.status,
+                                reference: pendingTx.reference,
                                 createdAt: pendingTx.createdAt,
                             },
                         },
@@ -1325,7 +1346,7 @@ export class FpayService {
                     );
                 }
 
-                this.logger.log(`✅ Aucune transaction en attente trouvée`);
+                this.logger.log(`✅ Aucune transaction en attente en ${dto.currency}`);
 
             } catch (error: any) {
                 if (error instanceof HttpException) {
@@ -1544,7 +1565,7 @@ export class FpayService {
             this.logger.log(`✅ OTP vérifié avec succès`);
 
             // ============================================================
-            // ÉTAPE 3: Effectuer la demande de dépôt (FPay gère tout)
+            // ÉTAPE 3: Effectuer la demande de dépôt
             // ============================================================
             const url = `${this.fpayApiUrl}/wallet/deposit/request`;
 
@@ -1558,11 +1579,59 @@ export class FpayService {
             this.logger.log(`📤 Appel API FPay: ${url}`);
             this.logger.log(`📤 Payload: ${JSON.stringify(payload)}`);
 
+            // ✅ AFFICHER LE CONTENU DU TOKEN AVANT ENVOI
+            const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE') || '';
+
+            console.log('============================================');
+            console.log('🔑 CONTENU DU TOKEN FPAY_API_KEY_PARRAINAGE');
+            console.log('============================================');
+            console.log(`📌 Longueur: ${parrainageApiKey.length}`);
+            console.log(`📌 Début: ${parrainageApiKey.substring(0, 50)}...`);
+            console.log(`📌 Fin: ...${parrainageApiKey.substring(parrainageApiKey.length - 30)}`);
+            console.log(`📌 Contient "Bearer "?: ${parrainageApiKey.includes('Bearer ')}`);
+            console.log(`📌 Commence par "Bearer "?: ${parrainageApiKey.startsWith('Bearer ')}`);
+            console.log(`📌 Est un JWT valide?: ${parrainageApiKey.includes('.')}`);
+            console.log('============================================');
+
+            // ✅ Décoder le token pour voir son contenu
+            try {
+                let tokenToDecode = parrainageApiKey;
+                if (tokenToDecode.startsWith('Bearer ')) {
+                    tokenToDecode = tokenToDecode.substring(7);
+                }
+                const decoded = jwt.decode(tokenToDecode) as any;
+                console.log('📋 PAYLOAD DU TOKEN:');
+                console.log(JSON.stringify(decoded, null, 2));
+                console.log('============================================');
+                console.log(`👤 userId: ${decoded?.userId || decoded?.id || decoded?.sub}`);
+                console.log(`📧 Email: ${decoded?.email}`);
+                console.log(`🔑 Permissions: ${decoded?.permissions}`);
+                console.log(`⏰ Expire le: ${decoded?.exp ? new Date(decoded.exp * 1000).toISOString() : 'N/A'}`);
+                console.log('============================================');
+            } catch (err) {
+                console.error('❌ Erreur décodage token:', err.message);
+            }
+
+            // ✅ Utiliser FPAY_API_KEY_PARRAINAGE comme Authorization header
+            const cleanApiKey = parrainageApiKey.startsWith('Bearer ')
+                ? parrainageApiKey
+                : `Bearer ${parrainageApiKey}`;
+
+            console.log(`📤 Header Authorization final: ${cleanApiKey.substring(0, 60)}...`);
+
+            const headers = {
+                'Authorization': cleanApiKey,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            };
+
+            this.logger.log(`📤 Headers: Authorization: ${cleanApiKey.substring(0, 50)}...`);
+
             const response = await firstValueFrom(
                 this.httpService.post(
                     url,
                     payload,
-                    { headers: this.getHeaders() }
+                    { headers: headers }
                 )
             );
 
@@ -1661,7 +1730,6 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
-
     async decreaseReferralPoints(
         userId: string,
         amount: number,
