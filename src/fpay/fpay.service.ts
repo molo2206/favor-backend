@@ -1085,11 +1085,11 @@ export class FpayService {
         try {
             this.logger.log(`🔍 Recherche des transactions PENDING pour ${userId}${type ? ` (type: ${type})` : ''}`);
 
-            // ✅ Augmenter le limit pour récupérer toutes les transactions
+            // ✅ Appel avec plus de transactions
             const result = await this.getWalletBalanceAndTransactions(
                 userId,
                 1,
-                100,        // ✅ Augmenté pour récupérer toutes les transactions
+                100,
                 undefined,
                 undefined,
                 type,
@@ -1098,19 +1098,27 @@ export class FpayService {
                 undefined,
             );
 
-            this.logger.log(`📦 Résultat reçu`);
+            // ✅ LOG DU RÉSULTAT COMPLET
+            this.logger.log(`📦 Résultat complet: ${JSON.stringify(result, null, 2)}`);
 
             // ✅ Extraire les transactions
             let transactions: any[] = [];
 
             if (result?.data?.transactions && Array.isArray(result.data.transactions)) {
                 transactions = result.data.transactions;
+                this.logger.log(`✅ Structure 1: data.transactions (${transactions.length})`);
             } else if (result?.data?.transactions?.data && Array.isArray(result.data.transactions.data)) {
                 transactions = result.data.transactions.data;
+                this.logger.log(`✅ Structure 2: data.transactions.data (${transactions.length})`);
             } else if (result?.data && Array.isArray(result.data)) {
                 transactions = result.data;
+                this.logger.log(`✅ Structure 3: data (${transactions.length})`);
             } else if (Array.isArray(result)) {
                 transactions = result;
+                this.logger.log(`✅ Structure 4: result (${transactions.length})`);
+            } else {
+                this.logger.warn(`⚠️ Structure de résultat non reconnue`);
+                this.logger.warn(`⚠️ Type: ${typeof result}, Keys: ${Object.keys(result || {})}`);
             }
 
             if (!transactions || transactions.length === 0) {
@@ -1123,7 +1131,9 @@ export class FpayService {
                 };
             }
 
+            // ✅ LOG DES TRANSACTIONS TROUVÉES
             this.logger.log(`📊 ${transactions.length} transaction(s) trouvée(s)`);
+            this.logger.log(`📊 Première transaction: ${JSON.stringify(transactions[0], null, 2)}`);
 
             // ✅ Filtrer par status PENDING
             const pendingTransactions = transactions.filter(
@@ -1133,6 +1143,7 @@ export class FpayService {
             this.logger.log(`⏳ ${pendingTransactions.length} transaction(s) en PENDING`);
 
             if (pendingTransactions.length === 0) {
+                this.logger.log(`ℹ️ Aucune transaction en PENDING`);
                 return {
                     success: true,
                     message: 'Aucune transaction en attente',
@@ -1141,24 +1152,24 @@ export class FpayService {
                 };
             }
 
-            // ✅ Grouper par devise et récupérer la plus récente de chaque devise
+            // ✅ LOG DES TRANSACTIONS PENDING
+            this.logger.log(`📊 Transactions PENDING: ${JSON.stringify(pendingTransactions, null, 2)}`);
+
+            // ✅ Grouper par devise
             const latestByCurrency: { [currency: string]: any } = {};
             const totalsByCurrency: { [currency: string]: number } = {};
 
             pendingTransactions.forEach((tx: any) => {
                 const currency = tx.currency || 'USD';
 
-                // ✅ Cumul des montants par devise
                 if (!totalsByCurrency[currency]) {
                     totalsByCurrency[currency] = 0;
                 }
                 totalsByCurrency[currency] += (tx.amount || 0);
 
-                // ✅ Vérifier si c'est la plus récente de cette devise
                 const txDate = new Date(tx.createdAt || tx.created_at || 0);
 
                 if (!latestByCurrency[currency]) {
-                    // Première transaction de cette devise
                     latestByCurrency[currency] = tx;
                 } else {
                     const currentLatestDate = new Date(
@@ -1166,8 +1177,6 @@ export class FpayService {
                         latestByCurrency[currency].created_at ||
                         0
                     );
-
-                    // Si la transaction actuelle est plus récente, remplacer
                     if (txDate > currentLatestDate) {
                         latestByCurrency[currency] = tx;
                     }
@@ -1181,21 +1190,22 @@ export class FpayService {
             currencies.forEach((currency) => {
                 const tx = latestByCurrency[currency];
 
+                // ✅ S'assurer que toutes les propriétés sont extraites
                 formattedData[currency] = {
-                    id: tx.id || tx.transactionId,
-                    amount: tx.amount,
-                    currency: tx.currency,
-                    type: tx.type,
-                    status: tx.status,
-                    createdAt: tx.createdAt || tx.created_at,
-                    description: tx.description,
-                    reference: tx.reference,
-                    walletId: tx.walletId,
-                    userId: tx.userId,
-                    movement: tx.movement,
-                    paymentMethod: tx.paymentMethod,
-                    external_reference: tx.external_reference,
-                    metadata: tx.metadata || null,
+                    id: tx.id || tx.transactionId || null,
+                    amount: tx.amount || 0,
+                    currency: tx.currency || currency,
+                    type: tx.type || null,
+                    status: tx.status || null,
+                    createdAt: tx.createdAt || tx.created_at || null,
+                    description: tx.description || null,
+                    reference: tx.reference || null,
+                    walletId: tx.walletId || null,
+                    userId: tx.userId || null,
+                    movement: tx.movement || null,
+                    paymentMethod: tx.paymentMethod || null,
+                    external_reference: tx.external_reference || null,
+                    // ✅ Garder toutes les propriétés originales
                     ...tx,
                 };
             });
@@ -1203,7 +1213,6 @@ export class FpayService {
             this.logger.log(`✅ Devises trouvées: ${currencies.join(', ')}`);
             this.logger.log(`📊 Totaux par devise: ${JSON.stringify(totalsByCurrency)}`);
 
-            // ✅ Retourner une transaction par devise
             return {
                 success: true,
                 message: `Dernière transaction en attente pour chaque devise (${currencies.length} devise(s))`,
@@ -1213,11 +1222,13 @@ export class FpayService {
 
         } catch (error) {
             this.logger.error(`❌ Erreur: ${error.message}`);
+            this.logger.error(`❌ Stack: ${error.stack}`);
             return {
                 success: false,
                 message: error.message || 'Erreur lors de la récupération',
                 data: {},
                 totalsByCurrency: {},
+                error: error.message,
             };
         }
     }
