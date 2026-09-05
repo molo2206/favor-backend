@@ -1269,15 +1269,15 @@ export class FpayService {
             }
 
             // ============================================================
-            // ✅ VÉRIFICATION DES TRANSACTIONS EN ATTENTE
+            // ✅ VÉRIFICATION DES TRANSACTIONS EN ATTENTE PAR DEVISE
             // ============================================================
             try {
-                this.logger.log(`🔍 Vérification des transactions en attente pour ${dto.userId}`);
+                this.logger.log(`🔍 Vérification des transactions en attente pour ${dto.userId} en ${dto.currency}`);
 
                 const transactionsData = await this.getWalletBalanceAndTransactions(
                     dto.userId,
                     1,
-                    10,
+                    100,  // ✅ Augmenté pour récupérer toutes les transactions
                     undefined,
                     undefined,
                     'DEPOSIT',
@@ -1306,18 +1306,29 @@ export class FpayService {
                     );
                 }
 
-                if (allPending.length > 0) {
-                    const pendingTx = allPending[0];
+                // ✅ Filtrer les transactions PENDING par DEVISE
+                const pendingInCurrency = allPending.filter(
+                    (tx: any) => (tx.currency || 'USD') === dto.currency
+                );
+
+                this.logger.log(`⏳ ${pendingInCurrency.length} transaction(s) en attente en ${dto.currency}`);
+
+                // ✅ Si une transaction PENDING existe dans cette devise → REFUSER
+                if (pendingInCurrency.length > 0) {
+                    const pendingTx = pendingInCurrency[0];
+                    this.logger.warn(`❌ Transaction en attente trouvée en ${dto.currency}: ${pendingTx.reference}`);
+
                     throw new HttpException(
                         {
                             statusCode: HttpStatus.BAD_REQUEST,
-                            message: `Vous avez déjà une demande de dépôt en cours de ${pendingTx.amount} ${pendingTx.currency}. Veuillez attendre sa finalisation.`,
-                            code: 'PENDING_TRANSACTION_EXISTS',
+                            message: `Vous avez déjà une demande de dépôt en cours en ${dto.currency} de ${pendingTx.amount} ${dto.currency}. Veuillez attendre sa finalisation avant de faire une nouvelle demande dans cette devise.`,
+                            code: 'PENDING_TRANSACTION_EXISTS_IN_CURRENCY',
                             pendingTransaction: {
                                 id: pendingTx.id,
                                 amount: pendingTx.amount,
                                 currency: pendingTx.currency,
                                 status: pendingTx.status,
+                                reference: pendingTx.reference,
                                 createdAt: pendingTx.createdAt,
                             },
                         },
@@ -1325,7 +1336,7 @@ export class FpayService {
                     );
                 }
 
-                this.logger.log(`✅ Aucune transaction en attente trouvée`);
+                this.logger.log(`✅ Aucune transaction en attente en ${dto.currency}`);
 
             } catch (error: any) {
                 if (error instanceof HttpException) {
@@ -1552,7 +1563,7 @@ export class FpayService {
                 userId: dto.userId,
                 amount: dto.amount,
                 currency: dto.currency,
-                apiKey: apiKey,           // ✅ API Key du payeur dans le body
+                apiKey: apiKey,
             };
 
             this.logger.log(`📤 Appel API FPay: ${url}`);
@@ -1661,7 +1672,6 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
-
     async decreaseReferralPoints(
         userId: string,
         amount: number,
