@@ -1167,7 +1167,6 @@ export class FpayService {
             currency: string;
             otpCode?: string;
         },
-        payerToken?: string,          // ✅ Token du payeur passé directement en paramètre
         lang: string = 'fr',
     ): Promise<any> {
         try {
@@ -1197,69 +1196,14 @@ export class FpayService {
                 );
             }
 
-            // ============================================================
-            // ✅ VÉRIFIER LE TOKEN DU PAYEUR (vérification locale JWT)
-            // ============================================================
-            let payerId: string | null = null;
-            let payerData: any = null;
+            // ✅ Récupérer l'API Key de parrainage automatiquement
+            const apiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE');
 
-            if (payerToken) {
-                try {
-                    // ✅ Extraire le token
-                    const cleanToken = payerToken.startsWith('Bearer ')
-                        ? payerToken.substring(7)
-                        : payerToken;
-
-                    // ✅ Récupérer la clé FPAY_API_KEY_PARRAINAGE comme secret
-                    const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE') || '';
-                    const cleanSecret = parrainageApiKey.startsWith('Bearer ')
-                        ? parrainageApiKey.substring(7)
-                        : parrainageApiKey;
-
-                    // ✅ Vérifier le JWT localement
-                    const decoded = jwt.verify(cleanToken, cleanSecret) as any;
-
-                    // ✅ Vérifier que le token a la permission "pay"
-                    if (decoded.permissions && !decoded.permissions.includes('pay')) {
-                        this.logger.warn(`⚠️ Le token n'a pas la permission "pay"`);
-                        throw new HttpException(
-                            'Le token n\'a pas la permission "pay" pour effectuer un dépôt',
-                            HttpStatus.FORBIDDEN,
-                        );
-                    }
-
-                    // ✅ Extraire l'ID (plusieurs champs possibles)
-                    payerId = decoded.userId || decoded.id || decoded.sub;
-                    payerData = decoded;
-
-                    if (payerId) {
-                        this.logger.log(`✅ Payeur identifié via JWT: ${payerId}`);
-                        this.logger.log(`📋 Infos payeur: ${decoded.email}, ${decoded.role}`);
-                        this.logger.log(`📋 Permissions: ${decoded.permissions}`);
-                    } else {
-                        this.logger.warn(`⚠️ Token valide mais aucun ID trouvé`);
-                    }
-                } catch (tokenError: any) {
-                    this.logger.warn(`⚠️ Erreur lors de la vérification du token JWT: ${tokenError.message}`);
-
-                    // ✅ Fallback: essayer de décoder sans vérifier
-                    try {
-                        const cleanToken = payerToken.startsWith('Bearer ')
-                            ? payerToken.substring(7)
-                            : payerToken;
-                        const decoded = jwt.decode(cleanToken) as any;
-                        payerId = decoded?.userId || decoded?.id || decoded?.sub;
-                        if (payerId) {
-                            this.logger.log(`ℹ️ Payeur extrait (sans vérification): ${payerId}`);
-                        }
-                    } catch (e) {
-                        // Ignorer
-                    }
-                }
-            }
-
-            if (!payerId) {
-                this.logger.log(`ℹ️ Aucun payeur identifié, dépôt sans payeur spécifique`);
+            if (!apiKey) {
+                throw new HttpException(
+                    'API Key de parrainage non configurée',
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                );
             }
 
             // ============================================================
@@ -1424,7 +1368,6 @@ export class FpayService {
                         amount: dto.amount,
                         currency: dto.currency,
                         destination: destinationType,
-                        payerId: payerId,
                     },
                 };
             }
@@ -1539,7 +1482,7 @@ export class FpayService {
             this.logger.log(`✅ OTP vérifié avec succès`);
 
             // ============================================================
-            // ÉTAPE 3: Effectuer la demande de dépôt AVEC LE TOKEN DU PAYEUR
+            // ÉTAPE 3: Effectuer la demande de dépôt (FPay gère tout)
             // ============================================================
             const url = `${this.fpayApiUrl}/wallet/deposit/request`;
 
@@ -1547,35 +1490,17 @@ export class FpayService {
                 userId: dto.userId,
                 amount: dto.amount,
                 currency: dto.currency,
+                apiKey: apiKey,           // ✅ API Key récupérée automatiquement
             };
-
-            if (payerId) {
-                payload.payerId = payerId;
-                this.logger.log(`📤 Payeur associé au dépôt: ${payerId}`);
-            }
 
             this.logger.log(`📤 Appel API FPay: ${url}`);
             this.logger.log(`📤 Payload: ${JSON.stringify(payload)}`);
-
-            // ✅ UTILISER LE TOKEN DU PAYEUR pour l'appel (correction clé)
-            // ✅ NE PAS utiliser FPAY_API_KEY_PARRAINAGE ici !
-            const cleanToken = payerToken?.startsWith('Bearer ')
-                ? payerToken
-                : `Bearer ${payerToken}`;
-
-            const headers = {
-                'Authorization': cleanToken,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            };
-
-            this.logger.log(`📤 Headers: Authorization: ${cleanToken?.substring(0, 50)}...`);
 
             const response = await firstValueFrom(
                 this.httpService.post(
                     url,
                     payload,
-                    { headers: headers }
+                    { headers: this.getHeaders() }
                 )
             );
 
@@ -1660,10 +1585,7 @@ export class FpayService {
             return {
                 status: 'success',
                 message: `Demande de dépôt de ${dto.amount} ${dto.currency} enregistrée avec succès. Référence: ${response.data.data?.transaction?.reference || 'N/A'}`,
-                data: {
-                    ...response.data.data,
-                    payerId: payerId || null,
-                },
+                data: response.data.data,
                 requiresOtp: false,
             };
 
