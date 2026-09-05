@@ -1097,9 +1097,6 @@ export class FpayService {
                 undefined,
             );
 
-            // ✅ CONSOLE LOG DU RÉSULTAT BRUT
-            console.log('📦 RESULT BRUT:', JSON.stringify(result, null, 2));
-
             let transactions: any[] = [];
 
             if (result?.data?.transactions && Array.isArray(result.data.transactions)) {
@@ -1112,17 +1109,14 @@ export class FpayService {
                 transactions = result;
             }
 
-            // ✅ CONSOLE LOG DES TRANSACTIONS
-            console.log('📊 TRANSACTIONS TROUVÉES:', JSON.stringify(transactions, null, 2));
-
             if (!transactions || transactions.length === 0) {
                 this.logger.log(`ℹ️ Aucune transaction trouvée pour ${userId}`);
-                console.log('❌ Aucune transaction trouvée');
                 return {
                     success: true,
                     message: 'Aucune transaction trouvée',
-                    data: [],
+                    data: {},
                     totalsByCurrency: {},
+                    currencies: [],
                     count: 0,
                 };
             }
@@ -1132,26 +1126,41 @@ export class FpayService {
                 (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
             );
 
-            // ✅ CONSOLE LOG DES TRANSACTIONS PENDING
-            console.log('⏳ TRANSACTIONS PENDING:', JSON.stringify(pendingTransactions, null, 2));
-            console.log(`⏳ ${pendingTransactions.length} transaction(s) en PENDING`);
+            this.logger.log(`⏳ ${pendingTransactions.length} transaction(s) en PENDING`);
 
-            if (pendingTransactions.length === 0) {
-                this.logger.log(`ℹ️ Aucune transaction en PENDING`);
-                console.log('❌ Aucune transaction en PENDING');
-                return {
-                    success: true,
-                    message: 'Aucune transaction en attente',
-                    data: [],
-                    totalsByCurrency: {},
-                    count: 0,
-                };
+            // ✅ Récupérer toutes les devises disponibles (même sans transactions PENDING)
+            const allCurrencies: string[] = [];
+
+            // Récupérer les devises depuis les wallets
+            if (result?.data?.wallets && Array.isArray(result.data.wallets)) {
+                result.data.wallets.forEach((wallet: any) => {
+                    if (wallet.currency && !allCurrencies.includes(wallet.currency)) {
+                        allCurrencies.push(wallet.currency);
+                    }
+                });
             }
 
-            // ✅ Grouper par devise
+            // Ajouter les devises des transactions (si pas déjà dans les wallets)
+            transactions.forEach((tx: any) => {
+                const currency = tx.currency || 'USD';
+                if (!allCurrencies.includes(currency)) {
+                    allCurrencies.push(currency);
+                }
+            });
+
+            this.logger.log(`💰 Devises disponibles: ${allCurrencies.join(', ')}`);
+
+            // ✅ Grouper par devise (même vides)
             const allByCurrency: { [currency: string]: any[] } = {};
             const totalsByCurrency: { [currency: string]: number } = {};
 
+            // ✅ Initialiser toutes les devises avec un tableau vide
+            allCurrencies.forEach((currency) => {
+                allByCurrency[currency] = [];
+                totalsByCurrency[currency] = 0;
+            });
+
+            // ✅ Remplir les transactions PENDING par devise
             pendingTransactions.forEach((tx: any) => {
                 const currency = tx.currency || 'USD';
 
@@ -1166,21 +1175,10 @@ export class FpayService {
                 totalsByCurrency[currency] += (tx.amount || 0);
             });
 
-            const currencies = Object.keys(allByCurrency);
-
-            // ✅ CONSOLE LOG DU GROUPEMENT PAR DEVISE
-            console.log('💰 GROUPEMENT PAR DEVISE:');
-            console.log(`   Devises: ${currencies.join(', ')}`);
-            console.log(`   Totaux: ${JSON.stringify(totalsByCurrency, null, 2)}`);
-            console.log(`   Transactions par devise: ${JSON.stringify(allByCurrency, null, 2)}`);
-
-            this.logger.log(`✅ Devises trouvées: ${currencies.join(', ')}`);
-            this.logger.log(`📊 Totaux par devise: ${JSON.stringify(totalsByCurrency)}`);
-
             // ✅ Formater toutes les transactions par devise
             const formattedData: { [currency: string]: any[] } = {};
 
-            currencies.forEach((currency) => {
+            allCurrencies.forEach((currency) => {
                 const txs = allByCurrency[currency] || [];
                 formattedData[currency] = txs.map((tx: any) => ({
                     id: tx.id || tx.transactionId,
@@ -1201,36 +1199,33 @@ export class FpayService {
                 }));
             });
 
-            // ✅ CONSOLE LOG DU RÉSULTAT FINAL
-            console.log('✅ RÉSULTAT FINAL:');
-            console.log(`   Message: ${pendingTransactions.length} transaction(s) en attente sur ${currencies.length} devise(s)`);
-            console.log(`   Data: ${JSON.stringify(formattedData, null, 2)}`);
-            console.log(`   Totals: ${JSON.stringify(totalsByCurrency, null, 2)}`);
-            console.log(`   Currencies: ${currencies.join(', ')}`);
-            console.log(`   Count: ${pendingTransactions.length}`);
-
-            // ✅ Calculer le nombre total de transactions
             const totalCount = pendingTransactions.length;
+            const currenciesWithData = Object.keys(allByCurrency).filter(
+                (currency) => allByCurrency[currency].length > 0
+            );
+
+            this.logger.log(`✅ Devises avec transactions: ${currenciesWithData.join(', ')}`);
+            this.logger.log(`📊 Totaux par devise: ${JSON.stringify(totalsByCurrency)}`);
 
             return {
                 success: true,
-                message: `${totalCount} transaction(s) en attente sur ${currencies.length} devise(s)`,
+                message: `${totalCount} transaction(s) en attente sur ${allCurrencies.length} devise(s)`,
                 data: formattedData,
                 totalsByCurrency: totalsByCurrency,
-                currencies: currencies,
+                currencies: allCurrencies,
+                currenciesWithData: currenciesWithData,
                 count: totalCount,
             };
 
         } catch (error) {
             this.logger.error(`❌ Erreur: ${error.message}`);
-            console.error('❌ ERREUR:', error.message);
-            console.error('❌ STACK:', error.stack);
             return {
                 success: false,
                 message: error.message || 'Erreur lors de la récupération',
                 data: {},
                 totalsByCurrency: {},
                 currencies: [],
+                currenciesWithData: [],
                 count: 0,
             };
         }
