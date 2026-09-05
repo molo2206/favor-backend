@@ -1114,8 +1114,9 @@ export class FpayService {
                 return {
                     success: true,
                     message: 'Aucune transaction trouvée',
-                    data: {},
+                    data: [],
                     totalsByCurrency: {},
+                    count: 0,
                 };
             }
 
@@ -1129,15 +1130,15 @@ export class FpayService {
                 return {
                     success: true,
                     message: 'Aucune transaction en attente',
-                    data: {},
+                    data: [],
                     totalsByCurrency: {},
+                    count: 0,
                 };
             }
 
-            // ✅ Grouper par devise et récupérer la plus récente de chaque devise
-            const latestByCurrency: { [currency: string]: any } = {};
-            const totalsByCurrency: { [currency: string]: number } = {};
+            // ✅ Grouper par devise
             const allByCurrency: { [currency: string]: any[] } = {};
+            const totalsByCurrency: { [currency: string]: number } = {};
 
             pendingTransactions.forEach((tx: any) => {
                 const currency = tx.currency || 'USD';
@@ -1153,38 +1154,19 @@ export class FpayService {
                     totalsByCurrency[currency] = 0;
                 }
                 totalsByCurrency[currency] += (tx.amount || 0);
-
-                // ✅ La plus récente par devise
-                const txDate = new Date(tx.createdAt || tx.created_at || 0);
-
-                if (!latestByCurrency[currency]) {
-                    latestByCurrency[currency] = tx;
-                } else {
-                    const currentLatestDate = new Date(
-                        latestByCurrency[currency].createdAt ||
-                        latestByCurrency[currency].created_at ||
-                        0
-                    );
-                    if (txDate > currentLatestDate) {
-                        latestByCurrency[currency] = tx;
-                    }
-                }
             });
 
-            const currencies = Object.keys(latestByCurrency);
+            const currencies = Object.keys(allByCurrency);
 
             this.logger.log(`✅ Devises trouvées: ${currencies.join(', ')}`);
             this.logger.log(`📊 Totaux par devise: ${JSON.stringify(totalsByCurrency)}`);
 
-            // ✅ Si une seule devise, retourner toutes les transactions en attente
-            if (currencies.length === 1) {
-                const currency = currencies[0];
-                const allTxs = allByCurrency[currency] || [];
+            // ✅ Formater toutes les transactions par devise
+            const formattedData: { [currency: string]: any[] } = {};
 
-                this.logger.log(`✅ Une seule devise (${currency}), retour de ${allTxs.length} transaction(s)`);
-
-                // ✅ Retourner toutes les transactions de cette devise
-                const formattedTxs = allTxs.map((tx: any) => ({
+            currencies.forEach((currency) => {
+                const txs = allByCurrency[currency] || [];
+                formattedData[currency] = txs.map((tx: any) => ({
                     id: tx.id || tx.transactionId,
                     amount: tx.amount,
                     currency: tx.currency,
@@ -1201,47 +1183,18 @@ export class FpayService {
                     metadata: tx.metadata || null,
                     ...tx,
                 }));
-
-                return {
-                    success: true,
-                    message: `${allTxs.length} transaction(s) en attente en ${currency}`,
-                    data: formattedTxs,
-                    totalsByCurrency: totalsByCurrency,
-                    currency: currency,
-                    count: allTxs.length,
-                };
-            }
-
-            // ✅ Si plusieurs devises, retourner la plus récente de chaque devise
-            const formattedData: { [currency: string]: any } = {};
-
-            currencies.forEach((currency) => {
-                const tx = latestByCurrency[currency];
-                formattedData[currency] = {
-                    id: tx.id || tx.transactionId,
-                    amount: tx.amount,
-                    currency: tx.currency,
-                    type: tx.type,
-                    status: tx.status,
-                    createdAt: tx.createdAt || tx.created_at,
-                    description: tx.description,
-                    reference: tx.reference,
-                    walletId: tx.walletId,
-                    userId: tx.userId,
-                    movement: tx.movement,
-                    paymentMethod: tx.paymentMethod,
-                    metadata: tx.metadata || null,
-                    ...tx,
-                };
             });
 
-            this.logger.log(`✅ Plusieurs devises (${currencies.length}), retour groupé`);
+            // ✅ Calculer le nombre total de transactions
+            const totalCount = pendingTransactions.length;
 
             return {
                 success: true,
-                message: `Dernière transaction en attente pour chaque devise (${currencies.length} devise(s))`,
+                message: `${totalCount} transaction(s) en attente sur ${currencies.length} devise(s)`,
                 data: formattedData,
                 totalsByCurrency: totalsByCurrency,
+                currencies: currencies,
+                count: totalCount,
             };
 
         } catch (error) {
@@ -1251,6 +1204,8 @@ export class FpayService {
                 message: error.message || 'Erreur lors de la récupération',
                 data: {},
                 totalsByCurrency: {},
+                currencies: [],
+                count: 0,
             };
         }
     }
