@@ -1277,7 +1277,7 @@ export class FpayService {
                 const transactionsData = await this.getWalletBalanceAndTransactions(
                     dto.userId,
                     1,
-                    100,  // ✅ Augmenté pour récupérer toutes les transactions
+                    100,
                     undefined,
                     undefined,
                     'DEPOSIT',
@@ -1313,7 +1313,6 @@ export class FpayService {
 
                 this.logger.log(`⏳ ${pendingInCurrency.length} transaction(s) en attente en ${dto.currency}`);
 
-                // ✅ Si une transaction PENDING existe dans cette devise → REFUSER
                 if (pendingInCurrency.length > 0) {
                     const pendingTx = pendingInCurrency[0];
                     this.logger.warn(`❌ Transaction en attente trouvée en ${dto.currency}: ${pendingTx.reference}`);
@@ -1563,17 +1562,31 @@ export class FpayService {
                 userId: dto.userId,
                 amount: dto.amount,
                 currency: dto.currency,
-                apiKey: apiKey,
+                apiKey: apiKey,           // ✅ API Key du payeur dans le body
             };
 
             this.logger.log(`📤 Appel API FPay: ${url}`);
             this.logger.log(`📤 Payload: ${JSON.stringify(payload)}`);
 
+            // ✅ Utiliser FPAY_API_KEY_PARRAINAGE comme Authorization header
+            const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE') || '';
+            const cleanApiKey = parrainageApiKey.startsWith('Bearer ')
+                ? parrainageApiKey
+                : `Bearer ${parrainageApiKey}`;
+
+            const headers = {
+                'Authorization': cleanApiKey,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            };
+
+            this.logger.log(`📤 Headers: Authorization: ${cleanApiKey.substring(0, 50)}...`);
+
             const response = await firstValueFrom(
                 this.httpService.post(
                     url,
                     payload,
-                    { headers: this.getHeaders() }
+                    { headers: headers }
                 )
             );
 
