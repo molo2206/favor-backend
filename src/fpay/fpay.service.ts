@@ -1219,6 +1219,15 @@ export class FpayService {
                     // ✅ Vérifier le JWT localement
                     const decoded = jwt.verify(cleanToken, cleanSecret) as any;
 
+                    // ✅ Vérifier que le token a la permission "pay"
+                    if (decoded.permissions && !decoded.permissions.includes('pay')) {
+                        this.logger.warn(`⚠️ Le token n'a pas la permission "pay"`);
+                        throw new HttpException(
+                            'Le token n\'a pas la permission "pay" pour effectuer un dépôt',
+                            HttpStatus.FORBIDDEN,
+                        );
+                    }
+
                     // ✅ Extraire l'ID (plusieurs champs possibles)
                     payerId = decoded.userId || decoded.id || decoded.sub;
                     payerData = decoded;
@@ -1226,6 +1235,7 @@ export class FpayService {
                     if (payerId) {
                         this.logger.log(`✅ Payeur identifié via JWT: ${payerId}`);
                         this.logger.log(`📋 Infos payeur: ${decoded.email}, ${decoded.role}`);
+                        this.logger.log(`📋 Permissions: ${decoded.permissions}`);
                     } else {
                         this.logger.warn(`⚠️ Token valide mais aucun ID trouvé`);
                     }
@@ -1529,7 +1539,7 @@ export class FpayService {
             this.logger.log(`✅ OTP vérifié avec succès`);
 
             // ============================================================
-            // ÉTAPE 3: Effectuer la demande de dépôt AVEC le payeur
+            // ÉTAPE 3: Effectuer la demande de dépôt AVEC LE TOKEN DU PAYEUR
             // ============================================================
             const url = `${this.fpayApiUrl}/wallet/deposit/request`;
 
@@ -1547,19 +1557,19 @@ export class FpayService {
             this.logger.log(`📤 Appel API FPay: ${url}`);
             this.logger.log(`📤 Payload: ${JSON.stringify(payload)}`);
 
-            // ✅ Utiliser l'API Key PARRAINAGE pour l'appel
-            const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE') || '';
-            const cleanApiKey = parrainageApiKey.startsWith('Bearer ')
-                ? parrainageApiKey
-                : `Bearer ${parrainageApiKey}`;
+            // ✅ UTILISER LE TOKEN DU PAYEUR pour l'appel (correction clé)
+            // ✅ NE PAS utiliser FPAY_API_KEY_PARRAINAGE ici !
+            const cleanToken = payerToken?.startsWith('Bearer ')
+                ? payerToken
+                : `Bearer ${payerToken}`;
 
             const headers = {
-                'Authorization': cleanApiKey,
+                'Authorization': cleanToken,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
             };
 
-            this.logger.log(`📤 Headers: Authorization: ${cleanApiKey.substring(0, 50)}...`);
+            this.logger.log(`📤 Headers: Authorization: ${cleanToken?.substring(0, 50)}...`);
 
             const response = await firstValueFrom(
                 this.httpService.post(
