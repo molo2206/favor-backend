@@ -1162,11 +1162,12 @@ export class FpayService {
 
     async requestDepositWithOtp(
         dto: {
-            userId: string;
+            userId: string;           // BÉNÉFICIAIRE (celui qui reçoit)
             amount: number;
             currency: string;
             otpCode?: string;
         },
+        payerToken?: string,          // ✅ Token du payeur passé directement en paramètre
         lang: string = 'fr',
     ): Promise<any> {
         try {
@@ -1175,7 +1176,7 @@ export class FpayService {
             // ✅ Validation initiale
             if (!dto.userId) {
                 throw new HttpException(
-                    'L\'ID de l\'utilisateur est requis',
+                    'L\'ID de l\'utilisateur (bénéficiaire) est requis',
                     HttpStatus.BAD_REQUEST,
                 );
             }
@@ -1194,75 +1195,97 @@ export class FpayService {
                 );
             }
 
+            // ✅ VÉRIFIER LE TOKEN DU PAYEUR (passé en paramètre)
+            let payerId: string | null = null;
+            let payerData: any = null;
+
+            if (payerToken) {
+                try {
+                    // ✅ Extraire et vérifier le token JWT
+                    const cleanToken = payerToken.startsWith('Bearer ')
+                        ? payerToken.substring(7)
+                        : payerToken;
+
+                    // ✅ Utiliser la clé API PARRAINAGE pour vérifier le token
+                    const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE');
+
+                    if (!parrainageApiKey) {
+                        this.logger.warn('⚠️ FPAY_API_KEY_PARRAINAGE non configurée');
+                    } else {
+                        // ✅ Appel à l'API FPay pour vérifier le token
+                        const verifyUrl = `${this.fpayApiUrl}/auth/verify-token`;
+                        const verifyResponse = await firstValueFrom(
+                            this.httpService.post(
+                                verifyUrl,
+                                { accessToken: cleanToken },
+                                { headers: { 'Authorization': `Bearer ${parrainageApiKey}` } }
+                            )
+                        );
+
+                        if (verifyResponse.data?.data?.id) {
+                            payerId = verifyResponse.data.data.id;
+                            payerData = verifyResponse.data.data;
+                            this.logger.log(`✅ Payeur identifié via token: ${payerId}`);
+                        }
+                    }
+                } catch (tokenError: any) {
+                    this.logger.warn(`⚠️ Erreur lors de la vérification du token payeur: ${tokenError.message}`);
+                }
+            }
+
+            if (!payerId) {
+                this.logger.log(`ℹ️ Aucun payeur identifié via token, dépôt sans payeur spécifique`);
+            }
+
             // ============================================================
             // ✅ VÉRIFICATION DES TRANSACTIONS EN ATTENTE
             // ============================================================
             try {
                 this.logger.log(`🔍 Vérification des transactions en attente pour ${dto.userId}`);
 
-                // ✅ Récupérer les transactions de l'utilisateur
                 const transactionsData = await this.getWalletBalanceAndTransactions(
-                    dto.userId,       // userId
-                    1,                // page
-                    10,               // limit
-                    undefined,        // startDate
-                    undefined,        // endDate
-                    'DEPOSIT',        // type
-                    'PENDING',        // status
-                    undefined,        // movement
-                    undefined,        // search
+                    dto.userId,
+                    1,
+                    10,
+                    undefined,
+                    undefined,
+                    'DEPOSIT',
+                    'PENDING',
+                    undefined,
+                    undefined,
                 );
 
-                this.logger.log(`📊 TransactionsData reçu:`, JSON.stringify(transactionsData, null, 2));
-
-                // ✅ Extraction CORRECTE des transactions
                 let allPending: any[] = [];
 
-                // Structure 1: data.transactions (tableau direct) - C'est la bonne !
                 if (transactionsData?.data?.transactions && Array.isArray(transactionsData.data.transactions)) {
                     allPending = transactionsData.data.transactions.filter(
                         (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
                     );
-                    this.logger.log(`📊 Structure 1: data.transactions (${allPending.length} pending)`);
-                }
-                // Structure 2: data (tableau direct)
-                else if (transactionsData?.data && Array.isArray(transactionsData.data)) {
+                } else if (transactionsData?.data && Array.isArray(transactionsData.data)) {
                     allPending = transactionsData.data.filter(
                         (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
                     );
-                    this.logger.log(`📊 Structure 2: data (${allPending.length} pending)`);
-                }
-                // Structure 3: data.transactions.data (imbriqué)
-                else if (transactionsData?.data?.transactions?.data && Array.isArray(transactionsData.data.transactions.data)) {
+                } else if (transactionsData?.data?.transactions?.data && Array.isArray(transactionsData.data.transactions.data)) {
                     allPending = transactionsData.data.transactions.data.filter(
                         (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
                     );
-                    this.logger.log(`📊 Structure 3: data.transactions.data (${allPending.length} pending)`);
-                }
-                // Structure 4: response.data direct
-                else if (Array.isArray(transactionsData)) {
+                } else if (Array.isArray(transactionsData)) {
                     allPending = transactionsData.filter(
                         (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
                     );
-                    this.logger.log(`📊 Structure 4: response.data (${allPending.length} pending)`);
                 }
 
                 if (allPending.length > 0) {
-                    this.logger.log(`⚠️ ${allPending.length} transaction(s) en attente trouvée(s)`);
-
                     const pendingTx = allPending[0];
-                    const pendingAmount = pendingTx.amount || 0;
-                    const pendingCurrency = pendingTx.currency || 'USD';
-
                     throw new HttpException(
                         {
                             statusCode: HttpStatus.BAD_REQUEST,
-                            message: `Vous avez déjà une demande de dépôt en cours de ${pendingAmount} ${pendingCurrency}. Veuillez attendre sa finalisation avant de faire une nouvelle demande.`,
+                            message: `Vous avez déjà une demande de dépôt en cours de ${pendingTx.amount} ${pendingTx.currency}. Veuillez attendre sa finalisation.`,
                             code: 'PENDING_TRANSACTION_EXISTS',
                             pendingTransaction: {
                                 id: pendingTx.id,
-                                amount: pendingAmount,
-                                currency: pendingCurrency,
+                                amount: pendingTx.amount,
+                                currency: pendingTx.currency,
                                 status: pendingTx.status,
                                 createdAt: pendingTx.createdAt,
                             },
@@ -1315,12 +1338,10 @@ export class FpayService {
 
                 if (!destination) {
                     throw new HttpException(
-                        'Aucun email ou téléphone trouvé pour cet utilisateur. Veuillez mettre à jour votre profil.',
+                        'Aucun email ou téléphone trouvé pour cet utilisateur.',
                         HttpStatus.BAD_REQUEST,
                     );
                 }
-
-                this.logger.log(`📤 Destination: ${destination} (${destinationType})`);
 
                 await this.otpRepository.update(
                     { email: destination, isUsed: false },
@@ -1335,8 +1356,6 @@ export class FpayService {
                     user: user,
                 });
                 await this.otpRepository.save(otp);
-
-                this.logger.log(`✅ OTP sauvegardé: ${generatedOtpCode} pour ${destination}`);
 
                 if (destinationType === 'email') {
                     const translations = {
@@ -1360,22 +1379,21 @@ export class FpayService {
                             translations: translations,
                         },
                     );
-                    this.logger.log(`✅ OTP envoyé par email à ${destination}`);
                 } else {
                     const smsMessage = `Votre code OTP pour le dépôt FPay est: ${generatedOtpCode}. Valable 10 minutes.`;
                     await this.smsHelper.sendSms(destination, smsMessage);
-                    this.logger.log(`✅ OTP envoyé par SMS à ${destination}`);
                 }
 
                 return {
                     status: 'success',
-                    message: `Un code OTP a été envoyé par ${destinationType === 'email' ? 'email' : 'SMS'}. Veuillez le saisir pour confirmer votre demande de dépôt.`,
+                    message: `Un code OTP a été envoyé par ${destinationType === 'email' ? 'email' : 'SMS'}.`,
                     requiresOtp: true,
                     data: {
                         userId: dto.userId,
                         amount: dto.amount,
                         currency: dto.currency,
                         destination: destinationType,
+                        payerId: payerId,
                     },
                 };
             }
@@ -1392,13 +1410,12 @@ export class FpayService {
 
             if (!user) {
                 throw new HttpException(
-                    'Utilisateur non trouvé. Veuillez vérifier vos identifiants.',
+                    'Utilisateur non trouvé.',
                     HttpStatus.NOT_FOUND,
                 );
             }
 
             let destination: string | null = null;
-
             if (user.email) {
                 destination = user.email;
             } else if (user.phone) {
@@ -1407,13 +1424,10 @@ export class FpayService {
 
             if (!destination) {
                 throw new HttpException(
-                    'Aucun email ou téléphone trouvé pour cet utilisateur. Veuillez mettre à jour votre profil.',
+                    'Aucun email ou téléphone trouvé pour cet utilisateur.',
                     HttpStatus.BAD_REQUEST,
                 );
             }
-
-            this.logger.log(`🔍 Recherche OTP avec destination: ${destination}`);
-            this.logger.log(`🔍 Code OTP: ${dto.otpCode}`);
 
             const otpCode = dto.otpCode as string;
 
@@ -1435,12 +1449,11 @@ export class FpayService {
                 });
 
                 if (existingOtp) {
-                    this.logger.log(`⚠️ OTP trouvé mais isUsed=${existingOtp.isUsed}`);
                     if (existingOtp.isUsed) {
                         throw new HttpException(
                             {
                                 statusCode: HttpStatus.BAD_REQUEST,
-                                message: 'Ce code OTP a déjà été utilisé. Veuillez faire une nouvelle demande.',
+                                message: 'Ce code OTP a déjà été utilisé.',
                                 code: 'OTP_ALREADY_USED',
                                 canResend: true,
                             },
@@ -1451,7 +1464,7 @@ export class FpayService {
                         throw new HttpException(
                             {
                                 statusCode: HttpStatus.BAD_REQUEST,
-                                message: 'Ce code OTP a expiré. Veuillez faire une nouvelle demande pour recevoir un nouveau code.',
+                                message: 'Ce code OTP a expiré.',
                                 code: 'OTP_EXPIRED',
                                 canResend: true,
                             },
@@ -1463,7 +1476,7 @@ export class FpayService {
                 throw new HttpException(
                     {
                         statusCode: HttpStatus.BAD_REQUEST,
-                        message: 'Code OTP invalide. Veuillez vérifier le code saisi ou faire une nouvelle demande pour recevoir un nouveau code.',
+                        message: 'Code OTP invalide.',
                         code: 'INVALID_OTP',
                         canResend: true,
                     },
@@ -1474,11 +1487,10 @@ export class FpayService {
             if (new Date() > otpEntry.expiresAt) {
                 otpEntry.isUsed = true;
                 await this.otpRepository.save(otpEntry);
-
                 throw new HttpException(
                     {
                         status: 'error',
-                        message: 'Code OTP expiré. Veuillez faire une nouvelle demande pour recevoir un nouveau code.',
+                        message: 'Code OTP expiré.',
                         code: 'OTP_EXPIRED',
                         canResend: true,
                     },
@@ -1492,25 +1504,28 @@ export class FpayService {
             this.logger.log(`✅ OTP vérifié avec succès`);
 
             // ============================================================
-            // ÉTAPE 3: Effectuer la demande de dépôt
+            // ÉTAPE 3: Effectuer la demande de dépôt AVEC le payeur
             // ============================================================
             const url = `${this.fpayApiUrl}/wallet/deposit/request`;
 
-            this.logger.log(`📤 Appel API FPay: ${url}`);
-            this.logger.log(`📤 Payload: ${JSON.stringify({
+            const payload: any = {
                 userId: dto.userId,
                 amount: dto.amount,
                 currency: dto.currency,
-            })}`);
+            };
+
+            if (payerId) {
+                payload.payerId = payerId;
+                this.logger.log(`📤 Payeur associé au dépôt: ${payerId}`);
+            }
+
+            this.logger.log(`📤 Appel API FPay: ${url}`);
+            this.logger.log(`📤 Payload: ${JSON.stringify(payload)}`);
 
             const response = await firstValueFrom(
                 this.httpService.post(
                     url,
-                    {
-                        userId: dto.userId,
-                        amount: dto.amount,
-                        currency: dto.currency,
-                    },
+                    payload,
                     { headers: this.getHeaders() }
                 )
             );
@@ -1569,10 +1584,8 @@ export class FpayService {
                             if (currentAmount <= remainingAmount) {
                                 referral.rewardAmount = 0;
                                 remainingAmount -= currentAmount;
-                                this.logger.log(`✅ Parrainage ${referral.id}: ${currentAmount} ${referralInfo.currency} entièrement déduit`);
                             } else {
                                 referral.rewardAmount = currentAmount - remainingAmount;
-                                this.logger.log(`✅ Parrainage ${referral.id}: ${currentAmount} → ${referral.rewardAmount} ${referralInfo.currency} (partiel)`);
                                 remainingAmount = 0;
                             }
 
@@ -1586,7 +1599,7 @@ export class FpayService {
                         userWithReferrals.referralPoints = totalAllCurrencies;
                         await this.userRepository.save(userWithReferrals);
 
-                        this.logger.log(`✅ Points diminués: ${dto.amount} ${dto.currency}. Restant: ${totalPointsInCurrency - dto.amount} ${dto.currency}`);
+                        this.logger.log(`✅ Points diminués: ${dto.amount} ${dto.currency}.`);
                     }
                 }
             } catch (referralError) {
@@ -1596,7 +1609,10 @@ export class FpayService {
             return {
                 status: 'success',
                 message: `Demande de dépôt de ${dto.amount} ${dto.currency} enregistrée avec succès. Référence: ${response.data.data?.transaction?.reference || 'N/A'}`,
-                data: response.data.data,
+                data: {
+                    ...response.data.data,
+                    payerId: payerId || null,
+                },
                 requiresOtp: false,
             };
 
