@@ -859,9 +859,9 @@ export class FpayController {
     }
 
     @Get('transactions/pending')
-    @UseGuards(AuthentificationGuard)  // ✅ Ajouter le guard d'authentification
+    @UseGuards(AuthentificationGuard)
     async getLastPendingTransaction(
-        @CurrentUser() user: UserEntity,  // ✅ Récupérer l'utilisateur connecté
+        @CurrentUser() user: UserEntity,
         @Query('type') type?: 'DEPOSIT' | 'WITHDRAW' | 'TRANSFER' | 'PAYMENT' | 'REFUND',
         @Query('walletId') walletId?: string,
     ) {
@@ -895,34 +895,29 @@ export class FpayController {
             // ✅ Appeler le service avec l'ID FPay de l'utilisateur connecté
             const result = await this.fpayService.getLastPendingTransaction(userIdFpay, type);
 
-            if (!result) {
+            // ✅ Vérifier si la fonction a retourné un résultat valide
+            if (!result || !result.success) {
                 return {
                     status: 'success',
-                    message: 'Aucune transaction en attente trouvée',
-                    data: null,
+                    message: 'Aucune transaction en attente',
+                    data: [],
+                    totalsByCurrency: {},
+                    currencies: [],
+                    count: 0,
                 };
             }
 
+            // ✅ Retourner le résultat complet
             return {
                 status: 'success',
-                message: 'Dernière transaction en attente récupérée avec succès',
-                data: {
-                    id: result.id,
-                    amount: result.amount,
-                    currency: result.currency,
-                    type: result.type,
-                    status: result.status,
-                    createdAt: result.createdAt,
-                    description: result.description || null,
-                    reference: result.reference || null,
-                    walletId: result.walletId || null,
-                    userId: result.userId || null,
-                    metadata: result.metadata || null,
-                },
+                message: result.message || 'Transactions en attente récupérées avec succès',
+                data: result.data,
+                totalsByCurrency: result.totalsByCurrency,
+                currencies: result.currencies || Object.keys(result.data || {}),
+                count: result.count || 0,
             };
 
         } catch (error) {
-            // ✅ Gérer les erreurs
             if (error instanceof HttpException) {
                 throw error;
             }
