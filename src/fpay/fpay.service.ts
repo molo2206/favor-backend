@@ -1083,24 +1083,24 @@ export class FpayService {
         type?: 'DEPOSIT' | 'WITHDRAW' | 'TRANSFER' | 'PAYMENT' | 'REFUND',
     ): Promise<any> {
         try {
-            this.logger.log(`🔍 Recherche des transactions PENDING pour ${userId}${type ? ` (type: ${type})` : ''}`);
+            this.logger.log(`🔍 Recherche de la dernière transaction PENDING pour ${userId}${type ? ` (type: ${type})` : ''}`);
 
-            // ✅ Utiliser la fonction existante
+            // ✅ Utiliser la fonction existante qui gère correctement la structure
             const result = await this.getWalletBalanceAndTransactions(
                 userId,
                 1,          // page
-                100,        // limit
+                10,         // limit
                 undefined,  // startDate
                 undefined,  // endDate
                 type,       // type
-                undefined,  // status
+                undefined,  // status (on va filtrer nous-mêmes)
                 undefined,  // movement
                 undefined,  // search
             );
 
-            this.logger.log(`📦 Résultat reçu`);
+            this.logger.log(`📦 Résultat:`, JSON.stringify(result, null, 2));
 
-            // ✅ Extraire les transactions
+            // ✅ Extraire les transactions (avec gestion des différentes structures)
             let transactions: any[] = [];
 
             if (result?.data?.transactions && Array.isArray(result.data.transactions)) {
@@ -1115,12 +1115,7 @@ export class FpayService {
 
             if (!transactions || transactions.length === 0) {
                 this.logger.log(`ℹ️ Aucune transaction trouvée pour ${userId}`);
-                return {
-                    success: true,
-                    message: 'Aucune transaction trouvée',
-                    data: {},
-                    totalsByCurrency: {},
-                };
+                return null;
             }
 
             this.logger.log(`📊 ${transactions.length} transaction(s) trouvée(s)`);
@@ -1133,92 +1128,35 @@ export class FpayService {
             this.logger.log(`⏳ ${pendingTransactions.length} transaction(s) en PENDING`);
 
             if (pendingTransactions.length === 0) {
-                return {
-                    success: true,
-                    message: 'Aucune transaction en attente',
-                    data: {},
-                    totalsByCurrency: {},
-                };
+                return null;
             }
 
-            // ✅ Grouper par devise et récupérer la plus récente de chaque devise
-            const latestByCurrency: { [currency: string]: any } = {};
-            const totalsByCurrency: { [currency: string]: number } = {};
-
-            pendingTransactions.forEach((tx: any) => {
-                const currency = tx.currency || 'USD';
-
-                // ✅ Cumul des montants par devise
-                if (!totalsByCurrency[currency]) {
-                    totalsByCurrency[currency] = 0;
-                }
-                totalsByCurrency[currency] += (tx.amount || 0);
-
-                // ✅ Vérifier si c'est la plus récente de cette devise
-                const txDate = new Date(tx.createdAt || tx.created_at || 0);
-
-                if (!latestByCurrency[currency]) {
-                    // Première transaction de cette devise
-                    latestByCurrency[currency] = tx;
-                } else {
-                    const currentLatestDate = new Date(
-                        latestByCurrency[currency].createdAt ||
-                        latestByCurrency[currency].created_at ||
-                        0
-                    );
-
-                    // Si la transaction actuelle est plus récente, remplacer
-                    if (txDate > currentLatestDate) {
-                        latestByCurrency[currency] = tx;
-                    }
-                }
+            // ✅ Trier par date (plus récent d'abord)
+            const sortedPending = pendingTransactions.sort((a: any, b: any) => {
+                const dateA = new Date(a.createdAt || a.created_at || 0);
+                const dateB = new Date(b.createdAt || b.created_at || 0);
+                return dateB.getTime() - dateA.getTime();
             });
 
-            // ✅ Formater la réponse avec des valeurs par défaut
-            const formattedData: { [currency: string]: any } = {};
-            const currencies = Object.keys(latestByCurrency).sort();
+            const lastPending = sortedPending[0];
 
-            currencies.forEach((currency) => {
-                const tx = latestByCurrency[currency];
+            this.logger.log(`✅ Dernière transaction PENDING: ${lastPending.id || 'N/A'}`);
 
-                // ✅ S'assurer que toutes les propriétés existent
-                formattedData[currency] = {
-                    id: tx.id || tx.transactionId || null,
-                    amount: tx.amount || 0,
-                    currency: tx.currency || currency,
-                    type: tx.type || 'DEPOSIT',
-                    status: tx.status || 'PENDING',
-                    createdAt: tx.createdAt || tx.created_at || new Date().toISOString(),
-                    description: tx.description || null,
-                    reference: tx.reference || null,
-                    walletId: tx.walletId || null,
-                    userId: tx.userId || null,
-                    movement: tx.movement || null,
-                    paymentMethod: tx.paymentMethod || null,
-                    // ✅ Garder toutes les autres propriétés
-                    ...tx,
-                };
-            });
-
-            this.logger.log(`✅ Devises trouvées: ${currencies.join(', ')}`);
-            this.logger.log(`📊 Totaux par devise: ${JSON.stringify(totalsByCurrency)}`);
-
-            // ✅ Retourner directement les transactions par devise
             return {
-                success: true,
-                message: `Dernière transaction en attente pour chaque devise (${currencies.length} devise(s))`,
-                data: formattedData,
-                totalsByCurrency: totalsByCurrency,
+                id: lastPending.id || lastPending.transactionId,
+                amount: lastPending.amount,
+                currency: lastPending.currency,
+                type: lastPending.type,
+                status: lastPending.status,
+                createdAt: lastPending.createdAt || lastPending.created_at,
+                description: lastPending.description,
+                reference: lastPending.reference,
+                ...lastPending,
             };
 
         } catch (error) {
             this.logger.error(`❌ Erreur: ${error.message}`);
-            return {
-                success: false,
-                message: error.message || 'Erreur lors de la récupération',
-                data: {},
-                totalsByCurrency: {},
-            };
+            return null;
         }
     }
 
@@ -1229,6 +1167,7 @@ export class FpayService {
             currency: string;
             otpCode?: string;
         },
+        apiKey?: string,              // ✅ API Key du payeur (FPay gère tout)
         lang: string = 'fr',
     ): Promise<any> {
         try {
@@ -1258,13 +1197,11 @@ export class FpayService {
                 );
             }
 
-            // ✅ Récupérer l'API Key de parrainage automatiquement
-            const apiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE');
-
+            // ✅ Vérifier que l'API Key est fournie (FPay gère la validation)
             if (!apiKey) {
                 throw new HttpException(
-                    'API Key de parrainage non configurée',
-                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    'API Key requise pour identifier le payeur',
+                    HttpStatus.UNAUTHORIZED,
                 );
             }
 
@@ -1552,7 +1489,7 @@ export class FpayService {
                 userId: dto.userId,
                 amount: dto.amount,
                 currency: dto.currency,
-                apiKey: apiKey,           // ✅ API Key récupérée automatiquement
+                apiKey: apiKey,           // ✅ API Key du payeur dans le body
             };
 
             this.logger.log(`📤 Appel API FPay: ${url}`);
@@ -1661,7 +1598,7 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
-
+    
     async decreaseReferralPoints(
         userId: string,
         amount: number,
