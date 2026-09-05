@@ -1089,11 +1089,11 @@ export class FpayService {
             const result = await this.getWalletBalanceAndTransactions(
                 userId,
                 1,          // page
-                100,        // limit (augmenté pour récupérer toutes les transactions)
+                100,        // limit
                 undefined,  // startDate
                 undefined,  // endDate
                 type,       // type
-                undefined,  // status (on va filtrer nous-mêmes)
+                undefined,  // status
                 undefined,  // movement
                 undefined,  // search
             );
@@ -1174,23 +1174,28 @@ export class FpayService {
                 }
             });
 
-            // ✅ Formater la réponse : retourner directement les objets par devise
+            // ✅ Formater la réponse avec des valeurs par défaut
             const formattedData: { [currency: string]: any } = {};
             const currencies = Object.keys(latestByCurrency).sort();
 
             currencies.forEach((currency) => {
                 const tx = latestByCurrency[currency];
+
+                // ✅ S'assurer que toutes les propriétés existent
                 formattedData[currency] = {
-                    id: tx.id || tx.transactionId,
-                    amount: tx.amount,
-                    currency: tx.currency,
-                    type: tx.type,
-                    status: tx.status,
-                    createdAt: tx.createdAt || tx.created_at,
-                    description: tx.description,
-                    reference: tx.reference,
-                    walletId: tx.walletId,
-                    userId: tx.userId,
+                    id: tx.id || tx.transactionId || null,
+                    amount: tx.amount || 0,
+                    currency: tx.currency || currency,
+                    type: tx.type || 'DEPOSIT',
+                    status: tx.status || 'PENDING',
+                    createdAt: tx.createdAt || tx.created_at || new Date().toISOString(),
+                    description: tx.description || null,
+                    reference: tx.reference || null,
+                    walletId: tx.walletId || null,
+                    userId: tx.userId || null,
+                    movement: tx.movement || null,
+                    paymentMethod: tx.paymentMethod || null,
+                    // ✅ Garder toutes les autres propriétés
                     ...tx,
                 };
             });
@@ -1202,7 +1207,7 @@ export class FpayService {
             return {
                 success: true,
                 message: `Dernière transaction en attente pour chaque devise (${currencies.length} devise(s))`,
-                data: formattedData,        // ✅ Directement les transactions par devise
+                data: formattedData,
                 totalsByCurrency: totalsByCurrency,
             };
 
