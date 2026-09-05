@@ -1109,14 +1109,44 @@ export class FpayService {
                 transactions = result;
             }
 
+            // ✅ Récupérer toutes les devises des wallets de l'utilisateur
+            const allCurrencies: string[] = [];
+
+            if (result?.data?.wallets && Array.isArray(result.data.wallets)) {
+                result.data.wallets.forEach((wallet: any) => {
+                    if (wallet.currency && !allCurrencies.includes(wallet.currency)) {
+                        allCurrencies.push(wallet.currency);
+                    }
+                });
+            }
+
+            // ✅ Ajouter les devises des transactions (si pas déjà dans les wallets)
+            transactions.forEach((tx: any) => {
+                const currency = tx.currency || 'USD';
+                if (!allCurrencies.includes(currency)) {
+                    allCurrencies.push(currency);
+                }
+            });
+
+            this.logger.log(`💰 Devises disponibles: ${allCurrencies.join(', ')}`);
+
             if (!transactions || transactions.length === 0) {
-                this.logger.log(`ℹ️ Aucune transaction trouvée pour ${userId}`);
+                // ✅ Retourner toutes les devises avec des tableaux vides
+                const emptyData: { [currency: string]: any[] } = {};
+                const emptyTotals: { [currency: string]: number } = {};
+
+                allCurrencies.forEach((currency) => {
+                    emptyData[currency] = [];
+                    emptyTotals[currency] = 0;
+                });
+
                 return {
                     success: true,
                     message: 'Aucune transaction trouvée',
-                    data: {},
-                    totalsByCurrency: {},
-                    currencies: [],
+                    data: emptyData,
+                    totalsByCurrency: emptyTotals,
+                    currencies: allCurrencies,
+                    currenciesWithData: [],
                     count: 0,
                 };
             }
@@ -1128,33 +1158,10 @@ export class FpayService {
 
             this.logger.log(`⏳ ${pendingTransactions.length} transaction(s) en PENDING`);
 
-            // ✅ Récupérer toutes les devises disponibles (même sans transactions PENDING)
-            const allCurrencies: string[] = [];
-
-            // Récupérer les devises depuis les wallets
-            if (result?.data?.wallets && Array.isArray(result.data.wallets)) {
-                result.data.wallets.forEach((wallet: any) => {
-                    if (wallet.currency && !allCurrencies.includes(wallet.currency)) {
-                        allCurrencies.push(wallet.currency);
-                    }
-                });
-            }
-
-            // Ajouter les devises des transactions (si pas déjà dans les wallets)
-            transactions.forEach((tx: any) => {
-                const currency = tx.currency || 'USD';
-                if (!allCurrencies.includes(currency)) {
-                    allCurrencies.push(currency);
-                }
-            });
-
-            this.logger.log(`💰 Devises disponibles: ${allCurrencies.join(', ')}`);
-
-            // ✅ Grouper par devise (même vides)
+            // ✅ Initialiser toutes les devises avec un tableau vide
             const allByCurrency: { [currency: string]: any[] } = {};
             const totalsByCurrency: { [currency: string]: number } = {};
 
-            // ✅ Initialiser toutes les devises avec un tableau vide
             allCurrencies.forEach((currency) => {
                 allByCurrency[currency] = [];
                 totalsByCurrency[currency] = 0;
