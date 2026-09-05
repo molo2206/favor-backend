@@ -1230,7 +1230,6 @@ export class FpayService {
             currency: string;
             otpCode?: string;
         },
-        apiKey?: string,              // ✅ API Key du payeur (FPay gère tout)
         lang: string = 'fr',
     ): Promise<any> {
         try {
@@ -1260,11 +1259,11 @@ export class FpayService {
                 );
             }
 
-            // ✅ Vérifier que l'API Key est fournie (FPay gère la validation)
-            if (!apiKey) {
+            // ✅ Vérifier que l'API Key PARRAINAGE est configurée
+            if (!this.parrainageApiKey) {
                 throw new HttpException(
-                    'API Key requise pour identifier le payeur',
-                    HttpStatus.UNAUTHORIZED,
+                    'API Key de parrainage non configurée',
+                    HttpStatus.INTERNAL_SERVER_ERROR,
                 );
             }
 
@@ -1558,30 +1557,24 @@ export class FpayService {
             // ============================================================
             const url = `${this.fpayApiUrl}/wallet/deposit/request`;
 
-            // ✅ L'API Key est dans le body (comme attendu par FPay)
+            // ✅ Utiliser this.parrainageApiKey dans le body
             const payload: any = {
                 userId: dto.userId,
                 amount: dto.amount,
                 currency: dto.currency,
-                apiKey: apiKey,           // ✅ API Key du payeur dans le body
+                apiKey: this.parrainageApiKey,   // ✅ API Key PARRAINAGE dans le body
             };
 
             this.logger.log(`📤 Appel API FPay: ${url}`);
             this.logger.log(`📤 Payload: ${JSON.stringify(payload)}`);
 
-            // ✅ Auth du service avec FPAY_API_KEY_HELP (headers)
-            const helpApiKey = this.configService.get<string>('FPAY_API_KEY_HELP') || '';
-            const cleanHelpApiKey = helpApiKey.startsWith('Bearer ')
-                ? helpApiKey
-                : `Bearer ${helpApiKey}`;
-
+            // ✅ PAS de headers Authorization - juste Content-Type
             const headers = {
-                'Authorization': cleanHelpApiKey,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
             };
 
-            this.logger.log(`📤 Headers: Authorization: ${cleanHelpApiKey.substring(0, 50)}...`);
+            this.logger.log(`📤 Headers: Content-Type: application/json`);
 
             const response = await firstValueFrom(
                 this.httpService.post(
