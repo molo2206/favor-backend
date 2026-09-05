@@ -1576,15 +1576,117 @@ export class FpayService {
 
             this.logger.log(`📤 Headers: Content-Type: application/json`);
 
-            const response = await firstValueFrom(
-                this.httpService.post(
-                    url,
-                    payload,
-                    { headers: headers }
-                )
-            );
+            let response: any;
 
-            this.logger.log(`✅ Demande de dépôt enregistrée: ${response.data.data?.transaction?.reference || 'OK'}`);
+            try {
+                response = await firstValueFrom(
+                    this.httpService.post(url, payload, { headers: headers })
+                );
+
+                this.logger.log(`✅ Demande de dépôt enregistrée: ${response.data.data?.transaction?.reference || 'OK'}`);
+
+            } catch (error: any) {
+                this.logger.error(`❌ Erreur appel FPay: ${error.message}`);
+
+                // ✅ Extraire le message d'erreur du backend FPay
+                let errorMessage = 'Erreur lors de la demande de dépôt';
+                let errorCode = null;
+                let errorData = null;
+                let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+
+                if (error.response) {
+                    const errorResponse = error.response.data;
+                    statusCode = error.response.status || HttpStatus.INTERNAL_SERVER_ERROR;
+
+                    this.logger.error(`📦 Réponse erreur FPay: ${JSON.stringify(errorResponse)}`);
+
+                    if (errorResponse) {
+                        errorMessage = errorResponse.message || errorResponse.error || errorMessage;
+                        errorCode = errorResponse.code || null;
+                        errorData = errorResponse.data || null;
+                    }
+
+                    // ✅ Gérer les erreurs spécifiques
+                    if (statusCode === 400) {
+                        if (errorMessage.includes('Solde insuffisant')) {
+                            throw new HttpException(
+                                {
+                                    statusCode: HttpStatus.BAD_REQUEST,
+                                    message: `Solde insuffisant pour effectuer ce dépôt. Veuillez vérifier votre solde et réessayer.`,
+                                    code: 'INSUFFICIENT_BALANCE',
+                                    fpayError: errorResponse,
+                                },
+                                HttpStatus.BAD_REQUEST,
+                            );
+                        }
+                        throw new HttpException(
+                            {
+                                statusCode: HttpStatus.BAD_REQUEST,
+                                message: errorMessage || 'Erreur lors de la demande de dépôt',
+                                code: errorCode || 'FPAY_ERROR',
+                                fpayError: errorResponse,
+                            },
+                            HttpStatus.BAD_REQUEST,
+                        );
+                    }
+
+                    if (statusCode === 401) {
+                        throw new HttpException(
+                            {
+                                statusCode: HttpStatus.UNAUTHORIZED,
+                                message: 'API Key invalide ou expirée. Veuillez vous reconnecter.',
+                                code: 'INVALID_API_KEY',
+                                fpayError: errorResponse,
+                            },
+                            HttpStatus.UNAUTHORIZED,
+                        );
+                    }
+
+                    if (statusCode === 403) {
+                        throw new HttpException(
+                            {
+                                statusCode: HttpStatus.FORBIDDEN,
+                                message: 'Vous n\'avez pas les permissions nécessaires pour effectuer cette opération.',
+                                code: 'FORBIDDEN',
+                                fpayError: errorResponse,
+                            },
+                            HttpStatus.FORBIDDEN,
+                        );
+                    }
+
+                    if (statusCode === 404) {
+                        throw new HttpException(
+                            {
+                                statusCode: HttpStatus.NOT_FOUND,
+                                message: 'Utilisateur ou wallet non trouvé.',
+                                code: 'NOT_FOUND',
+                                fpayError: errorResponse,
+                            },
+                            HttpStatus.NOT_FOUND,
+                        );
+                    }
+
+                    throw new HttpException(
+                        {
+                            statusCode: statusCode,
+                            message: errorMessage,
+                            code: errorCode || 'FPAY_ERROR',
+                            fpayError: errorResponse,
+                        },
+                        statusCode,
+                    );
+                }
+
+                // ✅ Erreur sans réponse
+                throw new HttpException(
+                    {
+                        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+                        message: errorMessage,
+                        code: 'FPAY_SERVICE_ERROR',
+                    },
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                );
+            }
 
             // ============================================================
             // ✅ ÉTAPE 4: DIMINUER LES POINTS DE PARRAINAGE
