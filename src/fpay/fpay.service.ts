@@ -1269,15 +1269,15 @@ export class FpayService {
             }
 
             // ============================================================
-            // ✅ VÉRIFICATION DES TRANSACTIONS EN ATTENTE PAR DEVISE
+            // ✅ VÉRIFICATION DES TRANSACTIONS EN ATTENTE
             // ============================================================
             try {
-                this.logger.log(`🔍 Vérification des transactions en attente pour ${dto.userId} en ${dto.currency}`);
+                this.logger.log(`🔍 Vérification des transactions en attente pour ${dto.userId}`);
 
                 const transactionsData = await this.getWalletBalanceAndTransactions(
                     dto.userId,
                     1,
-                    100,
+                    10,
                     undefined,
                     undefined,
                     'DEPOSIT',
@@ -1306,28 +1306,18 @@ export class FpayService {
                     );
                 }
 
-                // ✅ Filtrer les transactions PENDING par DEVISE
-                const pendingInCurrency = allPending.filter(
-                    (tx: any) => (tx.currency || 'USD') === dto.currency
-                );
-
-                this.logger.log(`⏳ ${pendingInCurrency.length} transaction(s) en attente en ${dto.currency}`);
-
-                if (pendingInCurrency.length > 0) {
-                    const pendingTx = pendingInCurrency[0];
-                    this.logger.warn(`❌ Transaction en attente trouvée en ${dto.currency}: ${pendingTx.reference}`);
-
+                if (allPending.length > 0) {
+                    const pendingTx = allPending[0];
                     throw new HttpException(
                         {
                             statusCode: HttpStatus.BAD_REQUEST,
-                            message: `Vous avez déjà une demande de dépôt en cours en ${dto.currency} de ${pendingTx.amount} ${dto.currency}. Veuillez attendre sa finalisation avant de faire une nouvelle demande dans cette devise.`,
-                            code: 'PENDING_TRANSACTION_EXISTS_IN_CURRENCY',
+                            message: `Vous avez déjà une demande de dépôt en cours de ${pendingTx.amount} ${pendingTx.currency}. Veuillez attendre sa finalisation.`,
+                            code: 'PENDING_TRANSACTION_EXISTS',
                             pendingTransaction: {
                                 id: pendingTx.id,
                                 amount: pendingTx.amount,
                                 currency: pendingTx.currency,
                                 status: pendingTx.status,
-                                reference: pendingTx.reference,
                                 createdAt: pendingTx.createdAt,
                             },
                         },
@@ -1335,7 +1325,7 @@ export class FpayService {
                     );
                 }
 
-                this.logger.log(`✅ Aucune transaction en attente en ${dto.currency}`);
+                this.logger.log(`✅ Aucune transaction en attente trouvée`);
 
             } catch (error: any) {
                 if (error instanceof HttpException) {
@@ -1568,25 +1558,11 @@ export class FpayService {
             this.logger.log(`📤 Appel API FPay: ${url}`);
             this.logger.log(`📤 Payload: ${JSON.stringify(payload)}`);
 
-            // ✅ Utiliser FPAY_API_KEY_PARRAINAGE comme Authorization header
-            const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE') || '';
-            const cleanApiKey = parrainageApiKey.startsWith('Bearer ')
-                ? parrainageApiKey
-                : `Bearer ${parrainageApiKey}`;
-
-            const headers = {
-                'Authorization': cleanApiKey,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            };
-
-            this.logger.log(`📤 Headers: Authorization: ${cleanApiKey.substring(0, 50)}...`);
-
             const response = await firstValueFrom(
                 this.httpService.post(
                     url,
                     payload,
-                    { headers: headers }
+                    { headers: this.getHeaders() }
                 )
             );
 
@@ -1685,6 +1661,7 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
+
     async decreaseReferralPoints(
         userId: string,
         amount: number,
