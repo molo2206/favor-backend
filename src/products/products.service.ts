@@ -2873,6 +2873,7 @@ export class ProductService {
       limit?: number;
       includeSpecifications?: boolean;
       includeVariations?: boolean;
+      type?: string;  // ✅ SEULEMENT AJOUTÉ
     }
   ): Promise<{
     message: string;
@@ -2916,6 +2917,11 @@ export class ProductService {
       .andWhere('company.status = :companyStatus', {
         companyStatus: CompanyStatus.VALIDATED,
       });
+
+    // ✅ SEULEMENT AJOUTÉ CETTE CONDITION
+    if (filters?.type) {
+      queryBuilder.andWhere('product.productType = :filterType', { filterType: filters.type });
+    }
 
     if (includeSpecs) {
       queryBuilder
