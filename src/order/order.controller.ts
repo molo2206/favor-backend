@@ -89,40 +89,16 @@ export class OrderController {
       );
     }
 
-    // ============================================================
-    // ✅ LOG DANS LA CONSOLE
-    // ============================================================
-    console.log('============================================');
-    console.log('📥 [FRONTEND] BODY REÇU DU CLIENT');
-    console.log('============================================');
-    console.log('📌 Données brutes reçues:');
-    console.log(JSON.stringify(createOrderDto, null, 2));
-    console.log('📌 Utilisateur connecté:');
-    console.log(JSON.stringify({
-      id: fullUser.id,
-      email: fullUser.email,
-      phone: fullUser.phone,
-      userIdFpay: fullUser.userIdFpay,
-      isLink: fullUser.isLink,
-    }, null, 2));
-    console.log('📌 Timestamp:', new Date().toISOString());
-    console.log('============================================');
+    const order = await this.orderService.createOrder(
+      createOrderDto,
+      fullUser,
+      abortController.signal,
+      lang,
+    );
 
-    // ✅ Retourner les données reçues du frontend
     return {
-      success: true,
-      message: 'Données reçues avec succès',
-      receivedData: {
-        body: createOrderDto,
-        user: {
-          id: fullUser.id,
-          email: fullUser.email,
-          phone: fullUser.phone,
-          userIdFpay: fullUser.userIdFpay,
-          isLink: fullUser.isLink,
-        },
-        timestamp: new Date().toISOString(),
-      }
+      message: this.i18nService.translate('order.order_created_success', lang),
+      data: order,
     };
   }
 
