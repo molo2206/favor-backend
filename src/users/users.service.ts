@@ -42,6 +42,7 @@ import { LoyaltyTier, UserLoyaltyEntity } from './entities/user-loyalty.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { ReferralEntity, ReferralStatus } from './entities/referral.entity';
 import { OrderStatus } from 'src/order/enum/order.status.enum';
+import { FpayService } from 'src/fpay/fpay.service';
 
 @Injectable()
 export class UsersService {
@@ -84,6 +85,8 @@ export class UsersService {
 
 
     private readonly i18n: I18nService,
+
+    private readonly fpayService: FpayService,
   ) { }
 
   private async generateReferralCode(
@@ -2362,6 +2365,7 @@ export class UsersService {
       return null;
     }
   }
+
   async getReferralPoints(
     userId: string,
     lang: string = 'fr',
@@ -2379,6 +2383,33 @@ export class UsersService {
       throw new NotFoundException(
         await this.i18n.translate('user_not_found', lang)
       );
+    }
+
+    // ============================================================
+    // ✅ RÉCUPÉRER LES TRANSACTIONS EN ATTENTE (DEPOSIT PENDING)
+    // ============================================================
+    let pendingTransactions = null;
+    try {
+      // ✅ Vérifier si l'utilisateur a un userIdFpay
+      if (user.userIdFpay) {
+        // ✅ Appel à FpayService.getLastPendingTransaction
+        const pendingResult = await this.fpayService.getLastPendingTransaction(
+          user.userIdFpay,
+          'DEPOSIT'
+        );
+
+        if (pendingResult && pendingResult.success) {
+          pendingTransactions = {
+            ...pendingResult.data,  // CDF: [...], USD: [...]
+            totalsByCurrency: pendingResult.totalsByCurrency,
+            currencies: pendingResult.currencies,
+            currenciesWithData: pendingResult.currenciesWithData,
+            count: pendingResult.count,
+          };
+        }
+      }
+    } catch (error) {
+      console.error('[ReferralPoints] ❌ Erreur récupération transactions PENDING:', error.message);
     }
 
     let totalPoints = 0;
@@ -2443,7 +2474,7 @@ export class UsersService {
       await this.usersRepository.save(user);
     }
 
-    // ✅ Liste des utilisateurs parrainés GROUPÉS par id (UNE SEULE DEVISE)
+    // ✅ Liste des utilisateurs parrainés groupés
     const referredUsersMap = new Map<string, {
       id: string;
       fullName: string;
@@ -2460,7 +2491,6 @@ export class UsersService {
       completedAt: Date | null;
     }>();
 
-    // ✅ Parcourir l'historique des parrainages pour regrouper
     for (const referral of user.referralHistory || []) {
       const referred = referral.referred;
       if (!referred) continue;
@@ -2469,7 +2499,6 @@ export class UsersService {
       const currency = referral.currency || 'USD';
       const pointsEarned = Number(referral.rewardAmount) || 0;
 
-      // ✅ Calculer le total des commandes validées
       const validatedOrders = referred.orders?.filter(
         (order) => order.status === OrderStatus.VALIDATED
       ) || [];
@@ -2478,7 +2507,6 @@ export class UsersService {
         0
       );
 
-      // ✅ Si l'utilisateur n'existe pas encore dans la map, le créer
       if (!referredUsersMap.has(referredId)) {
         referredUsersMap.set(referredId, {
           id: referredId,
@@ -2497,24 +2525,17 @@ export class UsersService {
         });
       }
 
-      // ✅ Mettre à jour les données de l'utilisateur
       const userEntry = referredUsersMap.get(referredId)!;
-
-      // ✅ Additionner les frais de livraison (toutes devises confondues)
       userEntry.totalShippingCost += totalShippingCost;
 
-      // ✅ Mettre à jour la devise et les points selon la devise la plus récente
-      // Si le parrainage est plus récent, on prend sa devise et ses points
       if (referral.createdAt > userEntry.createdAt) {
         userEntry.currency = currency;
         userEntry.pointsCurrency = currency;
-        userEntry.pointsEarned = pointsEarned; // ✅ On remplace, on n'additionne pas
+        userEntry.pointsEarned = pointsEarned;
       } else if (referral.createdAt.getTime() === userEntry.createdAt.getTime()) {
-        // Si même date, on additionne (cas rare)
         userEntry.pointsEarned += pointsEarned;
       }
 
-      // ✅ Mettre à jour le statut si plus récent
       if (referral.completedAt && (!userEntry.completedAt || referral.completedAt > userEntry.completedAt)) {
         userEntry.completedAt = referral.completedAt;
       }
@@ -2523,29 +2544,24 @@ export class UsersService {
       }
     }
 
-    // ✅ Construire la liste des utilisateurs parrainés groupés
-    const referredUsers = Array.from(referredUsersMap.values()).map((entry) => {
-      return {
-        id: entry.id,
-        fullName: entry.fullName,
-        email: entry.email,
-        phone: entry.phone,
-        status: entry.status,
-        totalOrders: entry.totalOrders,
-        totalValidatedOrders: entry.totalValidatedOrders,
-        totalShippingCost: Math.round(entry.totalShippingCost * 100) / 100,
-        currency: entry.currency,
-        pointsEarned: Math.round(entry.pointsEarned * 100) / 100,
-        pointsCurrency: entry.currency,
-        createdAt: entry.createdAt,
-        completedAt: entry.completedAt,
-      };
-    });
+    const referredUsers = Array.from(referredUsersMap.values()).map((entry) => ({
+      id: entry.id,
+      fullName: entry.fullName,
+      email: entry.email,
+      phone: entry.phone,
+      status: entry.status,
+      totalOrders: entry.totalOrders,
+      totalValidatedOrders: entry.totalValidatedOrders,
+      totalShippingCost: Math.round(entry.totalShippingCost * 100) / 100,
+      currency: entry.currency,
+      pointsEarned: Math.round(entry.pointsEarned * 100) / 100,
+      pointsCurrency: entry.currency,
+      createdAt: entry.createdAt,
+      completedAt: entry.completedAt,
+    }));
 
-    // ✅ Trier par date de création (du plus récent au plus ancien)
     referredUsers.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-    // ✅ Construire les récompenses par devise
     const rewardsByCurrencyArray = Object.entries(rewardsByCurrency).map(([currency, amount]) => ({
       currency: currency,
       amount: Math.round(amount * 100) / 100,
@@ -2568,7 +2584,8 @@ export class UsersService {
         rewardsByCurrency: rewardsByCurrencyArray,
         defaultCurrency: 'USD',
         history,
-        referredUsers, // ✅ Maintenant groupé par utilisateur avec une seule devise
+        referredUsers,
+        pendingTransactions: pendingTransactions,
       },
     };
   }
