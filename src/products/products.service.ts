@@ -2912,16 +2912,19 @@ export class ProductService {
       .leftJoinAndSelect('category.children', 'categoryChildren')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.measure', 'measure')
-      .where('product.type = :type', { type: CompanyType.RESTAURANT })
       .andWhere('product.status = :status', { status: ProductStatus.PUBLISHED })
       .andWhere('company.status = :companyStatus', {
         companyStatus: CompanyStatus.VALIDATED,
       });
 
-    // ✅ CORRECTION: Utiliser product.type (pas product.productType)
+    // ✅ DYNAMIQUE : Filtrer par type si fourni, sinon tous les types
     if (filters?.type) {
       queryBuilder.andWhere('product.type = :filterType', { filterType: filters.type });
+    } else if (day) {
+      // ✅ Si un jour est spécifié et pas de type, filtrer par RESTAURANT par défaut
+      queryBuilder.andWhere('product.type = :defaultType', { defaultType: CompanyType.RESTAURANT });
     }
+    // ✅ Si ni type ni day, retourner tous les types
 
     if (includeSpecs) {
       queryBuilder
