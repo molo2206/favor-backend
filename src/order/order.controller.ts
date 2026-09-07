@@ -89,16 +89,21 @@ export class OrderController {
       );
     }
 
-    const order = await this.orderService.createOrder(
-      createOrderDto,
-      fullUser,
-      abortController.signal,
-      lang,
-    );
-
+    // ✅ NE PAS APPELER orderService.createOrder
+    // ✅ Retourner directement les données reçues du frontend
     return {
-      message: this.i18nService.translate('order.order_created_success', lang),
-      data: order,
+      success: true,
+      message: 'Données reçues du frontend',
+      receivedData: {
+        body: createOrderDto,
+        user: {
+          id: fullUser.id,
+          email: fullUser.email,
+          phone: fullUser.phone,
+          userIdFpay: fullUser.userIdFpay,
+        },
+        timestamp: new Date().toISOString(),
+      }
     };
   }
 
