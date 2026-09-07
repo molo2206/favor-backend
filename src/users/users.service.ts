@@ -2393,21 +2393,27 @@ export class UsersService {
     // ============================================================
     let pendingTransactions = null;
     try {
-      // ✅ Vérifier si l'utilisateur a un userIdFpay
       if (user.userIdFpay) {
-        // ✅ Appel à FpayService.getLastPendingTransaction
         const pendingResult = await this.fpayService.getLastPendingTransaction(
           user.userIdFpay,
           'DEPOSIT'
         );
 
         if (pendingResult && pendingResult.success) {
+          // ✅ Transformer totalsByCurrency en tableau d'objets { amount, currency }
+          const totalsArray = Object.entries(pendingResult.totalsByCurrency || {})
+            .filter(([currency, amount]) => amount > 0)
+            .map(([currency, amount]) => ({
+              amount: Math.round(amount * 100) / 100,
+              currency: currency,
+            }));
+
           pendingTransactions = {
-            ...pendingResult.data,  // CDF: [...], USD: [...]
-            totalsByCurrency: pendingResult.totalsByCurrency,
-            currencies: pendingResult.currencies,
-            currenciesWithData: pendingResult.currenciesWithData,
-            count: pendingResult.count,
+            ...pendingResult.data,
+            totalsByCurrency: totalsArray,  // ✅ Tableau d'objets { amount, currency }
+            currencies: pendingResult.currencies || [],
+            currenciesWithData: pendingResult.currenciesWithData || [],
+            count: pendingResult.count || 0,
           };
         }
       }
