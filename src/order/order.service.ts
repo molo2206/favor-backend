@@ -309,13 +309,8 @@ export class OrderService {
           );
         }
 
-        if (!grandTotal || grandTotal <= 0) {
-          throw new BadRequestException(
-            this.i18nService.translate('order.mobile_money_grandtotal_required', lang)
-          );
-        }
-        // ✅ Utiliser grandTotal pour Pawapay (et non paymentAmount)
-        const amountForPawapay = grandTotal.toString();
+        // ✅ Utiliser paymentAmount (réduit si a un parrain)
+        const amountForPawapay = paymentAmount.toString();
 
         const pawapayData = {
           amount: amountForPawapay,
@@ -323,53 +318,14 @@ export class OrderService {
           provider,
           phone: phon
         };
-
-        console.log('[Order] Création dépôt Pawapay avec grandTotal:', pawapayData);
-        console.log('[Order] grandTotal:', grandTotal);
-        console.log('[Order] paymentAmount (avec parrainage):', paymentAmount);
-
-        // ============================================================
-        // ✅ LOG DU BODY AVANT ENVOI À PAWAPAY
-        // ============================================================
-        console.log('============================================');
-        console.log('📤 [PAWAPAY] BODY ENVOYÉ À PAWAPAY');
-        console.log('============================================');
-        console.log(JSON.stringify({
-          depositId: uuidv4(),
-          payer: {
-            type: 'MMO',
-            accountDetails: {
-              phoneNumber: phon,
-              provider: provider,
-            },
-          },
-          amount: amountForPawapay,
-          currency: orderCurrency,
-          preAuthorisationCode: '3c',
-          clientReferenceId: `INV-${Date.now()}`,
-          customerMessage: 'Note of 4 to 22 chars',
-          metadata: [
-            { orderId: `ORD-${Date.now()}` },
-            { customerId: 'favorhelp31@gmail.com', isPII: true },
-          ],
-        }, null, 2));
-        console.log('============================================');
+        console.log('[Order] Création dépôt Pawapay :', pawapayData);
 
         // ============================================================
         // 1. PAIEMENT PRINCIPAL VIA PAWAPAY (OBLIGATOIRE)
         // ============================================================
         try {
-          console.log('[Order] Création dépôt Pawapay...');
           const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
-
-          console.log('============================================');
-          console.log('✅ [PAWAPAY] RÉPONSE REÇUE');
-          console.log('============================================');
-          console.log('📌 Réponse complète:', JSON.stringify(pawapayResponse, null, 2));
-          console.log('📌 Deposit ID:', pawapayResponse?.deposit?.depositId);
-          console.log('📌 Statut:', pawapayResponse?.finalStatus?.data?.status);
-          console.log('📌 Redirect URL:', pawapayResponse?.deposit?.redirectUrl);
-          console.log('============================================');
+          console.log('[Order] Réponse Pawapay :', JSON.stringify(pawapayResponse, null, 2));
 
           const depositStatus = pawapayResponse.finalStatus?.data?.status;
           const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
