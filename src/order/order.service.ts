@@ -301,7 +301,7 @@ export class OrderService {
           throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
         }
 
-        const finalGrandTotal = grandTotal || (totalAmount + (shippingCost || 0) + (transactionFee || 0));
+        const finalGrandTotal = totalAmount + (shippingCost || 0);
 
         if (!finalGrandTotal || finalGrandTotal <= 0) {
           throw new BadRequestException(
@@ -310,7 +310,7 @@ export class OrderService {
         }
 
         // ✅ Utiliser paymentAmount (réduit si a un parrain)
-        const amountForPawapay = paymentAmount.toString();
+        const amountForPawapay = finalGrandTotal.toString();
 
         const pawapayData = {
           amount: amountForPawapay,
