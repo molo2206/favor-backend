@@ -20,7 +20,7 @@ import { UserSettingsEntity } from './entities/user-settings.entity';
 import { CommonModule } from 'src/libs/common/src/common.module';
 import { UserLoyaltyEntity } from './entities/user-loyalty.entity';
 import { ReferralEntity } from './entities/referral.entity';
-import { FpayModule } from 'src/fpay/fpay.module';
+import { FpayService } from 'src/fpay/fpay.service';
 
 
 @Module({
@@ -48,10 +48,9 @@ import { FpayModule } from 'src/fpay/fpay.module';
     MailModule,
     NotificationsModule,
     CommonModule,
-    FpayModule
   ],
   controllers: [UsersController],
-  providers: [UsersService, CloudinaryService, SmsHelper,FilesService],
-  exports: [UsersService, TypeOrmModule.forFeature([UserEntity, OtpEntity])],
+  providers: [UsersService, CloudinaryService, SmsHelper,FilesService,FpayService],
+  exports: [UsersService, TypeOrmModule.forFeature([UserEntity, OtpEntity]),FpayService],
 })
 export class UsersModule {}
