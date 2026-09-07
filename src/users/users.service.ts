@@ -2400,17 +2400,17 @@ export class UsersService {
         );
 
         if (pendingResult && pendingResult.success) {
-          // ✅ Transformer totalsByCurrency en tableau d'objets { amount, currency }
+          // ✅ Correction avec typage explicite
           const totalsArray = Object.entries(pendingResult.totalsByCurrency || {})
-            .filter(([currency, amount]) => amount > 0)
+            .filter(([, amount]) => typeof amount === 'number' && amount > 0)
             .map(([currency, amount]) => ({
-              amount: Math.round(amount * 100) / 100,
+              amount: Math.round((amount as number) * 100) / 100,
               currency: currency,
             }));
 
           pendingTransactions = {
             ...pendingResult.data,
-            totalsByCurrency: totalsArray,  // ✅ Tableau d'objets { amount, currency }
+            totalsByCurrency: totalsArray,
             currencies: pendingResult.currencies || [],
             currenciesWithData: pendingResult.currenciesWithData || [],
             count: pendingResult.count || 0,
@@ -2598,6 +2598,7 @@ export class UsersService {
       },
     };
   }
+  
   async sendOtp(email: string, lang: string = 'fr'): Promise<any> {
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
 
