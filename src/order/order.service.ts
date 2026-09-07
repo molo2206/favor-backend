@@ -838,7 +838,6 @@ export class OrderService {
     const hasReferrer = !!(userWithReferrer?.referrer);
 
     // ✅ Calcul du shippingCost, transactionFee et du montant total
-    // transactionFee peut venir de payOrderDto ou de order.transactionFee
     const shippingCostValue = Number(order.shippingCost || 0);
     const totalAmount = Number(order.totalAmount) + shippingCostValue;
     let parrainageAmount = 0;
@@ -852,7 +851,7 @@ export class OrderService {
       console.log(`[PayOrder] 👤 A un parrain: ${hasReferrer}`);
       console.log(`[PayOrder] Total: ${totalAmount}$`);
       console.log(`[PayOrder] 10% shipping pour parrainage: ${parrainageAmount}$`);
-      console.log(`[PayOrder] Montant du paiement: ${paymentAmount}$`);
+      console.log(`[PayOrder] Montant du paiement (après parrainage): ${paymentAmount}$`);
     } else {
       console.log(`[PayOrder] ℹ️ Aucun parrain trouvé`);
       console.log(`[PayOrder] Montant du paiement: ${totalAmount}$`);
@@ -881,10 +880,12 @@ export class OrderService {
         );
       }
 
-      // ✅ Utiliser paymentAmount (réduit si a un parrain) - inclut déjà transactionFee
-      const amountForPawapay = paymentAmount.toString().replace(/[^0-9.]/g, '');
+      // ✅ Envoyer le montant TOTAL à Pawapay (totalAmount = order.totalAmount + shippingCost)
+      const amountForPawapay = totalAmount.toString().replace(/[^0-9.]/g, '');
 
-      console.log('[PayOrder] Montant pour Pawapay:', amountForPawapay);
+      console.log('[PayOrder] Montant total envoyé à Pawapay:', amountForPawapay);
+      console.log('[PayOrder] totalAmount:', totalAmount);
+      console.log('[PayOrder] paymentAmount (après parrainage):', paymentAmount);
 
       const pawapayData = {
         amount: amountForPawapay,
@@ -972,7 +973,7 @@ export class OrderService {
           try {
             console.log('[PayOrder] Tentative paiement Favor Help...');
             const fpayResponse = await this.fpayService.payWithMobileMoney(
-              paymentAmount,  // ✅ Inclut déjà transactionFee
+              paymentAmount,  // ✅ Montant après parrainage
               order.currency || 'USD',
               `Paiement de commande #${order.invoiceNumber}`,
               'MOBILE_MONEY',
@@ -1009,8 +1010,6 @@ export class OrderService {
               const operation = this.operationRepo.create(operationData as any);
               await this.operationRepo.save(operation);
               console.log(`[PayOrder] Opération ${selectedMethod} enregistrée pour la commande ${order.invoiceNumber}`);
-
-              // Dans payPendingOrder, remplacer le bloc d'envoi du parrainage par :
 
               // ============================================================
               // ✅ ENVOYER LE PARRAINAGE (10%) - UNIQUEMENT SI PARRAIN
@@ -1094,7 +1093,7 @@ export class OrderService {
       }
 
       const fpayData = {
-        amount: paymentAmount,  // ✅ Inclut déjà transactionFee
+        amount: paymentAmount,  // ✅ Montant après parrainage
         currency: order.currency || 'USD',
         description: `Paiement de commande #${order.invoiceNumber}`,
         access_token: access_token,
@@ -1128,7 +1127,7 @@ export class OrderService {
           });
 
           // ✅ 2. Créer la transaction de paiement
-          const operationAmount =(Number(order.totalAmount) + Number(order.shippingCost || 0) );
+          const operationAmount = (Number(order.totalAmount) + Number(order.shippingCost || 0));
           const designation = this.i18nService.translate('order.payment_designation', lang, {
             invoiceNumber: order.invoiceNumber,
             method: selectedMethod,
