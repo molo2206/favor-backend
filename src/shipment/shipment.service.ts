@@ -490,7 +490,7 @@ export class ShipmentService {
       shippingCompanyId,
       deliveryCompanyId,
       loyaltyCode,
-      loyaltyCodeFournisseur, // ✅ Ajout
+      loyaltyCodeFournisseur,
     } = dto;
 
     if (!currentUser.activeCompanyId) {

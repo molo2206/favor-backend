@@ -318,14 +318,53 @@ export class OrderService {
           provider,
           phone: phon
         };
-        console.log('[Order] Création dépôt Pawapay :', pawapayData);
+
+        // ============================================================
+        // ✅ LOG DU BODY AVANT ENVOI À PAWAPAY
+        // ============================================================
+        console.log('============================================');
+        console.log('📤 [PAWAPAY] BODY ENVOYÉ À PAWAPAY');
+        console.log('============================================');
+        console.log('📌 PAYLOAD:');
+        console.log(JSON.stringify({
+          depositId: uuidv4(),
+          payer: {
+            type: 'MMO',
+            accountDetails: {
+              phoneNumber: phon,
+              provider: provider,
+            },
+          },
+          amount: amountForPawapay,
+          currency: orderCurrency,
+          preAuthorisationCode: '3c',
+          clientReferenceId: `INV-${Date.now()}`,
+          customerMessage: 'Note of 4 to 22 chars',
+          metadata: [
+            { orderId: `ORD-${Date.now()}` },
+            { customerId: 'favorhelp31@gmail.com', isPII: true },
+          ],
+        }, null, 2));
+        console.log('📌 pawapayData:', JSON.stringify(pawapayData, null, 2));
+        console.log('📌 Signal aborted?', signal?.aborted);
+        console.log('============================================');
 
         // ============================================================
         // 1. PAIEMENT PRINCIPAL VIA PAWAPAY (OBLIGATOIRE)
         // ============================================================
         try {
+          console.log('[Order] Création dépôt Pawapay...');
           const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
-          console.log('[Order] Réponse Pawapay :', JSON.stringify(pawapayResponse, null, 2));
+
+          console.log('============================================');
+          console.log('✅ [PAWAPAY] RÉPONSE REÇUE');
+          console.log('============================================');
+          console.log('📌 Réponse complète:', JSON.stringify(pawapayResponse, null, 2));
+          console.log('📌 Deposit ID:', pawapayResponse?.deposit?.depositId);
+          console.log('📌 Statut:', pawapayResponse?.finalStatus?.data?.status);
+          console.log('📌 Redirect URL:', pawapayResponse?.deposit?.redirectUrl);
+          console.log('📌 Failure Reason:', pawapayResponse?.finalStatus?.data?.failureReason);
+          console.log('============================================');
 
           const depositStatus = pawapayResponse.finalStatus?.data?.status;
           const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
@@ -660,7 +699,7 @@ export class OrderService {
     );
     return finalOrder;
   }
-
+  
   private async updateReferralWithAmount(
     referrerId: string,
     referredId: string,
