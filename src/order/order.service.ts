@@ -840,8 +840,7 @@ export class OrderService {
     // ✅ Calcul du shippingCost, transactionFee et du montant total
     // transactionFee peut venir de payOrderDto ou de order.transactionFee
     const shippingCostValue = Number(order.shippingCost || 0);
-    const transactionFeeValue = Number(transactionFee || order.transactionFee || 0);
-    const totalAmount = Number(order.totalAmount) + shippingCostValue + transactionFeeValue;
+    const totalAmount = Number(order.totalAmount) + shippingCostValue;
     let parrainageAmount = 0;
     let paymentAmount = totalAmount;
 
@@ -986,7 +985,7 @@ export class OrderService {
               console.log(`[PayOrder] ✅ Paiement Favor Help réussi: ${paymentAmount} ${order.currency}`);
 
               // ✅ Créer la transaction de paiement
-              const operationAmount = order.grandTotal || (Number(order.totalAmount) + Number(order.shippingCost || 0) + Number(transactionFeeValue || 0));
+              const operationAmount = (Number(order.totalAmount) + Number(order.shippingCost || 0));
               const designation = this.i18nService.translate('order.payment_designation', lang, {
                 invoiceNumber: order.invoiceNumber,
                 method: selectedMethod,
@@ -1129,7 +1128,7 @@ export class OrderService {
           });
 
           // ✅ 2. Créer la transaction de paiement
-          const operationAmount = order.grandTotal || (Number(order.totalAmount) + Number(order.shippingCost || 0) + Number(transactionFeeValue || 0));
+          const operationAmount =(Number(order.totalAmount) + Number(order.shippingCost || 0) );
           const designation = this.i18nService.translate('order.payment_designation', lang, {
             invoiceNumber: order.invoiceNumber,
             method: selectedMethod,
