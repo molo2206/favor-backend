@@ -309,6 +309,11 @@ export class OrderService {
           );
         }
 
+        if (!grandTotal || grandTotal <= 0) {
+          throw new BadRequestException(
+            this.i18nService.translate('order.mobile_money_grandtotal_required', lang)
+          );
+        }
         // ✅ Utiliser grandTotal pour Pawapay (et non paymentAmount)
         const amountForPawapay = grandTotal.toString();
 
