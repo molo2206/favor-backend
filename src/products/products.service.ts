@@ -2989,7 +2989,6 @@ export class ProductService {
     const rotateProducts = (productList: Product[], dayIndex: number): Product[] => {
       if (productList.length === 0) return [];
 
-      // ✅ Seed basé sur la date du jour + l'index du jour
       const today = new Date();
       const dateSeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
       const seed = dateSeed + dayIndex;
@@ -2997,7 +2996,6 @@ export class ProductService {
       const sorted = [...productList];
       sorted.sort((a, b) => (b.price || 0) - (a.price || 0));
 
-      // ✅ Utiliser le seed pour mélanger de manière déterministe
       const shuffled = [...sorted];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const pseudoRandom = (seed * 9301 + 49297) % 233280;
@@ -3007,6 +3005,9 @@ export class ProductService {
 
       return shuffled;
     };
+
+    // ✅ Utiliser un Set pour éviter les doublons
+    const seenProductIds = new Set<string>();
 
     if (day) {
       const dayKey = day.toLowerCase();
@@ -3045,6 +3046,7 @@ export class ProductService {
       };
     }
 
+    // ✅ Pour tous les jours, éviter les doublons
     const allRotatedProducts: { product: Product; day: string; dayIndex: number }[] = [];
 
     for (let i = 0; i < daysOfWeek.length; i++) {
@@ -3052,11 +3054,15 @@ export class ProductService {
       const rotated = rotateProducts(products, i);
 
       rotated.forEach((product) => {
-        allRotatedProducts.push({
-          product,
-          day: day.key,
-          dayIndex: i,
-        });
+        // ✅ Vérifier si le produit a déjà été ajouté pour un jour précédent
+        if (!seenProductIds.has(product.id)) {
+          seenProductIds.add(product.id);
+          allRotatedProducts.push({
+            product,
+            day: day.key,
+            dayIndex: i,
+          });
+        }
       });
     }
 
