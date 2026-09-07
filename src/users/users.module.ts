@@ -1,4 +1,7 @@
-import { Module } from '@nestjs/common';
+// apps/users/users.module.ts
+
+import { Module, forwardRef } from '@nestjs/common';  // ✅ AJOUTER forwardRef
+import { HttpModule } from '@nestjs/axios';  // ✅ AJOUTER HttpModule
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -20,11 +23,19 @@ import { UserSettingsEntity } from './entities/user-settings.entity';
 import { CommonModule } from 'src/libs/common/src/common.module';
 import { UserLoyaltyEntity } from './entities/user-loyalty.entity';
 import { ReferralEntity } from './entities/referral.entity';
-import { FpayService } from 'src/fpay/fpay.service';
-
+import { FpayModule } from 'src/fpay/fpay.module';
 
 @Module({
   imports: [
+    // ✅ AJOUTER HttpModule pour FpayService
+    HttpModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (config: ConfigService) => ({
+        timeout: 30000,
+        maxRedirects: 5,
+      }),
+    }),
     TypeOrmModule.forFeature([
       UserEntity,
       OtpEntity,
@@ -48,9 +59,23 @@ import { FpayService } from 'src/fpay/fpay.service';
     MailModule,
     NotificationsModule,
     CommonModule,
+    // ✅ Utiliser forwardRef pour éviter la dépendance circulaire
+    forwardRef(() => FpayModule),
   ],
   controllers: [UsersController],
-  providers: [UsersService, CloudinaryService, SmsHelper,FilesService,FpayService],
-  exports: [UsersService, TypeOrmModule.forFeature([UserEntity, OtpEntity]),FpayService],
+  providers: [
+    UsersService,
+    CloudinaryService,
+    SmsHelper,
+    FilesService,
+    // ❌ SUPPRIMER FpayService des providers (il est fourni par FpayModule)
+    // FpayService,  // ← SUPPRIMER
+  ],
+  exports: [
+    UsersService,
+    TypeOrmModule.forFeature([UserEntity, OtpEntity]),
+    // ❌ SUPPRIMER FpayService des exports (il est exporté par FpayModule)
+    // FpayService,  // ← SUPPRIMER
+  ],
 })
 export class UsersModule {}

@@ -1,6 +1,6 @@
 // src/modules/fpay/fpay.module.ts
 
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';  // ✅ AJOUTER forwardRef
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -12,7 +12,7 @@ import { OtpEntity } from 'src/otp/entities/otp.entity';
 import { MailService } from 'src/email/email.service';
 import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 import { I18nService } from 'src/libs/common/src';
-import { UsersModule } from 'src/users/users.module';  // ✅ IMPORTER UsersModule
+import { UsersModule } from 'src/users/users.module';
 
 @Module({
     imports: [
@@ -32,7 +32,8 @@ import { UsersModule } from 'src/users/users.module';  // ✅ IMPORTER UsersModu
             }),
             inject: [ConfigService],
         }),
-        UsersModule,  // ✅ IMPORTER UsersModule (qui exporte UsersService et les repositories)
+        // ✅ Utiliser forwardRef pour éviter la dépendance circulaire
+        forwardRef(() => UsersModule),
     ],
     controllers: [FpayController],
     providers: [
@@ -40,7 +41,6 @@ import { UsersModule } from 'src/users/users.module';  // ✅ IMPORTER UsersModu
         MailService,
         SmsHelper,
         I18nService,
-        // ❌ SUPPRIMER UsersService d'ici car il est fourni par UsersModule
     ],
     exports: [FpayService, JwtModule],
 })

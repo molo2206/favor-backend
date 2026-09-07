@@ -7,6 +7,8 @@ import {
   BadRequestException,
   NotFoundException,
   InternalServerErrorException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
@@ -86,6 +88,7 @@ export class UsersService {
 
     private readonly i18n: I18nService,
 
+    @Inject(forwardRef(() => FpayService))  // ✅ Utiliser forwardRef
     private readonly fpayService: FpayService,
   ) { }
 
