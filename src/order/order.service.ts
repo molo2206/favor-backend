@@ -174,6 +174,43 @@ export class OrderService {
     signal?: AbortSignal,
     langHeader?: string,
   ): Promise<OrderEntity> {
+    // ============================================================
+    // ✅ LOG DU BODY REÇU DU CLIENT
+    // ============================================================
+    console.log('============================================');
+    console.log('📥 [CLIENT] BODY REÇU DU FRONTEND');
+    console.log('============================================');
+    console.log('📌 createOrderDto COMPLET:');
+    console.log(JSON.stringify(createOrderDto, null, 2));
+    console.log('📌 Détails:');
+    console.log(`   - totalAmount: ${createOrderDto.totalAmount}`);
+    console.log(`   - currency: ${createOrderDto.currency}`);
+    console.log(`   - paymentMethod: ${createOrderDto.paymentMethod}`);
+    console.log(`   - provider: ${createOrderDto.provider}`);
+    console.log(`   - phone: ${createOrderDto.phone}`);
+    console.log(`   - type: ${createOrderDto.type}`);
+    console.log(`   - shopType: ${createOrderDto.shopType}`);
+    console.log(`   - orderItems: ${createOrderDto.orderItems?.length || 0} items`);
+    console.log(`   - addressUserId: ${createOrderDto.addressUserId}`);
+    console.log(`   - whatsapp_number: ${createOrderDto.whatsapp_number}`);
+    console.log(`   - shippingCost: ${createOrderDto.shippingCost}`);
+    console.log(`   - transactionFee: ${createOrderDto.transactionFee}`);
+    console.log(`   - grandTotal: ${createOrderDto.grandTotal}`);
+    console.log(`   - appliedFeeRate: ${createOrderDto.appliedFeeRate}`);
+    console.log(`   - pin: ${createOrderDto.pin ? '✅ fourni' : '❌ non fourni'}`);
+    console.log(`   - access_token: ${createOrderDto.access_token ? '✅ fourni' : '❌ non fourni'}`);
+    console.log('📌 orderItems détaillés:');
+    createOrderDto.orderItems?.forEach((item, index) => {
+      console.log(`   [${index}] productId: ${item.productId}, quantity: ${item.quantity}, price: ${item.price}`);
+    });
+    console.log('📌 User connecté:');
+    console.log(`   - id: ${user.id}`);
+    console.log(`   - email: ${user.email}`);
+    console.log(`   - phone: ${user.phone}`);
+    console.log(`   - userIdFpay: ${user.userIdFpay}`);
+    console.log(`   - isLink: ${user.isLink}`);
+    console.log('============================================');
+
     const {
       totalAmount,
       currency,
@@ -699,7 +736,6 @@ export class OrderService {
     );
     return finalOrder;
   }
-  
   private async updateReferralWithAmount(
     referrerId: string,
     referredId: string,
