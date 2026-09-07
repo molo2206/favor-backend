@@ -541,6 +541,7 @@ export class ProductController {
     @Query('limit') limit?: string,
     @Query('includeSpecifications') includeSpecifications?: string,
     @Query('includeVariations') includeVariations?: string,
+    @Query('type') type?: string,  // ✅ AJOUTÉ
   ) {
     const lang = this.extractLanguage(req);
 
@@ -557,6 +558,7 @@ export class ProductController {
       limit: limit ? Number(limit) : undefined,
       includeSpecifications: includeSpecifications === 'true',
       includeVariations: includeVariations === 'true',
+      type,  // ✅ AJOUTÉ
     };
 
     return this.productService.getRestaurantProductsByDay(day, lang, filters);
