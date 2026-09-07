@@ -269,7 +269,7 @@ export class OrderService {
     // ✅ Calcul du shippingCost, transactionFee et du montant total
     const shippingCostValue = Number(shippingCost || 0);
     const transactionFeeValue = Number(transactionFee || 0);
-    const totalAmountValue = Number(totalAmount) + shippingCostValue + transactionFeeValue;
+    const totalAmountValue = Number(totalAmount) + shippingCostValue;
     let parrainageAmount = 0;
     let paymentAmount = totalAmountValue;
 
