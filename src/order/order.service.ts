@@ -174,43 +174,6 @@ export class OrderService {
     signal?: AbortSignal,
     langHeader?: string,
   ): Promise<OrderEntity> {
-    // ============================================================
-    // ✅ LOG DU BODY REÇU DU CLIENT
-    // ============================================================
-    console.log('============================================');
-    console.log('📥 [CLIENT] BODY REÇU DU FRONTEND');
-    console.log('============================================');
-    console.log('📌 createOrderDto COMPLET:');
-    console.log(JSON.stringify(createOrderDto, null, 2));
-    console.log('📌 Détails:');
-    console.log(`   - totalAmount: ${createOrderDto.totalAmount}`);
-    console.log(`   - currency: ${createOrderDto.currency}`);
-    console.log(`   - paymentMethod: ${createOrderDto.paymentMethod}`);
-    console.log(`   - provider: ${createOrderDto.provider}`);
-    console.log(`   - phone: ${createOrderDto.phone}`);
-    console.log(`   - type: ${createOrderDto.type}`);
-    console.log(`   - shopType: ${createOrderDto.shopType}`);
-    console.log(`   - orderItems: ${createOrderDto.orderItems?.length || 0} items`);
-    console.log(`   - addressUserId: ${createOrderDto.addressUserId}`);
-    console.log(`   - whatsapp_number: ${createOrderDto.whatsapp_number}`);
-    console.log(`   - shippingCost: ${createOrderDto.shippingCost}`);
-    console.log(`   - transactionFee: ${createOrderDto.transactionFee}`);
-    console.log(`   - grandTotal: ${createOrderDto.grandTotal}`);
-    console.log(`   - appliedFeeRate: ${createOrderDto.appliedFeeRate}`);
-    console.log(`   - pin: ${createOrderDto.pin ? '✅ fourni' : '❌ non fourni'}`);
-    console.log(`   - access_token: ${createOrderDto.access_token ? '✅ fourni' : '❌ non fourni'}`);
-    console.log('📌 orderItems détaillés:');
-    createOrderDto.orderItems?.forEach((item, index) => {
-      console.log(`   [${index}] productId: ${item.productId}, quantity: ${item.quantity}, price: ${item.price}`);
-    });
-    console.log('📌 User connecté:');
-    console.log(`   - id: ${user.id}`);
-    console.log(`   - email: ${user.email}`);
-    console.log(`   - phone: ${user.phone}`);
-    console.log(`   - userIdFpay: ${user.userIdFpay}`);
-    console.log(`   - isLink: ${user.isLink}`);
-    console.log('============================================');
-
     const {
       totalAmount,
       currency,
@@ -346,8 +309,8 @@ export class OrderService {
           );
         }
 
-        // ✅ Utiliser paymentAmount (réduit si a un parrain)
-        const amountForPawapay = paymentAmount.toString();
+        // ✅ Utiliser grandTotal pour Pawapay (et non paymentAmount)
+        const amountForPawapay = grandTotal.toString();
 
         const pawapayData = {
           amount: amountForPawapay,
@@ -356,13 +319,16 @@ export class OrderService {
           phone: phon
         };
 
+        console.log('[Order] Création dépôt Pawapay avec grandTotal:', pawapayData);
+        console.log('[Order] grandTotal:', grandTotal);
+        console.log('[Order] paymentAmount (avec parrainage):', paymentAmount);
+
         // ============================================================
         // ✅ LOG DU BODY AVANT ENVOI À PAWAPAY
         // ============================================================
         console.log('============================================');
         console.log('📤 [PAWAPAY] BODY ENVOYÉ À PAWAPAY');
         console.log('============================================');
-        console.log('📌 PAYLOAD:');
         console.log(JSON.stringify({
           depositId: uuidv4(),
           payer: {
@@ -382,8 +348,6 @@ export class OrderService {
             { customerId: 'favorhelp31@gmail.com', isPII: true },
           ],
         }, null, 2));
-        console.log('📌 pawapayData:', JSON.stringify(pawapayData, null, 2));
-        console.log('📌 Signal aborted?', signal?.aborted);
         console.log('============================================');
 
         // ============================================================
@@ -400,7 +364,6 @@ export class OrderService {
           console.log('📌 Deposit ID:', pawapayResponse?.deposit?.depositId);
           console.log('📌 Statut:', pawapayResponse?.finalStatus?.data?.status);
           console.log('📌 Redirect URL:', pawapayResponse?.deposit?.redirectUrl);
-          console.log('📌 Failure Reason:', pawapayResponse?.finalStatus?.data?.failureReason);
           console.log('============================================');
 
           const depositStatus = pawapayResponse.finalStatus?.data?.status;
@@ -736,6 +699,7 @@ export class OrderService {
     );
     return finalOrder;
   }
+
   private async updateReferralWithAmount(
     referrerId: string,
     referredId: string,
