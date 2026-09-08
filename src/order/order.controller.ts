@@ -89,43 +89,16 @@ export class OrderController {
       );
     }
 
-    // ============================================================
-    // ✅ LOG DU BODY REÇU DU FRONTEND
-    // ============================================================
-    console.log('============================================');
-    console.log('📥 [FRONTEND] BODY REÇU DU CLIENT');
-    console.log('============================================');
-    console.log('📌 Données brutes reçues:');
-    console.log(JSON.stringify(createOrderDto, null, 2));
-    console.log('📌 Utilisateur connecté:');
-    console.log(JSON.stringify({
-      id: fullUser.id,
-      email: fullUser.email,
-      phone: fullUser.phone,
-      userIdFpay: fullUser.userIdFpay,
-      isLink: fullUser.isLink,
-    }, null, 2));
-    console.log('📌 Timestamp:', new Date().toISOString());
-    console.log('============================================');
+    const order = await this.orderService.createOrder(
+      createOrderDto,
+      fullUser,
+      abortController.signal,
+      lang,
+    );
 
-    // ❌ NE PAS APPELER orderService.createOrder
-    // const order = await this.orderService.createOrder(...);
-
-    // ✅ Retourner directement les données reçues
     return {
-      success: true,
-      message: 'Données reçues avec succès (mode debug)',
-      receivedData: {
-        body: createOrderDto,
-        user: {
-          id: fullUser.id,
-          email: fullUser.email,
-          phone: fullUser.phone,
-          userIdFpay: fullUser.userIdFpay,
-          isLink: fullUser.isLink,
-        },
-        timestamp: new Date().toISOString(),
-      }
+      message: this.i18nService.translate('order.order_created_success', lang),
+      data: order,
     };
   }
 
