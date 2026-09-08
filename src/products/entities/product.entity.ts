@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
   JoinColumn,
   OneToMany,
+  ValueTransformer,
 } from 'typeorm';
 import { CompanyEntity } from 'src/company/entities/company.entity';
 import { CategoryEntity } from 'src/category/entities/category.entity';
@@ -27,6 +28,18 @@ import { RoomAvailability } from 'src/HotelRoomAvailability/entity/RoomAvailabil
 import { Reservation } from 'src/HotelRoomAvailability/entity/Reservation.entity';
 import { BedTypes } from '../enum/bedtypes.enum';
 
+/**
+ * Transformateur pour convertir les decimal en number
+ * Solution sans migration, compatible production
+ */
+const decimalToNumber: ValueTransformer = {
+  to: (value: number): number => value,
+  from: (value: string | number | null | undefined): number | null => {
+    if (value === null || value === undefined) return null;
+    return typeof value === 'string' ? parseFloat(value) : value;
+  },
+};
+
 @Entity('products')
 export class Product {
   @PrimaryGeneratedColumn('uuid')
@@ -41,20 +54,50 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: decimalToNumber, // ✅ Ajouté
+  })
   price: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: decimalToNumber, // ✅ Ajouté
+  })
   detail_price_original?: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: decimalToNumber, // ✅ Ajouté
+  })
   gros_price_original?: number;
 
   // Prix actuels
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: decimalToNumber, // ✅ Ajouté
+  })
   detail?: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: decimalToNumber, // ✅ Ajouté
+  })
   gros?: number;
 
   @Column({ nullable: true })
@@ -77,10 +120,22 @@ export class Product {
   })
   typecar?: Type_rental_both_sale_car;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: decimalToNumber, // ✅ Ajouté
+  })
   dailyRate?: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: decimalToNumber, // ✅ Ajouté
+  })
   salePrice?: number;
 
   @Column({ type: 'enum', enum: FuelType, default: FuelType.ESSENCE })
@@ -92,7 +147,13 @@ export class Product {
   @Column({ nullable: true })
   color?: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: decimalToNumber, // ✅ Ajouté
+  })
   dailyRate_price_original?: number;
 
   //fin car

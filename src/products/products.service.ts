@@ -94,8 +94,9 @@ export class ProductService {
   ) { }
 
   private readonly logger = new Logger(ProductService.name);
-  private generateSlug(name: string): string {
-    return name
+  
+  private generateSlug(name: string, existingSlugs?: string[]): string {
+    let slug = name
       .toLowerCase()
       .trim()
       .normalize('NFD')
@@ -104,6 +105,22 @@ export class ProductService {
       .replace(/\s+/g, '-') // Remplace les espaces par des tirets
       .replace(/-+/g, '-') // Supprime les tirets multiples
       .replace(/^-+|-+$/g, ''); // Supprime les tirets au début et à la fin
+
+    // ✅ Si des slugs existants sont fournis, vérifier les doublons
+    if (existingSlugs && existingSlugs.length > 0) {
+      let counter = 1;
+      let finalSlug = slug;
+
+      // ✅ Vérifier si le slug existe déjà
+      while (existingSlugs.includes(finalSlug)) {
+        finalSlug = `${slug}-${counter}`;
+        counter++;
+      }
+
+      return finalSlug;
+    }
+
+    return slug;
   }
 
   /**
