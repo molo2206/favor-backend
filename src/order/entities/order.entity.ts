@@ -155,4 +155,7 @@ export class OrderEntity {
 
   @Column({ type: 'text', nullable: true })
   cancellationReason?: string;
+
+  @Column({ type: 'boolean', default: false })
+  readyToPay: boolean;
 }

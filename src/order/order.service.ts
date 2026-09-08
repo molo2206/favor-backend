@@ -2343,6 +2343,7 @@ export class OrderService {
 
     // 6️⃣ Mettre à jour le prix de livraison
     order.shippingCost = shippingCost;
+    order.readyToPay = true;
 
     // 7️⃣ Recalculer le grand total
     const itemsTotal = order.orderItems?.reduce(
