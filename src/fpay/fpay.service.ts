@@ -1464,6 +1464,15 @@ export class FpayService {
                     );
                 }
 
+                this.logger.log(`👤 ========== UTILISATEUR CONNECTÉ ==========`);
+                this.logger.log(`👤 ID système: ${user.id}`);
+                this.logger.log(`👤 Nom: ${user.fullName}`);
+                this.logger.log(`👤 EMAIL: ${user.email || 'NON RENSEIGNÉ'}`);
+                this.logger.log(`👤 Téléphone: ${user.phone || 'NON RENSEIGNÉ'}`);
+                this.logger.log(`👤 userIdFpay: ${dto.userId}`);
+                this.logger.log(`👤 ===========================================`);
+
+
                 let destination: string | null = null;
                 let destinationType: 'email' | 'sms' = 'email';
 
