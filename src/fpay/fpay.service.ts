@@ -1565,8 +1565,8 @@ export class FpayService {
                 return {
                     status: 'success',
                     message: `Un code OTP a été envoyé par ${destinationType === 'email'
-                            ? 'email'
-                            : 'SMS'
+                        ? 'email'
+                        : 'SMS'
                         }.`,
                     requiresOtp: true,
                     data: {
@@ -1756,8 +1756,14 @@ export class FpayService {
                     );
                 }
 
+                // ✅ LOG POUR VOIR CE QUI EST RÉCUPÉRÉ
+                this.logger.log(`📊 referralHistory trouvé: ${userWithReferrals?.referralHistory?.length || 0} entrées`);
+                userWithReferrals?.referralHistory?.forEach(r => {
+                    this.logger.log(`  - ${r.id.substring(0, 8)}...: ${r.rewardAmount} ${r.currency} (referrerId: ${r.referrerId})`);
+                });
+
                 // ========================================================
-                // RÉCUPÉRER UNIQUEMENT LES BALANCES DE LA DEVISE
+                // ✅ RÉCUPÉRER UNIQUEMENT LES BALANCES DU USER ET DE LA DEVISE
                 // ========================================================
 
                 const referralsInCurrency =
@@ -1767,6 +1773,7 @@ export class FpayService {
                     )
                         .filter(
                             (referral) =>
+                                referral.referrerId === user.id &&  // ✅ Vérifier que c'est bien le parrain
                                 String(
                                     referral.currency,
                                 ).toUpperCase() ===
@@ -2503,14 +2510,29 @@ export class FpayService {
                     remainingAmount = 0;
                 }
 
-                updatedReferrals.push({
-                    id: referral.id,
-                    oldAmount: currentAmount,
-                    newAmount: referral.rewardAmount,
-                    currency: referral.currency,
-                });
+                const updateResult = await this.referralRepository
+                    .createQueryBuilder()
+                    .update(ReferralEntity)
+                    .set({
+                        rewardAmount: () => `rewardAmount - ${amountToDeduct}`,
+                    })
+                    .where('id = :id', { id: referral.id })
+                    .andWhere('rewardAmount >= :amount', {
+                        amount: amountToDeduct,
+                    })
+                    .execute();
 
-                await this.referralRepository.save(referral);
+                if (updateResult.affected !== 1) {
+                    throw new HttpException(
+                        {
+                            statusCode: HttpStatus.CONFLICT,
+                            message:
+                                'La balance de parrainage a changé. Veuillez réessayer.',
+                            code: 'REFERRAL_BALANCE_CHANGED',
+                        },
+                        HttpStatus.CONFLICT,
+                    );
+                }
             }
 
             // ✅ Recalculer le total des points restants
