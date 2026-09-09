@@ -448,6 +448,7 @@ export class FpayController {
         @Query('status') status?: string,
         @Query('movement') movement?: string,
         @Query('search') search?: string,
+        @Query('walletId') walletId?: string,
     ) {
         if (!user) {
             throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
@@ -477,6 +478,7 @@ export class FpayController {
             status,
             movement,
             search,
+            walletId
         );
 
         return result;

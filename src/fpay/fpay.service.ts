@@ -971,6 +971,7 @@ export class FpayService {
         status?: string,
         movement?: string,
         search?: string,
+        walletId?: string,
     ): Promise<any> {
         try {
             if (!userId || userId.trim() === '') {
@@ -992,6 +993,7 @@ export class FpayService {
             if (status) params.set('status', status);
             if (movement) params.set('movement', movement);
             if (search) params.set('search', search);
+            if (walletId) params.set('walletId', walletId);
 
             const fullUrl = `${url}?${params.toString()}`;
             this.logger.log(`🔗 Appel API: ${fullUrl}`);
