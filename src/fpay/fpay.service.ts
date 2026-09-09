@@ -979,18 +979,12 @@ export class FpayService {
             }
 
             // ============================================================
-            // 🔥 LOGS POUR VOIR CE QUI EST ENVOYÉ
+            // 🔥 LOGS AVANT D'ENVOYER - AFFICHER userId ET walletId
             // ============================================================
             this.logger.log(`📊 ========== APPEL API FPAY ==========`);
-            this.logger.log(`📊 userId envoyé: ${userId}`);
-            this.logger.log(`📊 walletId envoyé: ${walletId || 'NON FOURNI'}`);
+            this.logger.log(`📊 userId envoyé: "${userId}"`);
+            this.logger.log(`📊 walletId envoyé: "${walletId || 'NON FOURNI'}"`);
             this.logger.log(`📊 page: ${page}, limit: ${limit}`);
-            this.logger.log(`📊 startDate: ${startDate || 'NON FOURNI'}`);
-            this.logger.log(`📊 endDate: ${endDate || 'NON FOURNI'}`);
-            this.logger.log(`📊 type: ${type || 'NON FOURNI'}`);
-            this.logger.log(`📊 status: ${status || 'NON FOURNI'}`);
-            this.logger.log(`📊 movement: ${movement || 'NON FOURNI'}`);
-            this.logger.log(`📊 search: ${search || 'NON FOURNI'}`);
             this.logger.log(`📊 ========================================`);
 
             const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
@@ -1015,7 +1009,7 @@ export class FpayService {
             const fullUrl = `${url}?${params.toString()}`;
 
             // ============================================================
-            // 🔥 LOG DE L'URL COMPLÈTE
+            // 🔥 AFFICHER L'URL COMPLÈTE
             // ============================================================
             this.logger.log(`🔗 URL COMPLÈTE: ${fullUrl}`);
             this.logger.log(`📤 ========================================`);
@@ -1028,7 +1022,15 @@ export class FpayService {
             return response.data;
 
         } catch (error) {
-            this.logger.error(`❌ Erreur: ${error.message}`);
+            // ============================================================
+            // 🔥 AFFICHER L'ERREUR AVEC CE QUI A ÉTÉ ENVOYÉ
+            // ============================================================
+            this.logger.error(`❌ ERREUR - Ce qui a été envoyé:`);
+            this.logger.error(`❌ userId: "${userId}"`);
+            this.logger.error(`❌ walletId: "${walletId || 'NON FOURNI'}"`);
+            this.logger.error(`❌ URL: ${url}?${params.toString()}`);
+            this.logger.error(`❌ Message: ${error.message}`);
+
             if (error.response) {
                 this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
             }
