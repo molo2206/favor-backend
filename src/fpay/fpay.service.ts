@@ -1722,7 +1722,7 @@ export class FpayService {
             );
 
             // ============================================================
-            // ÉTAPE 3 : DÉDUIRE AUTOMATIQUEMENT LA BALANCE
+            // ÉTAPE 3 : DÉDUIRE DIRECTEMENT LA BALANCE
             // ============================================================
 
             const deductedReferrals: Array<{
@@ -1852,7 +1852,7 @@ export class FpayService {
                 }
 
                 // ========================================================
-                // DÉDUCTION AUTOMATIQUE
+                // DÉDUCTION DIRECTE
                 // ========================================================
 
                 let remainingAmount =
@@ -1897,7 +1897,7 @@ export class FpayService {
                         );
 
                     // ====================================================
-                    // ⭐ BALANCE DIMINUÉE AUTOMATIQUEMENT
+                    // ⭐ BALANCE DIMINUÉE DIRECTEMENT
                     // ====================================================
 
                     referral.rewardAmount =
@@ -2431,7 +2431,6 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
-
     async decreaseReferralPoints(
         userId: string,
         amount: number,
