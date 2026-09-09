@@ -1023,12 +1023,28 @@ export class FpayService {
 
         } catch (error) {
             // ============================================================
-            // 🔥 AFFICHER L'ERREUR AVEC CE QUI A ÉTÉ ENVOYÉ
+            // 🔥 RECONSTRUIRE L'URL DANS LE CATCH
             // ============================================================
+            const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
+            const params = new URLSearchParams();
+            params.set('userId', userId.trim());
+            params.set('page', page.toString());
+            params.set('limit', limit.toString());
+
+            if (startDate) params.set('startDate', startDate);
+            if (endDate) params.set('endDate', endDate);
+            if (type) params.set('type', type);
+            if (status) params.set('status', status);
+            if (movement) params.set('movement', movement);
+            if (search) params.set('search', search);
+            if (walletId) params.set('walletId', walletId);
+
+            const fullUrl = `${url}?${params.toString()}`;
+
             this.logger.error(`❌ ERREUR - Ce qui a été envoyé:`);
             this.logger.error(`❌ userId: "${userId}"`);
             this.logger.error(`❌ walletId: "${walletId || 'NON FOURNI'}"`);
-            this.logger.error(`❌ URL: ${url}?${params.toString()}`);
+            this.logger.error(`❌ URL: ${fullUrl}`);
             this.logger.error(`❌ Message: ${error.message}`);
 
             if (error.response) {
