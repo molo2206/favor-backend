@@ -971,7 +971,7 @@ export class FpayService {
         status?: string,
         movement?: string,
         search?: string,
-        walletId?: string,
+        walletId?: string,  // ✅ Reçu du contrôleur
     ): Promise<any> {
         try {
             if (!userId || userId.trim() === '') {
@@ -979,6 +979,7 @@ export class FpayService {
             }
 
             this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}`);
+            this.logger.log(`🔍 walletId: ${walletId || 'Tous'}`);
 
             const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
 
@@ -993,10 +994,15 @@ export class FpayService {
             if (status) params.set('status', status);
             if (movement) params.set('movement', movement);
             if (search) params.set('search', search);
-            if (walletId) params.set('walletId', walletId);
+
+            // ✅ AJOUTER walletId
+            if (walletId) {
+                params.set('walletId', walletId);  // ← C'est ici que ça manquait !
+                this.logger.log(`🔗 Filtrage par walletId: ${walletId}`);
+            }
 
             const fullUrl = `${url}?${params.toString()}`;
-            this.logger.log(`🔗 Appel API: ${fullUrl}`);
+            this.logger.log(`🔗 Appel API FPay: ${fullUrl}`);
 
             const response = await firstValueFrom(
                 this.httpService.get(fullUrl, { headers: this.getHeaders() })
@@ -1013,6 +1019,7 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
+
     getApiKey(): string {
         return this.apiKey;
     }
