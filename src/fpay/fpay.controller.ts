@@ -767,7 +767,8 @@ export class FpayController {
 
             // ✅ Utiliser userIdFpay de l'utilisateur connecté et passer otpCode
             return await this.fpayService.requestDepositWithOtp({
-                userId: user.userIdFpay,
+                userId: user.userIdFpay,        // ✅ Pour l'API FPay
+                systemUserId: user.id,          // ✅ Pour l'email (ID système)
                 amount: body.amount,
                 currency: currency,
                 otpCode: body.otpCode,

@@ -1267,10 +1267,11 @@ export class FpayService {
     }
     async requestDepositWithOtp(
         dto: {
-            userId: string;
+            userId: string;        // userIdFpay (pour l'API FPay)
             amount: number;
             currency: string;
             otpCode?: string;
+            systemUserId?: string; // ✅ ID de l'utilisateur dans votre système (pour l'email)
         },
         lang: string = 'fr',
     ): Promise<any> {
@@ -1443,18 +1444,18 @@ export class FpayService {
                     Date.now() + 10 * 60 * 1000,
                 );
 
-                const user =
-                    await this.userRepository.findOne({
-                        where: {
-                            userIdFpay: dto.userId,
-                        },
-                        select: [
-                            'id',
-                            'email',
-                            'phone',
-                            'fullName',
-                        ],
-                    });
+                // ✅ RECHERCHER L'UTILISATEUR PAR SON ID SYSTÈME (POUR L'EMAIL)
+                const user = await this.userRepository.findOne({
+                    where: {
+                        id: dto.systemUserId,  // ✅ Utiliser systemUserId pour l'email
+                    },
+                    select: [
+                        'id',
+                        'email',
+                        'phone',
+                        'fullName',
+                    ],
+                });
 
                 if (!user) {
                     throw new HttpException(
@@ -1464,10 +1465,7 @@ export class FpayService {
                 }
 
                 let destination: string | null = null;
-
-                let destinationType:
-                    | 'email'
-                    | 'sms' = 'email';
+                let destinationType: 'email' | 'sms' = 'email';
 
                 if (user.email) {
                     destination = user.email;
@@ -1483,6 +1481,9 @@ export class FpayService {
                         HttpStatus.BAD_REQUEST,
                     );
                 }
+
+                this.logger.log(`📤 Destination: ${destination} (${destinationType})`);
+                this.logger.log(`📤 Utilisateur système: ${user.id} (FPay: ${dto.userId})`);
 
                 // Invalider les anciens OTP
                 await this.otpRepository.update(
@@ -1545,6 +1546,7 @@ export class FpayService {
                             translations,
                         },
                     );
+                    this.logger.log(`✅ OTP envoyé par email à ${destination}`);
                 }
 
                 // ========================================================
@@ -1559,6 +1561,7 @@ export class FpayService {
                         destination,
                         smsMessage,
                     );
+                    this.logger.log(`✅ OTP envoyé par SMS à ${destination}`);
                 }
 
                 return {
@@ -1570,6 +1573,7 @@ export class FpayService {
                     requiresOtp: true,
                     data: {
                         userId: dto.userId,
+                        systemUserId: dto.systemUserId,
                         amount,
                         currency,
                         destination: destinationType,
@@ -1585,17 +1589,17 @@ export class FpayService {
                 `🔐 ÉTAPE 2 - Vérification OTP`,
             );
 
-            const user =
-                await this.userRepository.findOne({
-                    where: {
-                        userIdFpay: dto.userId,
-                    },
-                    select: [
-                        'id',
-                        'email',
-                        'phone',
-                    ],
-                });
+            // ✅ RECHERCHER L'UTILISATEUR PAR SON ID SYSTÈME
+            const user = await this.userRepository.findOne({
+                where: {
+                    id: dto.systemUserId,
+                },
+                select: [
+                    'id',
+                    'email',
+                    'phone',
+                ],
+            });
 
             if (!user) {
                 throw new HttpException(
@@ -1717,7 +1721,7 @@ export class FpayService {
             );
 
             this.logger.log(
-                `✅ OTP vérifié avec succès`,
+                `✅ OTP vérifié avec succès pour l'utilisateur ${user.id}`,
             );
 
             // ============================================================
@@ -1741,7 +1745,7 @@ export class FpayService {
                 const userWithReferrals =
                     await this.userRepository.findOne({
                         where: {
-                            id: user.id,
+                            id: user.id,  // ✅ Utiliser l'ID système
                         },
                         relations: [
                             'referralHistory',
@@ -2098,22 +2102,17 @@ export class FpayService {
             }
 
             // ============================================================
-            // ÉTAPE 4 : APPEL FPAY
+            // ÉTAPE 4 : APPEL FPAY AVEC userIdFpay
             // ============================================================
 
             const url =
                 `${this.fpayApiUrl}/wallet/deposit/request`;
 
             const payload = {
-                userId:
-                    dto.userId,
-
+                userId: dto.userId,  // ✅ userIdFpay pour l'API FPay
                 amount,
-
                 currency,
-
-                apiKey:
-                    this.parrainageApiKey,
+                apiKey: this.parrainageApiKey,
             };
 
             const headers = {
@@ -2128,7 +2127,10 @@ export class FpayService {
 
             try {
                 this.logger.log(
-                    `📤 Appel FPay: ${url}`,
+                    `📤 Appel FPay avec userIdFpay: ${dto.userId}`,
+                );
+                this.logger.log(
+                    `📤 Payload: ${JSON.stringify(payload)}`,
                 );
 
                 response =
