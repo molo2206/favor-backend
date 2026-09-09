@@ -18,7 +18,7 @@ import { Validator } from 'class-validator';
 import { MailService } from 'src/email/email.service';
 import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 import { I18nService } from 'src/libs/common/src';
-import { ReferralEntity } from 'src/users/entities/referral.entity';
+import { ReferralEntity, ReferralStatus } from 'src/users/entities/referral.entity';
 
 export interface WalletBalanceResponse {
     success: boolean;
@@ -1302,7 +1302,6 @@ export class FpayService {
                 );
             }
 
-            // ✅ Vérifier que l'API Key PARRAINAGE est configurée
             if (!this.parrainageApiKey) {
                 throw new HttpException(
                     'API Key de parrainage non configurée',
@@ -1311,7 +1310,7 @@ export class FpayService {
             }
 
             // ============================================================
-            // ✅ VÉRIFICATION DES TRANSACTIONS EN ATTENTE PAR DEVISE
+            // VÉRIFICATION DES TRANSACTIONS EN ATTENTE PAR DEVISE
             // ============================================================
             try {
                 this.logger.log(`🔍 Vérification des transactions en attente pour ${dto.userId} en ${dto.currency}`);
@@ -1348,7 +1347,6 @@ export class FpayService {
                     );
                 }
 
-                // ✅ Filtrer les transactions PENDING par DEVISE
                 const pendingInCurrency = allPending.filter(
                     (tx: any) => (tx.currency || 'USD') === dto.currency
                 );
@@ -1596,28 +1594,109 @@ export class FpayService {
             this.logger.log(`✅ OTP vérifié avec succès`);
 
             // ============================================================
-            // ÉTAPE 3: Effectuer la demande de dépôt (API Key dans le body)
+            // ÉTAPE 3: DÉDUIRE LES POINTS AVANT L'APPEL API
+            // ============================================================
+            let pointsDeducted = false;
+            let deductedAmount = 0;
+            let userWithReferrals: any = null;
+
+            try {
+                this.logger.log(`🔄 Vérification des points de parrainage pour ${dto.userId}: ${dto.amount} ${dto.currency}`);
+
+                userWithReferrals = await this.userRepository.findOne({
+                    where: { userIdFpay: dto.userId },
+                    relations: ['referralHistory'],
+                });
+
+                if (!userWithReferrals) {
+                    this.logger.warn(`⚠️ Utilisateur non trouvé pour la déduction des points`);
+                } else {
+                    // ✅ Calculer le total disponible dans la devise demandée
+                    const totalAvailable = (userWithReferrals.referralHistory || [])
+                        .filter(r => r.currency === dto.currency && Number(r.rewardAmount) > 0)
+                        .reduce((sum, r) => sum + Number(r.rewardAmount), 0);
+
+                    this.logger.log(`💰 Total disponible en ${dto.currency}: ${totalAvailable}`);
+                    this.logger.log(`💰 Montant demandé: ${dto.amount} ${dto.currency}`);
+
+                    // ✅ VÉRIFICATION : Si points insuffisants, on refuse
+                    if (totalAvailable < dto.amount) {
+                        throw new HttpException(
+                            {
+                                statusCode: HttpStatus.BAD_REQUEST,
+                                message: `Solde de parrainage insuffisant en ${dto.currency}. Disponible: ${totalAvailable} ${dto.currency}, Demandé: ${dto.amount} ${dto.currency}`,
+                                code: 'INSUFFICIENT_REFERRAL_POINTS',
+                                available: totalAvailable,
+                                requested: dto.amount,
+                                currency: dto.currency,
+                            },
+                            HttpStatus.BAD_REQUEST,
+                        );
+                    }
+
+                    // ✅ DÉDUIRE LES POINTS
+                    let remainingToDeduct = dto.amount;
+                    deductedAmount = dto.amount;
+
+                    const referralsInCurrency = (userWithReferrals.referralHistory || [])
+                        .filter(r => r.currency === dto.currency && Number(r.rewardAmount) > 0)
+                        .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+
+                    for (const referral of referralsInCurrency) {
+                        if (remainingToDeduct <= 0) break;
+
+                        const currentAmount = Number(referral.rewardAmount);
+
+                        if (currentAmount <= remainingToDeduct) {
+                            referral.rewardAmount = 0;
+                            remainingToDeduct -= currentAmount;
+                            this.logger.log(`✅ Parrainage ${referral.id}: ${currentAmount} ${dto.currency} entièrement déduit`);
+                        } else {
+                            referral.rewardAmount = currentAmount - remainingToDeduct;
+                            this.logger.log(`✅ Parrainage ${referral.id}: ${currentAmount} → ${referral.rewardAmount} ${dto.currency} (partiel)`);
+                            remainingToDeduct = 0;
+                        }
+
+                        await this.referralRepository.save(referral);
+                    }
+
+                    // ✅ Mettre à jour le total des points de l'utilisateur
+                    const totalAllCurrencies = (userWithReferrals.referralHistory || []).reduce((sum, r) => {
+                        return sum + (Number(r.rewardAmount) || 0);
+                    }, 0);
+
+                    userWithReferrals.referralPoints = totalAllCurrencies;
+                    await this.userRepository.save(userWithReferrals);
+
+                    pointsDeducted = true;
+                    this.logger.log(`✅ Points déduits: ${dto.amount} ${dto.currency}. Total restant: ${totalAllCurrencies}`);
+                }
+            } catch (referralError) {
+                if (referralError instanceof HttpException) {
+                    throw referralError;
+                }
+                this.logger.error(`❌ Erreur lors de la déduction des points: ${referralError.message}`);
+            }
+
+            // ============================================================
+            // ÉTAPE 4: Effectuer la demande de dépôt
             // ============================================================
             const url = `${this.fpayApiUrl}/wallet/deposit/request`;
 
-            // ✅ Utiliser this.parrainageApiKey dans le body
             const payload: any = {
                 userId: dto.userId,
                 amount: dto.amount,
                 currency: dto.currency,
-                apiKey: this.parrainageApiKey,   // ✅ API Key PARRAINAGE dans le body
+                apiKey: this.parrainageApiKey,
             };
 
             this.logger.log(`📤 Appel API FPay: ${url}`);
             this.logger.log(`📤 Payload: ${JSON.stringify(payload)}`);
 
-            // ✅ PAS de headers Authorization - juste Content-Type
             const headers = {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
             };
-
-            this.logger.log(`📤 Headers: Content-Type: application/json`);
 
             let response: any;
 
@@ -1631,6 +1710,67 @@ export class FpayService {
             } catch (error: any) {
                 this.logger.error(`❌ Erreur appel FPay: ${error.message}`);
 
+                // ✅ Si l'appel FPay échoue, rembourser les points
+                if (pointsDeducted && deductedAmount > 0) {
+                    this.logger.log(`🔄 Remboursement automatique des points: ${deductedAmount} ${dto.currency}`);
+
+                    try {
+                        // ✅ Recharger l'utilisateur avec ses parrainages
+                        const userForRefund = await this.userRepository.findOne({
+                            where: { userIdFpay: dto.userId },
+                            relations: ['referralHistory'],
+                        });
+
+                        if (userForRefund) {
+                            // ✅ Ajouter le montant déduit au premier parrainage disponible dans cette devise
+                            const firstReferral = userForRefund.referralHistory?.find(
+                                r => r.currency === dto.currency
+                            );
+
+                            if (firstReferral) {
+                                // ✅ REMBOURSEMENT : on ajoute le montant déduit
+                                firstReferral.rewardAmount = Number(firstReferral.rewardAmount) + deductedAmount;
+                                await this.referralRepository.save(firstReferral);
+                                this.logger.log(`✅ Remboursé ${deductedAmount} ${dto.currency} sur le parrainage ${firstReferral.id}`);
+                            } else {
+                                // ✅ Si aucun parrainage dans cette devise, en créer un nouveau
+                                this.logger.warn(`⚠️ Aucun parrainage en ${dto.currency} pour rembourser, création d'un nouveau`);
+
+                                // ✅ Utiliser l'utilisateur comme referrer
+                                const newReferral = this.referralRepository.create({
+                                    referrerId: userForRefund.id,           // ✅ Utiliser referrerId directement
+                                    referredId: userForRefund.id,           // ✅ Utiliser referredId directement
+                                    referralCode: `REFUND-${Date.now()}`,
+                                    status: ReferralStatus.COMPLETED,       // ✅ Utiliser l'enum
+                                    rewardAmount: deductedAmount,
+                                    currency: dto.currency,
+                                    rewardType: 'POINTS',
+                                    metadata: {
+                                        refund: true,
+                                        originalAmount: deductedAmount,
+                                        currency: dto.currency,
+                                        refundedAt: new Date().toISOString(),
+                                        reason: 'Remboursement suite à échec de dépôt',
+                                    },
+                                });
+                                await this.referralRepository.save(newReferral);
+                                this.logger.log(`✅ Nouveau parrainage créé pour le remboursement de ${deductedAmount} ${dto.currency}`);
+                            }
+
+                            // ✅ Recalculer le total des points
+                            const totalAllCurrencies = (userForRefund.referralHistory || []).reduce((sum, r) => {
+                                return sum + (Number(r.rewardAmount) || 0);
+                            }, 0);
+
+                            userForRefund.referralPoints = totalAllCurrencies;
+                            await this.userRepository.save(userForRefund);
+
+                            this.logger.log(`✅ Points remboursés avec succès. Nouveau total: ${totalAllCurrencies}`);
+                        }
+                    } catch (refundError) {
+                        this.logger.error(`❌ Erreur lors du remboursement automatique: ${refundError.message}`);
+                    }
+                }
                 // ✅ Extraire le message d'erreur du backend FPay
                 let errorMessage = 'Erreur lors de la demande de dépôt';
                 let errorCode = null;
@@ -1649,7 +1789,6 @@ export class FpayService {
                         errorData = errorResponse.data || null;
                     }
 
-                    // ✅ Gérer les erreurs spécifiques
                     if (statusCode === 400) {
                         if (errorMessage.includes('Solde insuffisant')) {
                             throw new HttpException(
@@ -1720,7 +1859,6 @@ export class FpayService {
                     );
                 }
 
-                // ✅ Erreur sans réponse
                 throw new HttpException(
                     {
                         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
@@ -1731,83 +1869,9 @@ export class FpayService {
                 );
             }
 
-            try {
-                this.logger.log(`🔄 Vérification des points de parrainage pour ${dto.userId}: ${dto.amount} ${dto.currency}`);
-
-                const userWithReferrals = await this.userRepository.findOne({
-                    where: { userIdFpay: dto.userId },
-                    relations: ['referralHistory'],
-                });
-
-                if (!userWithReferrals) {
-                    this.logger.warn(`⚠️ Utilisateur non trouvé`);
-                } else {
-                    // ✅ Calculer le total disponible dans la devise demandée
-                    const totalAvailable = (userWithReferrals.referralHistory || [])
-                        .filter(r => r.currency === dto.currency && Number(r.rewardAmount) > 0)
-                        .reduce((sum, r) => sum + Number(r.rewardAmount), 0);
-
-                    this.logger.log(`💰 Total disponible en ${dto.currency}: ${totalAvailable}`);
-                    this.logger.log(`💰 Montant demandé: ${dto.amount} ${dto.currency}`);
-
-                    // ✅ VÉRIFICATION : Si points insuffisants, on refuse
-                    if (totalAvailable < dto.amount) {
-                        throw new HttpException(
-                            {
-                                statusCode: HttpStatus.BAD_REQUEST,
-                                message: `Solde de parrainage insuffisants en ${dto.currency}. Disponible: ${totalAvailable} ${dto.currency}, Demandé: ${dto.amount} ${dto.currency}`,
-                                code: 'INSUFFICIENT_REFERRAL_POINTS',
-                                available: totalAvailable,
-                                requested: dto.amount,
-                                currency: dto.currency,
-                            },
-                            HttpStatus.BAD_REQUEST,
-                        );
-                    }
-
-                    // ✅ Si suffisant, on déduit
-                    let remainingToDeduct = dto.amount;
-
-                    // Récupérer les parrainages de la devise concernée
-                    const referralsInCurrency = (userWithReferrals.referralHistory || [])
-                        .filter(r => r.currency === dto.currency && Number(r.rewardAmount) > 0)
-                        .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-
-                    for (const referral of referralsInCurrency) {
-                        if (remainingToDeduct <= 0) break;
-
-                        const currentAmount = Number(referral.rewardAmount);
-
-                        if (currentAmount <= remainingToDeduct) {
-                            referral.rewardAmount = 0;
-                            remainingToDeduct -= currentAmount;
-                            this.logger.log(`✅ Parrainage ${referral.id}: ${currentAmount} ${dto.currency} entièrement déduit`);
-                        } else {
-                            referral.rewardAmount = currentAmount - remainingToDeduct;
-                            this.logger.log(`✅ Parrainage ${referral.id}: ${currentAmount} → ${referral.rewardAmount} ${dto.currency} (partiel)`);
-                            remainingToDeduct = 0;
-                        }
-
-                        await this.referralRepository.save(referral);
-                    }
-
-                    // ✅ Mettre à jour le total des points de l'utilisateur
-                    const totalAllCurrencies = (userWithReferrals.referralHistory || []).reduce((sum, r) => {
-                        return sum + (Number(r.rewardAmount) || 0);
-                    }, 0);
-
-                    userWithReferrals.referralPoints = totalAllCurrencies;
-                    await this.userRepository.save(userWithReferrals);
-
-                    this.logger.log(`✅ Solde déduit: ${dto.amount} ${dto.currency}. Total général restant: ${totalAllCurrencies}`);
-                }
-            } catch (referralError) {
-                if (referralError instanceof HttpException) {
-                    throw referralError;
-                }
-                this.logger.error(`❌ Erreur lors de la diminution des points: ${referralError.message}`);
-            }
-
+            // ============================================================
+            // ✅ SUCCÈS : Retourner la réponse
+            // ============================================================
             return {
                 status: 'success',
                 message: `Demande de dépôt de ${dto.amount} ${dto.currency} enregistrée avec succès. Référence: ${response.data.data?.transaction?.reference || 'N/A'}`,
@@ -1825,6 +1889,7 @@ export class FpayService {
             throw this.handleError(error);
         }
     }
+
     async decreaseReferralPoints(
         userId: string,
         amount: number,
