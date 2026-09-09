@@ -1276,19 +1276,22 @@ export class FpayService {
         lang: string = 'fr',
     ): Promise<any> {
         try {
-            this.logger.log(`📤 Demande de dépôt avec OTP: ${dto.amount} ${dto.currency} pour ${dto.userId}`);
+            this.logger.log(
+                `📤 Demande de dépôt: ${dto.amount} ${dto.currency} - userIdFpay=${dto.userId}`,
+            );
 
             // ============================================================
-            // VALIDATIONS INITIALES
+            // VALIDATIONS
             // ============================================================
+
             if (!dto.userId) {
                 throw new HttpException(
-                    'L\'ID de l\'utilisateur (bénéficiaire) est requis',
+                    "L'ID de l'utilisateur est requis",
                     HttpStatus.BAD_REQUEST,
                 );
             }
 
-            if (!dto.amount || dto.amount <= 0) {
+            if (!dto.amount || Number(dto.amount) <= 0) {
                 throw new HttpException(
                     'Le montant doit être supérieur à 0',
                     HttpStatus.BAD_REQUEST,
@@ -1309,58 +1312,89 @@ export class FpayService {
                 );
             }
 
+            const amount = Number(dto.amount);
+            const currency = dto.currency.toUpperCase();
+
             // ============================================================
             // VÉRIFICATION DES TRANSACTIONS EN ATTENTE
             // ============================================================
-            try {
-                this.logger.log(`🔍 Vérification des transactions en attente pour ${dto.userId} en ${dto.currency}`);
 
-                const transactionsData = await this.getWalletBalanceAndTransactions(
-                    dto.userId,
-                    1,
-                    100,
-                    undefined,
-                    undefined,
-                    'DEPOSIT',
-                    'PENDING',
-                    undefined,
-                    undefined,
+            try {
+                this.logger.log(
+                    `🔍 Vérification des transactions PENDING en ${currency}`,
                 );
+
+                const transactionsData =
+                    await this.getWalletBalanceAndTransactions(
+                        dto.userId,
+                        1,
+                        100,
+                        undefined,
+                        undefined,
+                        'DEPOSIT',
+                        'PENDING',
+                        undefined,
+                        undefined,
+                    );
 
                 let allPending: any[] = [];
 
-                if (transactionsData?.data?.transactions && Array.isArray(transactionsData.data.transactions)) {
-                    allPending = transactionsData.data.transactions.filter(
-                        (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
-                    );
-                } else if (transactionsData?.data && Array.isArray(transactionsData.data)) {
+                if (
+                    transactionsData?.data?.transactions &&
+                    Array.isArray(transactionsData.data.transactions)
+                ) {
+                    allPending =
+                        transactionsData.data.transactions.filter(
+                            (tx: any) =>
+                                tx.status === 'PENDING' ||
+                                tx.status === 'pending',
+                        );
+                } else if (
+                    transactionsData?.data &&
+                    Array.isArray(transactionsData.data)
+                ) {
                     allPending = transactionsData.data.filter(
-                        (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
+                        (tx: any) =>
+                            tx.status === 'PENDING' ||
+                            tx.status === 'pending',
                     );
-                } else if (transactionsData?.data?.transactions?.data && Array.isArray(transactionsData.data.transactions.data)) {
-                    allPending = transactionsData.data.transactions.data.filter(
-                        (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
-                    );
+                } else if (
+                    transactionsData?.data?.transactions?.data &&
+                    Array.isArray(
+                        transactionsData.data.transactions.data,
+                    )
+                ) {
+                    allPending =
+                        transactionsData.data.transactions.data.filter(
+                            (tx: any) =>
+                                tx.status === 'PENDING' ||
+                                tx.status === 'pending',
+                        );
                 } else if (Array.isArray(transactionsData)) {
                     allPending = transactionsData.filter(
-                        (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
+                        (tx: any) =>
+                            tx.status === 'PENDING' ||
+                            tx.status === 'pending',
                     );
                 }
 
                 const pendingInCurrency = allPending.filter(
-                    (tx: any) => (tx.currency || 'USD') === dto.currency
+                    (tx: any) =>
+                        String(tx.currency || 'USD').toUpperCase() ===
+                        currency,
                 );
-
-                this.logger.log(`⏳ ${pendingInCurrency.length} transaction(s) en attente en ${dto.currency}`);
 
                 if (pendingInCurrency.length > 0) {
                     const pendingTx = pendingInCurrency[0];
-                    this.logger.warn(`❌ Transaction en attente trouvée en ${dto.currency}: ${pendingTx.reference}`);
+
+                    this.logger.warn(
+                        `❌ Une transaction est déjà PENDING en ${currency}`,
+                    );
 
                     throw new HttpException(
                         {
                             statusCode: HttpStatus.BAD_REQUEST,
-                            message: `Vous avez déjà une demande de dépôt en cours en ${dto.currency} de ${pendingTx.amount} ${dto.currency}. Veuillez attendre sa finalisation avant de faire une nouvelle demande dans cette devise.`,
+                            message: `Vous avez déjà une demande de dépôt en cours en ${currency} de ${pendingTx.amount} ${currency}. Veuillez attendre sa finalisation.`,
                             code: 'PENDING_TRANSACTION_EXISTS_IN_CURRENCY',
                             pendingTransaction: {
                                 id: pendingTx.id,
@@ -1375,39 +1409,66 @@ export class FpayService {
                     );
                 }
 
-                this.logger.log(`✅ Aucune transaction en attente en ${dto.currency}`);
-
+                this.logger.log(
+                    `✅ Aucune transaction PENDING en ${currency}`,
+                );
             } catch (error: any) {
                 if (error instanceof HttpException) {
                     throw error;
                 }
-                this.logger.warn(`⚠️ Erreur lors de la vérification des transactions: ${error.message}`);
+
+                this.logger.warn(
+                    `⚠️ Impossible de vérifier les transactions PENDING: ${error.message}`,
+                );
             }
 
             // ============================================================
-            // ÉTAPE 1: Vérifier si l'OTP est fourni
+            // ÉTAPE 1 : ENVOI OTP
             // ============================================================
-            const hasOtp = dto.otpCode && dto.otpCode.trim() !== '';
+
+            const hasOtp =
+                dto.otpCode &&
+                dto.otpCode.trim() !== '';
 
             if (!hasOtp) {
-                this.logger.log(`📱 ÉTAPE 1 - Envoi OTP pour ${dto.userId}`);
-                const generatedOtpCode = Math.floor(1000 + Math.random() * 9000).toString();
-                const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+                this.logger.log(
+                    `📱 ÉTAPE 1 - Génération OTP`,
+                );
 
-                const user = await this.userRepository.findOne({
-                    where: { userIdFpay: dto.userId },
-                    select: ['id', 'email', 'phone', 'fullName'],
-                });
+                const generatedOtpCode =
+                    Math.floor(
+                        1000 + Math.random() * 9000,
+                    ).toString();
+
+                const otpExpiry = new Date(
+                    Date.now() + 10 * 60 * 1000,
+                );
+
+                const user =
+                    await this.userRepository.findOne({
+                        where: {
+                            userIdFpay: dto.userId,
+                        },
+                        select: [
+                            'id',
+                            'email',
+                            'phone',
+                            'fullName',
+                        ],
+                    });
 
                 if (!user) {
                     throw new HttpException(
-                        'Utilisateur non trouvé. Veuillez vérifier vos identifiants.',
+                        'Utilisateur non trouvé.',
                         HttpStatus.NOT_FOUND,
                     );
                 }
 
                 let destination: string | null = null;
-                let destinationType: 'email' | 'sms' = 'email';
+
+                let destinationType:
+                    | 'email'
+                    | 'sms' = 'email';
 
                 if (user.email) {
                     destination = user.email;
@@ -1424,33 +1485,54 @@ export class FpayService {
                     );
                 }
 
-                this.logger.log(`📤 Destination: ${destination} (${destinationType})`);
-
+                // Invalider les anciens OTP
                 await this.otpRepository.update(
-                    { email: destination, isUsed: false },
-                    { isUsed: true }
+                    {
+                        email: destination,
+                        isUsed: false,
+                    },
+                    {
+                        isUsed: true,
+                    },
                 );
 
-                const otp = this.otpRepository.create({
-                    email: destination,
-                    otpCode: generatedOtpCode,
-                    expiresAt: otpExpiry,
-                    isUsed: false,
-                    user: user,
-                });
+                const otp =
+                    this.otpRepository.create({
+                        email: destination,
+                        otpCode: generatedOtpCode,
+                        expiresAt: otpExpiry,
+                        isUsed: false,
+                        user,
+                    });
+
                 await this.otpRepository.save(otp);
 
-                this.logger.log(`✅ OTP sauvegardé: ${generatedOtpCode} pour ${destination}`);
+                // ========================================================
+                // EMAIL
+                // ========================================================
 
                 if (destinationType === 'email') {
                     const translations = {
-                        title: 'Code de vérification pour votre dépôt',
-                        description: 'Utilisez le code ci-dessous pour confirmer votre demande de dépôt sur FPay',
-                        label: 'VOTRE CODE DE VÉRIFICATION',
-                        expiry: 'Ce code expire dans 10 minutes',
-                        footerCopyright: `© ${new Date().getFullYear()} FavorHelp. Tous droits réservés.`,
-                        footerSecurity: 'Protection des données | Email sécurisé',
-                        legalNote: 'Favor Help — Écosystème digital par Favor Group | RCCM: 21-A-770 | N° IMPÔT: A2156062L | National ID: 19-G4701-N74976H',
+                        title:
+                            'Code de vérification pour votre dépôt',
+
+                        description:
+                            'Utilisez le code ci-dessous pour confirmer votre demande de dépôt sur FPay',
+
+                        label:
+                            'VOTRE CODE DE VÉRIFICATION',
+
+                        expiry:
+                            'Ce code expire dans 10 minutes',
+
+                        footerCopyright:
+                            `© ${new Date().getFullYear()} FavorHelp. Tous droits réservés.`,
+
+                        footerSecurity:
+                            'Protection des données | Email sécurisé',
+
+                        legalNote:
+                            'Favor Help — Écosystème digital par Favor Group | RCCM: 21-A-770 | N° IMPÔT: A2156062L | National ID: 19-G4701-N74976',
                     };
 
                     await this.mailService.sendHtmlEmail(
@@ -1460,39 +1542,61 @@ export class FpayService {
                         {
                             otpCode: generatedOtpCode,
                             year: new Date().getFullYear(),
-                            lang: lang,
-                            translations: translations,
+                            lang,
+                            translations,
                         },
                     );
-                    this.logger.log(`✅ OTP envoyé par email à ${destination}`);
-                } else {
-                    const smsMessage = `Votre code OTP pour le dépôt FPay est: ${generatedOtpCode}. Valable 10 minutes.`;
-                    await this.smsHelper.sendSms(destination, smsMessage);
-                    this.logger.log(`✅ OTP envoyé par SMS à ${destination}`);
+                }
+
+                // ========================================================
+                // SMS
+                // ========================================================
+
+                else {
+                    const smsMessage =
+                        `Votre code OTP pour le dépôt FPay est: ${generatedOtpCode}. Valable 10 minutes.`;
+
+                    await this.smsHelper.sendSms(
+                        destination,
+                        smsMessage,
+                    );
                 }
 
                 return {
                     status: 'success',
-                    message: `Un code OTP a été envoyé par ${destinationType === 'email' ? 'email' : 'SMS'}.`,
+                    message: `Un code OTP a été envoyé par ${destinationType === 'email'
+                            ? 'email'
+                            : 'SMS'
+                        }.`,
                     requiresOtp: true,
                     data: {
                         userId: dto.userId,
-                        amount: dto.amount,
-                        currency: dto.currency,
+                        amount,
+                        currency,
                         destination: destinationType,
                     },
                 };
             }
 
             // ============================================================
-            // ÉTAPE 2: Vérifier l'OTP
+            // ÉTAPE 2 : VÉRIFICATION OTP
             // ============================================================
-            this.logger.log(`🔐 ÉTAPE 2 - Vérification OTP: ${dto.otpCode} pour ${dto.userId}`);
 
-            const user = await this.userRepository.findOne({
-                where: { userIdFpay: dto.userId },
-                select: ['id', 'email', 'phone'],
-            });
+            this.logger.log(
+                `🔐 ÉTAPE 2 - Vérification OTP`,
+            );
+
+            const user =
+                await this.userRepository.findOne({
+                    where: {
+                        userIdFpay: dto.userId,
+                    },
+                    select: [
+                        'id',
+                        'email',
+                        'phone',
+                    ],
+                });
 
             if (!user) {
                 throw new HttpException(
@@ -1502,6 +1606,7 @@ export class FpayService {
             }
 
             let destination: string | null = null;
+
             if (user.email) {
                 destination = user.email;
             } else if (user.phone) {
@@ -1515,58 +1620,65 @@ export class FpayService {
                 );
             }
 
-            this.logger.log(`🔍 Recherche OTP avec destination: ${destination}`);
-            this.logger.log(`🔍 Code OTP: ${dto.otpCode}`);
+            const otpCode =
+                dto.otpCode!.trim();
 
-            const otpCode = dto.otpCode as string;
-
-            const otpEntry = await this.otpRepository.findOne({
-                where: {
-                    email: destination,
-                    otpCode: otpCode.trim(),
-                    isUsed: false,
-                },
-                relations: ['user'],
-            });
-
-            if (!otpEntry) {
-                const existingOtp = await this.otpRepository.findOne({
+            const otpEntry =
+                await this.otpRepository.findOne({
                     where: {
                         email: destination,
-                        otpCode: otpCode.trim(),
+                        otpCode,
+                        isUsed: false,
                     },
+                    relations: ['user'],
                 });
 
-                if (existingOtp) {
-                    this.logger.log(`⚠️ OTP trouvé mais isUsed=${existingOtp.isUsed}`);
-                    if (existingOtp.isUsed) {
-                        throw new HttpException(
-                            {
-                                statusCode: HttpStatus.BAD_REQUEST,
-                                message: 'Ce code OTP a déjà été utilisé.',
-                                code: 'OTP_ALREADY_USED',
-                                canResend: true,
-                            },
-                            HttpStatus.BAD_REQUEST,
-                        );
-                    }
-                    if (new Date() > existingOtp.expiresAt) {
-                        throw new HttpException(
-                            {
-                                statusCode: HttpStatus.BAD_REQUEST,
-                                message: 'Ce code OTP a expiré.',
-                                code: 'OTP_EXPIRED',
-                                canResend: true,
-                            },
-                            HttpStatus.BAD_REQUEST,
-                        );
-                    }
+            if (!otpEntry) {
+                const existingOtp =
+                    await this.otpRepository.findOne({
+                        where: {
+                            email: destination,
+                            otpCode,
+                        },
+                    });
+
+                if (existingOtp?.isUsed) {
+                    throw new HttpException(
+                        {
+                            statusCode:
+                                HttpStatus.BAD_REQUEST,
+                            message:
+                                'Ce code OTP a déjà été utilisé.',
+                            code: 'OTP_ALREADY_USED',
+                            canResend: true,
+                        },
+                        HttpStatus.BAD_REQUEST,
+                    );
+                }
+
+                if (
+                    existingOtp &&
+                    new Date() > existingOtp.expiresAt
+                ) {
+                    throw new HttpException(
+                        {
+                            statusCode:
+                                HttpStatus.BAD_REQUEST,
+                            message:
+                                'Ce code OTP a expiré.',
+                            code: 'OTP_EXPIRED',
+                            canResend: true,
+                        },
+                        HttpStatus.BAD_REQUEST,
+                    );
                 }
 
                 throw new HttpException(
                     {
-                        statusCode: HttpStatus.BAD_REQUEST,
-                        message: 'Code OTP invalide.',
+                        statusCode:
+                            HttpStatus.BAD_REQUEST,
+                        message:
+                            'Code OTP invalide.',
                         code: 'INVALID_OTP',
                         canResend: true,
                     },
@@ -1574,13 +1686,23 @@ export class FpayService {
                 );
             }
 
-            if (new Date() > otpEntry.expiresAt) {
+            // Vérification expiration
+            if (
+                new Date() >
+                otpEntry.expiresAt
+            ) {
                 otpEntry.isUsed = true;
-                await this.otpRepository.save(otpEntry);
+
+                await this.otpRepository.save(
+                    otpEntry,
+                );
+
                 throw new HttpException(
                     {
-                        status: 'error',
-                        message: 'Code OTP expiré.',
+                        statusCode:
+                            HttpStatus.BAD_REQUEST,
+                        message:
+                            'Code OTP expiré.',
                         code: 'OTP_EXPIRED',
                         canResend: true,
                     },
@@ -1588,196 +1710,662 @@ export class FpayService {
                 );
             }
 
+            // OTP valide
             otpEntry.isUsed = true;
-            await this.otpRepository.save(otpEntry);
 
-            this.logger.log(`✅ OTP vérifié avec succès`);
+            await this.otpRepository.save(
+                otpEntry,
+            );
+
+            this.logger.log(
+                `✅ OTP vérifié avec succès`,
+            );
 
             // ============================================================
-            // ✅ ÉTAPE 3: DÉDUIRE LES POINTS AVANT L'APPEL API
+            // ÉTAPE 3 : DÉDUIRE AUTOMATIQUEMENT LA BALANCE
             // ============================================================
-            let pointsDeducted = false;
-            let deductedAmount = 0;
+
+            const deductedReferrals: Array<{
+                id: string;
+                amount: number;
+                balanceBefore: number;
+                balanceAfter: number;
+            }> = [];
+
+            let totalDeducted = 0;
 
             try {
-                this.logger.log(`🔄 DÉDUCTION des points de parrainage pour ${dto.userId}: ${dto.amount} ${dto.currency}`);
+                this.logger.log(
+                    `💰 Recherche du solde de parrainage en ${currency}`,
+                );
 
-                const user = await this.userRepository.findOne({
-                    where: { userIdFpay: dto.userId },
-                });
+                const userWithReferrals =
+                    await this.userRepository.findOne({
+                        where: {
+                            id: user.id,
+                        },
+                        relations: [
+                            'referralHistory',
+                        ],
+                    });
 
-                if (!user) {
+                if (!userWithReferrals) {
                     throw new HttpException(
-                        'Utilisateur non trouvé pour la déduction des points',
+                        'Utilisateur non trouvé.',
                         HttpStatus.NOT_FOUND,
                     );
                 }
 
-                const userWithReferrals = await this.userRepository.findOne({
-                    where: { id: user.id },
-                    relations: ['referralHistory'],
-                });
+                // ========================================================
+                // RÉCUPÉRER UNIQUEMENT LES BALANCES DE LA DEVISE
+                // ========================================================
 
-
-                if (!userWithReferrals) {
-                    this.logger.warn(`⚠️ Utilisateur non trouvé pour la déduction des points`);
-                } else {
-                    // ✅ Calculer le total disponible dans la devise demandée
-                    const totalAvailable = (userWithReferrals.referralHistory || [])
-                        .filter(r => r.currency === dto.currency && Number(r.rewardAmount) > 0)
-                        .reduce((sum, r) => sum + Number(r.rewardAmount), 0);
-
-                    this.logger.log(`💰 Total disponible en ${dto.currency}: ${totalAvailable}`);
-                    this.logger.log(`💰 Montant demandé: ${dto.amount} ${dto.currency}`);
-
-                    if (totalAvailable < dto.amount) {
-                        throw new HttpException(
-                            {
-                                statusCode: HttpStatus.BAD_REQUEST,
-                                message: `Solde de parrainage insuffisant en ${dto.currency}. Disponible: ${totalAvailable} ${dto.currency}, Demandé: ${dto.amount} ${dto.currency}`,
-                                code: 'INSUFFICIENT_REFERRAL_POINTS',
-                                available: totalAvailable,
-                                requested: dto.amount,
-                                currency: dto.currency,
-                            },
-                            HttpStatus.BAD_REQUEST,
+                const referralsInCurrency =
+                    (
+                        userWithReferrals.referralHistory ||
+                        []
+                    )
+                        .filter(
+                            (referral) =>
+                                String(
+                                    referral.currency,
+                                ).toUpperCase() ===
+                                currency &&
+                                Number(
+                                    referral.rewardAmount,
+                                ) > 0,
+                        )
+                        .sort(
+                            (a, b) =>
+                                (
+                                    a.createdAt?.getTime() ||
+                                    0
+                                ) -
+                                (
+                                    b.createdAt?.getTime() ||
+                                    0
+                                ),
                         );
+
+                // ========================================================
+                // BALANCE TOTALE
+                // ========================================================
+
+                const availableBalance =
+                    referralsInCurrency.reduce(
+                        (
+                            total,
+                            referral,
+                        ) =>
+                            total +
+                            Number(
+                                referral.rewardAmount ||
+                                0,
+                            ),
+                        0,
+                    );
+
+                this.logger.log(
+                    `💰 Balance disponible: ${availableBalance} ${currency}`,
+                );
+
+                this.logger.log(
+                    `💸 Montant demandé: ${amount} ${currency}`,
+                );
+
+                // ========================================================
+                // VÉRIFICATION DU SOLDE
+                // ========================================================
+
+                if (
+                    availableBalance <
+                    amount
+                ) {
+                    throw new HttpException(
+                        {
+                            statusCode:
+                                HttpStatus.BAD_REQUEST,
+
+                            message:
+                                `Solde de parrainage insuffisant. Votre balance est de ${availableBalance} ${currency}, mais vous demandez ${amount} ${currency}.`,
+
+                            code:
+                                'INSUFFICIENT_REFERRAL_BALANCE',
+
+                            available:
+                                availableBalance,
+
+                            requested:
+                                amount,
+
+                            currency,
+                        },
+                        HttpStatus.BAD_REQUEST,
+                    );
+                }
+
+                // ========================================================
+                // DÉDUCTION AUTOMATIQUE
+                // ========================================================
+
+                let remainingAmount =
+                    amount;
+
+                for (
+                    const referral
+                    of referralsInCurrency
+                ) {
+                    if (
+                        remainingAmount <=
+                        0
+                    ) {
+                        break;
                     }
 
-                    // ✅ DÉDUIRE LES POINTS
-                    let remainingToDeduct = dto.amount;
-                    deductedAmount = dto.amount;
+                    const balanceBefore =
+                        Number(
+                            referral.rewardAmount ||
+                            0,
+                        );
 
-                    const referralsInCurrency = (userWithReferrals.referralHistory || [])
-                        .filter(r => r.currency === dto.currency && Number(r.rewardAmount) > 0)
-                        .sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
-
-                    for (const referral of referralsInCurrency) {
-                        if (remainingToDeduct <= 0) break;
-
-                        const currentAmount = Number(referral.rewardAmount);
-
-                        if (currentAmount <= remainingToDeduct) {
-                            referral.rewardAmount = 0;
-                            remainingToDeduct -= currentAmount;
-                            this.logger.log(`✅ Parrainage ${referral.id.substring(0, 8)}...: ${currentAmount} ${dto.currency} → 0`);
-                        } else {
-                            referral.rewardAmount = currentAmount - remainingToDeduct;
-                            this.logger.log(`✅ Parrainage ${referral.id.substring(0, 8)}...: ${currentAmount} → ${referral.rewardAmount} ${dto.currency}`);
-                            remainingToDeduct = 0;
-                        }
-
-                        await this.referralRepository.save(referral);
+                    if (
+                        balanceBefore <=
+                        0
+                    ) {
+                        continue;
                     }
 
-                    // ✅ Mettre à jour le total des points
-                    const totalAllCurrencies = (userWithReferrals.referralHistory || []).reduce((sum, r) => {
-                        return sum + (Number(r.rewardAmount) || 0);
-                    }, 0);
+                    const amountToDeduct =
+                        Math.min(
+                            balanceBefore,
+                            remainingAmount,
+                        );
 
-                    userWithReferrals.referralPoints = totalAllCurrencies;
-                    await this.userRepository.save(userWithReferrals);
+                    const balanceAfter =
+                        Number(
+                            (
+                                balanceBefore -
+                                amountToDeduct
+                            ).toFixed(2),
+                        );
 
-                    pointsDeducted = true;
-                    this.logger.log(`✅ Points déduits: ${dto.amount} ${dto.currency}. Total restant: ${totalAllCurrencies}`);
+                    // ====================================================
+                    // ⭐ BALANCE DIMINUÉE AUTOMATIQUEMENT
+                    // ====================================================
+
+                    referral.rewardAmount =
+                        balanceAfter;
+
+                    // ====================================================
+                    // HISTORIQUE
+                    // ====================================================
+
+                    const existingMetadata =
+                        referral.metadata &&
+                            typeof referral.metadata ===
+                            'object'
+                            ? referral.metadata
+                            : {};
+
+                    const history =
+                        Array.isArray(
+                            existingMetadata.history,
+                        )
+                            ? existingMetadata.history
+                            : [];
+
+                    const operation = {
+                        type: 'WITHDRAWAL',
+
+                        amount:
+                            amountToDeduct,
+
+                        currency,
+
+                        balanceBefore,
+
+                        balanceAfter,
+
+                        reason:
+                            'REFERRAL_DEPOSIT_REQUEST',
+
+                        userId:
+                            user.id,
+
+                        fpayUserId:
+                            dto.userId,
+
+                        createdAt:
+                            new Date().toISOString(),
+                    };
+
+                    referral.metadata = {
+                        ...existingMetadata,
+
+                        history: [
+                            ...history,
+                            operation,
+                        ],
+
+                        lastOperation:
+                            operation,
+                    };
+
+                    // ====================================================
+                    // SAUVEGARDER LA NOUVELLE BALANCE
+                    // ====================================================
+
+                    await this.referralRepository.save(
+                        referral,
+                    );
+
+                    // ====================================================
+                    // MÉMORISER POUR UN ÉVENTUEL REMBOURSEMENT
+                    // ====================================================
+
+                    deductedReferrals.push({
+                        id:
+                            referral.id,
+
+                        amount:
+                            amountToDeduct,
+
+                        balanceBefore,
+
+                        balanceAfter,
+                    });
+
+                    remainingAmount =
+                        Number(
+                            (
+                                remainingAmount -
+                                amountToDeduct
+                            ).toFixed(2),
+                        );
+
+                    totalDeducted =
+                        Number(
+                            (
+                                totalDeducted +
+                                amountToDeduct
+                            ).toFixed(2),
+                        );
+
+                    this.logger.log(
+                        `💰 Balance ${referral.id.substring(
+                            0,
+                            8,
+                        )}... : ${balanceBefore} → ${balanceAfter} ${currency}`,
+                    );
                 }
-            } catch (referralError) {
-                if (referralError instanceof HttpException) {
-                    throw referralError;
+
+                // ========================================================
+                // SÉCURITÉ
+                // ========================================================
+
+                if (
+                    remainingAmount >
+                    0.001
+                ) {
+                    throw new HttpException(
+                        {
+                            statusCode:
+                                HttpStatus.INTERNAL_SERVER_ERROR,
+
+                            message:
+                                'La déduction de la balance de parrainage n’a pas pu être complétée.',
+
+                            code:
+                                'REFERRAL_BALANCE_DEDUCTION_FAILED',
+
+                            remaining:
+                                remainingAmount,
+                        },
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                    );
                 }
-                this.logger.error(`❌ Erreur lors de la déduction: ${referralError.message}`);
+
+                // ========================================================
+                // RECALCULER referralPoints
+                // ========================================================
+
+                const totalAllCurrencies =
+                    (
+                        userWithReferrals.referralHistory ||
+                        []
+                    ).reduce(
+                        (
+                            total,
+                            referral,
+                        ) =>
+                            total +
+                            Number(
+                                referral.rewardAmount ||
+                                0,
+                            ),
+                        0,
+                    );
+
+                userWithReferrals.referralPoints =
+                    Number(
+                        totalAllCurrencies.toFixed(
+                            2,
+                        ),
+                    );
+
+                await this.userRepository.save(
+                    userWithReferrals,
+                );
+
+                this.logger.log(
+                    `✅ Balance diminuée automatiquement de ${totalDeducted} ${currency}`,
+                );
+
+                this.logger.log(
+                    `💰 Nouvelle balance totale: ${totalAllCurrencies}`,
+                );
+            } catch (error: any) {
+                if (
+                    error instanceof
+                    HttpException
+                ) {
+                    throw error;
+                }
+
+                this.logger.error(
+                    `❌ Erreur déduction balance: ${error.message}`,
+                );
+
+                throw new HttpException(
+                    {
+                        statusCode:
+                            HttpStatus.INTERNAL_SERVER_ERROR,
+
+                        message:
+                            'Erreur lors de la mise à jour de la balance de parrainage.',
+
+                        code:
+                            'REFERRAL_BALANCE_ERROR',
+                    },
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                );
             }
 
             // ============================================================
-            // ÉTAPE 4: Effectuer la demande de dépôt
+            // ÉTAPE 4 : APPEL FPAY
             // ============================================================
-            const url = `${this.fpayApiUrl}/wallet/deposit/request`;
 
-            const payload: any = {
-                userId: dto.userId,
-                amount: dto.amount,
-                currency: dto.currency,
-                apiKey: this.parrainageApiKey,
+            const url =
+                `${this.fpayApiUrl}/wallet/deposit/request`;
+
+            const payload = {
+                userId:
+                    dto.userId,
+
+                amount,
+
+                currency,
+
+                apiKey:
+                    this.parrainageApiKey,
             };
 
-            this.logger.log(`📤 Appel API FPay: ${url}`);
-            this.logger.log(`📤 Payload: ${JSON.stringify(payload)}`);
-
             const headers = {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
+                'Content-Type':
+                    'application/json',
+
+                Accept:
+                    'application/json',
             };
 
             let response: any;
 
             try {
-                response = await firstValueFrom(
-                    this.httpService.post(url, payload, { headers: headers })
+                this.logger.log(
+                    `📤 Appel FPay: ${url}`,
                 );
 
-                this.logger.log(`✅ Demande de dépôt enregistrée: ${response.data.data?.transaction?.reference || 'OK'}`);
+                response =
+                    await firstValueFrom(
+                        this.httpService.post(
+                            url,
+                            payload,
+                            {
+                                headers,
+                            },
+                        ),
+                    );
 
+                const reference =
+                    response?.data?.data
+                        ?.transaction
+                        ?.reference;
+
+                this.logger.log(
+                    `✅ Dépôt FPay enregistré: ${reference || 'OK'
+                    }`,
+                );
             } catch (error: any) {
-                this.logger.error(`❌ Erreur appel FPay: ${error.message}`);
+                this.logger.error(
+                    `❌ Erreur FPay: ${error.message}`,
+                );
 
                 if (error.response) {
-                    this.logger.error(`📦 Réponse erreur FPay: ${JSON.stringify(error.response.data)}`);
+                    this.logger.error(
+                        `📦 Réponse FPay: ${JSON.stringify(
+                            error.response.data,
+                        )}`,
+                    );
                 }
 
-                // ============================================================
-                // ✅ SI L'APPEL ÉCHOUE, REMBOURSER LES POINTS
-                // ============================================================
-                if (pointsDeducted && deductedAmount > 0) {
-                    this.logger.log(`🔄 REMBOURSEMENT automatique: ${deductedAmount} ${dto.currency}`);
+                // ========================================================
+                // REMBOURSEMENT AUTOMATIQUE
+                // ========================================================
+
+                if (
+                    deductedReferrals.length >
+                    0
+                ) {
+                    this.logger.warn(
+                        `🔄 FPay a échoué. Remboursement de ${totalDeducted} ${currency}`,
+                    );
 
                     try {
-                        const userForRefund = await this.userRepository.findOne({
-                            where: { userIdFpay: dto.userId },
-                            relations: ['referralHistory'],
-                        });
-
-                        if (userForRefund) {
-                            // ✅ Ajouter le montant au premier parrainage de la devise
-                            let referralToRefund = userForRefund.referralHistory?.find(
-                                r => r.currency === dto.currency
+                        const userForRefund =
+                            await this.userRepository.findOne(
+                                {
+                                    where: {
+                                        id: user.id,
+                                    },
+                                    relations: [
+                                        'referralHistory',
+                                    ],
+                                },
                             );
 
-                            if (referralToRefund) {
-                                const currentAmount = Number(referralToRefund.rewardAmount);
-                                referralToRefund.rewardAmount = currentAmount + deductedAmount;
-                                await this.referralRepository.save(referralToRefund);
-                                this.logger.log(`✅ Remboursé ${deductedAmount} ${dto.currency} sur ${referralToRefund.id.substring(0, 8)}...`);
-                                this.logger.log(`   ${currentAmount} → ${referralToRefund.rewardAmount} ${dto.currency}`);
+                        if (!userForRefund) {
+                            throw new Error(
+                                'Utilisateur introuvable pour remboursement.',
+                            );
+                        }
+
+                        for (
+                            const deducted
+                            of deductedReferrals
+                        ) {
+                            const referral =
+                                (
+                                    userForRefund.referralHistory ||
+                                    []
+                                ).find(
+                                    (item) =>
+                                        item.id ===
+                                        deducted.id,
+                                );
+
+                            if (!referral) {
+                                this.logger.error(
+                                    `❌ Referral ${deducted.id} introuvable.`,
+                                );
+
+                                continue;
                             }
 
-                            // ✅ Recalculer le total
-                            const totalAllCurrencies = (userForRefund.referralHistory || []).reduce((sum, r) => {
-                                return sum + (Number(r.rewardAmount) || 0);
-                            }, 0);
+                            const currentBalance =
+                                Number(
+                                    referral.rewardAmount ||
+                                    0,
+                                );
 
-                            userForRefund.referralPoints = totalAllCurrencies;
-                            await this.userRepository.save(userForRefund);
-                            this.logger.log(`💰 Nouveau total: ${totalAllCurrencies}`);
+                            const newBalance =
+                                Number(
+                                    (
+                                        currentBalance +
+                                        deducted.amount
+                                    ).toFixed(2),
+                                );
+
+                            // ============================================
+                            // RESTAURATION DE LA BALANCE
+                            // ============================================
+
+                            referral.rewardAmount =
+                                newBalance;
+
+                            // ============================================
+                            // HISTORIQUE REFUND
+                            // ============================================
+
+                            const existingMetadata =
+                                referral.metadata &&
+                                    typeof referral.metadata ===
+                                    'object'
+                                    ? referral.metadata
+                                    : {};
+
+                            const history =
+                                Array.isArray(
+                                    existingMetadata.history,
+                                )
+                                    ? existingMetadata.history
+                                    : [];
+
+                            const refundOperation = {
+                                type: 'REFUND',
+
+                                amount:
+                                    deducted.amount,
+
+                                currency,
+
+                                balanceBefore:
+                                    currentBalance,
+
+                                balanceAfter:
+                                    newBalance,
+
+                                reason:
+                                    'FPAY_DEPOSIT_REQUEST_FAILED',
+
+                                userId:
+                                    user.id,
+
+                                fpayUserId:
+                                    dto.userId,
+
+                                createdAt:
+                                    new Date().toISOString(),
+                            };
+
+                            referral.metadata = {
+                                ...existingMetadata,
+
+                                history: [
+                                    ...history,
+                                    refundOperation,
+                                ],
+
+                                lastOperation:
+                                    refundOperation,
+                            };
+
+                            await this.referralRepository.save(
+                                referral,
+                            );
+
+                            this.logger.log(
+                                `✅ Balance restaurée: ${currentBalance} → ${newBalance} ${currency}`,
+                            );
                         }
-                    } catch (refundError) {
-                        this.logger.error(`❌ Erreur remboursement: ${refundError.message}`);
+
+                        // ================================================
+                        // RECALCUL TOTAL
+                        // ================================================
+
+                        const newTotal =
+                            (
+                                userForRefund.referralHistory ||
+                                []
+                            ).reduce(
+                                (
+                                    total,
+                                    referral,
+                                ) =>
+                                    total +
+                                    Number(
+                                        referral.rewardAmount ||
+                                        0,
+                                    ),
+                                0,
+                            );
+
+                        userForRefund.referralPoints =
+                            Number(
+                                newTotal.toFixed(
+                                    2,
+                                ),
+                            );
+
+                        await this.userRepository.save(
+                            userForRefund,
+                        );
+
+                        this.logger.log(
+                            `💰 Balance totale après remboursement: ${newTotal}`,
+                        );
+                    } catch (refundError: any) {
+                        this.logger.error(
+                            `❌ ERREUR CRITIQUE REMBOURSEMENT: ${refundError.message}`,
+                        );
                     }
                 }
 
-                // ✅ Gérer l'erreur FPay
-                let errorMessage = 'Erreur lors de la demande de dépôt';
-                let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+                // ========================================================
+                // ERREUR FPAY
+                // ========================================================
 
                 if (error.response) {
-                    const errorResponse = error.response.data;
-                    statusCode = error.response.status || HttpStatus.INTERNAL_SERVER_ERROR;
-                    errorMessage = errorResponse.message || errorResponse.error || errorMessage;
+                    const errorResponse =
+                        error.response.data;
+
+                    const statusCode =
+                        error.response.status ||
+                        HttpStatus.INTERNAL_SERVER_ERROR;
+
+                    const errorMessage =
+                        errorResponse?.message ||
+                        errorResponse?.error ||
+                        'Erreur lors de la demande de dépôt';
 
                     throw new HttpException(
                         {
-                            statusCode: statusCode,
-                            message: errorMessage,
-                            fpayError: errorResponse,
+                            statusCode,
+
+                            message:
+                                errorMessage,
+
+                            fpayError:
+                                errorResponse,
                         },
                         statusCode,
                     );
@@ -1785,29 +2373,52 @@ export class FpayService {
 
                 throw new HttpException(
                     {
-                        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-                        message: errorMessage,
-                        code: 'FPAY_SERVICE_ERROR',
+                        statusCode:
+                            HttpStatus.INTERNAL_SERVER_ERROR,
+
+                        message:
+                            'Erreur lors de la demande de dépôt FPay.',
+
+                        code:
+                            'FPAY_SERVICE_ERROR',
                     },
                     HttpStatus.INTERNAL_SERVER_ERROR,
                 );
             }
 
             // ============================================================
-            // ✅ SUCCÈS
+            // SUCCÈS
             // ============================================================
+
+            const transaction =
+                response?.data?.data
+                    ?.transaction;
+
             return {
                 status: 'success',
-                message: `Demande de dépôt de ${dto.amount} ${dto.currency} enregistrée avec succès. Référence: ${response.data.data?.transaction?.reference || 'N/A'}`,
-                data: response.data.data,
-                requiresOtp: false,
-            };
 
-        } catch (error) {
-            this.logger.error(`❌ Erreur demande de dépôt: ${error.message}`);
+                message:
+                    `Demande de dépôt de ${amount} ${currency} enregistrée avec succès. Référence: ${transaction?.reference ||
+                    'N/A'
+                    }`,
+
+                data:
+                    response?.data?.data,
+
+                requiresOtp:
+                    false,
+            };
+        } catch (error: any) {
+            this.logger.error(
+                `❌ Erreur demande de dépôt: ${error.message}`,
+            );
 
             if (error.response) {
-                this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
+                this.logger.error(
+                    `📦 Réponse erreur: ${JSON.stringify(
+                        error.response.data,
+                    )}`,
+                );
             }
 
             throw this.handleError(error);
