@@ -1918,9 +1918,40 @@ export class FpayService {
             return error;
         }
 
-        // ✅ Si c'est une erreur avec un message personnalisé (comme OTP)
+        // ✅ Si c'est une erreur avec réponse HTTP (API FPay)
+        if (error.response) {
+            const status = error.response.status || HttpStatus.INTERNAL_SERVER_ERROR;
+            const errorData = error.response.data;
+
+            // ✅ Extraire le message de l'API FPay
+            let message = errorData?.message || errorData?.error || 'FPAY API error';
+
+            // ✅ Si l'API FPay retourne une structure avec data.message
+            if (errorData?.data?.message) {
+                message = errorData.data.message;
+            }
+
+            // ✅ Si l'API FPay retourne une structure avec message
+            if (errorData?.message) {
+                message = errorData.message;
+            }
+
+            this.logger.error(`❌ FPAY API Error: ${status} - ${message}`);
+
+            // ✅ Retourner l'erreur avec le message original de l'API
+            return new HttpException(
+                {
+                    statusCode: status,
+                    message: message,  // ✅ Message original de l'API
+                    error: errorData,
+                    timestamp: new Date().toISOString(),
+                },
+                status,
+            );
+        }
+
+        // ✅ Si c'est une erreur avec un message personnalisé
         if (error.message) {
-            // ✅ Vérifier si l'erreur contient des codes OTP
             if (error.code === 'INVALID_OTP' || error.message.includes('OTP')) {
                 return new HttpException(
                     {
@@ -1934,7 +1965,6 @@ export class FpayService {
                 );
             }
 
-            // ✅ Si c'est une erreur avec un message simple
             return new HttpException(
                 {
                     statusCode: HttpStatus.BAD_REQUEST,
@@ -1942,24 +1972,6 @@ export class FpayService {
                     timestamp: new Date().toISOString(),
                 },
                 HttpStatus.BAD_REQUEST,
-            );
-        }
-
-        // ✅ Erreur avec réponse HTTP
-        if (error.response) {
-            const status = error.response.status || HttpStatus.INTERNAL_SERVER_ERROR;
-            const message = error.response.data?.message || error.response.message || 'FPAY API error';
-
-            this.logger.error(`❌ FPAY API Error: ${status} - ${message}`);
-
-            return new HttpException(
-                {
-                    statusCode: status,
-                    message: message,
-                    error: error.response.data,
-                    timestamp: new Date().toISOString(),
-                },
-                status,
             );
         }
 
