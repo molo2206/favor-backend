@@ -94,7 +94,7 @@ export class ProductService {
   ) { }
 
   private readonly logger = new Logger(ProductService.name);
-  
+
   private generateSlug(name: string, existingSlugs?: string[]): string {
     let slug = name
       .toLowerCase()
@@ -3249,8 +3249,8 @@ export class ProductService {
     keyword?: string,
     type?: CompanyType,
     lang: string = 'fr',
-    countryId?: string,  // Ajout du paramètre optionnel
-    cityId?: string,     // Ajout du paramètre optionnel
+    countryId?: string,
+    cityId?: string,
   ) {
     if (!keyword || keyword.trim() === '') {
       return {
@@ -3267,7 +3267,18 @@ export class ProductService {
       };
     }
 
-    const searchKey = `%${keyword.trim().toLowerCase()}%`;
+    const cleanKeyword = keyword.trim().toLowerCase();
+    const words = cleanKeyword
+      .split(/\s+/)
+      .filter(word => word.length > 1);
+
+    const searchKey = `%${cleanKeyword}%`;
+
+    this.logger.log(`🔍 Recherche: "${cleanKeyword}" - ${words.length} mot(s)`);
+
+    // ============================================================
+    // ✅ RECHERCHE DES ENTREPRISES
+    // ============================================================
 
     const companyQuery = this.companyRepo
       .createQueryBuilder('company')
@@ -3280,24 +3291,49 @@ export class ProductService {
       .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
       .leftJoinAndSelect('company.country', 'country')
       .leftJoinAndSelect('company.city', 'city')
-      .where('LOWER(company.companyName) LIKE :searchKey', { searchKey })
-      .andWhere('company.status = :validatedStatus', {
-        validatedStatus: 'VALIDATED',
+      .where('company.status = :validatedStatus', {
+        validatedStatus: CompanyStatus.VALIDATED,
       });
 
-    // Ajout des filtres country et city pour les compagnies
+    if (words.length > 1) {
+      const conditions = words.map((word, index) => {
+        return `(
+                LOWER(company.companyName) LIKE :word${index}
+                OR LOWER(country.name) LIKE :word${index}
+                OR LOWER(city.name) LIKE :word${index}
+            )`;
+      });
+      const params = {};
+      words.forEach((word, index) => {
+        params[`word${index}`] = `%${word}%`;
+      });
+      companyQuery.andWhere(`(${conditions.join(' AND ')})`, params);
+    } else {
+      companyQuery.andWhere(
+        `(
+                LOWER(company.companyName) LIKE :searchKey
+                OR LOWER(country.name) LIKE :searchKey
+                OR LOWER(city.name) LIKE :searchKey
+            )`,
+        { searchKey },
+      );
+    }
+
     if (countryId) {
       companyQuery.andWhere('country.id = :countryId', { countryId });
     }
     if (cityId) {
       companyQuery.andWhere('city.id = :cityId', { cityId });
     }
-
     if (type) {
       companyQuery.andWhere('company.typeCompany = :type', { type });
     }
 
     const companies = await companyQuery.distinct(true).getMany();
+
+    // ============================================================
+    // ✅ RECHERCHE DES PRODUITS
+    // ============================================================
 
     const productQuery = this.productRepo
       .createQueryBuilder('product')
@@ -3316,39 +3352,51 @@ export class ProductService {
       .leftJoinAndSelect('attributes.attribute', 'attribute')
       .leftJoinAndSelect('product.variations', 'variations')
       .leftJoinAndSelect('variations.image', 'variationImage')
-      .leftJoinAndSelect(
-        'variations.attributeValues',
-        'variationAttributeValues',
-      )
-      .leftJoinAndSelect(
-        'variationAttributeValues.attribute',
-        'variationAttribute',
-      )
-      .where(
-        `(
-        LOWER(product.name) LIKE :searchKey
-        OR LOWER(product.description) LIKE :searchKey
-        OR LOWER(category.name) LIKE :searchKey
-        OR LOWER(parentCategory.name) LIKE :searchKey
-        OR LOWER(brand.name) LIKE :searchKey
-      )
-      AND product.status = :productStatus
-      AND company.status = :companyStatus`,
-        {
-          searchKey,
-          productStatus: ProductStatus.PUBLISHED,
-          companyStatus: CompanyStatus.VALIDATED,
-        },
-      );
+      .leftJoinAndSelect('variations.attributeValues', 'variationAttributeValues')
+      .leftJoinAndSelect('variationAttributeValues.attribute', 'variationAttribute')
+      .where('product.status = :productStatus', {
+        productStatus: ProductStatus.PUBLISHED,
+      })
+      .andWhere('company.status = :companyStatus', {
+        companyStatus: CompanyStatus.VALIDATED,
+      });
 
-    // Ajout des filtres country et city pour les produits
+    if (words.length > 1) {
+      const conditions = words.map((word, index) => {
+        return `(
+                LOWER(product.name) LIKE :word${index}
+                OR LOWER(product.description) LIKE :word${index}
+                OR LOWER(category.name) LIKE :word${index}
+                OR LOWER(brand.name) LIKE :word${index}
+                OR LOWER(country.name) LIKE :word${index}
+                OR LOWER(city.name) LIKE :word${index}
+            )`;
+      });
+      const params = {};
+      words.forEach((word, index) => {
+        params[`word${index}`] = `%${word}%`;
+      });
+      productQuery.andWhere(`(${conditions.join(' AND ')})`, params);
+    } else {
+      productQuery.andWhere(
+        `(
+                LOWER(product.name) LIKE :searchKey
+                OR LOWER(product.description) LIKE :searchKey
+                OR LOWER(category.name) LIKE :searchKey
+                OR LOWER(brand.name) LIKE :searchKey
+                OR LOWER(country.name) LIKE :searchKey
+                OR LOWER(city.name) LIKE :searchKey
+            )`,
+        { searchKey },
+      );
+    }
+
     if (countryId) {
       productQuery.andWhere('country.id = :countryId', { countryId });
     }
     if (cityId) {
       productQuery.andWhere('city.id = :cityId', { cityId });
     }
-
     if (type) {
       productQuery.andWhere('company.typeCompany = :type', { type });
     }
@@ -3357,6 +3405,10 @@ export class ProductService {
       .distinct(true)
       .orderBy('product.createdAt', 'DESC')
       .getMany();
+
+    // ============================================================
+    // ✅ RECHERCHE DES SERVICES
+    // ============================================================
 
     const serviceQuery = this.serviceRepo
       .createQueryBuilder('service')
@@ -3369,25 +3421,44 @@ export class ProductService {
       .leftJoinAndSelect('service.measure', 'measure')
       .leftJoinAndSelect('service.prestataires', 'prestataires')
       .leftJoinAndSelect('prestataires.prestataire', 'prestataire')
-      .where(
-        `(
-        LOWER(service.name) LIKE :searchKey
-        OR LOWER(service.description) LIKE :searchKey
-        OR LOWER(category.name) LIKE :searchKey
-        OR LOWER(parentCategory.name) LIKE :searchKey
-      )
-      AND company.status = :companyStatus`,
-        { searchKey, companyStatus: CompanyStatus.VALIDATED },
-      );
+      .where('company.status = :companyStatus', {
+        companyStatus: CompanyStatus.VALIDATED,
+      });
 
-    // Ajout des filtres country et city pour les services
+    if (words.length > 1) {
+      const conditions = words.map((word, index) => {
+        return `(
+                LOWER(service.name) LIKE :word${index}
+                OR LOWER(service.description) LIKE :word${index}
+                OR LOWER(category.name) LIKE :word${index}
+                OR LOWER(country.name) LIKE :word${index}
+                OR LOWER(city.name) LIKE :word${index}
+            )`;
+      });
+      const params = {};
+      words.forEach((word, index) => {
+        params[`word${index}`] = `%${word}%`;
+      });
+      serviceQuery.andWhere(`(${conditions.join(' AND ')})`, params);
+    } else {
+      serviceQuery.andWhere(
+        `(
+                LOWER(service.name) LIKE :searchKey
+                OR LOWER(service.description) LIKE :searchKey
+                OR LOWER(category.name) LIKE :searchKey
+                OR LOWER(country.name) LIKE :searchKey
+                OR LOWER(city.name) LIKE :searchKey
+            )`,
+        { searchKey },
+      );
+    }
+
     if (countryId) {
       serviceQuery.andWhere('country.id = :countryId', { countryId });
     }
     if (cityId) {
       serviceQuery.andWhere('city.id = :cityId', { cityId });
     }
-
     if (type) {
       serviceQuery.andWhere('company.typeCompany = :type', { type });
     }
@@ -3396,6 +3467,10 @@ export class ProductService {
       .distinct(true)
       .orderBy('service.createdAt', 'DESC')
       .getMany();
+
+    // ============================================================
+    // ✅ GROUPEMENT DES RÉSULTATS
+    // ============================================================
 
     const groupedResults: Record<string, any> = {
       [CompanyType.RESTAURANT]: [],
@@ -3429,12 +3504,23 @@ export class ProductService {
       groupedResults.SERVICE_LIST.push(serv);
     }
 
+    const totalResults = companies.length + products.length + services.length;
+    this.logger.log(`✅ Résultats: ${companies.length} entreprises, ${products.length} produits, ${services.length} services`);
+
     return {
       message:
-        companies.length === 0 && products.length === 0 && services.length === 0
+        totalResults === 0
           ? await this.i18n.translate('no_search_results', lang)
           : await this.i18n.translate('search_results', lang),
       data: groupedResults,
+      meta: {
+        keyword: cleanKeyword,
+        words: words,
+        total: totalResults,
+        companies: companies.length,
+        products: products.length,
+        services: services.length,
+      },
     };
   }
 
