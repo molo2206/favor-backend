@@ -971,15 +971,27 @@ export class FpayService {
         status?: string,
         movement?: string,
         search?: string,
-        walletId?: string,  // ✅ Reçu du contrôleur
+        walletId?: string,
     ): Promise<any> {
         try {
             if (!userId || userId.trim() === '') {
                 throw new Error('userId est requis');
             }
 
-            this.logger.log(`📊 Récupération balance/transactions: userIdFpay=${userId}`);
-            this.logger.log(`🔍 walletId: ${walletId || 'Tous'}`);
+            // ============================================================
+            // 🔥 LOGS POUR VOIR CE QUI EST ENVOYÉ
+            // ============================================================
+            this.logger.log(`📊 ========== APPEL API FPAY ==========`);
+            this.logger.log(`📊 userId envoyé: ${userId}`);
+            this.logger.log(`📊 walletId envoyé: ${walletId || 'NON FOURNI'}`);
+            this.logger.log(`📊 page: ${page}, limit: ${limit}`);
+            this.logger.log(`📊 startDate: ${startDate || 'NON FOURNI'}`);
+            this.logger.log(`📊 endDate: ${endDate || 'NON FOURNI'}`);
+            this.logger.log(`📊 type: ${type || 'NON FOURNI'}`);
+            this.logger.log(`📊 status: ${status || 'NON FOURNI'}`);
+            this.logger.log(`📊 movement: ${movement || 'NON FOURNI'}`);
+            this.logger.log(`📊 search: ${search || 'NON FOURNI'}`);
+            this.logger.log(`📊 ========================================`);
 
             const url = `${this.fpayApiUrl}/wallet/balance-transactions`;
 
@@ -995,14 +1007,18 @@ export class FpayService {
             if (movement) params.set('movement', movement);
             if (search) params.set('search', search);
 
-            // ✅ AJOUTER walletId
             if (walletId) {
-                params.set('walletId', walletId);  // ← C'est ici que ça manquait !
+                params.set('walletId', walletId);
                 this.logger.log(`🔗 Filtrage par walletId: ${walletId}`);
             }
 
             const fullUrl = `${url}?${params.toString()}`;
-            this.logger.log(`🔗 Appel API FPay: ${fullUrl}`);
+
+            // ============================================================
+            // 🔥 LOG DE L'URL COMPLÈTE
+            // ============================================================
+            this.logger.log(`🔗 URL COMPLÈTE: ${fullUrl}`);
+            this.logger.log(`📤 ========================================`);
 
             const response = await firstValueFrom(
                 this.httpService.get(fullUrl, { headers: this.getHeaders() })
