@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bienvenue sur FavorHelp</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #eef2ff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        font-family:
+          'Segoe UI', 'Helvetica Neue', 'Roboto', system-ui, sans-serif;
+        padding: 2rem;
+      }
+
+      .container {
+        max-width: 600px;
+        width: 100%;
+        background: white;
+        box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.2);
+        border-radius: 12px;
+        overflow: hidden;
+        margin: 0 auto;
+      }
+
+      .content {
+        padding: 2rem;
+      }
+
+      .brand-section {
+        border-bottom: 3px solid #0014D2;
+        padding-bottom: 0.7rem;
+        margin-bottom: 1.6rem;
+      }
+
+      .app-intro {
+        background: #f0f7ff;
+        border-left: 4px solid #0014D2;
+        padding: 0.75rem 1rem;
+        margin: -0.2rem 0 1.2rem 0;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        color: #0c4e6e;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.8rem;
+      }
+      .app-intro-text {
+        flex: 2;
+        line-height: 1.4;
+      }
+      .app-intro-text strong {
+        color: #0014D2;
+        font-weight: 700;
+      }
+      .app-badge {
+        background: white;
+        padding: 0.2rem 0.8rem;
+        border-radius: 40px;
+        font-weight: 600;
+        font-size: 0.7rem;
+        color: #0014D2;
+        border: 1px solid #b9d0f8;
+        white-space: nowrap;
+      }
+
+      .header-section {
+        text-align: center;
+        margin-bottom: 1.5rem;
+      }
+      .header {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #0014D2;
+        margin-bottom: 0.5rem;
+      }
+      .description {
+        font-size: 0.85rem;
+        color: #1f2a3e;
+      }
+
+      .success-badge {
+        display: inline-block;
+        background: #dcfce7;
+        color: #15803d;
+        padding: 0.75rem 1.5rem;
+        border-radius: 40px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        margin: 1rem 0;
+        border: 1px solid #86efac;
+        text-align: center;
+        width: auto;
+      }
+
+      .btn-primary {
+        display: inline-block;
+        background: #0014D2;
+        color: white;
+        padding: 0.7rem 2rem;
+        border-radius: 40px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.8rem;
+        border: none;
+        cursor: pointer;
+        transition: background 0.3s ease;
+      }
+      .btn-primary:hover {
+        background: #0010a8;
+      }
+
+      .whatsapp-btn {
+        display: inline-block;
+        background: #25D366;
+        color: white;
+        padding: 0.75rem 2rem;
+        border-radius: 40px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        border: none;
+        cursor: pointer;
+        transition: background 0.3s ease;
+      }
+      .whatsapp-btn:hover {
+        background: #1da851;
+      }
+
+      .support-section {
+        text-align: center;
+        margin: 1.5rem 0;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+      }
+      .support-text {
+        font-size: 0.75rem;
+        color: #4b5563;
+        margin-bottom: 0.5rem;
+      }
+      .contact-info {
+        font-size: 0.7rem;
+        color: #6b7280;
+      }
+      .contact-link {
+        color: #0014D2;
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .footer {
+        margin-top: 1.5rem;
+        text-align: center;
+        font-size: 0.6rem;
+        color: #6c86a3;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 1rem;
+      }
+      .footer p {
+        margin: 4px 0;
+      }
+      .footer strong {
+        color: #0014D2;
+      }
+
+      .btn-group {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin: 1rem 0 0.5rem 0;
+      }
+
+      @media (max-width: 600px) {
+        .content {
+          padding: 1.2rem;
+        }
+        .app-intro {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .app-badge {
+          white-space: normal;
+        }
+        .btn-group {
+          flex-direction: column;
+          align-items: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="content">
+        <div class="brand-section"></div>
+       
+        <div class="header-section">
+          <div class="header">Bienvenue sur FavorHelp</div>
+          <div class="description">
+            Bonjour, nous sommes ravis de vous accueillir sur notre plateforme !
+          </div>
+        </div>
+        <div class="btn-group">
+          <a href="https://favorhelp.com" class="btn-primary">
+            Découvrir la plateforme
+          </a>
+          <a href="https://wa.me/243991225122" class="whatsapp-btn">
+            Contactez-nous sur WhatsApp
+          </a>
+        </div>
+
+        <div class="support-section">
+          <div class="support-text">
+            Besoin d'aide ? Notre équipe est à votre disposition.
+          </div>
+          <div class="contact-info">
+            <a href="mailto:favorhelp31@gmail.com" class="contact-link"
+              >favorhelp31@gmail.com</a
+            >
+            <br />
+            +243 991 225 122
+          </div>
+        </div>
+
+        <div class="footer">
+          <p><strong>FavorHelp — Marketplace Premium</strong></p>
+          <p>
+            RCCM : 21-A-770 | N° Impôt : A2156062L | National ID:
+            19-G4701-N74976H
+          </p>
+          <p>© {{year}} FavorHelp. Tous droits réservés.</p>
+        </div>
+
+        <div
+          style="
+            text-align: center;
+            font-size: 0.55rem;
+            color: #6c86a3;
+            margin-top: 1rem;
+            border-top: 1px solid #eef2ff;
+            padding-top: 0.7rem;
+          "
+        >
+          Favor Help — Écosystème digital par Favor Group | RCCM: 21-A-770 | N°
+          IMPÔT: A2156062L | National ID: 19-G4701-N74976H
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

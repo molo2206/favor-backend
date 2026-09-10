@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Confirmation de paiement et code PIN – FavorHelp</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+        background: #f0f2f5;
+        margin: 0;
+        padding: 40px 20px;
+        color: #1f2937;
+      }
+
+      .container {
+        background: white;
+        padding: 40px 30px;
+        max-width: 550px;
+        margin: 0 auto;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        border: 1px solid #e5e7eb;
+      }
+
+      /* Logo */
+      .logo-container {
+        margin-bottom: 20px;
+      }
+
+      .logo {
+        height: 60px;
+        width: auto;
+        border-radius: 10px;
+      }
+
+      .header {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1d4ed8;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .header i {
+        color: #10b981;
+        font-size: 28px;
+      }
+
+      .subheader {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #1d4ed8;
+        display: inline-block;
+      }
+
+      .description {
+        font-size: 15px;
+        color: #4b5563;
+        margin-bottom: 30px;
+        line-height: 1.6;
+        text-align: left;
+        background: #f9fafb;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+      }
+
+      .description strong {
+        color: #1d4ed8;
+      }
+
+      /* Info box */
+      .info {
+        background: #eff6ff;
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin: 20px 0 15px;
+        font-size: 14px;
+        color: #1e40af;
+        text-align: left;
+        border: 1px solid #bfdbfe;
+      }
+
+      .info-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+
+      .info-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .info-item i {
+        width: 20px;
+        color: #1d4ed8;
+      }
+
+      .info-label {
+        font-weight: 600;
+        color: #1e40af;
+      }
+
+      .info-value {
+        color: #1f2937;
+        font-weight: 500;
+      }
+
+      /* PIN Code */
+      .pin-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #4b5563;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 10px;
+      }
+
+      .pin-code {
+        font-size: 42px;
+        font-weight: 800;
+        letter-spacing: 10px;
+        color: #1d4ed8;
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        padding: 20px 0;
+        border-radius: 12px;
+        margin: 15px 0;
+        border: 2px solid #1d4ed8;
+        font-family: 'Courier New', monospace;
+      }
+
+      /* Note */
+      .note {
+        background: #fefce8;
+        border-radius: 10px;
+        padding: 15px 20px;
+        margin-top: 20px;
+        font-size: 13px;
+        color: #854d0e;
+        text-align: left;
+        border: 1px solid #fde68a;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .note i {
+        font-size: 20px;
+        color: #f59e0b;
+      }
+
+      .note-content {
+        flex: 1;
+      }
+
+      .note-content strong {
+        color: #b45309;
+      }
+
+      /* Footer */
+      .footer {
+        margin-top: 35px;
+        padding-top: 20px;
+        font-size: 11px;
+        color: #9ca3af;
+        border-top: 1px solid #e5e7eb;
+        text-align: center;
+      }
+
+      .footer a {
+        color: #1d4ed8;
+        text-decoration: none;
+      }
+
+      .footer a:hover {
+        text-decoration: underline;
+      }
+
+      /* Bouton */
+      .btn-help {
+        display: inline-block;
+        margin-top: 20px;
+        padding: 10px 24px;
+        background: #1d4ed8;
+        color: white;
+        border-radius: 30px;
+        font-size: 13px;
+        font-weight: 500;
+        text-decoration: none;
+        transition: background 0.3s;
+      }
+
+      .btn-help:hover {
+        background: #1e40af;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="logo-container">
+        <img
+          src="https://cosamed.org/1%20Favor.png"
+          alt="FavorHelp"
+          class="logo"
+        />
+      </div>
+
+      <div class="header">
+        <i class="fas fa-check-circle"></i>
+        Paiement confirmé
+      </div>
+
+      <div class="subheader">Code PIN de validation</div>
+
+      <div class="description">
+        <i
+          class="fas fa-user-circle"
+          style="margin-right: 10px; color: #1d4ed8"
+        ></i>
+        Bonjour
+        <strong><%= user ? user.fullName : 'Client' %></strong>,<br /><br />
+        Nous vous confirmons que le paiement des frais liés à votre colis a bien
+        été enregistré.<br /><br />
+        <i class="fas fa-truck" style="margin-right: 5px; color: #1d4ed8"></i>
+        Notre équipe passera dans les plus brefs délais pour le
+        <strong>ramassage de votre colis</strong>.
+      </div>
+
+      <div class="info">
+        <div class="info-item">
+          <i class="fas fa-barcode"></i>
+          <span class="info-label">Numéro de suivi :</span>
+          <span class="info-value"><%= trackingNumber %></span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-box"></i>
+          <span class="info-label">Référence colis :</span>
+          <span class="info-value">#SHIP-<%= shipmentId %></span>
+        </div>
+      </div>
+
+      <div class="pin-label">
+        <i class="fas fa-lock"></i> VOTRE CODE PIN DE VALIDATION
+      </div>
+
+      <div class="pin-code"><%= pinCode %></div>
+
+      <div class="note">
+        <i class="fas fa-shield-alt"></i>
+        <div class="note-content">
+          <strong>Important :</strong> Veuillez présenter ce
+          <strong>code PIN</strong> au livreur lors du ramassage afin de valider
+          votre colis.<br />
+          <span style="font-size: 11px; color: #a16207"
+            >Ne partagez jamais ce code avec une personne non autorisée.</span
+          >
+        </div>
+      </div>
+
+      <a href="#" class="btn-help">
+        <i class="fas fa-headset"></i> Contacter le support
+      </a>
+
+      <div class="footer">
+        <i class="far fa-copyright"></i> <%= new Date().getFullYear() %>
+        FavorHelp. Tous droits réservés.<br />
+        <a href="#">Conditions d'utilisation</a> |
+        <a href="#">Politique de confidentialité</a>
+      </div>
+    </div>
+  </body>
+</html>

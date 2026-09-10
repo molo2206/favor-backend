@@ -1,0 +1,6 @@
+export enum CompanyActivity {
+    RETAILER = 'RETAILER',
+    WHOLESALER = 'WHOLESALER',
+    WHOLESALER_RETAILER = 'WHOLESALER_RETAILER'
+}
+

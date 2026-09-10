@@ -1,0 +1,13 @@
+{
+  "name_label_required": "Name and label are required.",
+  "already_exists": "A resource already exists ({{name}} - {{label}}).",
+  "created": "Resource created successfully.",
+  "list_retrieved": "Resource list retrieved successfully.",
+  "retrieve_failed": "Unable to retrieve resources.",
+  "not_found": "Resource with ID {{id}} not found.",
+  "retrieved": "Resource retrieved successfully.",
+  "updated": "Resource updated successfully.",
+  "name_exists": "This name already exists.",
+  "deleted": "Resource '{{label}}' deleted successfully.",
+  "create_error": "Error creating resource."
+}

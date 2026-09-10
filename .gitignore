@@ -1,0 +1,62 @@
+# Compiled output
+/dist
+/build
+/node_modules
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+/coverage
+/.nyc_output
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# VSCode settings
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Environment variable files (secrets)
+/.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# Temporary files
+.temp
+.tmp
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Diagnostic reports (Node.js)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Optional: lockfiles (if you prefer to ignore them)
+/package-lock.json
+/yarn.lock
+/pnpm-lock.yaml

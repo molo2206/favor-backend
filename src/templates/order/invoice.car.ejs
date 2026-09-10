@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Facture | FavorHelp</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #eef2ff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+        padding: 2rem;
+      }
+
+      .invoice-card {
+        max-width: 1100px;
+        width: 100%;
+        background: white;
+        box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .invoice-content {
+        padding: 2rem;
+      }
+
+      /* ========== EN-TÊTE ========== */
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 3px solid #1d4ed8;
+        padding-bottom: 1.5rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      .logo-title {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .logo-title img {
+        height: 62px;
+        width: auto;
+        object-fit: contain;
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 4px 6px;
+      }
+
+      .logo-title h1 {
+        font-size: 2.2rem;
+        font-weight: 800;
+        letter-spacing: 1px;
+        color: #1d4ed8;
+        margin: 0;
+        line-height: 1.2;
+      }
+
+      .logo-title p {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #1e3a8a;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        margin-top: 4px;
+      }
+
+      .status-box {
+        text-align: right;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0.4rem 1rem;
+        border-radius: 40px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        border: 1px solid;
+      }
+
+      .status.paid {
+        background: #dcfce7;
+        color: #15803d;
+        border-color: #86efac;
+      }
+
+      .status.pending {
+        background: #fff7ed;
+        color: #b45309;
+        border-color: #fde68a;
+      }
+
+      .status.cancelled {
+        background: #fee2e2;
+        color: #dc2626;
+        border-color: #fecaca;
+      }
+
+      /* ========== BADGE ÉCOSYSTÈME ========== */
+      .app-intro {
+        background: #f0f7ff;
+        border-left: 4px solid #1d4ed8;
+        padding: 0.75rem 1rem;
+        margin: 1rem 0 1.5rem 0;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        color: #0c4e6e;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.8rem;
+      }
+
+      .app-intro-text {
+        flex: 2;
+        line-height: 1.4;
+      }
+
+      .app-intro-text strong {
+        color: #1d4ed8;
+        font-weight: 700;
+      }
+
+      .app-badge {
+        background: white;
+        padding: 0.2rem 0.8rem;
+        border-radius: 40px;
+        font-weight: 600;
+        font-size: 0.7rem;
+        color: #1d4ed8;
+        border: 1px solid #b9d0f8;
+        white-space: nowrap;
+      }
+
+      /* ========== SECTION CLIENT ========== */
+      .section {
+        margin-bottom: 1.5rem;
+      }
+
+      .section-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: white;
+        background: #1d4ed8;
+        padding: 8px 12px;
+        border-radius: 4px 4px 0 0;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .section-content {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        padding: 15px;
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      .section-content div {
+        flex: 1;
+        min-width: 150px;
+      }
+
+      .section-content strong {
+        color: #1d4ed8;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 0.5rem;
+      }
+
+      /* ========== TABLEAU ========== */
+      .invoice-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+        font-size: 0.85rem;
+      }
+
+      .invoice-table th,
+      .invoice-table td {
+        border: 1px solid #cbd5e1;
+        padding: 12px 8px;
+        vertical-align: top;
+      }
+
+      .invoice-table th {
+        background: #1d4ed8;
+        color: white;
+        font-weight: 600;
+        text-align: left;
+      }
+
+      .invoice-table td {
+        color: #1e293b;
+      }
+
+      .text-right {
+        text-align: right;
+      }
+
+      /* ========== TOTAUX ========== */
+      .totals {
+        margin-top: 1.5rem;
+        text-align: right;
+      }
+
+      .totals div {
+        margin: 0.25rem 0;
+        font-size: 0.85rem;
+      }
+
+      .totals .grand-total {
+        font-weight: 800;
+        font-size: 1.1rem;
+        color: #1d4ed8;
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 2px solid #1d4ed8;
+      }
+
+      /* ========== SECTION LÉGALE ========== */
+      .legal-info {
+        background: #f0f4fe;
+        border: 1px solid #b9d0f8;
+        border-radius: 12px;
+        padding: 0.7rem 1rem;
+        margin: 1rem 0;
+        font-size: 0.65rem;
+        color: #0f3b2c;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+
+      .legal-item {
+        display: flex;
+        align-items: baseline;
+        gap: 5px;
+        flex-wrap: wrap;
+      }
+
+      .legal-label {
+        font-weight: 800;
+        color: #1d4ed8;
+      }
+
+      /* ========== FOOTER ========== */
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      .footer-left {
+        flex: 1;
+      }
+
+      .footer-left strong {
+        display: block;
+        color: #1d4ed8;
+        margin-bottom: 0.5rem;
+        font-size: 0.75rem;
+      }
+
+      .footer-left p {
+        font-size: 0.7rem;
+        color: #4b5563;
+        margin: 4px 0;
+      }
+
+      .footer-right {
+        text-align: right;
+      }
+
+      .qr-code {
+        width: 80px;
+        height: 80px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 4px;
+      }
+
+      .favor-contact {
+        background: #f0f4fe;
+        border-radius: 10px;
+        padding: 0.6rem 1rem;
+        margin-top: 1rem;
+        text-align: center;
+        font-size: 0.7rem;
+        border: 1px solid #b9d0f8;
+        color: #0f3b2c;
+      }
+
+      .favor-contact strong {
+        color: #1d4ed8;
+        font-size: 0.75rem;
+      }
+
+      .favor-contact p {
+        margin: 4px 0;
+      }
+
+      @media (max-width: 768px) {
+        body {
+          padding: 1rem;
+        }
+        .invoice-content {
+          padding: 1.2rem;
+        }
+        .header {
+          flex-direction: column;
+          text-align: center;
+        }
+        .status-box {
+          text-align: center;
+        }
+        .section-content {
+          flex-direction: column;
+        }
+        .section-content div {
+          width: 100%;
+        }
+        .footer {
+          flex-direction: column;
+          text-align: center;
+        }
+        .footer-right {
+          text-align: center;
+        }
+        .app-intro {
+          flex-direction: column;
+          text-align: center;
+        }
+        .app-badge {
+          white-space: normal;
+        }
+        .invoice-table {
+          display: block;
+          overflow-x: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="invoice-card">
+      <div class="invoice-content">
+        <!-- EN-TÊTE -->
+        <div class="header">
+          <div class="logo-title">
+            <img src="https://api-prod.favorhelp.com/uploads/1%20Favor.webp" alt="Favor Help Logo" />
+            <div>
+              <h1>FACTURE</h1>
+              <p>FavorHelp • Service Client</p>
+            </div>
+          </div>
+          <div class="status-box">
+            <div class="status 
+              <% if(order.paymentStatus === 'PAID') { %>paid<% } 
+                else if(order.paymentStatus === 'PENDING') { %>pending<% } 
+                else { %>cancelled<% } %>">
+              <% if(order.paymentStatus === 'PAID') { %>
+                <i class="fas fa-check-circle"></i> Payée
+              <% } else if(order.paymentStatus === 'PENDING') { %>
+                <i class="fas fa-hourglass-half"></i> En attente
+              <% } else { %>
+                <i class="fas fa-times-circle"></i> Annulée
+              <% } %>
+            </div>
+          </div>
+        </div>
+        <!-- SECTION CLIENT -->
+        <div class="section">
+          <div class="section-title">Client</div>
+          <div class="section-content">
+            <div>
+              <strong>Facturé à</strong><br />
+              <%= user.fullName %><br />
+              <%= user.email %>
+            </div>
+            <div>
+              <strong>N° Facture</strong><br />
+              #<%= order.invoiceNumber %><br />
+              <strong>Date</strong><br />
+              <%= order.date %>
+            </div>
+            <div>
+              <strong>Adresse Livraison</strong><br />
+              <%= order.address || 'Non spécifiée' %>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION LÉGALE -->
+        <div class="legal-info">
+          <div class="legal-item"><span class="legal-label">RCCM:</span> 21-A-770</div>
+          <div class="legal-item"><span class="legal-label">N° IMPÔT:</span> A2156062L</div>
+          <div class="legal-item"><span class="legal-label">NATIONAL ID:</span> 19-G4701-N74976H</div>
+          <div class="legal-item"><span class="legal-label">IMPORT/EXPORT:</span> PP/0023/EWX-23/1002234MK/W</div>
+        </div>
+
+        <!-- TABLEAU PRODUITS -->
+        <div class="section">
+          <div class="section-title">Détails de la facture</div>
+          <table class="invoice-table">
+            <thead>
+              <tr>
+                <th>N°</th>
+                <th>Produit</th>
+                <th>Quantité</th>
+                <th>Prix unitaire</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <%- subOrdersHtml %>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" class="text-right"><strong>Sous-total:</strong></td>
+                <td class="text-right"><%= order.totalAmount %> <%= order.currency %></td>
+              </tr>
+              <tr>
+                <td colspan="4" class="text-right">Frais de livraison:</td>
+                <td class="text-right"><%= order.shippingFee || 0 %> <%= order.currency %></td>
+              </tr>
+              <tr>
+                <td colspan="4" class="text-right"><strong>Total TTC:</strong></td>
+                <td class="text-right"><strong><%= order.totalAmount %> <%= order.currency %></strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+          <div class="footer-left">
+            <strong>Contact FavorHelp</strong>
+            <p><i class="fas fa-phone"></i> +243 991 225 122</p>
+            <p><i class="fas fa-envelope"></i> favorhelp31@gmail.com</p>
+            <p><i class="fas fa-globe"></i> www.favorhelp.com</p>
+          </div>
+          <div class="footer-right">
+            <img src="<%= paymentQrCode %>" alt="QR Code" class="qr-code" />
+          </div>
+        </div>
+
+        <!-- Mention légale -->
+        <div style="text-align: center; font-size: 0.55rem; color: #6c86a3; margin-top: 1rem; border-top: 1px solid #eef2ff; padding-top: 0.7rem;">
+          Favor Help — Écosystème digital par Favor Group | RCCM: 21-A-770 | N° IMPÔT: A2156062L
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

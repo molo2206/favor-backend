@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>Code PIN de livraison · FavorHelp Logistics</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          'Inter',
+          'Segoe UI',
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: radial-gradient(circle at 10% 30%, #eef2ff, #f9fafc);
+        margin: 0;
+        padding: 2rem 1.5rem;
+        min-height: 100vh;
+        line-height: 1.5;
+        color: #111827;
+      }
+
+      /* animated background soft blobs */
+      .bg-blobs {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      .bg-blobs .blob {
+        position: absolute;
+        background: radial-gradient(
+          circle,
+          rgba(24, 119, 242, 0.04) 0%,
+          rgba(24, 119, 242, 0.01) 100%
+        );
+        border-radius: 50%;
+        filter: blur(70px);
+        animation: floatBlob 24s infinite alternate ease-in-out;
+      }
+
+      @keyframes floatBlob {
+        0% {
+          transform: translate(0, 0) scale(1);
+          opacity: 0.4;
+        }
+        100% {
+          transform: translate(40px, -30px) scale(1.2);
+          opacity: 0.7;
+        }
+      }
+
+      .email-wrapper {
+        max-width: 720px;
+        margin: 0 auto;
+        position: relative;
+        z-index: 2;
+      }
+
+      /* carte principale premium */
+      .card {
+        background: rgba(255, 255, 255, 0.97);
+        backdrop-filter: blur(0px);
+        border-radius: 2rem;
+        box-shadow:
+          0 25px 45px -15px rgba(0, 0, 0, 0.2),
+          0 4px 12px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+        transition: transform 0.25s ease;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+      }
+
+      .card:hover {
+        transform: scale(1.01);
+      }
+
+      /* bandeau animé */
+      .hero-strip {
+        height: 8px;
+        background: linear-gradient(
+          90deg,
+          #0d5cb6,
+          #1877f2,
+          #42a5f5,
+          #90caf9,
+          #1877f2
+        );
+        background-size: 250% auto;
+        animation: shimmerSlide 5s linear infinite;
+      }
+
+      @keyframes shimmerSlide {
+        0% {
+          background-position: 0% 50%;
+        }
+        100% {
+          background-position: 200% 50%;
+        }
+      }
+
+      .inner-padding {
+        padding: 2.5rem 2.2rem;
+      }
+
+      @media (max-width: 640px) {
+        body {
+          padding: 1rem;
+        }
+        .inner-padding {
+          padding: 1.8rem 1.5rem;
+        }
+      }
+
+      /* header */
+      .header-section {
+        text-align: center;
+        margin-bottom: 1.8rem;
+      }
+
+      .logo-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        background: linear-gradient(145deg, #eef2ff, #ffffff);
+        padding: 0.5rem 1.5rem;
+        border-radius: 100px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.02);
+        margin-bottom: 1.2rem;
+      }
+
+      .logo-badge i {
+        font-size: 1.6rem;
+        color: #1877f2;
+      }
+
+      .logo-badge span {
+        font-weight: 800;
+        font-size: 1.3rem;
+        background: linear-gradient(135deg, #0d5cb6, #1877f2);
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+      }
+
+      .header-section h1 {
+        font-size: 2rem;
+        font-weight: 800;
+        background: linear-gradient(120deg, #0f2b4d, #1877f2);
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+        letter-spacing: -0.02em;
+        margin-bottom: 0.5rem;
+      }
+
+      .greeting {
+        font-size: 1.05rem;
+        background: #f0f4fe;
+        display: inline-block;
+        padding: 0.3rem 1.2rem;
+        border-radius: 40px;
+        color: #1e3a8a;
+        font-weight: 500;
+      }
+
+      .greeting strong {
+        font-weight: 800;
+        color: #0d5cb6;
+      }
+
+      /* PIN container style glassmorph */
+      .pin-container {
+        background: linear-gradient(135deg, #f0f9ff, #e6f0fe);
+        border-radius: 2rem;
+        padding: 1.8rem;
+        text-align: center;
+        margin: 2rem 0;
+        border: 1px solid rgba(24, 119, 242, 0.3);
+        box-shadow: 0 12px 22px -12px rgba(24, 119, 242, 0.2);
+      }
+
+      .pin-label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #2c5282;
+        margin-bottom: 1rem;
+      }
+
+      .pin-code {
+        font-size: 3.2rem;
+        font-weight: 800;
+        letter-spacing: 0.2rem;
+        font-family: 'Monaco', 'Menlo', monospace;
+        background: white;
+        padding: 0.5rem 1.2rem;
+        border-radius: 1.5rem;
+        display: inline-block;
+        box-shadow:
+          inset 0 1px 3px #0001,
+          0 8px 18px -6px #1877f240;
+        color: #1877f2;
+        border: 1px solid #cde3fe;
+        animation: gentlePulse 2.5s infinite;
+      }
+
+      /* info-box moderne */
+      .info-box {
+        background: white;
+        border-radius: 1.5rem;
+        padding: 1.5rem;
+        margin: 1.8rem 0;
+        border: 1px solid #eef2ff;
+        box-shadow: 0 5px 14px rgba(0, 0, 0, 0.02);
+      }
+
+      .info-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        color: #1877f2;
+        margin-bottom: 1.2rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px dashed #e2efff;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 0.8rem;
+      }
+
+      .info-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid #f0f2f5;
+      }
+
+      .info-label {
+        font-weight: 600;
+        color: #4b5563;
+        font-size: 0.85rem;
+        letter-spacing: 0.3px;
+      }
+
+      .info-value {
+        font-weight: 700;
+        color: #111827;
+        font-size: 0.95rem;
+        background: #f8fafc;
+        padding: 0.2rem 0.7rem;
+        border-radius: 30px;
+      }
+
+      /* instructions & warning stylées */
+      .instructions,
+      .warning {
+        border-radius: 1.2rem;
+        padding: 1.4rem 1.8rem;
+        margin: 1.5rem 0;
+        transition: all 0.2s;
+      }
+
+      .instructions {
+        background: linear-gradient(115deg, #fffbeb, #fff6e5);
+        border-left: 6px solid #f59e0b;
+      }
+
+      .instructions-title,
+      .warning-title {
+        font-weight: 800;
+        font-size: 1.05rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 0.8rem;
+      }
+
+      .instructions-title i {
+        color: #f59e0b;
+        font-size: 1.2rem;
+      }
+
+      .instructions-list {
+        padding-left: 1.5rem;
+        margin: 0;
+      }
+
+      .instructions-list li {
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+        color: #2c3e4e;
+      }
+
+      .warning {
+        background: #fff5f5;
+        border-left: 6px solid #dc3545;
+      }
+
+      .warning-title i {
+        color: #dc3545;
+      }
+
+      .warning p {
+        font-size: 0.9rem;
+        color: #9b2c2c;
+      }
+
+      /* petit message final */
+      .merci {
+        text-align: center;
+        font-weight: 500;
+        margin: 1.2rem 0 0.5rem;
+        color: #3b5c8c;
+      }
+
+      /* footer */
+      .footer {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #eef2ff;
+        text-align: center;
+        font-size: 0.75rem;
+        color: #6c86a3;
+      }
+
+      .footer p {
+        margin: 0.3rem 0;
+      }
+
+      .footer i {
+        margin-right: 4px;
+      }
+
+      .footer a {
+        color: #1877f2;
+        text-decoration: none;
+      }
+
+      .footer a:hover {
+        text-decoration: underline;
+      }
+
+      /* anim PIN pulse */
+      @keyframes gentlePulse {
+        0% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(24, 119, 242, 0.2);
+        }
+        70% {
+          transform: scale(1.02);
+          box-shadow: 0 0 0 12px rgba(24, 119, 242, 0);
+        }
+        100% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(24, 119, 242, 0);
+        }
+      }
+
+      /* responsive */
+      @media (max-width: 500px) {
+        .pin-code {
+          font-size: 2rem;
+          letter-spacing: 4px;
+        }
+        .info-item {
+          flex-direction: column;
+          gap: 0.2rem;
+        }
+        .info-value {
+          align-self: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-blobs">
+      <div
+        class="blob"
+        style="width: 300px; height: 300px; top: -80px; left: -80px"
+      ></div>
+      <div
+        class="blob"
+        style="
+          width: 400px;
+          height: 400px;
+          bottom: -60px;
+          right: -100px;
+          animation-duration: 28s;
+        "
+      ></div>
+      <div
+        class="blob"
+        style="
+          width: 200px;
+          height: 200px;
+          top: 40%;
+          left: 85%;
+          background: radial-gradient(
+            circle,
+            rgba(245, 158, 11, 0.03) 0%,
+            rgba(245, 158, 11, 0.01) 100%
+          );
+        "
+      ></div>
+    </div>
+
+    <div class="email-wrapper">
+      <div class="card">
+        <div class="hero-strip"></div>
+        <div class="inner-padding">
+          <!-- Entête avec logo dynamique -->
+          <div class="header-section">
+            <div class="logo-badge">
+              <i class="fas fa-box-open"></i>
+              <span>FavorHelp Logistics</span>
+            </div>
+            <h1><i class="fas fa-key"></i> Code PIN de votre colis</h1>
+            <div class="greeting">Bonjour <strong>{{clientName}}</strong></div>
+          </div>
+
+          <!-- Zone PIN centrale -->
+          <div class="pin-container">
+            <div class="pin-label">
+              <i class="fas fa-lock"></i> Votre code PIN pour réceptionner le
+              colis :
+            </div>
+            <div class="pin-code">{{pinCode}}</div>
+          </div>
+
+          <!-- Détails colis (info-box) -->
+          <div class="info-box">
+            <div class="info-title">
+              <i class="fas fa-clipboard-list"></i> Détails du colis
+            </div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Numéro de suivi :</span>
+                <span class="info-value">{{trackingNumber}}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Référence :</span>
+                <span class="info-value">{{shipmentReference}}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Poids :</span>
+                <span class="info-value">{{weight}}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Dimensions :</span>
+                <span class="info-value">{{dimensions}}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Type de colis :</span>
+                <span class="info-value">{{packageType}}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Montant total :</span>
+                <span class="info-value">{{totalPrice}}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Instructions de livraison -->
+          <div class="instructions">
+            <div class="instructions-title">
+              <i class="fas fa-truck"></i> Instructions de livraison
+            </div>
+            <ul class="instructions-list">
+              <li> Présentez ce code PIN au livreur lors de la livraison</li>
+              <li>
+                Le livreur vous demandera de saisir ce code pour confirmer la
+                réception
+              </li>
+              <li>Assurez-vous d'être présent à l'adresse indiquée</li>
+              <li>Vérifiez l'état du colis avant de signer la réception</li>
+            </ul>
+          </div>
+
+          <!-- Avertissement sécurité -->
+          <div class="warning">
+            <div class="warning-title">
+              <i class="fas fa-shield-alt"></i> Consignes de sécurité
+            </div>
+            <p>
+              Ne partagez jamais votre code PIN avec des personnes non
+              autorisées. Votre code PIN est strictement personnel et
+              confidentiel.
+            </p>
+          </div>
+
+          <div class="merci">
+            <i class="fas fa-heart" style="color: #1877f2"></i> Merci de votre
+            confiance.
+          </div>
+
+          <!-- Footer -->
+          <div class="footer">
+            <p>
+              <i class="far fa-copyright"></i>© {{year}} FavorHelp Logistics.
+              Tous droits réservés.
+            </p>
+            <p style="margin-top: 8px; font-size: 0.7rem">
+              <i class="fas fa-headset"></i> Service client : +243 991 225 122
+              &nbsp;|&nbsp;
+              <a
+                href="mailto:favorhelp31@gmail.com"
+                style="color: #1877f2; text-decoration: none"
+                >favorhelp31@gmail.com</a
+              >
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

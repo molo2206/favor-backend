@@ -1,0 +1,16 @@
+{
+  "branch_created": "Branche créée avec succès.",
+  "branch_updated": "Branche mise à jour avec succès.",
+  "branch_deleted": "Branche supprimée avec succès.",
+  "branch_retrieved": "Branche récupérée avec succès.",
+  "branches_retrieved": "Branches récupérées avec succès.",
+  "branch_not_found": "Branche avec l'ID {{id}} introuvable.",
+  "forbidden_edit_branch": "Vous ne pouvez modifier que les branches de votre entreprise active.",
+  "country_not_found": "Pays avec l'ID {{id}} introuvable.",
+  "city_not_found": "Ville avec l'ID {{id}} introuvable.",
+  "failed_retrieve_branches": "Échec de la récupération des branches.",
+  "failed_retrieve_branch": "Échec de la récupération de la branche.",
+  "failed_create_branch": "Échec de la création de la branche.",
+  "failed_update_branch": "Échec de la mise à jour de la branche.",
+  "failed_delete_branch": "Échec de la suppression de la branche."
+}

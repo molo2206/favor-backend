@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="<%= lang || 'fr' %>">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= translations.title %> | Favor Help</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --primary: #0014D2;
+      --secondary: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --bg: #f4f7fb;
+      --card: #ffffff;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: #1e293b;
+      padding: 12px;
+    }
+
+    .invoice-container {
+      max-width: 980px;
+      margin: auto;
+      background: var(--card);
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(15,23,42,0.08);
+      overflow: hidden;
+    }
+
+    .invoice { padding: 18px; }
+
+    /* HEADER */
+    .brand-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 14px;
+      border-bottom: 2px solid #eef2ff;
+      margin-bottom: 14px;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-image {
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
+      border-radius: 12px;
+      border: 1px solid #e0e7ff;
+      padding: 4px;
+      background: #fff;
+    }
+
+    .brand {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--secondary);
+    }
+
+    .slogan {
+      font-size: 0.65rem;
+      color: var(--primary);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .invoice-badge {
+      background: var(--primary);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 12px;
+      text-align: right;
+      min-width: 120px;
+    }
+
+    .invoice-badge small {
+      font-size: 0.65rem;
+      opacity: 0.85;
+      display: block;
+    }
+
+    .invoice-badge strong {
+      font-size: 0.9rem;
+    }
+
+    /* TOP */
+    .to-invoice-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .to-section {
+      background: #f8fbff;
+      border: 1px solid #dbeafe;
+      padding: 10px 14px;
+      border-radius: 12px;
+      min-width: 220px;
+    }
+
+    .to-label {
+      font-size: 0.65rem;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .to-name {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .invoice-status {
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #fde68a;
+      background: #fff7ed;
+      color: #b45309;
+    }
+
+    .status-badge {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #f59e0b;
+    }
+
+    /* DETAILS */
+    .details-row {
+      display: grid;
+      grid-template-columns: 1fr 260px;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .client-info,
+    .invoice-date,
+    .summary-box {
+      background: var(--card);
+      border: 1px solid #edf2f7;
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .info-title,
+    .summary-title {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 10px;
+    }
+
+    .client-info p {
+      font-size: 0.75rem;
+      margin-bottom: 6px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .bold-label {
+      min-width: 110px;
+      font-weight: 700;
+      color: var(--secondary);
+    }
+
+    /* TABLE */
+    .table-wrapper {
+      border: 1px solid #edf2f7;
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 14px;
+      background: white;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: #f8fafc;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      font-size: 0.75rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    th {
+      text-align: left;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      color: #334155;
+    }
+
+    tfoot td {
+      font-weight: 700;
+      background: #fafafa;
+    }
+
+    /* PAYMENT */
+    .payment-summary {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 14px;
+      margin-top: 10px;
+    }
+
+    .payment-info {
+      padding: 14px;
+      background: #f8fbff;
+      border: 1px solid #dbeafe;
+      border-radius: 14px;
+      font-size: 0.75rem;
+    }
+
+    .summary-line {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 0.75rem;
+    }
+
+    .summary-line.total {
+      font-size: 0.9rem;
+      font-weight: 800;
+      border-top: 1px solid #e2e8f0;
+      margin-top: 8px;
+      padding-top: 10px;
+    }
+
+    /* THANK YOU */
+    .thankyou {
+      margin-top: 16px;
+      text-align: center;
+      padding: 14px;
+      border: 1px solid #edf2f7;
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .thankyou h2 {
+      font-size: 1rem;
+      margin-bottom: 6px;
+    }
+
+    .thankyou p {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 780px) {
+      .details-row,
+      .payment-summary {
+        grid-template-columns: 1fr;
+      }
+
+      .invoice { padding: 12px; }
+    }
+
+    /* PRINT */
+    @media print {
+      body { background: white; padding: 0; }
+      .invoice-container { box-shadow: none; border-radius: 0; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="invoice-container">
+  <div class="invoice">
+
+    <!-- HEADER -->
+    <div class="brand-section">
+      <div class="logo-container">
+        <img src="https://api-prod.favorhelp.com/uploads/1%20Favor.webp" class="logo-image" />
+        <div>
+          <div class="brand"><%= translations.title %></div>
+          <div class="slogan">FavorHelp • Voyages</div>
+        </div>
+      </div>
+
+      <div class="invoice-badge">
+        <small>RÉFÉRENCE</small>
+        <strong>#<%= reservationRef %></strong>
+      </div>
+    </div>
+
+    <!-- CLIENT + STATUS -->
+    <div class="to-invoice-row">
+      <div class="to-section">
+        <span class="to-label"><%= translations.booked_by %></span>
+        <div class="to-name"><%= user ? user.fullName : 'Client' %></div>
+      </div>
+
+      <div class="invoice-status">
+        <span class="status-badge"></span>
+        <span><%= translations.status_pending_sheet %></span>
+      </div>
+    </div>
+
+    <!-- DETAILS -->
+    <div class="details-row">
+      <div class="client-info">
+        <div class="info-title"><%= translations.trip_details %></div>
+
+        <p><span class="bold-label"><%= translations.trip_route %> :</span> <%= departureCity %> → <%= arrivalCity %></p>
+        <p><span class="bold-label"><%= translations.departure_date %> :</span> <%= new Date(segments[0]?.departure_datetime).toLocaleString(lang) %></p>
+        <p><span class="bold-label"><%= translations.passengers_count %> :</span> <%= passengers.length %></p>
+        <p><span class="bold-label"><%= translations.seats_reserved %> :</span> <%= segments.map(s => s.seat_number).join(', ') %></p>
+      </div>
+
+      <div class="invoice-date">
+        <strong><%= translations.reservation_date %></strong><br/>
+        <%= new Date().toLocaleDateString(lang) %><br/><br/>
+
+        <strong><%= translations.validity %></strong><br/>
+        <%= reservation.expires_at ? new Date(reservation.expires_at).toLocaleDateString(lang) : '120 min' %>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th><%= translations.table_header_passenger %></th>
+            <th><%= translations.table_header_segment %></th>
+            <th><%= translations.table_header_seat %></th>
+            <th><%= translations.table_header_price %></th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <% let i = 1; for (const rs of reservationSegments) { 
+             const seatNumber = rs.seat?.seat_number || 'N/A';
+             const segment = rs.segment;
+          %>
+          <tr>
+            <td><%= i++ %></td>
+            <td><%= rs.passenger_prename %> <%= rs.passenger_name %></td>
+            <td><%= segment.departure_city %> → <%= segment.arrival_city %></td>
+            <td><%= seatNumber %></td>
+            <td><%= rs.price %> USD</td>
+          </tr>
+          <% } %>
+        </tbody>
+
+        <tfoot>
+          <tr>
+            <td colspan="4">Subtotal</td>
+            <td><%= totalAmount %> USD</td>
+          </tr>
+
+          <% if (totalMealsFee > 0) { %>
+          <tr>
+            <td colspan="4">Meals</td>
+            <td><%= totalMealsFee %> USD</td>
+          </tr>
+          <% } %>
+
+          <tr>
+            <td colspan="4">Total</td>
+            <td><%= finalTotal %> USD</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- PAYMENT -->
+    <div class="payment-summary">
+      <div class="payment-info">
+        <strong><%= translations.payment_instructions %></strong>
+        <p>➡️ Mobile Money : +243 979 649 404</p>
+        <p>➡️ Cash : Goma, Avenue Kanyamuhanga n°12</p>
+        <p><strong>Total :</strong> <%= finalTotal %> USD</p>
+      </div>
+
+      <div class="summary-box">
+        <div class="summary-title"><%= translations.summary %></div>
+
+        <div class="summary-line">
+          <span>Trip</span>
+          <span><%= totalAmount %> USD</span>
+        </div>
+
+        <% if (totalMealsFee > 0) { %>
+        <div class="summary-line">
+          <span>Meals</span>
+          <span><%= totalMealsFee %> USD</span>
+        </div>
+        <% } %>
+
+        <div class="summary-line total">
+          <span>Total</span>
+          <span><%= finalTotal %> USD</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- THANK YOU -->
+    <div class="thankyou">
+      <h2><%= translations.thank_you %></h2>
+      <p><%= translations.payment_reminder %></p>
+      <p><%= translations.contact %></p>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

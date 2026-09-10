@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Facture</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background: #f1f5f9;
+        padding: 2rem;
+        margin: 0;
+      }
+
+      .card {
+        background: #ffffff;
+        max-width: 900px;
+        margin: auto;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 1rem;
+      }
+
+      .logo-title {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .logo-title img {
+        height: 50px;
+      }
+
+      .logo-title h1 {
+        font-size: 1.75rem;
+        color: #1d4ed8;
+        margin: 0;
+      }
+
+      .status-box {
+        text-align: right;
+      }
+
+      .status-box .status {
+        padding: 0.4rem 1rem;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-block;
+      }
+
+      .status.paid {
+        background: #dcfce7;
+        color: #16a34a;
+      }
+
+      .status.pending {
+        background: #fef3c7;
+        color: #f59e0b;
+      }
+
+      .section {
+        margin-top: 2rem;
+      }
+
+      .section-title {
+        font-weight: 600;
+        background: #1d4ed8;
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 6px 6px 0 0;
+      }
+
+      .section-content {
+        display: flex;
+        justify-content: space-between;
+        background: #f8fafc;
+        padding: 1rem;
+        border-radius: 0 0 6px 6px;
+      }
+
+      .section-content div {
+        width: 30%;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+      }
+
+      th,
+      td {
+        border: 1px solid #e5e7eb;
+        padding: 0.75rem;
+        font-size: 0.95rem;
+      }
+
+      th {
+        background: #1d4ed8;
+        color: white;
+        text-align: left;
+      }
+
+      .totals {
+        margin-top: 1.5rem;
+        text-align: right;
+      }
+
+      .totals div {
+        margin: 0.25rem 0;
+      }
+
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2rem;
+        font-size: 0.9rem;
+        border-top: 1px solid #e5e7eb;
+        padding-top: 1.5rem;
+        color: #4b5563;
+      }
+
+      .footer div strong {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #111827;
+      }
+
+      @media (max-width: 768px) {
+        .section-content {
+          flex-direction: column;
+        }
+
+        .section-content div {
+          width: 100%;
+          margin-bottom: 1rem;
+        }
+
+        .footer {
+          flex-direction: column;
+          gap: 1rem;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="card">
+      <div class="header">
+        <div class="logo-title">
+          <img src="https://yourdomain.com/logo.png" alt="Logo" />
+          <h1>FACTURE</h1>
+        </div>
+        <div class="status-box">
+          <div class="status">{{order.paymentStatus}}</div>
+          <small>{{order.type}} / {{order.shopType}}</small>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Client</div>
+        <div class="section-content">
+          <div>
+            <strong>Facturé à</strong><br />
+            {{user.fullName}}<br />
+            {{user.email}}<br />
+          </div>
+          <div>
+            <strong>N° Facture:</strong> #{{order.invoiceNumber}}<br />
+            <strong>Date:</strong> {{order.createdAt}}<br />
+          </div>
+          <div>
+            <strong>Adresse Livraison:</strong><br />
+            {{order.addressUser.address}}<br />
+            {{order.addressUser.city}}, {{order.addressUser.country}}
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Détails de la facture / Invoice Details</div>
+        <table>
+          <thead>
+            <tr>
+              <th>N°</th>
+              <th>Produit</th>
+              <th>Quantité</th>
+              <th>Prix unitaire</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{subOrdersHtml}}
+            <!-- Chacune des lignes devra inclure la cellule du numéro -->
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" style="text-align: right">
+                <strong>Sous-total:</strong>
+              </td>
+              <td>{{subOrders.totalAmount}} {{order.currency}}</td>
+            </tr>
+            <tr>
+              <td colspan="4" style="text-align: right">Frais de livraison:</td>
+              <td>{{order.shippingFee}} {{order.currency}}</td>
+            </tr>
+            <tr>
+              <td colspan="4" style="text-align: right">Frais de douane:</td>
+              <td>{{order.customsFee}} {{order.currency}}</td>
+            </tr>
+            <tr>
+              <td colspan="4" style="text-align: right">Remise:</td>
+              <td>-{{order.discount}} {{order.currency}}</td>
+            </tr>
+            <tr>
+              <td colspan="4" style="text-align: right">TVA:</td>
+              <td>{{order.tax}} {{order.currency}}</td>
+            </tr>
+            <tr>
+              <td colspan="4" style="text-align: right">
+                <strong>Total:</strong>
+              </td>
+              <td><strong>{{order.totalAmount}} {{order.currency}}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="footer">
+        <div>
+          <strong>Conditions générales</strong>
+          Les marchandises peuvent être soumises à des droits d'importation et
+          taxes locales. L'acheteur est responsable de vérifier les lois
+          douanières locales.
+        </div>
+        <div>
+          <strong>Méthode de paiement</strong>
+          💳 IBAN: XX00 XXXX XXXX XXXX<br />
+          👤 Nom: John Doe<br />
+          📞 +00 123 456 789<br />
+          ✉️ contact@votresite.com
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
