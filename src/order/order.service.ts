@@ -270,7 +270,7 @@ export class OrderService {
     // ✅ Calcul du shippingCost, transactionFee et du montant total
     const shippingCostValue = Number(shippingCost || 0);
     const transactionFeeValue = Number(transactionFee || 0);
-    const totalAmountValue = Number(totalAmount) + shippingCostValue;
+    const totalAmountValue = Number(totalAmount) + shippingCostValue + Number(transactionFeeValue);
     let parrainageAmount = 0;
     let paymentAmount = totalAmountValue;
 
@@ -302,7 +302,7 @@ export class OrderService {
           throw new BadRequestException(this.i18nService.translate('order.mobile_money_invalid_phone', lang));
         }
 
-        const finalGrandTotal = totalAmount + (shippingCost || 0);
+        const finalGrandTotal = totalAmount + (shippingCost || 0) + Number(transactionFeeValue);
 
         if (!finalGrandTotal || finalGrandTotal <= 0) {
           throw new BadRequestException(
@@ -331,7 +331,6 @@ export class OrderService {
           const depositStatus = pawapayResponse.finalStatus?.data?.status;
           const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
           const lastStatus = pawapayResponse.finalStatus?.data?.lastStatus;
-
           console.log(`[Order] Statut final Pawapay: ${depositStatus}`);
 
           if (depositStatus === 'COMPLETED') {
