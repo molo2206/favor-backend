@@ -170,13 +170,13 @@ export class PawapayService {
       },
       amount: data.amount,
       currency: data.currency,
-      preAuthorisationCode: '3c', // ou vide si Pawapay doit générer
+      preAuthorisationCode: '3c',
       clientReferenceId,
       customerMessage: 'Note of 4 to 22 chars',
       metadata,
     };
 
-    // Appel direct à l'API Pawapay
+    // ✅ Appel direct à l'API Pawapay
     const deposit = await lastValueFrom(
       this.httpService.post(`${this.baseUrl}/v2/deposits`, body, {
         headers: this.headers,
@@ -186,14 +186,27 @@ export class PawapayService {
 
     console.log('[PawaPay] Dépôt créé :', deposit.depositId);
 
-    // 2️⃣ Polling jusqu’au statut final
+    // ✅ Polling jusqu'au statut final
     const finalStatus = await this.pollDepositStatus(deposit.depositId, signal);
 
-    console.log('[PawaPay] Statut final :', finalStatus);
+    // ✅ AFFICHER LE STATUT COMPLET
+    console.log('[PawaPay] 📊 Statut final complet:', JSON.stringify(finalStatus, null, 2));
+
+    // ✅ EXTRAIRE LE MESSAGE D'ERREUR SI PRÉSENT
+    const status = finalStatus?.data?.status;
+    const failureReason = finalStatus?.data?.failureReason;
+
+    if (failureReason) {
+      console.error(`[PawaPay] ❌ Échec: ${failureReason.failureCode} - ${failureReason.failureMessage}`);
+    }
 
     return {
       deposit,
       finalStatus,
+      status,
+      failureReason: failureReason || null,
+      message: failureReason?.failureMessage || null,
+      success: status === 'COMPLETED',
     };
   }
 

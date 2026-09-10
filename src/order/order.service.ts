@@ -3,6 +3,7 @@ import { OrderNotificationHelper } from 'src/notification/utils/order-notificati
 import {
   BadRequestException,
   ForbiddenException,
+  HttpStatus,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -339,23 +340,33 @@ export class OrderService {
             orderStatus = OrderStatus.VALIDATED;
             isPaidByMobileMoney = true;
           } else if (depositStatus === 'REJECTED') {
-            console.log('[Order] ❌ Paiement rejeté par Pawapay');
-            if (failureReason?.failureMessage) {
-              throw new BadRequestException(failureReason.failureMessage);
-            }
-            throw new BadRequestException('Le paiement a été rejeté. Veuillez vérifier vos informations.');
+            throw new BadRequestException({
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: failureReason?.failureMessage || 'Le paiement a été rejeté.',
+              code: failureReason?.failureCode || 'PAYMENT_REJECTED',
+              provider: pawapayData.provider,
+            });
           } else if (depositStatus === 'FAILED') {
-            console.log('[Order] ❌ Paiement échoué');
-            if (failureReason?.failureMessage) {
-              throw new BadRequestException(failureReason.failureMessage);
-            }
-            throw new BadRequestException('Le paiement a échoué. Veuillez réessayer.');
+            throw new BadRequestException({
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: failureReason?.failureMessage || 'Le paiement a échoué.',
+              code: failureReason?.failureCode || 'PAYMENT_FAILED',
+              provider: pawapayData.provider,
+            });
           } else if (depositStatus === 'CANCELED') {
-            console.log('[Order] ❌ Paiement annulé');
-            throw new BadRequestException('Le paiement a été annulé.');
+            throw new BadRequestException({
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: failureReason?.failureMessage || 'Le paiement a été annulé.',
+              code: failureReason?.failureCode || 'PAYMENT_CANCELED',
+              provider: pawapayData.provider,
+            });
           } else if (depositStatus === 'EXPIRED') {
-            console.log('[Order] ❌ Paiement expiré');
-            throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
+            throw new BadRequestException({
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: failureReason?.failureMessage || 'Le paiement a expiré.',
+              code: failureReason?.failureCode || 'PAYMENT_EXPIRED',
+              provider: pawapayData.provider,
+            });
           } else if (depositStatus === 'TIMEOUT') {
             console.log('[Order] ⏳ Timeout du polling');
             if (lastStatus === 'ACCEPTED' || lastStatus === 'PENDING' || lastStatus === 'PROCESSING') {
@@ -367,14 +378,18 @@ export class OrderService {
               'Le paiement est en attente depuis trop longtemps. Veuillez vérifier le statut manuellement.'
             );
           } else if (depositStatus === 'ACCEPTED' || depositStatus === 'PENDING' || depositStatus === 'PROCESSING' || depositStatus === 'WAITING') {
-            console.log(`[Order] ⏳ Statut en attente: ${depositStatus}`);
+            console.log(`[Order] Statut en attente: ${depositStatus}`);
             paymentStatus = PaymentStatus.PENDING;
             orderStatus = OrderStatus.PENDING;
             isPaidByMobileMoney = false;
             console.log(`[Order] Commande en attente de confirmation du paiement (${depositStatus})`);
           } else {
-            console.log(`[Order] ⚠️ Statut inattendu: ${depositStatus}`);
-            throw new BadRequestException(`Statut de paiement inattendu: ${depositStatus}`);
+            throw new BadRequestException({
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: failureReason?.failureMessage || `Statut de paiement inattendu: ${depositStatus}`,
+              code: failureReason?.failureCode || 'UNEXPECTED_STATUS',
+              provider: pawapayData.provider,
+            });
           }
 
           // ============================================================
@@ -918,38 +933,33 @@ export class OrderService {
             break;
 
           case 'REJECTED':
-            console.log('[PayOrder] ❌ Dépôt Pawapay REJETÉ');
-            if (failureReason?.failureMessage) {
-              throw new BadRequestException(failureReason.failureMessage);
-            }
-            throw new BadRequestException('Le paiement a été rejeté. Veuillez vérifier vos informations.');
-
+            throw new BadRequestException({
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: failureReason?.failureMessage || 'Le paiement a été rejeté.',
+              code: failureReason?.failureCode || 'PAYMENT_REJECTED',
+              provider: pawapayData.provider,
+            });
           case 'FAILED':
-            console.log('[PayOrder] ❌ Dépôt Pawapay FAILED');
-            if (failureReason?.failureMessage) {
-              throw new BadRequestException(failureReason.failureMessage);
-            }
-            throw new BadRequestException('Le paiement a échoué. Veuillez réessayer.');
-
+            throw new BadRequestException({
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: failureReason?.failureMessage || 'Le paiement a échoué.',
+              code: failureReason?.failureCode || 'PAYMENT_FAILED',
+              provider: pawapayData.provider,
+            });
           case 'CANCELED':
-            console.log('[PayOrder] ❌ Dépôt Pawapay CANCELED');
-            throw new BadRequestException('Le paiement a été annulé.');
-
-          case 'EXPIRED':
-            console.log('[PayOrder] ❌ Dépôt Pawapay EXPIRED');
-            throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
-
+            throw new BadRequestException({
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: failureReason?.failureMessage || 'Le paiement a été annulé.',
+              code: failureReason?.failureCode || 'PAYMENT_CANCELED',
+              provider: pawapayData.provider,
+            });
           case 'TIMEOUT':
-            console.log('[PayOrder] ⏳ Timeout du polling');
-            if (lastStatus === 'ACCEPTED' || lastStatus === 'PENDING' || lastStatus === 'PROCESSING') {
-              throw new BadRequestException(
-                `Le paiement est en cours de traitement (${lastStatus}). Veuillez vérifier le statut plus tard.`
-              );
-            }
-            throw new BadRequestException(
-              'Le paiement est en attente depuis trop longtemps. Veuillez vérifier le statut manuellement.'
-            );
-
+            throw new BadRequestException({
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: failureReason?.failureMessage || 'Le paiement a expiré.',
+              code: failureReason?.failureCode || 'PAYMENT_EXPIRED',
+              provider: pawapayData.provider,
+            });
           case 'ACCEPTED':
           case 'PENDING':
           case 'PROCESSING':
@@ -963,7 +973,12 @@ export class OrderService {
 
           default:
             console.log(`[PayOrder] ❌ Statut inconnu: ${depositStatus}`);
-            throw new BadRequestException(`Statut de paiement inattendu: ${depositStatus}`);
+            throw new BadRequestException({
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: failureReason?.failureMessage || `Statut de paiement inattendu: ${depositStatus}`,
+              code: failureReason?.failureCode || 'UNEXPECTED_STATUS',
+              provider: pawapayData.provider,
+            });
         }
 
         // ============================================================
