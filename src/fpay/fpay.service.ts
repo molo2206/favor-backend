@@ -1151,12 +1151,10 @@ export class FpayService {
                 });
             }
 
-            // ✅ Si pas de wallets, ajouter USD par défaut
             if (allCurrencies.length === 0) {
                 allCurrencies.push('USD');
             }
 
-            // ✅ Initialiser toutes les devises avec tableau vide
             const allByCurrency: { [currency: string]: any[] } = {};
             const totalsByCurrency: { [currency: string]: number } = {};
 
@@ -1165,7 +1163,6 @@ export class FpayService {
                 totalsByCurrency[currency] = 0;
             });
 
-            // ✅ Extraire les transactions
             let transactions: any[] = [];
 
             if (result?.data?.transactions && Array.isArray(result.data.transactions)) {
@@ -1178,7 +1175,6 @@ export class FpayService {
                 transactions = result;
             }
 
-            // ✅ Si pas de transactions du tout
             if (!transactions || transactions.length === 0) {
                 return {
                     success: true,
@@ -1191,12 +1187,10 @@ export class FpayService {
                 };
             }
 
-            // ✅ Filtrer par status PENDING
             const pendingTransactions = transactions.filter(
                 (tx: any) => tx.status === 'PENDING' || tx.status === 'pending'
             );
 
-            // ✅ Remplir les transactions PENDING par devise
             pendingTransactions.forEach((tx: any) => {
                 const currency = tx.currency || 'USD';
 
@@ -1211,7 +1205,6 @@ export class FpayService {
                 totalsByCurrency[currency] += (tx.amount || 0);
             });
 
-            // ✅ Formater
             const formattedData: { [currency: string]: any[] } = {};
 
             allCurrencies.forEach((currency) => {
@@ -1254,17 +1247,20 @@ export class FpayService {
 
         } catch (error) {
             this.logger.error(`❌ Erreur: ${error.message}`);
-            return {
-                success: false,
-                message: error.message || 'Erreur lors de la récupération',
-                data: {},
-                totalsByCurrency: {},
-                currencies: [],
-                currenciesWithData: [],
-                count: 0,
-            };
+
+            // ✅ CORRECTION : Propager les HttpException au lieu de les masquer
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            // ✅ Sinon, lancer une erreur générique
+            throw new HttpException(
+                error.message || 'Erreur lors de la récupération',
+                HttpStatus.INTERNAL_SERVER_ERROR,
+            );
         }
     }
+    
     async requestDepositWithOtp(
         dto: {
             userId: string;        // userIdFpay (pour l'API FPay)

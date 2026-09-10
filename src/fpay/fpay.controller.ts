@@ -796,80 +796,32 @@ export class FpayController {
         description: 'Diminue les points de parrainage d\'un utilisateur selon la devise et le montant'
     })
 
-    @Get('transactions/pending')
+    @Get('wallet/pending-transactions')
     @UseGuards(AuthentificationGuard)
-    async getLastPendingTransaction(
+    @ApiBearerAuth()
+    async getPendingTransactions(
         @CurrentUser() user: UserEntity,
-        @Query('type') type?: 'DEPOSIT' | 'WITHDRAW' | 'TRANSFER' | 'PAYMENT' | 'REFUND',
-        @Query('walletId') walletId?: string,
+        @Query('type') type?: string,
     ) {
-        try {
-            // ✅ Vérifier que l'utilisateur est connecté
-            if (!user) {
-                throw new HttpException(
-                    {
-                        statusCode: HttpStatus.UNAUTHORIZED,
-                        message: 'Utilisateur non authentifié',
-                        code: 'UNAUTHORIZED',
-                    },
-                    HttpStatus.UNAUTHORIZED,
-                );
-            }
-
-            // ✅ Récupérer le userIdFpay de l'utilisateur connecté
-            const userIdFpay = user.userIdFpay;
-
-            if (!userIdFpay) {
-                throw new HttpException(
-                    {
-                        statusCode: HttpStatus.BAD_REQUEST,
-                        message: 'Aucun compte FPay lié à cet utilisateur',
-                        code: 'NO_FPAY_ACCOUNT',
-                    },
-                    HttpStatus.BAD_REQUEST,
-                );
-            }
-
-            // ✅ Appeler le service avec l'ID FPay de l'utilisateur connecté
-            const result = await this.fpayService.getLastPendingTransaction(userIdFpay, type);
-
-            // ✅ Vérifier si la fonction a retourné un résultat valide
-            if (!result || !result.success) {
-                return {
-                    status: 'success',
-                    message: 'Aucune transaction en attente',
-                    data: [],
-                    totalsByCurrency: {},
-                    currencies: [],
-                    count: 0,
-                };
-            }
-
-            // ✅ Retourner le résultat complet
-            return {
-                status: 'success',
-                message: result.message || 'Transactions en attente récupérées avec succès',
-                data: result.data,
-                totalsByCurrency: result.totalsByCurrency,
-                currencies: result.currencies || Object.keys(result.data || {}),
-                count: result.count || 0,
-            };
-
-        } catch (error) {
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            this.logger.error(`❌ Erreur dans getLastPendingTransaction: ${error.message}`);
-
+        // ✅ Vérifications (sans changer la structure)
+        if (!user) {
             throw new HttpException(
-                {
-                    statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-                    message: 'Erreur lors de la récupération de la transaction',
-                    code: 'FETCH_PENDING_TRANSACTION_ERROR',
-                },
-                HttpStatus.INTERNAL_SERVER_ERROR,
+                'Utilisateur non authentifié',
+                HttpStatus.UNAUTHORIZED,
             );
         }
+
+        if (!user.userIdFpay || !user.isLink) {
+            throw new HttpException(
+                'Compte FPay non lié',
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
+        // ✅ Utilise user.userIdFpay (le user connecté)
+        return this.fpayService.getLastPendingTransaction(
+            user.userIdFpay,  // ✅ SÉCURISÉ
+            type as any,
+        );
     }
 }
