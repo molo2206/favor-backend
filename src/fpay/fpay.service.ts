@@ -402,6 +402,33 @@ export class FpayService {
                 throw new Error('systemUserId ou fpayUserId est vide');
             }
 
+            // ✅ VÉRIFIER SI CE fpayUserId EST DÉJÀ UTILISÉ PAR UN AUTRE UTILISATEUR
+            const existingUser = await this.userRepository.findOne({
+                where: { userIdFpay: fpayUserId },
+            });
+
+            if (existingUser && existingUser.id !== systemUserId) {
+                console.warn(`⚠️ Le userIdFpay ${fpayUserId} est déjà utilisé par l'utilisateur ${existingUser.id}`);
+                throw new Error(
+                    `Ce compte FPay est déjà lié à un autre utilisateur. Veuillez contacter le support.`
+                );
+            }
+
+            // ✅ VÉRIFIER SI L'UTILISATEUR ACTUEL A DÉJÀ UN userIdFpay DIFFÉRENT
+            const currentUser = await this.userRepository.findOne({
+                where: { id: systemUserId },
+            });
+
+            if (!currentUser) {
+                throw new Error(`Utilisateur ${systemUserId} non trouvé`);
+            }
+
+            // ✅ Si l'utilisateur a déjà un userIdFpay différent, on le remplace
+            if (currentUser.userIdFpay && currentUser.userIdFpay !== fpayUserId) {
+                console.log(`🔄 Remplacement: ${currentUser.userIdFpay} → ${fpayUserId}`);
+            }
+
+            // ✅ Mettre à jour
             const result = await this.userRepository.update(
                 { id: systemUserId },
                 {
@@ -417,7 +444,6 @@ export class FpayService {
             throw error;
         }
     }
-
 
     async accessToken(user: UserEntity): Promise<string> {
         const payload = {
@@ -1260,7 +1286,7 @@ export class FpayService {
             );
         }
     }
-    
+
     async requestDepositWithOtp(
         dto: {
             userId: string;        // userIdFpay (pour l'API FPay)
