@@ -153,5 +153,14 @@
   "order.payment_insufficient_balance": "Insufficient balance. {{message}}",
   "order.payment_provider_unavailable": "Provider is temporarily unavailable. {{message}}",
   "order.payment_canceled": "Payment has been cancelled.",
-  "order.payment_expired": "Payment has expired. Please try again."
+  "order.payment_expired": "Payment has expired. Please try again.",
+  "order.shipping_cost_updated_title": "Shipping cost updated",
+  "order.shipping_cost_updated_content": "The shipping cost for your order #{{invoiceNumber}} has been updated: {{oldCost}} → {{newCost}} {{currency}}.",
+  "order.push_shipping_cost_updated_title": "Shipping cost updated",
+  "order.push_shipping_cost_updated_body": "Order #{{invoiceNumber}}: new shipping cost {{newCost}} {{currency}} (previous: {{oldCost}} {{currency}}).",
+  "order.sms_shipping_cost_updated": "Favor Help: Shipping cost for order #{{invoiceNumber}} is now {{newCost}} {{currency}} (previous: {{oldCost}} {{currency}}).",
+  "order.shipping_cost_positive": "Shipping cost must be positive.",
+  "order.cannot_modify_finalized": "Cannot modify an already finalized order (delivered, validated, or rejected).",
+  "order.access_denied": "You do not have permission to modify this order.",
+  "order.shipping_cost_updated": "Shipping cost has been updated: {{oldCost}} → {{newCost}}."
 }

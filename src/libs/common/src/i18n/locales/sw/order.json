@@ -153,5 +153,14 @@
   "order.payment_insufficient_balance": "Salio haitoshi. {{message}}",
   "order.payment_provider_unavailable": "Mtoa huduma hapatikani kwa muda. {{message}}",
   "order.payment_canceled": "Malipo yameghairiwa.",
-  "order.payment_expired": "Malipo yameisha muda wake. Tafadhali jaribu tena."
+  "order.payment_expired": "Malipo yameisha muda wake. Tafadhali jaribu tena.",
+  "order.shipping_cost_updated_title": "Gharama ya usafirishaji imesasishwa",
+  "order.shipping_cost_updated_content": "Gharama ya usafirishaji ya oda yako #{{invoiceNumber}} imesasishwa: {{oldCost}} → {{newCost}} {{currency}}.",
+  "order.push_shipping_cost_updated_title": "Gharama ya usafirishaji imesasishwa",
+  "order.push_shipping_cost_updated_body": "Oda #{{invoiceNumber}}: gharama mpya ya usafirishaji {{newCost}} {{currency}} (ya awali: {{oldCost}} {{currency}}).",
+  "order.sms_shipping_cost_updated": "Favor Help: Gharama ya usafirishaji ya oda #{{invoiceNumber}} sasa ni {{newCost}} {{currency}} (ya awali: {{oldCost}} {{currency}}).",
+  "order.shipping_cost_positive": "Gharama ya usafirishaji lazima iwe chanya.",
+  "order.cannot_modify_finalized": "Haiwezi kubadilisha oda iliyokamilika (iliyowasilishwa, iliyothibitishwa, au iliyokataliwa).",
+  "order.access_denied": "Huna ruhusa ya kubadilisha oda hii.",
+  "order.shipping_cost_updated": "Gharama ya usafirishaji imesasishwa: {{oldCost}} → {{newCost}}."
 }

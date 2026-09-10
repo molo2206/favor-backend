@@ -2223,7 +2223,6 @@ export class OrderService {
   }
   // ======================== MODIFICATION DE COMMANDE ========================
   // Dans le service OrderService
-
   async updateOrderShippingCost(
     orderId: string,
     shippingCost: number,
@@ -2237,6 +2236,7 @@ export class OrderService {
         'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
+        'orderItems.product.images',
         'subOrders',
         'subOrders.items.product.company',
         'subOrders.items.product.category',
@@ -2253,7 +2253,7 @@ export class OrderService {
       );
     }
 
-    // 2️⃣ Vérifier les permissions (corrigé)
+    // 2️⃣ Vérifier les permissions
     const isAdmin = user.role === UserRole.SUPER_ADMIN;
     const isOwner = order.userId === user.id;
 
@@ -2299,13 +2299,14 @@ export class OrderService {
     // 8️⃣ Sauvegarder la commande
     const updatedOrder = await this.orderRepo.save(order);
 
-    // 9️⃣ Retourner la commande mise à jour
+    // 9️⃣ Récupérer la commande mise à jour avec toutes les relations
     const finalOrder = await this.orderRepo.findOne({
       where: { id: order.id },
       relations: [
         'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
+        'orderItems.product.images',
         'subOrders',
         'subOrders.items.product.company',
         'subOrders.items.product.category',
@@ -2322,6 +2323,18 @@ export class OrderService {
       );
     }
 
+    // ============================================================
+    // ✅ 1️⃣0️⃣ ENVOYER LES NOTIFICATIONS
+    // ============================================================
+    this.processShippingCostUpdate(
+      finalOrder,
+      oldShippingCost,
+      shippingCost,
+      lang,
+    ).catch((err) =>
+      console.error('[Order] Erreur notifications frais de livraison:', err),
+    );
+
     return {
       message: this.i18nService.translate('order.shipping_cost_updated', lang, {
         oldCost: oldShippingCost,
@@ -2331,6 +2344,96 @@ export class OrderService {
     };
   }
 
+  private async processShippingCostUpdate(
+    order: OrderEntity,
+    oldShippingCost: number,
+    newShippingCost: number,
+    lang: string = 'fr',
+  ): Promise<void> {
+    try {
+      console.log(`[Order] 📤 Envoi notifications frais de livraison pour #${order.invoiceNumber}`);
+      console.log(`[Order] Ancien: ${oldShippingCost} → Nouveau: ${newShippingCost}`);
+
+      // ✅ Récupérer l'image du premier produit
+      let imageUrl: string | undefined;
+      if (order.orderItems?.length) {
+        const firstItem = order.orderItems[0];
+        if (firstItem.product?.images?.length) {
+          imageUrl = firstItem.product.images[0].url;
+        } else if (firstItem.product?.image) {
+          imageUrl = firstItem.product.image;
+        }
+      }
+
+      // ✅ 1. Notification in-app
+      const inAppTitle = this.i18nService.translate('order.shipping_cost_updated_title', lang, {
+        invoiceNumber: order.invoiceNumber,
+      });
+      const inAppContent = this.i18nService.translate('order.shipping_cost_updated_content', lang, {
+        invoiceNumber: order.invoiceNumber,
+        oldCost: oldShippingCost,
+        newCost: newShippingCost,
+        currency: order.currency,
+      });
+
+      await this.notificationsService.sendAndSaveNotification(
+        order.userId,
+        inAppTitle,
+        inAppContent,
+        NotificationType.ORDER_UPDATED,
+        {
+          orderId: order.id,
+          status: order.status,
+          oldShippingCost: oldShippingCost,
+          newShippingCost: newShippingCost,
+        },
+      );
+
+      console.log(`[Order] ✅ Notification in-app envoyée`);
+
+      // ✅ 2. Push notification + SMS
+      const hasPhone = order.user?.phone && order.user.phone.trim() !== '';
+
+      const pushTitle = this.i18nService.translate('order.push_shipping_cost_updated_title', lang, {
+        invoiceNumber: order.invoiceNumber,
+      });
+
+      const pushBody = this.i18nService.translate('order.push_shipping_cost_updated_body', lang, {
+        invoiceNumber: order.invoiceNumber,
+        oldCost: oldShippingCost,
+        newCost: newShippingCost,
+        currency: order.currency,
+      });
+
+      const smsBody = hasPhone
+        ? this.i18nService.translate('order.sms_shipping_cost_updated', lang, {
+          invoiceNumber: order.invoiceNumber,
+          oldCost: oldShippingCost,
+          newCost: newShippingCost,
+          currency: order.currency,
+        })
+        : undefined;
+
+      await this.pushNotificationHelper.sendAll({
+        userId: order.userId,
+        pushTitle,
+        pushBody,
+        pushData: {
+          entity: 'ORDER',
+          entityId: order.id,
+          action: 'SHIPPING_COST_UPDATED',
+        },
+        phoneNumber: hasPhone ? order.user.phone : undefined,
+        smsBody: smsBody,
+        imageUrl,
+      });
+
+      console.log(`[Order] ✅ Push + SMS envoyés`);
+
+    } catch (error: any) {
+      console.error('[Order] ❌ Erreur dans processShippingCostUpdate:', error.message);
+    }
+  }
 
   async getAllTransctions(): Promise<{ data: TransactionEntity[] }> {
     const transactions = await this.transactionRepository.find({ relations: ['order', 'order.user'] });

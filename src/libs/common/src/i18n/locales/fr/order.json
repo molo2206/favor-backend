@@ -153,5 +153,14 @@
   "order.payment_insufficient_balance": "Solde insuffisant. {{message}}",
   "order.payment_provider_unavailable": "Le fournisseur est temporairement indisponible. {{message}}",
   "order.payment_canceled": "Le paiement a été annulé.",
-  "order.payment_expired": "Le paiement a expiré. Veuillez réessayer."
+  "order.payment_expired": "Le paiement a expiré. Veuillez réessayer.",
+  "order.shipping_cost_updated_title": "Frais de livraison mis à jour",
+  "order.shipping_cost_updated_content": "Les frais de livraison de votre commande #{{invoiceNumber}} ont été mis à jour : {{oldCost}} → {{newCost}} {{currency}}.",
+  "order.push_shipping_cost_updated_title": "Frais de livraison mis à jour",
+  "order.push_shipping_cost_updated_body": "Commande #{{invoiceNumber}} : nouveaux frais de livraison {{newCost}} {{currency}} (ancien : {{oldCost}} {{currency}}).",
+  "order.sms_shipping_cost_updated": "Favor Help : Les frais de livraison de la commande #{{invoiceNumber}} sont maintenant de {{newCost}} {{currency}} (ancien : {{oldCost}} {{currency}}).",
+  "order.shipping_cost_positive": "Les frais de livraison doivent être positifs.",
+  "order.cannot_modify_finalized": "Impossible de modifier une commande déjà finalisée (livrée, validée ou rejetée).",
+  "order.access_denied": "Vous n'avez pas la permission de modifier cette commande.",
+  "order.shipping_cost_updated": "Les frais de livraison ont été mis à jour : {{oldCost}} → {{newCost}}."
 }

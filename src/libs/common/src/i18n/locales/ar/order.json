@@ -153,5 +153,14 @@
   "order.payment_insufficient_balance": "الرصيد غير كافٍ. {{message}}",
   "order.payment_provider_unavailable": "المزود غير متوفر مؤقتاً. {{message}}",
   "order.payment_canceled": "تم إلغاء الدفع.",
-  "order.payment_expired": "انتهت صلاحية الدفع. يرجى المحاولة مرة أخرى."
+  "order.payment_expired": "انتهت صلاحية الدفع. يرجى المحاولة مرة أخرى.",
+  "order.shipping_cost_updated_title": "تم تحديث تكلفة الشحن",
+  "order.shipping_cost_updated_content": "تم تحديث تكلفة الشحن لطلبك #{{invoiceNumber}}: {{oldCost}} → {{newCost}} {{currency}}.",
+  "order.push_shipping_cost_updated_title": "تم تحديث تكلفة الشحن",
+  "order.push_shipping_cost_updated_body": "الطلب #{{invoiceNumber}}: تكلفة الشحن الجديدة {{newCost}} {{currency}} (السابقة: {{oldCost}} {{currency}}).",
+  "order.sms_shipping_cost_updated": "Favor Help: تكلفة الشحن للطلب #{{invoiceNumber}} أصبحت الآن {{newCost}} {{currency}} (السابقة: {{oldCost}} {{currency}}).",
+  "order.shipping_cost_positive": "يجب أن تكون تكلفة الشحن موجبة.",
+  "order.cannot_modify_finalized": "لا يمكن تعديل طلب تم إنهاؤه بالفعل (تم تسليمه، أو التحقق منه، أو رفضه).",
+  "order.access_denied": "ليس لديك إذن لتعديل هذا الطلب.",
+  "order.shipping_cost_updated": "تم تحديث تكلفة الشحن: {{oldCost}} → {{newCost}}."
 }
