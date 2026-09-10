@@ -369,14 +369,13 @@ export class OrderService {
             });
           } else if (depositStatus === 'TIMEOUT') {
             console.log('[Order] ⏳ Timeout du polling');
-            if (lastStatus === 'ACCEPTED' || lastStatus === 'PENDING' || lastStatus === 'PROCESSING') {
-              throw new BadRequestException(
-                `Le paiement est en cours de traitement (${lastStatus}). Veuillez vérifier le statut plus tard.`
-              );
-            }
-            throw new BadRequestException(
-              'Le paiement est en attente depuis trop longtemps. Veuillez vérifier le statut manuellement.'
-            );
+            throw new BadRequestException({
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: failureReason?.failureMessage || `Le paiement est en cours de traitement (${lastStatus}). Veuillez vérifier le statut plus tard.`,
+              code: failureReason?.failureCode || 'POLLING_TIMEOUT',
+              provider: pawapayData.provider,
+              lastStatus: lastStatus,
+            });
           } else if (depositStatus === 'ACCEPTED' || depositStatus === 'PENDING' || depositStatus === 'PROCESSING' || depositStatus === 'WAITING') {
             console.log(`[Order] Statut en attente: ${depositStatus}`);
             paymentStatus = PaymentStatus.PENDING;
