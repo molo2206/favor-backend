@@ -850,24 +850,25 @@ export class OrderService {
 
     const hasReferrer = !!(userWithReferrer?.referrer);
 
-    // ✅ Calcul du shippingCost, transactionFee et du montant total
+    // ✅ Calcul IDENTIQUE à createOrder
     const shippingCostValue = Number(order.shippingCost || 0);
-    const totalAmount = Number(order.totalAmount) + shippingCostValue + Number(transactionFee || 0);
+    const transactionFeeValue = Number(transactionFee || 0);
+    const totalAmountValue = Number(order.totalAmount) + shippingCostValue + transactionFeeValue;
     let parrainageAmount = 0;
-    let paymentAmount = totalAmount;
+    let paymentAmount = totalAmountValue;
 
     // ✅ Si l'utilisateur a un parrain → 10% du shippingCost pour le parrainage
     if (hasReferrer && shippingCostValue > 0) {
       parrainageAmount = shippingCostValue * 0.10;
-      paymentAmount = totalAmount - parrainageAmount;
+      paymentAmount = totalAmountValue - parrainageAmount;
 
       console.log(`[PayOrder] 👤 A un parrain: ${hasReferrer}`);
-      console.log(`[PayOrder] Total: ${totalAmount}$`);
+      console.log(`[PayOrder] Total: ${totalAmountValue}$`);
       console.log(`[PayOrder] 10% shipping pour parrainage: ${parrainageAmount}$`);
-      console.log(`[PayOrder] Montant du paiement (après parrainage): ${paymentAmount}$`);
+      console.log(`[PayOrder] Montant du paiement: ${paymentAmount}$`);
     } else {
       console.log(`[PayOrder] ℹ️ Aucun parrain trouvé`);
-      console.log(`[PayOrder] Montant du paiement: ${totalAmount}$`);
+      console.log(`[PayOrder] Montant du paiement: ${totalAmountValue}$`);
     }
 
     // 6. Traiter le paiement selon la méthode choisie
@@ -887,18 +888,17 @@ export class OrderService {
         );
       }
 
-      if (!order.grandTotal) {
+      // ✅ IDENTIQUE à createOrder
+      const finalGrandTotal = Number(order.totalAmount) + shippingCostValue + transactionFeeValue;
+
+      if (!finalGrandTotal || finalGrandTotal <= 0) {
         throw new BadRequestException(
           this.i18nService.translate('order.mobile_money_grandtotal_required', lang)
         );
       }
 
-      // ✅ Envoyer le montant TOTAL à Pawapay (totalAmount = order.totalAmount + shippingCost)
-      const amountForPawapay = totalAmount.toString().replace(/[^0-9.]/g, '');
-
-      console.log('[PayOrder] Montant total envoyé à Pawapay:', amountForPawapay);
-      console.log('[PayOrder] totalAmount:', totalAmount);
-      console.log('[PayOrder] paymentAmount (après parrainage):', paymentAmount);
+      // ✅ Utiliser finalGrandTotal (IDENTIQUE à createOrder)
+      const amountForPawapay = finalGrandTotal.toString();
 
       const pawapayData = {
         amount: amountForPawapay,
@@ -910,7 +910,7 @@ export class OrderService {
       console.log('[PayOrder] Création dépôt Pawapay :', pawapayData);
 
       // ============================================================
-      // 1. PAWAPAY - OBLIGATOIRE
+      // 1. PAWAPAY - OBLIGATOIRE (IDENTIQUE à createOrder)
       // ============================================================
       try {
         const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData, signal);
@@ -922,71 +922,72 @@ export class OrderService {
 
         console.log(`[PayOrder] Statut final Pawapay: ${depositStatus}`);
 
-        switch (depositStatus) {
-          case 'COMPLETED':
-            console.log('[PayOrder] ✅ Dépôt Pawapay confirmé : COMPLETED');
-            paymentStatus = PaymentStatus.PAID;
-            orderStatus = OrderStatus.VALIDATED;
-            isPaidByMobileMoney = true;
-            break;
-
-          case 'REJECTED':
-            throw new BadRequestException({
-              statusCode: HttpStatus.BAD_REQUEST,
-              message: failureReason?.failureMessage || 'Le paiement a été rejeté.',
-              code: failureReason?.failureCode || 'PAYMENT_REJECTED',
-              provider: pawapayData.provider,
-            });
-          case 'FAILED':
-            throw new BadRequestException({
-              statusCode: HttpStatus.BAD_REQUEST,
-              message: failureReason?.failureMessage || 'Le paiement a échoué.',
-              code: failureReason?.failureCode || 'PAYMENT_FAILED',
-              provider: pawapayData.provider,
-            });
-          case 'CANCELED':
-            throw new BadRequestException({
-              statusCode: HttpStatus.BAD_REQUEST,
-              message: failureReason?.failureMessage || 'Le paiement a été annulé.',
-              code: failureReason?.failureCode || 'PAYMENT_CANCELED',
-              provider: pawapayData.provider,
-            });
-          case 'TIMEOUT':
-            throw new BadRequestException({
-              statusCode: HttpStatus.BAD_REQUEST,
-              message: failureReason?.failureMessage || 'Le paiement a expiré.',
-              code: failureReason?.failureCode || 'PAYMENT_EXPIRED',
-              provider: pawapayData.provider,
-            });
-          case 'ACCEPTED':
-          case 'PENDING':
-          case 'PROCESSING':
-          case 'WAITING':
-            console.log(`[PayOrder] ⏳ Statut en attente: ${depositStatus}`);
-            paymentStatus = PaymentStatus.PENDING;
-            orderStatus = OrderStatus.PENDING;
-            isPaidByMobileMoney = false;
-            console.log(`[PayOrder] Commande en attente de confirmation du paiement (${depositStatus})`);
-            break;
-
-          default:
-            console.log(`[PayOrder] ❌ Statut inconnu: ${depositStatus}`);
-            throw new BadRequestException({
-              statusCode: HttpStatus.BAD_REQUEST,
-              message: failureReason?.failureMessage || `Statut de paiement inattendu: ${depositStatus}`,
-              code: failureReason?.failureCode || 'UNEXPECTED_STATUS',
-              provider: pawapayData.provider,
-            });
+        // ✅ Gestion IDENTIQUE à createOrder
+        if (depositStatus === 'COMPLETED') {
+          console.log('[PayOrder] ✅ Dépôt Pawapay confirmé : COMPLETED');
+          paymentStatus = PaymentStatus.PAID;
+          orderStatus = OrderStatus.VALIDATED;
+          isPaidByMobileMoney = true;
+        } else if (depositStatus === 'REJECTED') {
+          throw new BadRequestException({
+            statusCode: HttpStatus.BAD_REQUEST,
+            message: failureReason?.failureMessage || 'Le paiement a été rejeté.',
+            code: failureReason?.failureCode || 'PAYMENT_REJECTED',
+            provider: pawapayData.provider,
+          });
+        } else if (depositStatus === 'FAILED') {
+          throw new BadRequestException({
+            statusCode: HttpStatus.BAD_REQUEST,
+            message: failureReason?.failureMessage || 'Le paiement a échoué.',
+            code: failureReason?.failureCode || 'PAYMENT_FAILED',
+            provider: pawapayData.provider,
+          });
+        } else if (depositStatus === 'CANCELED') {
+          throw new BadRequestException({
+            statusCode: HttpStatus.BAD_REQUEST,
+            message: failureReason?.failureMessage || 'Le paiement a été annulé.',
+            code: failureReason?.failureCode || 'PAYMENT_CANCELED',
+            provider: pawapayData.provider,
+          });
+        } else if (depositStatus === 'EXPIRED') {
+          throw new BadRequestException({
+            statusCode: HttpStatus.BAD_REQUEST,
+            message: failureReason?.failureMessage || 'Le paiement a expiré.',
+            code: failureReason?.failureCode || 'PAYMENT_EXPIRED',
+            provider: pawapayData.provider,
+          });
+        } else if (depositStatus === 'TIMEOUT') {
+          console.log('[PayOrder] ⏳ Timeout du polling');
+          throw new BadRequestException({
+            statusCode: HttpStatus.BAD_REQUEST,
+            message: failureReason?.failureMessage || `Le paiement est en cours de traitement (${lastStatus}). Veuillez vérifier le statut plus tard.`,
+            code: failureReason?.failureCode || 'POLLING_TIMEOUT',
+            provider: pawapayData.provider,
+            lastStatus: lastStatus,
+          });
+        } else if (['ACCEPTED', 'PENDING', 'PROCESSING', 'WAITING'].includes(depositStatus)) {
+          console.log(`[PayOrder] ⏳ Statut en attente: ${depositStatus}`);
+          paymentStatus = PaymentStatus.PENDING;
+          orderStatus = OrderStatus.PENDING;
+          isPaidByMobileMoney = false;
+          console.log(`[PayOrder] Commande en attente de confirmation du paiement (${depositStatus})`);
+        } else {
+          throw new BadRequestException({
+            statusCode: HttpStatus.BAD_REQUEST,
+            message: failureReason?.failureMessage || `Statut de paiement inattendu: ${depositStatus}`,
+            code: failureReason?.failureCode || 'UNEXPECTED_STATUS',
+            provider: pawapayData.provider,
+          });
         }
 
         // ============================================================
-        // ✅ PAIEMENT FAVOR HELP AVEC payWithMobileMoney (MOBILE_MONEY)
+        // ✅ PAIEMENT FAVOR HELP AVEC payWithMobileMoney (IDENTIQUE à createOrder)
         // ============================================================
         if (paymentStatus === PaymentStatus.PAID) {
           try {
             console.log('[PayOrder] Tentative paiement Favor Help...');
             const fpayResponse = await this.fpayService.payWithMobileMoney(
-              paymentAmount,  // ✅ Montant après parrainage
+              paymentAmount,  // ✅ paymentAmount (après parrainage)
               order.currency || 'USD',
               `Paiement de commande #${order.invoiceNumber}`,
               'MOBILE_MONEY',
@@ -997,77 +998,7 @@ export class OrderService {
               fpayTransactionId = fpayResponse.data.transaction.id;
               fpayReference = fpayResponse.data.transaction.reference;
               console.log(`[PayOrder] ✅ Paiement Favor Help réussi: ${paymentAmount} ${order.currency}`);
-
-              // ✅ Créer la transaction de paiement
-              const operationAmount = (Number(order.totalAmount) + Number(order.shippingCost || 0));
-              const designation = this.i18nService.translate('order.payment_designation', lang, {
-                invoiceNumber: order.invoiceNumber,
-                method: selectedMethod,
-              });
-
-              const operationData: Partial<OperationEntity> = {
-                debit: 0,
-                credit: operationAmount,
-                designation,
-                status: OperationStatus.ACCEPTED,
-                orderId: order.id,
-                userId: user.id,
-                paymentMethod: selectedMethod,
-                reference: order.invoiceNumber,
-              };
-
-              if (selectedMethod === PaymentMethod.MOBILE_MONEY && provider) {
-                operationData.provider = provider;
-              }
-
-              const operation = this.operationRepo.create(operationData as any);
-              await this.operationRepo.save(operation);
-              console.log(`[PayOrder] Opération ${selectedMethod} enregistrée pour la commande ${order.invoiceNumber}`);
-
-              // ============================================================
-              // ✅ ENVOYER LE PARRAINAGE (10%) - UNIQUEMENT SI PARRAIN
-              // ============================================================
-              if (hasReferrer && parrainageAmount > 0) {
-                console.log(`[PayOrder] 👤 A un parrain: ${hasReferrer}`);
-                console.log(`[PayOrder] 10% shipping pour parrainage: ${parrainageAmount}$`);
-
-                const sendDto: FpaySendDto = {
-                  amount: parrainageAmount,
-                  description: `Bonus parrainage (10%) - Achat de votre filleul, commande #${order.invoiceNumber}`,
-                  currency: order.currency || 'USD',
-                  countryCode: 'CD',
-                  paymentMethod: 'MOBILE_MONEY',
-                };
-
-                // ✅ Appel à makeSendparrainage (HELP → PARRAINAGE) - NON BLOQUANT
-                this.fpayService.makeSendparrainage(sendDto, user)
-                  .then(async (result) => {
-                    if (result && result.success) {
-                      console.log(`[PayOrder] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
-
-                      // ✅ Mettre à jour le parrainage dans la base de données
-                      const referrerId = userWithReferrer?.referrer?.id;
-                      if (referrerId) {
-                        await this.updateReferralWithAmount(
-                          referrerId,
-                          user.id,
-                          parrainageAmount,
-                          order.invoiceNumber,
-                          order.currency
-                        );
-                      }
-                    } else if (result) {
-                      console.log(`[PayOrder] ⚠️ Parrainage non envoyé: ${result.message}`);
-                    }
-                  })
-                  .catch(error => {
-                    console.error('[PayOrder] ❌ Erreur envoi parrainage:', error.message);
-                  });
-
-                console.log(`[PayOrder] 📤 Envoi parrainage en cours (non bloquant)...`);
-              } else {
-                console.log(`[PayOrder] 👤 Sans parrain - Pas de parrainage envoyé`);
-              }
+              console.log(`[PayOrder] Paiement Favor Help réussi pour la commande #${order.invoiceNumber}`);
             } else {
               console.log('[PayOrder] ⚠️ Paiement Favor Help échoué - statut:', fpayResponse?.data?.transaction?.status || 'inconnu');
             }
@@ -1187,7 +1118,6 @@ export class OrderService {
                 if (result && result.success) {
                   console.log(`[PayOrder] ✅ ${parrainageAmount} envoyé au compte Parrainage via FPay`);
 
-                  // ✅ Mettre à jour le parrainage dans la base de données
                   const referrerId = userWithReferrer?.referrer?.id;
                   if (referrerId) {
                     await this.updateReferralWithAmount(
