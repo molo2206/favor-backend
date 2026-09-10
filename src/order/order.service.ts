@@ -852,7 +852,7 @@ export class OrderService {
 
     // ✅ Calcul du shippingCost, transactionFee et du montant total
     const shippingCostValue = Number(order.shippingCost || 0);
-    const totalAmount = Number(order.totalAmount) + shippingCostValue;
+    const totalAmount = Number(order.totalAmount) + shippingCostValue + Number(transactionFee || 0);
     let parrainageAmount = 0;
     let paymentAmount = totalAmount;
 
