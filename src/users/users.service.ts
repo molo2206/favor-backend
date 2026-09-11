@@ -669,11 +669,47 @@ export class UsersService {
       );
     }
 
-    // ✅ Vérifier si l'utilisateur a un compte de fidélité, sinon le créer
+    // ============================================================
+    // 🔥 GARANTIR LE referralCode ET LE COMPTE FIDÉLITÉ
+    // ============================================================
+    let needsReload = false;
+
+    // ✅ Vérifier le referralCode
+    if (!user.referralCode || user.referralCode.trim() === '') {
+      console.warn(`⚠️ [signin] Utilisateur ${user.id} sans referralCode, génération...`);
+
+      const existingCodesRows = await this.usersRepository
+        .createQueryBuilder('u')
+        .select('u.referralCode', 'code')
+        .where('u.referralCode IS NOT NULL')
+        .andWhere("TRIM(u.referralCode) != ''")
+        .getRawMany();
+      const existingCodes = existingCodesRows.map((r) => r.code);
+
+      const newCode = await this.generateReferralCode(user.id, existingCodes);
+
+      if (!newCode || newCode.trim() === '') {
+        console.error(`❌ [signin] Impossible de générer un referralCode pour ${user.id}`);
+        throw new InternalServerErrorException(
+          await this.i18n.translate('user.referral_code_generation_failed', lang),
+        );
+      }
+
+      user.referralCode = newCode;
+      await this.usersRepository.save(user);
+      needsReload = true;
+      console.log(`✅ [signin] referralCode généré: ${newCode}`);
+    }
+
+    // ✅ Vérifier le compte fidélité
     if (!user.loyalty || user.loyalty.length === 0) {
       const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
+      needsReload = true;
+    }
 
+    // ✅ Recharger si nécessaire
+    if (needsReload) {
       const reloadedUser = await this.usersRepository
         .createQueryBuilder('users')
         .addSelect('users.password')
@@ -1903,7 +1939,7 @@ export class UsersService {
       fcmToken,
     };
   }
-  
+
   // ==================== APPLE LOGIN ====================
   private async ensureReferralCodeAndLoyalty(
     user: UserEntity,
