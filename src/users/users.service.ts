@@ -542,7 +542,6 @@ export class UsersService {
         email: userWithoutPassword.email || 'Non renseigné',
         phone: userWithoutPassword.phone || 'Non renseigné',
         role: userWithoutPassword.role || 'Client',
-        loyaltyCode: loyaltyCode,
         referralCode: savedUser.referralCode,
         createdAt: userWithoutPassword.createdAt
           ? new Date(
