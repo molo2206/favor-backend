@@ -62,10 +62,8 @@ export class UsersService {
 
     @InjectRepository(ReferralEntity)
     private readonly referralRepository: Repository<ReferralEntity>,
-
     @InjectRepository(UserHasResourceEntity)
     private readonly userHasResourceRepository: Repository<UserHasResourceEntity>,
-
     @InjectRepository(CompanyEntity)
     private readonly companyRepository: Repository<CompanyEntity>,
 
@@ -149,6 +147,59 @@ export class UsersService {
     }
 
     return code;
+  }
+
+  private async getOrCreateLoyaltyAccount(userId: string): Promise<UserLoyaltyEntity> {
+    // ✅ 1. VÉRIFIER SI ÇA EXISTE
+    const existingLoyalty = await this.loyaltyRepository.findOne({
+      where: { userId },
+    });
+
+    // ✅ 2. SI EXISTE → NE PAS CRÉER, RETOURNER
+    if (existingLoyalty) {
+      return existingLoyalty;
+    }
+
+    // ✅ 3. SINON → GÉNÉRER UN CODE UNIQUE ET CRÉER
+    let code: string;
+    let exists: UserLoyaltyEntity | null = null;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    do {
+      code = Math.floor(10000000 + Math.random() * 90000000).toString();
+      exists = await this.loyaltyRepository.findOne({
+        where: { loyaltyCode: code },
+      });
+      attempts++;
+    } while (exists && attempts < maxAttempts);
+
+    if (exists) {
+      code = Date.now().toString().slice(-8);
+    }
+
+    const loyalty = this.loyaltyRepository.create({
+      userId,
+      loyaltyCode: code,
+      pointsBalance: 0,
+      pointsTotalEarned: 0,
+      pointsTotalSpent: 0,
+      currentTier: LoyaltyTier.BRONZE,
+      isActive: true,
+    });
+
+    try {
+      return await this.loyaltyRepository.save(loyalty);
+    } catch (error: any) {
+      // ✅ 4. Si erreur de doublon (concurrence) → retourner l'existant
+      if (error.code === 'ER_DUP_ENTRY' || error.message?.includes('Duplicate')) {
+        const existing = await this.loyaltyRepository.findOne({
+          where: { userId },
+        });
+        if (existing) return existing;
+      }
+      throw error;
+    }
   }
 
   async changePassword(
@@ -417,39 +468,8 @@ export class UsersService {
     // ============================================================
     // 5️⃣ CRÉATION DU COMPTE FIDÉLITÉ
     // ============================================================
-    const generateUniqueLoyaltyCode = async (): Promise<string> => {
-      let code: string;
-      let exists: UserLoyaltyEntity | null = null;
-      let attempts = 0;
-      const maxAttempts = 10;
+    const loyalty = await this.getOrCreateLoyaltyAccount(savedUser.id);
 
-      do {
-        code = Math.floor(10000000 + Math.random() * 90000000).toString();
-        exists = await this.loyaltyRepository.findOne({
-          where: { loyaltyCode: code },
-        });
-        attempts++;
-      } while (exists && attempts < maxAttempts);
-
-      if (exists) {
-        const timestamp = Date.now().toString().slice(-8);
-        code = timestamp;
-      }
-
-      return code;
-    };
-
-    const loyaltyCode = await generateUniqueLoyaltyCode();
-
-    const loyalty = this.loyaltyRepository.create({
-      userId: savedUser.id,
-      loyaltyCode: loyaltyCode,
-      pointsBalance: 0,
-      pointsTotalEarned: 0,
-      pointsTotalSpent: 0,
-      currentTier: LoyaltyTier.BRONZE,
-      isActive: true,
-    });
     await this.loyaltyRepository.save(loyalty);
 
     // ============================================================
@@ -652,36 +672,7 @@ export class UsersService {
 
     // ✅ Vérifier si l'utilisateur a un compte de fidélité, sinon le créer
     if (!user.loyalty || user.loyalty.length === 0) {
-      const generateUniqueLoyaltyCode = async (): Promise<string> => {
-        let code: string;
-        let exists: UserLoyaltyEntity | null = null;
-        let attempts = 0;
-        const maxAttempts = 10;
-        do {
-          code = Math.floor(10000000 + Math.random() * 90000000).toString();
-          exists = await this.loyaltyRepository.findOne({
-            where: { loyaltyCode: code },
-          });
-          attempts++;
-        } while (exists && attempts < maxAttempts);
-        if (exists) {
-          const timestamp = Date.now().toString().slice(-8);
-          code = timestamp;
-        }
-        return code;
-      };
-
-      const loyaltyCode = await generateUniqueLoyaltyCode();
-
-      const loyalty = this.loyaltyRepository.create({
-        userId: user.id,
-        loyaltyCode: loyaltyCode,
-        pointsBalance: 0,
-        pointsTotalEarned: 0,
-        pointsTotalSpent: 0,
-        currentTier: LoyaltyTier.BRONZE,
-        isActive: true,
-      });
+      const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
 
       const reloadedUser = await this.usersRepository
@@ -1002,36 +993,7 @@ export class UsersService {
       await this.usersRepository.save(user);
 
       // ✅ Création du compte fidélité
-      const generateUniqueLoyaltyCode = async (): Promise<string> => {
-        let code: string;
-        let exists: UserLoyaltyEntity | null = null;
-        let attempts = 0;
-        const maxAttempts = 10;
-        do {
-          code = Math.floor(10000000 + Math.random() * 90000000).toString();
-          exists = await this.loyaltyRepository.findOne({
-            where: { loyaltyCode: code },
-          });
-          attempts++;
-        } while (exists && attempts < maxAttempts);
-        if (exists) {
-          const timestamp = Date.now().toString().slice(-8);
-          code = timestamp;
-        }
-        return code;
-      };
-
-      const loyaltyCode = await generateUniqueLoyaltyCode();
-
-      const loyalty = this.loyaltyRepository.create({
-        userId: user.id,
-        loyaltyCode: loyaltyCode,
-        pointsBalance: 0,
-        pointsTotalEarned: 0,
-        pointsTotalSpent: 0,
-        currentTier: LoyaltyTier.BRONZE,
-        isActive: true,
-      });
+      const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
 
       await this.mailService.sendHtmlEmail(
@@ -1446,37 +1408,7 @@ export class UsersService {
       user.referralCode = referralCodeGenerated;
       await this.usersRepository.save(user);
 
-      // ✅ Création du compte fidélité
-      const generateUniqueLoyaltyCode = async (): Promise<string> => {
-        let code: string;
-        let exists: UserLoyaltyEntity | null = null;
-        let attempts = 0;
-        const maxAttempts = 10;
-        do {
-          code = Math.floor(10000000 + Math.random() * 90000000).toString();
-          exists = await this.loyaltyRepository.findOne({
-            where: { loyaltyCode: code },
-          });
-          attempts++;
-        } while (exists && attempts < maxAttempts);
-        if (exists) {
-          const timestamp = Date.now().toString().slice(-8);
-          code = timestamp;
-        }
-        return code;
-      };
-
-      const loyaltyCode = await generateUniqueLoyaltyCode();
-
-      const loyalty = this.loyaltyRepository.create({
-        userId: user.id,
-        loyaltyCode: loyaltyCode,
-        pointsBalance: 0,
-        pointsTotalEarned: 0,
-        pointsTotalSpent: 0,
-        currentTier: LoyaltyTier.BRONZE,
-        isActive: true,
-      });
+      const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
 
       if (user.email) {
@@ -2598,7 +2530,7 @@ export class UsersService {
       },
     };
   }
-  
+
   async sendOtp(email: string, lang: string = 'fr'): Promise<any> {
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
 
@@ -2819,36 +2751,7 @@ export class UsersService {
 
     // ✅ Vérifier si l'utilisateur a un compte de fidélité, sinon le créer
     if (!user.loyalty || user.loyalty.length === 0) {
-      const generateUniqueLoyaltyCode = async (): Promise<string> => {
-        let code: string;
-        let exists: UserLoyaltyEntity | null = null;
-        let attempts = 0;
-        const maxAttempts = 10;
-        do {
-          code = Math.floor(10000000 + Math.random() * 90000000).toString();
-          exists = await this.loyaltyRepository.findOne({
-            where: { loyaltyCode: code },
-          });
-          attempts++;
-        } while (exists && attempts < maxAttempts);
-        if (exists) {
-          const timestamp = Date.now().toString().slice(-8);
-          code = timestamp;
-        }
-        return code;
-      };
-
-      const loyaltyCode = await generateUniqueLoyaltyCode();
-
-      const loyalty = this.loyaltyRepository.create({
-        userId: user.id,
-        loyaltyCode: loyaltyCode,
-        pointsBalance: 0,
-        pointsTotalEarned: 0,
-        pointsTotalSpent: 0,
-        currentTier: LoyaltyTier.BRONZE,
-        isActive: true,
-      });
+      const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
 
       const reloadedUser = await this.usersRepository
