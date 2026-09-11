@@ -1394,6 +1394,516 @@ export class UsersService {
       fcmToken,
     };
   }
+
+  async appleLogin(
+    dto: {
+      appleUserId: string;
+      fullName?: string;
+      email?: string;
+      fcmToken?: string;
+      platform?: 'ios' | 'android' | 'web';
+    },
+    lang: string = 'fr',
+  ): Promise<{
+    message: string;
+    data: any;
+    access_token: string;
+    refresh_token: string;
+    fcmToken?: string;
+  }> {
+    const {
+      appleUserId,
+      fullName: rawFullName,
+      email: rawEmail,
+      fcmToken,
+      platform,
+    } = dto;
+    if (!appleUserId)
+      throw new BadRequestException(
+        await this.i18n.translate('user.apple_user_id_required', lang),
+      );
+    const fullName = rawFullName?.trim() || 'Utilisateur Apple';
+    const email = rawEmail?.trim() || undefined;
+
+    let user = await this.usersRepository
+      .createQueryBuilder('users')
+      .addSelect('users.password')
+      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
+      .leftJoinAndSelect('userHasCompany.company', 'company')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.category', 'category')
+      .leftJoinAndSelect('company.companyResources', 'companyResources')
+      .leftJoinAndSelect('companyResources.resource', 'resource')
+      .leftJoinAndSelect('company.branches', 'branches')
+      .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
+      .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
+      .leftJoinAndSelect('userPlatformRoles.role', 'role')
+      .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+      .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
+      .leftJoinAndSelect(
+        'userCompanyResources.resource',
+        'userCompanyResourceDetail',
+      )
+      .leftJoinAndSelect('users.activeBranch', 'activeBranch')
+      .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
+      .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+      .leftJoinAndSelect('users.loyalty', 'loyalty')
+      .leftJoinAndSelect('users.referrals', 'referrals')
+      .leftJoinAndSelect('users.referrer', 'referrer')
+      .where('users.appleUserId = :appleUserId', { appleUserId })
+      .getOne();
+
+    let isNewUser = false;
+
+    if (!user && email) {
+      const existingUserByEmail = await this.usersRepository.findOne({
+        where: { email },
+      });
+      if (existingUserByEmail) {
+        throw new BadRequestException(
+          await this.i18n.translate('user.email_already_exists', lang),
+        );
+      }
+    }
+
+    if (!user) {
+      // ============================================================
+      // 🔥 NOUVEL UTILISATEUR
+      // ============================================================
+      const newUser = this.usersRepository.create({
+        appleUserId,
+        fullName,
+        email,
+        provider: 'APPLE',
+        role: UserRole.CUSTOMER,
+        password: '',
+        isActive: true,
+      });
+      user = await this.usersRepository.save(newUser);
+      isNewUser = true;
+
+      // ✅ Génération robuste du referralCode avec anti-doublon
+      console.log(`🔍 [appleLogin] Nouvel utilisateur: ${user.id}, génération du referralCode...`);
+
+      const existingCodesRows = await this.usersRepository
+        .createQueryBuilder('u')
+        .select('u.referralCode', 'code')
+        .where('u.referralCode IS NOT NULL')
+        .andWhere("TRIM(u.referralCode) != ''")
+        .getRawMany();
+      const existingCodes = existingCodesRows.map((r) => r.code);
+
+      const referralCodeGenerated = await this.generateReferralCode(user.id, existingCodes);
+
+      // ✅ Vérification stricte
+      if (!referralCodeGenerated || referralCodeGenerated.trim() === '') {
+        console.error(`❌ [appleLogin] generateReferralCode a retourné un code invalide pour ${user.id}`);
+        throw new InternalServerErrorException(
+          await this.i18n.translate('user.referral_code_generation_failed', lang),
+        );
+      }
+
+      user.referralCode = referralCodeGenerated;
+      await this.usersRepository.save(user);
+      console.log(`✅ [appleLogin] Nouveau user créé avec referralCode: ${referralCodeGenerated}`);
+
+      // ✅ Vérification post-save
+      const verifyUser = await this.usersRepository.findOne({
+        where: { id: user.id },
+        select: ['id', 'referralCode'],
+      });
+      if (!verifyUser?.referralCode) {
+        console.error(`❌ [appleLogin] ALERTE: referralCode non persisté pour ${user.id}`);
+        throw new InternalServerErrorException(
+          await this.i18n.translate('user.referral_code_generation_failed', lang),
+        );
+      }
+
+      const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
+      await this.loyaltyRepository.save(loyalty);
+
+      if (user.email) {
+        await this.mailService.sendHtmlEmail(
+          user.email,
+          await this.i18n.translate('user.welcome_subject', lang),
+          'createCount.html',
+          { userWithoutPassword: user, year: new Date().getFullYear() },
+        );
+      }
+
+      user = await this.usersRepository
+        .createQueryBuilder('users')
+        .addSelect('users.password')
+        .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+        .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
+        .leftJoinAndSelect('userHasCompany.company', 'company')
+        .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+        .leftJoinAndSelect('company.country', 'country')
+        .leftJoinAndSelect('company.city', 'city')
+        .leftJoinAndSelect('company.category', 'category')
+        .leftJoinAndSelect('company.companyResources', 'companyResources')
+        .leftJoinAndSelect('companyResources.resource', 'resource')
+        .leftJoinAndSelect('company.branches', 'branches')
+        .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
+        .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
+        .leftJoinAndSelect('userPlatformRoles.role', 'role')
+        .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+        .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
+        .leftJoinAndSelect(
+          'userCompanyResources.resource',
+          'userCompanyResourceDetail',
+        )
+        .leftJoinAndSelect('users.activeBranch', 'activeBranch')
+        .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
+        .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+        .leftJoinAndSelect('users.loyalty', 'loyalty')
+        .leftJoinAndSelect('users.referrals', 'referrals')
+        .leftJoinAndSelect('users.referrer', 'referrer')
+        .where('users.id = :id', { id: user.id })
+        .getOne();
+    } else {
+      // ============================================================
+      // 🔥 UTILISATEUR EXISTANT
+      // ============================================================
+      console.log(`🔍 [appleLogin] Utilisateur existant: ${user.id}`);
+      console.log(`🔍 [appleLogin] referralCode actuel: "${user.referralCode || 'NULL'}"`);
+
+      if (user.provider !== 'APPLE') {
+        throw new BadRequestException(
+          await this.i18n.translate('user.apple_account_not_linked', lang, {
+            provider: user.provider,
+          }),
+        );
+      }
+
+      let shouldUpdate = false;
+      if (fullName && fullName !== user.fullName) {
+        user.fullName = fullName;
+        shouldUpdate = true;
+      }
+      if (email && email !== user.email) {
+        const existingUserByEmail = await this.usersRepository.findOne({
+          where: { email },
+        });
+        if (existingUserByEmail)
+          throw new BadRequestException(
+            await this.i18n.translate('user.email_already_exists', lang),
+          );
+        user.email = email;
+        shouldUpdate = true;
+      }
+
+      // ============================================================
+      // 🔥 GARANTIR LE referralCode POUR LES UTILISATEURS EXISTANTS
+      // ============================================================
+      if (!user.referralCode || user.referralCode.trim() === '') {
+        console.warn(`⚠️ [appleLogin] Utilisateur ${user.id} sans referralCode, génération...`);
+
+        const existingCodesRows = await this.usersRepository
+          .createQueryBuilder('u')
+          .select('u.referralCode', 'code')
+          .where('u.referralCode IS NOT NULL')
+          .andWhere("TRIM(u.referralCode) != ''")
+          .getRawMany();
+        const existingCodes = existingCodesRows.map((r) => r.code);
+
+        const newCode = await this.generateReferralCode(user.id, existingCodes);
+
+        if (newCode && newCode.trim() !== '') {
+          user.referralCode = newCode;
+          shouldUpdate = true;
+          console.log(`✅ [appleLogin] referralCode généré: ${newCode}`);
+        } else {
+          console.error(`❌ [appleLogin] Impossible de générer un referralCode pour ${user.id}`);
+          throw new InternalServerErrorException(
+            await this.i18n.translate('user.referral_code_generation_failed', lang),
+          );
+        }
+      } else {
+        console.log(`✅ [appleLogin] referralCode déjà présent: ${user.referralCode}`);
+      }
+
+      // ============================================================
+      // 🔥 GARANTIR LE COMPTE FIDÉLITÉ POUR LES UTILISATEURS EXISTANTS
+      // ============================================================
+      if (!user.loyalty || user.loyalty.length === 0) {
+        console.log(`⚠️ [appleLogin] Utilisateur ${user.id} sans loyalty, création...`);
+        const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
+        await this.loyaltyRepository.save(loyalty);
+      }
+
+      if (shouldUpdate) {
+        user = await this.usersRepository.save(user);
+        user = await this.usersRepository
+          .createQueryBuilder('users')
+          .addSelect('users.password')
+          .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+          .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
+          .leftJoinAndSelect('userHasCompany.company', 'company')
+          .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+          .leftJoinAndSelect('company.country', 'country')
+          .leftJoinAndSelect('company.city', 'city')
+          .leftJoinAndSelect('company.category', 'category')
+          .leftJoinAndSelect('company.companyResources', 'companyResources')
+          .leftJoinAndSelect('companyResources.resource', 'resource')
+          .leftJoinAndSelect('company.branches', 'branches')
+          .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
+          .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
+          .leftJoinAndSelect('userPlatformRoles.role', 'role')
+          .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+          .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
+          .leftJoinAndSelect(
+            'userCompanyResources.resource',
+            'userCompanyResourceDetail',
+          )
+          .leftJoinAndSelect('users.activeBranch', 'activeBranch')
+          .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
+          .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+          .leftJoinAndSelect('users.loyalty', 'loyalty')
+          .leftJoinAndSelect('users.referrals', 'referrals')
+          .leftJoinAndSelect('users.referrer', 'referrer')
+          .where('users.id = :id', { id: user.id })
+          .getOne();
+      }
+    }
+
+    if (!user)
+      throw new InternalServerErrorException(
+        await this.i18n.translate('user.user_not_found', lang),
+      );
+
+    if (fcmToken && platform) {
+      const existingToken = await this.deviceTokenRepo.findOne({
+        where: { token: fcmToken },
+      });
+      if (existingToken) {
+        await this.deviceTokenRepo.update(
+          { token: fcmToken },
+          { userId: user.id, platform, updatedAt: new Date() },
+        );
+      } else {
+        await this.deviceTokenRepo.save(
+          this.deviceTokenRepo.create({
+            token: fcmToken,
+            userId: user.id,
+            platform,
+          }),
+        );
+      }
+    }
+
+    const access_token = await this.accessToken(user);
+    const refresh_token = await this.refreshToken(user);
+
+    const { password, ...userWithoutPassword } = user;
+
+    const userHasCompany =
+      userWithoutPassword.userHasCompany?.map((uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+        company: uhc.company
+          ? {
+            ...uhc.company,
+            tauxCompanies: uhc.company.tauxCompanies ?? [],
+            country: uhc.company.country ?? null,
+            city: uhc.company.city ?? null,
+            category: uhc.company.category ?? null,
+            branches: (uhc.company.branches ?? []).map((b) => ({
+              id: b.id,
+              name: b.name,
+              address: b.address,
+              phone: b.phone,
+              email: b.email,
+              status: b.status,
+              deleted: b.deleted,
+              country: b.country
+                ? { id: b.country.id, name: b.country.name }
+                : null,
+              city: b.city ? { id: b.city.id, name: b.city.name } : null,
+            })),
+          }
+          : null,
+        branch: uhc.branch
+          ? { id: uhc.branch.id, name: uhc.branch.name }
+          : null,
+        userResources:
+          uhc.resources?.map((r) => ({
+            id: r.id,
+            canCreate: r.canCreate,
+            canRead: r.canRead,
+            canUpdate: r.canUpdate,
+            canDelete: r.canDelete,
+            canManage: r.canManage,
+            status: r.status,
+            resource: r.resource
+              ? {
+                id: r.resource.id,
+                name: r.resource.name,
+                label: r.resource.label,
+              }
+              : null,
+          })) ?? [],
+      })) ?? [];
+
+    const activeCompanyRaw = await this.usersRepository
+      .createQueryBuilder('users')
+      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
+      .leftJoinAndSelect('userHasCompany.company', 'company')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.category', 'category')
+      .leftJoinAndSelect('company.companyResources', 'companyResources')
+      .leftJoinAndSelect('companyResources.resource', 'resource')
+      .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
+      .leftJoinAndSelect(
+        'userCompanyResources.resource',
+        'userCompanyResourceDetail',
+      )
+      .leftJoinAndSelect('company.branches', 'branches')
+      .where('users.id = :id', { id: user.id })
+      .getOne();
+
+    const activeUserHasCompany = activeCompanyRaw?.userHasCompany?.find(
+      (uhc) => uhc.company?.id === user.activeCompanyId,
+    );
+    const activeCompanyEntity = activeUserHasCompany?.company ?? null;
+    const userResourcesForActiveCompany =
+      activeUserHasCompany?.resources?.map((r) => ({
+        id: r.id,
+        canCreate: r.canCreate,
+        canRead: r.canRead,
+        canUpdate: r.canUpdate,
+        canDelete: r.canDelete,
+        canManage: r.canManage,
+        status: r.status,
+        resource: r.resource
+          ? {
+            id: r.resource.id,
+            name: r.resource.name,
+            label: r.resource.label,
+          }
+          : null,
+      })) ?? [];
+
+    const activeCompanyBranch = activeUserHasCompany?.branch
+      ? {
+        id: activeUserHasCompany.branch.id,
+        name: activeUserHasCompany.branch.name,
+      }
+      : null;
+
+    const activeCompany = activeCompanyEntity
+      ? {
+        ...activeCompanyEntity,
+        tauxCompanies: activeCompanyEntity.tauxCompanies ?? [],
+        country: activeCompanyEntity.country ?? null,
+        city: activeCompanyEntity.city ?? null,
+        category: activeCompanyEntity.category ?? null,
+        branch: activeCompanyBranch,
+        companyResources:
+          activeCompanyEntity.companyResources?.map((cr) => ({
+            id: cr.id,
+            canCreate: cr.can_create,
+            canRead: cr.can_read,
+            canUpdate: cr.can_update,
+            canDelete: cr.can_delete,
+            canManage: cr.can_manage,
+            status: cr.status,
+            resource: cr.resource
+              ? {
+                id: cr.resource.id,
+                name: cr.resource.name,
+                label: cr.resource.label,
+              }
+              : null,
+          })) ?? [],
+        userResources: userResourcesForActiveCompany,
+        branches: (activeCompanyEntity.branches ?? []).map((b) => ({
+          id: b.id,
+          name: b.name,
+          address: b.address,
+          phone: b.phone,
+          email: b.email,
+          status: b.status,
+          deleted: b.deleted,
+          country: b.country
+            ? { id: b.country.id, name: b.country.name }
+            : null,
+          city: b.city ? { id: b.city.id, name: b.city.name } : null,
+        })),
+      }
+      : null;
+
+    const userPlatformRoles =
+      userWithoutPassword.userPlatformRoles?.map((upr: any) => ({
+        id: upr.id,
+        platform: upr.platform,
+        role: upr.role,
+      })) ?? [];
+
+    const activeBranch = userWithoutPassword.activeBranch
+      ? {
+        id: userWithoutPassword.activeBranch.id,
+        name: userWithoutPassword.activeBranch.name,
+        address: userWithoutPassword.activeBranch.address,
+        phone: userWithoutPassword.activeBranch.phone,
+        email: userWithoutPassword.activeBranch.email,
+        status: userWithoutPassword.activeBranch.status,
+        deleted: userWithoutPassword.activeBranch.deleted,
+        country: userWithoutPassword.activeBranch.country
+          ? {
+            id: userWithoutPassword.activeBranch.country.id,
+            name: userWithoutPassword.activeBranch.country.name,
+          }
+          : null,
+        city: userWithoutPassword.activeBranch.city
+          ? {
+            id: userWithoutPassword.activeBranch.city.id,
+            name: userWithoutPassword.activeBranch.city.name,
+          }
+          : null,
+      }
+      : null;
+
+    // ✅ Ajout des informations de parrainage
+    const referralData = {
+      referralCode: user.referralCode,
+      referralCount: user.referralCount || 0,
+      referralPoints: user.referralPoints || 0,
+      referredBy: user.referredBy,
+      referrerName: user.referrer?.fullName || null,
+      referralActive: user.referralActive !== false,
+      totalReferrals: user.referrals?.length || 0,
+    };
+
+    return {
+      message: isNewUser
+        ? await this.i18n.translate('user.apple_account_created', lang)
+        : await this.i18n.translate('user.apple_login_success', lang),
+      data: instanceToPlain({
+        ...userWithoutPassword,
+        userHasCompany,
+        activeCompany,
+        userPlatformRoles,
+        activeBranch,
+        loyalty: {
+          points: user.loyalty?.[0]?.pointsBalance ?? 0,
+          tier: user.loyalty?.[0]?.currentTier ?? null,
+          code: user.loyalty?.[0]?.loyaltyCode ?? null,
+        },
+        referral: referralData,
+      }),
+      access_token,
+      refresh_token,
+      fcmToken,
+    };
+  }
+  
   // ==================== APPLE LOGIN ====================
   private async ensureReferralCodeAndLoyalty(
     user: UserEntity,
