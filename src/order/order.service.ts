@@ -1640,44 +1640,133 @@ export class OrderService {
       console.log(`🏙️ Ville de la commande: ${orderCityName} (${orderCityId})`);
 
       if (!orderCityId) {
-        console.log('⚠️ Impossible de déterminer la ville de la commande');
-        return;
+        console.log('⚠️ Impossible de déterminer la ville de la commande, on continue pour les super admins');
       }
 
       // 🔥 ÉTAPE 2: Récupérer les branches qui sont dans la ville de la commande
-      const branchesInCity = await this.branchRepo.find({
-        where: { cityId: orderCityId },
-        select: ['id']
-      });
+      let branchIdsInCity: string[] = [];
+      if (orderCityId) {
+        const branchesInCity = await this.branchRepo.find({
+          where: { cityId: orderCityId },
+          select: ['id', 'name', 'cityId']
+        });
 
-      const branchIdsInCity = branchesInCity.map(b => b.id);
-      console.log(`🏢 Branches dans la ville ${orderCityName}: ${branchIdsInCity.length}`);
+        branchIdsInCity = branchesInCity.map(b => b.id);
+        console.log(`🏢 Branches dans la ville ${orderCityName}: ${branchIdsInCity.length}`);
+        console.log(`🏢 Détail branches:`, branchesInCity.map(b => `${b.name} (${b.id})`).join(' | '));
 
-      if (branchIdsInCity.length === 0) {
-        console.log('⚠️ Aucune branche trouvée dans cette ville');
-        return;
+        if (branchIdsInCity.length === 0) {
+          console.log('⚠️ Aucune branche trouvée dans cette ville, on continue quand même pour les super admins');
+        }
       }
 
       // 🔥 ÉTAPE 3: Récupérer les ADMINISTRATEURS qui ont canManage sur la ressource
       // ET qui sont dans une branche de la ville
-      const adminUsers = await this.userRepository
-        .createQueryBuilder('u')
-        .innerJoin('user_has_company', 'uhc', 'uhc.userId = u.id')
-        .innerJoin('company_has_user_resource', 'chur', 'chur.userCompanyId = uhc.id')
-        .innerJoin('resources', 'r', 'r.id = chur.resourceId')
-        .innerJoin('branches', 'b', 'b.id = chur.branchId')
-        .where('u.role = :role', { role: 'ADMIN' })
-        .andWhere('r.name = :resourceName', { resourceName })
-        .andWhere(
-          // ✅ canManage = true (voit tout) OU (canRead = true ET dans la même ville)
-          '(chur.canManage = :canManage OR (chur.canRead = :canRead AND b.cityId = :orderCityId))',
-          { canManage: true, canRead: true, orderCityId }
-        )
-        .getMany();
+      const adminUsers = orderCityId
+        ? await this.userRepository
+          .createQueryBuilder('u')
+          .innerJoin('user_has_company', 'uhc', 'uhc.userId = u.id')
+          .innerJoin('company_has_user_resource', 'chur', 'chur.userCompanyId = uhc.id')
+          .innerJoin('resources', 'r', 'r.id = chur.resourceId')
+          .leftJoin('branches', 'b', 'b.id = chur.branchId')
+          .where('u.role = :role', { role: 'ADMIN' })
+          .andWhere('r.name = :resourceName', { resourceName })
+          .andWhere(
+            `(
+                chur.canManage = :canManage 
+                OR (
+                  chur.canRead = :canRead 
+                  AND (
+                    b.cityId = :orderCityId 
+                    OR b.cityId IS NULL 
+                    OR b.id IS NULL
+                  )
+                )
+              )`,
+            { canManage: true, canRead: true, orderCityId }
+          )
+          .getMany()
+        : await this.userRepository
+          .createQueryBuilder('u')
+          .innerJoin('user_has_company', 'uhc', 'uhc.userId = u.id')
+          .innerJoin('company_has_user_resource', 'chur', 'chur.userCompanyId = uhc.id')
+          .innerJoin('resources', 'r', 'r.id = chur.resourceId')
+          .where('u.role = :role', { role: 'ADMIN' })
+          .andWhere('r.name = :resourceName', { resourceName })
+          .andWhere('(chur.canManage = :canManage OR chur.canRead = :canRead)', {
+            canManage: true,
+            canRead: true,
+          })
+          .getMany();
 
-      console.log(`👥 Admins trouvés: ${adminUsers.length}`);
+      // 🔍 DEBUG DÉTAILLÉ : récupérer les infos brutes pour voir branche par branche
+      const adminDebugRaw = orderCityId
+        ? await this.userRepository
+          .createQueryBuilder('u')
+          .select([
+            'u.id AS userId',
+            'u.fullName AS fullName',
+            'u.role AS role',
+            'r.name AS resourceName',
+            'chur.canManage AS canManage',
+            'chur.canRead AS canRead',
+            'chur.branchId AS churBranchId',
+            'b.id AS branchId',
+            'b.name AS branchName',
+            'b.cityId AS branchCityId',
+          ])
+          .innerJoin('user_has_company', 'uhc', 'uhc.userId = u.id')
+          .innerJoin('company_has_user_resource', 'chur', 'chur.userCompanyId = uhc.id')
+          .innerJoin('resources', 'r', 'r.id = chur.resourceId')
+          .leftJoin('branches', 'b', 'b.id = chur.branchId')
+          .where('u.role = :role', { role: 'ADMIN' })
+          .andWhere('r.name = :resourceName', { resourceName })
+          .andWhere(
+            `(
+                chur.canManage = :canManage 
+                OR (
+                  chur.canRead = :canRead 
+                  AND (
+                    b.cityId = :orderCityId 
+                    OR b.cityId IS NULL 
+                    OR b.id IS NULL
+                  )
+                )
+              )`,
+            { canManage: true, canRead: true, orderCityId }
+          )
+          .getRawMany()
+        : [];
+
+      console.log(`\n========== 🔍 DEBUG ADMINS PAR BRANCHE ==========`);
+      console.log(`🏙️ Ville commande: ${orderCityName} (${orderCityId || 'NULL'})`);
+      console.log(`📦 Ressource: ${resourceName}`);
+      console.log(`👥 Total admins trouvés: ${adminUsers.length}`);
+      console.log(`----------------------------------------------`);
+
+      if (adminDebugRaw.length === 0) {
+        console.log(`❌ AUCUN ADMIN trouvé pour cette ressource et cette ville`);
+        console.log(`   → Vérifier : rôle='ADMIN', resource='${resourceName}', permissions canManage/canRead`);
+      } else {
+        adminDebugRaw.forEach((row, index) => {
+          const cityMatch =
+            row.branchCityId === orderCityId
+              ? '✅'
+              : row.branchCityId === null
+                ? '⚠️ (cityId NULL)'
+                : row.branchId === null
+                  ? '⚠️ (branchId NULL)'
+                  : '❌';
+          console.log(`   ${index + 1}. ${row.fullName} (${row.userId})`);
+          console.log(`      └─ Branche: ${row.branchName || 'AUCUNE'} (${row.branchId || 'NULL'})`);
+          console.log(`      └─ cityId branche: ${row.branchCityId || 'NULL'} ${cityMatch}`);
+          console.log(`      └─ canManage: ${row.canManage} | canRead: ${row.canRead}`);
+        });
+      }
+      console.log(`================================================\n`);
+
       if (adminUsers.length > 0) {
-        console.log(`👥 Admins: ${adminUsers.map(a => a.fullName).join(', ')}`);
+        console.log(`👥 Admins à notifier: ${adminUsers.map(a => a.fullName).join(', ')}`);
       }
 
       const processedRecipients = new Set<string>([user.id]);
@@ -1687,7 +1776,7 @@ export class OrderService {
         if (processedRecipients.has(admin.id)) continue;
         processedRecipients.add(admin.id);
 
-        console.log(`📨 Envoi notification à l'admin: ${admin.fullName} (${admin.id}) - Ville: ${orderCityName}`);
+        console.log(`📨 [ADMIN] Envoi notification à: ${admin.fullName} (${admin.id}) - Ville: ${orderCityName || 'N/A'}`);
 
         await this.notificationsService.sendNotificationToUser(
           admin.id,
@@ -1733,12 +1822,34 @@ export class OrderService {
         where: { role: UserRole.SUPER_ADMIN },
       });
 
+      console.log(`👑 Super admins trouvés: ${superAdmins.length}`);
+
       for (const admin of superAdmins) {
         if (processedRecipients.has(admin.id)) continue;
+        processedRecipients.add(admin.id);
 
-        console.log(`📨 Envoi notification au SUPER ADMIN: ${admin.fullName} (${admin.id})`);
+        console.log(`📨 [SUPER ADMIN] Envoi notification à: ${admin.fullName} (${admin.id})`);
 
         await this.notificationsService.sendNotificationToUser(
+          admin.id,
+          this.i18nService.translate('notification.order_created_title', lang),
+          this.i18nService.translate('notification.order_created_content', lang, {
+            invoiceNumber: finalOrder.invoiceNumber,
+            totalAmount: finalOrder.totalAmount,
+            currency: finalOrder.currency,
+          }),
+          finalOrder.type as any,
+          {
+            orderId: finalOrder.id,
+            invoiceNumber: finalOrder.invoiceNumber,
+            totalAmount: finalOrder.totalAmount,
+            currency: finalOrder.currency,
+            type: finalOrder.type,
+            city: orderCityName,
+          }
+        );
+
+        await this.notificationsService.sendAndSaveNotification(
           admin.id,
           this.i18nService.translate('notification.order_created_title', lang),
           this.i18nService.translate('notification.order_created_content', lang, {
