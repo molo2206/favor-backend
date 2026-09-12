@@ -621,7 +621,7 @@ export class FpayService {
         amount: number,
         currency: string = 'CDF',
         description?: string,
-        paymentMethod: string = 'MOBILE_MONEY',
+        paymentMethod?: string,
         ipAddress?: string,
         lang: string = 'fr',
     ): Promise<any> {

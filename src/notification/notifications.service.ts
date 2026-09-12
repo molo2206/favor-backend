@@ -149,6 +149,10 @@ export class NotificationsService {
     return result;
   }
 
+  public translateNotification(key: string, lang: string = 'fr', params?: any): string {
+    return this.translate(key, lang, params);
+  }
+
   /** Notification à un utilisateur spécifique (WebSocket uniquement) */
   async sendNotificationToUser(
     userId: string,

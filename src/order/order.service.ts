@@ -439,7 +439,7 @@ export class OrderService {
         const fpayData = {
           amount: paymentAmount,
           currency: orderCurrency || 'USD',
-          description: `Paiement de commande #${invoiceNumb}`,
+          description: `Paiement de commande #${invoiceNumb} pour ${user.fullName}`,
           access_token: createOrderDto.access_token as string,
         };
 
@@ -2025,8 +2025,8 @@ export class OrderService {
         const fpayResponse = await this.fpayService.payWithMobileMoney(
           paymentAmount,
           order.currency || 'USD',
-          `Paiement de commande #${order.invoiceNumber}`,
-          'MOBILE_MONEY',
+          `Paiement de commande #${order.invoiceNumber} pour ${user.fullName} (${user.email || user.phone}) `,
+          'CASH',
           lang
         );
 
