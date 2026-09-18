@@ -3039,8 +3039,8 @@ export class OrderService {
     data: {
       totalOrders: number;
       totalSales: number;
-      totalRevenue: number;
-      totalShippingFees: number;
+      totalRevenue: Record<string, number>;
+      totalShippingFees: Record<string, number>;
       totalProducts: number;
       totalUsers: number;
       totalCompanies: number;
@@ -3051,24 +3051,48 @@ export class OrderService {
   }> {
     const adjustedDateFin = new Date(dateFin);
     adjustedDateFin.setDate(adjustedDateFin.getDate() + 1);
+
     const whereConditions: string[] = [];
     const whereParams: any = { start: dateDebut, end: adjustedDateFin };
     whereConditions.push('order.createdAt BETWEEN :start AND :end');
     whereConditions.push('order.status != :rejected');
     whereParams.rejected = OrderStatus.REJECTED;
+
     if (type && type !== 'ALL') {
       whereConditions.push('order.type = :type');
       whereParams.type = type;
     }
     const whereClause = whereConditions.join(' AND ');
-    const orders = await this.orderRepo.createQueryBuilder('order').where(whereClause, whereParams).getMany();
+
+    const orders = await this.orderRepo
+      .createQueryBuilder('order')
+      .where(whereClause, whereParams)
+      .getMany();
 
     const totalOrders = orders.length;
-    const deliveredOrders = orders.filter(o => o.status === OrderStatus.DELIVERED);
+    const deliveredOrders = orders.filter((o) => o.status === OrderStatus.DELIVERED);
     const totalSales = deliveredOrders.length;
-    const totalRevenue = orders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
-    const totalShippingFees = orders.reduce((acc, o) => acc + Number(o.shippingCost || 0), 0);
 
+    // ============================================================
+    // ✅ GROUPEMENT PAR DEVISE
+    // ============================================================
+    const totalRevenue = orders.reduce((acc, o) => {
+      const currency = o.currency || 'USD';
+      if (!acc[currency]) acc[currency] = 0;
+      acc[currency] += Number(o.totalAmount || 0);
+      return acc;
+    }, {} as Record<string, number>);
+
+    const totalShippingFees = orders.reduce((acc, o) => {
+      const currency = o.currency || 'USD';
+      if (!acc[currency]) acc[currency] = 0;
+      acc[currency] += Number(o.shippingCost || 0);
+      return acc;
+    }, {} as Record<string, number>);
+
+    // ============================================================
+    // 📊 ordersByDay (inchangé)
+    // ============================================================
     const ordersByDay = await this.orderRepo
       .createQueryBuilder('order')
       .select('DATE(order.createdAt)', 'date')
@@ -3079,16 +3103,51 @@ export class OrderService {
       .orderBy('DATE(order.createdAt)', 'ASC')
       .getRawMany();
 
-    const revenueByDay = await this.orderRepo
+    // ============================================================
+    // ✅ revenueByDay groupé par devise
+    // ============================================================
+    const revenueByDayRaw = await this.orderRepo
       .createQueryBuilder('order')
       .select('DATE(order.createdAt)', 'date')
+      .addSelect('order.currency', 'currency')
       .addSelect('SUM(order.totalAmount)', 'revenue')
       .addSelect('SUM(order.shippingCost)', 'shipping')
       .where(whereClause, whereParams)
       .groupBy('DATE(order.createdAt)')
+      .addGroupBy('order.currency')
       .orderBy('DATE(order.createdAt)', 'ASC')
       .getRawMany();
 
+    const revenueByDayMap: Record<
+      string,
+      { date: string; revenue: Record<string, number>; shipping: Record<string, number> }
+    > = {};
+
+    for (const row of revenueByDayRaw) {
+      const date = row.date;
+      const currency = row.currency || 'USD';
+
+      if (!revenueByDayMap[date]) {
+        revenueByDayMap[date] = {
+          date,
+          revenue: {},
+          shipping: {},
+        };
+      }
+
+      revenueByDayMap[date].revenue[currency] = Number(
+        Number(row.revenue || 0).toFixed(2),
+      );
+      revenueByDayMap[date].shipping[currency] = Number(
+        Number(row.shipping || 0).toFixed(2),
+      );
+    }
+
+    const revenueByDay = Object.values(revenueByDayMap);
+
+    // ============================================================
+    // 📊 topProducts (inchangé)
+    // ============================================================
     const topProductsQueryBuilder = this.orderItemRepo
       .createQueryBuilder('oi')
       .innerJoin('oi.product', 'product')
@@ -3097,21 +3156,55 @@ export class OrderService {
       .addSelect('product.id', 'productId')
       .addSelect('SUM(oi.quantity)', 'count')
       .addSelect('SUM(oi.quantity * oi.price)', 'amount')
-      .where('order.createdAt BETWEEN :start AND :end', { start: dateDebut, end: adjustedDateFin });
-    if (type && type !== 'ALL') topProductsQueryBuilder.andWhere('order.type = :type', { type });
-    const topProducts = await topProductsQueryBuilder.groupBy('product.id, product.name').orderBy('count', 'DESC').limit(10).getRawMany();
+      .where('order.createdAt BETWEEN :start AND :end', {
+        start: dateDebut,
+        end: adjustedDateFin,
+      });
 
-    const totalProductsQueryBuilder = this.productRepo.createQueryBuilder('product').select('COUNT(product.id)', 'count');
-    if (type && type !== 'ALL') totalProductsQueryBuilder.innerJoin('product.company', 'company').where('company.typeCompany = :type', { type });
-    totalProductsQueryBuilder.andWhere('product.createdAt BETWEEN :start AND :end', { start: dateDebut, end: adjustedDateFin });
+    if (type && type !== 'ALL') {
+      topProductsQueryBuilder.andWhere('order.type = :type', { type });
+    }
+
+    const topProducts = await topProductsQueryBuilder
+      .groupBy('product.id, product.name')
+      .orderBy('count', 'DESC')
+      .limit(10)
+      .getRawMany();
+
+    // ============================================================
+    // 📊 Compteurs (inchangés)
+    // ============================================================
+    const totalProductsQueryBuilder = this.productRepo
+      .createQueryBuilder('product')
+      .select('COUNT(product.id)', 'count');
+
+    if (type && type !== 'ALL') {
+      totalProductsQueryBuilder
+        .innerJoin('product.company', 'company')
+        .where('company.typeCompany = :type', { type });
+    }
+
+    totalProductsQueryBuilder.andWhere('product.createdAt BETWEEN :start AND :end', {
+      start: dateDebut,
+      end: adjustedDateFin,
+    });
+
     const totalProductsResult = await totalProductsQueryBuilder.getRawOne();
     const totalProducts = parseInt(totalProductsResult?.count || 0);
 
-    const totalUsers = await this.userRepository.count({ where: { createdAt: Between(dateDebut, adjustedDateFin) } });
-    const totalCompaniesWhere: any = { createdAt: Between(dateDebut, adjustedDateFin) };
+    const totalUsers = await this.userRepository.count({
+      where: { createdAt: Between(dateDebut, adjustedDateFin) },
+    });
+
+    const totalCompaniesWhere: any = {
+      createdAt: Between(dateDebut, adjustedDateFin),
+    };
     if (type && type !== 'ALL') totalCompaniesWhere.typeCompany = type;
     const totalCompanies = await this.companyRepo.count({ where: totalCompaniesWhere });
 
+    // ============================================================
+    // ✅ RETURN
+    // ============================================================
     return {
       message: this.i18nService.translate('dashboard.data_fetched_success', lang),
       data: {
