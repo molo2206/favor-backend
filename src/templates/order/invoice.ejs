@@ -1,0 +1,752 @@
+<!-- shipment.ejs -->
+<!DOCTYPE html>
+<html lang="<%= lang || 'fr' %>">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>
+    <%= translations.shipment_title || 'Confirmation de Colis' %> - Favor Help
+  </title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        "Helvetica Neue",
+        sans-serif;
+      background-color: #f1f5f9;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .invoice-container {
+      position: relative;
+      width: 210mm;
+      height: 297mm;
+      background-color: #ffffff;
+      overflow: hidden;
+      background-image:
+        repeating-linear-gradient(135deg,
+          rgba(56, 189, 248, 0.02) 0px,
+          rgba(56, 189, 248, 0.02) 2px,
+          transparent 2px,
+          transparent 22px),
+        repeating-linear-gradient(45deg,
+          rgba(56, 189, 248, 0.02) 0px,
+          rgba(56, 189, 248, 0.02) 2px,
+          transparent 2px,
+          transparent 22px);
+    }
+
+    .invoice-padding {
+      padding: 22px 42px 18px 42px;
+    }
+
+    /* =========================
+         HEADER
+      ========================= */
+    .parties {
+      margin-top: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1.5rem;
+    }
+
+    .sender,
+    .recipient {
+      font-size: 0.655rem;
+      line-height: 1.5;
+      color: #1e293b;
+    }
+
+    .sender p,
+    .recipient p {
+      margin: 0;
+    }
+
+    .sender .bold,
+    .recipient .bold {
+      font-weight: 700;
+    }
+
+    .logo {
+      width: 150px;
+    }
+
+    .recipient {
+      text-align: right;
+    }
+
+    /* =========================
+         DATES / TITRE
+      ========================= */
+    .dates {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.655rem;
+      color: #1e293b;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .invoice-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #0118d8;
+      line-height: 1.2;
+    }
+
+    .draft-badge-wrapper {
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+
+    .draft-text {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .date-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .date-row .label {
+      font-weight: 700;
+    }
+
+    /* =========================
+         STATUS BADGE
+      ========================= */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.655rem;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    .status-pending {
+      background-color: #fef3c7;
+      color: #d97706;
+      border: 1px solid #fde68a;
+    }
+
+    .status-in-transit {
+      background-color: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+    }
+
+    .status-delivered {
+      background-color: #dcfce7;
+      color: #16a34a;
+      border: 1px solid #bbf7d0;
+    }
+
+    .status-cancelled {
+      background-color: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+    }
+
+    /* =========================
+         TABLEAU
+      ========================= */
+    .table-wrapper {
+      margin-top: 14px;
+      overflow: hidden;
+      border-radius: 0.125rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.655rem;
+    }
+
+    thead tr {
+      background-color: #0118d8;
+      color: #ffffff;
+      text-align: left;
+    }
+
+    th {
+      padding: 7px 9px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    td {
+      padding: 9px;
+      color: #334155;
+    }
+
+    td.bold {
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    /* =========================
+         SERVICES
+      ========================= */
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .service-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.125rem;
+      padding: 10px 12px;
+      background-color: #f8fafc;
+    }
+
+    .service-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed #e2e8f0;
+    }
+
+    .service-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-color: #eff6ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #0118d8;
+      font-size: 0.7rem;
+    }
+
+    .service-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #0118d8;
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .service-content {
+      font-size: 0.655rem;
+      line-height: 1.5;
+      color: #1e293b;
+    }
+
+    .service-content .detail-item {
+      margin-bottom: 4px;
+    }
+
+    .service-content .detail-label {
+      font-weight: 700;
+      color: #334155;
+      display: block;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+      margin-bottom: 1px;
+    }
+
+    /* =========================
+         NOTES
+      ========================= */
+    .invoice-notes {
+      margin-top: 16px;
+      padding: 10px 14px;
+      background-color: #f8fafc;
+      border-radius: 0.125rem;
+      font-size: 0.655rem;
+      line-height: 1.45;
+      color: #475569;
+    }
+
+    .invoice-notes p {
+      margin: 0 0 0.35rem 0;
+    }
+
+    .invoice-notes p:last-child {
+      margin-bottom: 0;
+    }
+
+    .invoice-notes .notes-title {
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 0.35rem;
+      font-size: 0.75rem;
+    }
+
+    /* =========================
+         THANK YOU
+      ========================= */
+    .thank-you {
+      margin-top: 12px;
+      text-align: center;
+      font-size: 0.655rem;
+      color: #64748b;
+      font-style: italic;
+    }
+
+    /* =========================
+         LEGAL FOOTER
+      ========================= */
+    .legal-footer {
+      margin-top: 10px;
+      padding-top: 9px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 0.655rem;
+      line-height: 1.35;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    .legal-footer p {
+      margin: 0 0 0.2rem 0;
+    }
+
+    .legal-footer p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* =========================
+         FRAGILE
+      ========================= */
+    .fragile-icon {
+      color: #dc2626;
+      margin-right: 4px;
+    }
+
+    /* =========================
+         STAMP (PAID / UNPAID)
+      ========================= */
+    .stamp-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      overflow: hidden;
+    }
+
+    .stamp-image {
+      width: 250px;
+      max-width: 100%;
+      height: auto;
+      opacity: 0.85;
+      transform: rotate(-18deg) scale(1);
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15));
+    }
+
+    .stamp-image.paid {
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15));
+    }
+
+    .stamp-image.unpaid {
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15)) hue-rotate(0deg) saturate(1.2);
+    }
+
+    /* =========================
+         PRINT
+      ========================= */
+    @media print {
+
+      html,
+      body {
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+      }
+
+      body {
+        display: block;
+      }
+
+      .invoice-container {
+        width: 210mm;
+        height: 297mm;
+        min-height: 297mm;
+        max-height: 297mm;
+        margin: 0;
+        overflow: hidden;
+        page-break-after: avoid;
+        page-break-before: avoid;
+      }
+
+      .invoice-padding {
+        page-break-inside: avoid;
+      }
+
+      .parties,
+      .dates,
+      .table-wrapper,
+      .services-grid,
+      .invoice-notes,
+      .thank-you,
+      .legal-footer {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="invoice-container">
+
+    <!-- =========================
+           TAMPON PAID / UNPAID
+           (se base sur shipment.isPaid OU shipment.paid)
+      ========================= -->
+    <div class="stamp-overlay">
+      <% const isPaid=shipment.isPaid===true || shipment.paid===true; %>
+        <% if (isPaid) { %>
+          <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20GREEN.png"
+            alt="<%= translations.status_paid || 'Payé' %>" class="stamp-image paid" />
+          <% } else { %>
+            <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20RED.png"
+              alt="<%= translations.status_unpaid || 'Impayé' %>" class="stamp-image unpaid" />
+            <% } %>
+    </div>
+
+    <div class="invoice-padding">
+
+      <!-- =========================
+             EXPÉDITEUR / CLIENT
+        ========================= -->
+      <div class="parties">
+        <div class="sender">
+          <img src="https://admin.favorhelp.com/logos/logo-dark.png" alt="Favor Help" class="logo" />
+          <p class="bold">Favor Help</p>
+          <p>Office 1, Q.Murara, 012, Goma</p>
+          <p>Nord-Kivu, Congo-Kinshasa</p>
+          <p>RCCM : 81194815700029</p>
+          <p>N°Tel : +24397964940</p>
+        </div>
+
+        <div class="recipient">
+          <p class="bold">
+            <%= user ? user.fullName : 'Client' %>
+          </p>
+          <p>
+            <%= user ? user.email || '' : '' %>
+          </p>
+          <p>
+            <%= user ? user.phone || '' : '' %>
+          </p>
+        </div>
+      </div>
+
+      <!-- =========================
+             COLIS / TRACKING / DATE
+        ========================= -->
+      <div class="dates">
+        <div class="header-right">
+          <h1 class="invoice-title">
+            <%= translations.shipment || 'COLIS' %>
+          </h1>
+          <div class="draft-badge-wrapper">
+            <span class="draft-text">
+              <%= translations.tracking || 'Suivi' %>
+                <%= shipment.trackingNumber %>
+            </span>
+          </div>
+        </div>
+
+        <div class="date-row">
+          <span class="label">
+            <%= translations.date || 'Date' %>
+          </span>
+          <span>
+            <%= new Date().toLocaleDateString(lang==='en' ? 'en-US' : 'fr-FR' ) %>
+          </span>
+        </div>
+
+        <!-- =========================
+             STATUT — CORRIGÉ (12 statuts)
+        ========================= -->
+        <div>
+          <% const statusConfig={ 'PENDING' : { badge: 'status-pending' , icon: 'hourglass-half' , key: 'status_pending'
+            , default: 'En attente' }, 'PICKUP_ASSIGNED' : { badge: 'status-in-transit' , icon: 'user-check' ,
+            key: 'status_pickup_assigned' , default: 'Ramassage assigné' }, 'PICKUP_IN_PROGRESS' : {
+            badge: 'status-in-transit' , icon: 'truck-loading' , key: 'status_pickup_progress' ,
+            default: 'Ramassage en cours' }, 'PICKUP_COMPLETED' : { badge: 'status-in-transit' , icon: 'box-open' ,
+            key: 'status_pickup_done' , default: 'Ramassage terminé' }, 'AT_ORIGIN_AGENCY' : {
+            badge: 'status-in-transit' , icon: 'warehouse' , key: 'status_at_origin' , default: "À l'agence d'origine"
+            }, 'AWAITING_SHIPPING' : { badge: 'status-pending' , icon: 'hourglass-half' , key: 'status_awaiting_ship' ,
+            default: "En attente d'expédition" }, 'SHIPPING_IN_PROGRESS' : { badge: 'status-in-transit' ,
+            icon: 'shipping-fast' , key: 'status_in_transit' , default: 'En transit' }, 'TRANSIT' : {
+            badge: 'status-in-transit' , icon: 'shipping-fast' , key: 'status_in_transit' , default: 'En transit'
+            }, 'ARRIVED_DESTINATION' : { badge: 'status-delivered' , icon: 'check-circle' , key: 'status_arrived' ,
+            default: 'Arrivé à destination' }, 'READY_FOR_DELIVERY' : { badge: 'status-delivered' , icon: 'check-circle'
+            , key: 'status_ready_delivery' , default: 'Prêt pour livraison' }, 'DELIVERED' : { badge: 'status-delivered'
+            , icon: 'check-circle' , key: 'status_delivered' , default: 'Livré' }, 'COLLECTED' : {
+            badge: 'status-delivered' , icon: 'check-double' , key: 'status_collected' , default: 'Récupéré'
+            }, 'CANCELLED' : { badge: 'status-cancelled' , icon: 'times-circle' , key: 'status_cancelled' ,
+            default: 'Annulé' }, }; const currentStatus=statusConfig[shipment.status] || { badge: 'status-pending' ,
+            icon: 'hourglass-half' , key: 'status_pending' , default: 'En attente' , }; %>
+            <span class="status-badge <%= currentStatus.badge %>">
+              <i class="fas fa-<%= currentStatus.icon %>"></i>
+              <%= translations[currentStatus.key] || currentStatus.default %>
+            </span>
+        </div>
+      </div>
+
+      <!-- =========================
+             TABLEAU DÉTAILS COLIS
+        ========================= -->
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 2.5rem;">#</th>
+              <th>
+                <%= translations.description || 'Description' %>
+              </th>
+              <th>
+                <%= translations.quantity || 'Quantité' %>
+              </th>
+              <th>
+                <%= translations.weight || 'Poids' %>
+              </th>
+              <th>
+                <%= translations.value || 'Valeur' %>
+              </th>
+              <th>
+                <%= translations.fragile || 'Fragile' %>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td class="bold">
+                <%= shipment.package ? shipment.package.description : '—' %>
+              </td>
+              <td>
+                <%= shipment.package ? shipment.package.external_quantity : '—' %>
+              </td>
+              <td>
+                <%= shipment.package && shipment.package.weight ? shipment.package.weight + ' kg' : '—' %>
+              </td>
+              <td>
+                <%= shipment.package && shipment.package.value ? shipment.package.value + ' USD' : '—' %>
+              </td>
+              <td>
+                <% if (shipment.package && (shipment.package.fragile===true || shipment.package.fragile==='true' ||
+                  shipment.package.fragile==='oui' || shipment.package.fragile==='Oui' )) { %>
+                  <i class="fas fa-exclamation-triangle fragile-icon"></i>
+                  <%= translations.yes || 'Oui' %>
+                    <% } else { %>
+                      <%= translations.no || 'Non' %>
+                        <% } %>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- =========================
+             SERVICES SOUSCRITS
+        ========================= -->
+      <div class="services-grid" style="margin-top: 14px;">
+        <!-- Ramassage -->
+        <% if (shipment.pickupEnabled) { %>
+          <div class="service-card">
+            <div class="service-header">
+              <div class="service-icon">
+                <i class="fas fa-hand-holding-box"></i>
+              </div>
+              <h4 class="service-title">
+                <%= translations.pickup || 'Ramassage' %>
+              </h4>
+            </div>
+            <div class="service-content">
+              <div class="detail-item">
+                <span class="detail-label">
+                  <%= translations.from || 'De' %>
+                </span>
+                <%= shipment.pickupFrom || '—' %>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">
+                  <%= translations.to || 'À' %>
+                </span>
+                <%= shipment.pickupTo || '—' %>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">
+                  <%= translations.contact || 'Contact' %>
+                </span>
+                <%= shipment.pickupContactName || '—' %>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">
+                  <%= translations.phone || 'Téléphone' %>
+                </span>
+                <%= shipment.pickupContactPhone || '—' %>
+              </div>
+            </div>
+          </div>
+          <% } %>
+
+            <!-- Transport -->
+            <% if (shipment.shippingEnabled) { %>
+              <div class="service-card">
+                <div class="service-header">
+                  <div class="service-icon">
+                    <i class="fas fa-truck"></i>
+                  </div>
+                  <h4 class="service-title">
+                    <%= translations.shipping || 'Transport' %>
+                  </h4>
+                </div>
+                <div class="service-content">
+                  <div class="detail-item">
+                    <span class="detail-label">
+                      <%= translations.from || 'De' %>
+                    </span>
+                    <%= shipment.shippingFrom || '—' %>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">
+                      <%= translations.to || 'À' %>
+                    </span>
+                    <%= shipment.shippingTo || '—' %>
+                  </div>
+                </div>
+              </div>
+              <% } %>
+
+                <!-- Livraison -->
+                <% if (shipment.deliveryEnabled) { %>
+                  <div class="service-card">
+                    <div class="service-header">
+                      <div class="service-icon">
+                        <i class="fas fa-map-marker-alt"></i>
+                      </div>
+                      <h4 class="service-title">
+                        <%= translations.delivery || 'Livraison' %>
+                      </h4>
+                    </div>
+                    <div class="service-content">
+                      <div class="detail-item">
+                        <span class="detail-label">
+                          <%= translations.address || 'Adresse' %>
+                        </span>
+                        <%= shipment.deliveryFrom || '—' %>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">
+                          <%= translations.contact || 'Contact' %>
+                        </span>
+                        <%= shipment.deliveryContactName || '—' %>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">
+                          <%= translations.phone || 'Téléphone' %>
+                        </span>
+                        <%= shipment.deliveryContactPhone || '—' %>
+                      </div>
+                    </div>
+                  </div>
+                  <% } %>
+      </div>
+
+      <!-- =========================
+             NOTES
+        ========================= -->
+      <div class="invoice-notes">
+        <p class="notes-title">
+          <%= translations.notes_conditions || 'Notes et conditions' %>
+        </p>
+        <p>
+          <%= translations.shipment_note_1 || 'Ce bordereau est émis pour le transport et la livraison de votre colis.'
+            %>
+        </p>
+        <p>
+          <%= translations.shipment_note_2 || 'Présentez ce document lors du retrait du colis.' %>
+        </p>
+      </div>
+
+      <!-- =========================
+             REMERCIEMENT
+        ========================= -->
+      <p class="thank-you">
+        <%= translations.thank_you_footer || 'Merci pour votre confiance et votre collaboration.' %>
+      </p>
+
+      <!-- =========================
+             FOOTER LÉGAL
+        ========================= -->
+      <div class="legal-footer">
+        <p>
+          <%= translations.legal_line_1 || 'Favor Help — Office 1, Q.Murara, 012, Goma, Nord-Kivu, Congo-Kinshasa' %>
+        </p>
+        <p>
+          <%= translations.legal_line_2 || 'RCCM : 81194815700029 — N°Tel : +24397964940 — Email : contact@favorhelp.cd'
+            %>
+        </p>
+        <p>
+          <%= translations.legal_line_3 || 'Document généré électroniquement — Valable sans signature manuscrite.' %>
+        </p>
+      </div>
+
+    </div>
+  </div>
+</body>
+
+</html>

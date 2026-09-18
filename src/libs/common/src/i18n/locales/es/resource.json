@@ -1,0 +1,13 @@
+{
+  "name_label_required": "El nombre y la etiqueta son obligatorios.",
+  "already_exists": "Ya existe un recurso ({{name}} - {{label}}).",
+  "created": "Recurso creado con éxito.",
+  "list_retrieved": "Lista de recursos recuperada con éxito.",
+  "retrieve_failed": "No se pudieron recuperar los recursos.",
+  "not_found": "Recurso con ID {{id}} no encontrado.",
+  "retrieved": "Recurso recuperado con éxito.",
+  "updated": "Recurso actualizado con éxito.",
+  "name_exists": "Este nombre ya existe.",
+  "deleted": "Recurso '{{label}}' eliminado con éxito.",
+  "create_error": "Error al crear el recurso."
+}

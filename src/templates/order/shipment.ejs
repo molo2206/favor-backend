@@ -1,0 +1,597 @@
+<!-- shipment.ejs -->
+<!DOCTYPE html>
+<html lang="<%= lang || 'fr' %>">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>
+    <%= translations.shipment_title || 'Facture' %> - Favor Help
+  </title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    html,
+    body {
+      width: 210mm;
+      height: 297mm;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .invoice-container {
+      position: relative;
+      width: 210mm;
+      height: 297mm;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .invoice-padding {
+      padding: 15px 35px 12px 35px;
+    }
+
+    /* HEADER */
+    .parties {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .sender,
+    .recipient {
+      font-size: 0.62rem;
+      line-height: 1.4;
+      color: #1e293b;
+    }
+
+    .sender p,
+    .recipient p {
+      margin: 0;
+    }
+
+    .sender .bold,
+    .recipient .bold {
+      font-weight: 700;
+    }
+
+    .logo {
+      width: 120px;
+      margin-bottom: 4px;
+    }
+
+    .recipient {
+      text-align: right;
+    }
+
+    /* DATES */
+    .dates {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.62rem;
+      color: #1e293b;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .invoice-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #0118d8;
+      line-height: 1.1;
+    }
+
+    .draft-text {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .date-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .date-row .label {
+      font-weight: 700;
+    }
+
+    .package-section {
+      margin-top: 14px;
+    }
+
+    .package-section-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #0118d8;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .package-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 28px;
+      font-size: 0.75rem;
+      color: #1e293b;
+      padding: 16px 18px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+    }
+
+    .package-info .detail-item {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      line-height: 1.6;
+    }
+
+    .package-info .detail-label {
+      font-weight: 700;
+      color: #0118d8;
+      font-size: 0.7rem;
+      min-width: 120px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .package-info .detail-value {
+      color: #1e293b;
+      font-weight: 500;
+      font-size: 0.78rem;
+    }
+
+    /* TABLEAU */
+    .table-wrapper {
+      margin-top: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.62rem;
+    }
+
+    thead tr {
+      background: #0118d8;
+      color: #fff;
+      text-align: left;
+    }
+
+    th {
+      padding: 5px 7px;
+      font-weight: 600;
+    }
+
+    td {
+      padding: 6px 7px;
+      color: #334155;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    td.bold {
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    /* BOTTOM */
+    .bottom-section {
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .terms {
+      max-width: 16rem;
+      font-size: 0.62rem;
+    }
+
+    .terms p {
+      margin: 0;
+    }
+
+    .terms .label {
+      font-weight: 700;
+    }
+
+    .totals {
+      width: 240px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 10px;
+      font-size: 0.62rem;
+    }
+
+    .total-row .label {
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .total-row .value {
+      color: #1e293b;
+    }
+
+    .total-row+.total-row {
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .total-row.ttc {
+      background: #0118d8;
+      color: #fff;
+    }
+
+    .total-row.ttc .label,
+    .total-row.ttc .value {
+      color: #fff;
+      font-weight: 700;
+    }
+
+    /* NOTES */
+    .invoice-notes {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: #f8fafc;
+      font-size: 0.6rem;
+      line-height: 1.4;
+      color: #475569;
+    }
+
+    .invoice-notes p {
+      margin: 0 0 3px 0;
+    }
+
+    .invoice-notes p:last-child {
+      margin-bottom: 0;
+    }
+
+    .invoice-notes .notes-title {
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 3px;
+      font-size: 0.7rem;
+    }
+
+    /* THANK YOU */
+    .thank-you {
+      margin-top: 8px;
+      text-align: center;
+      font-size: 0.6rem;
+      color: #64748b;
+      font-style: italic;
+    }
+
+    /* FOOTER */
+    .legal-footer {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 0.58rem;
+      line-height: 1.3;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    .legal-footer p {
+      margin: 0 0 2px 0;
+    }
+
+    .legal-footer p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* STAMP — position absolute pour rester dans la 1ère page */
+    .stamp-overlay {
+      position: absolute;
+      bottom: 40px;
+      right: 40px;
+      width: 200px;
+      height: auto;
+      pointer-events: none;
+      z-index: 10;
+      transform: rotate(-18deg);
+    }
+
+    .stamp-image {
+      width: 100%;
+      height: auto;
+      opacity: 0.85;
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15));
+    }
+
+    /* PRINT */
+    @media print {
+
+      html,
+      body {
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        padding: 0;
+        background: #fff;
+      }
+
+      .invoice-container {
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      .invoice-padding {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <% // Variables principales de la facture const isPaid=shipment && (shipment.isPaid===true || shipment.paid===true);
+    const currency='USD' ; const shippingPrice=shipment?.shippingPrice ?? shipment?.totalPrice ?? 0; const
+    totalPrice=shipment?.totalPrice ?? shipment?.shippingPrice ?? 0; const vatAmount=0; const totalTTC=totalPrice +
+    vatAmount; %>
+
+    <div class="invoice-container">
+
+      <!-- TAMPON PAID / UNPAID -->
+      <div class="stamp-overlay">
+        <% if (isPaid) { %>
+          <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20GREEN.png"
+            alt="<%= translations.status_paid || 'Payé' %>" class="stamp-image" />
+          <% } else { %>
+            <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20RED.png"
+              alt="<%= translations.status_unpaid || 'Impayé' %>" class="stamp-image" />
+            <% } %>
+      </div>
+
+      <div class="invoice-padding">
+
+        <!-- EXPÉDITEUR / CLIENT -->
+        <div class="parties">
+          <div class="sender">
+            <img src="https://admin.favorhelp.com/logos/logo-dark.png" alt="Favor Help" class="logo" />
+            <p class="bold">Favor Help</p>
+            <p>Office 1, Q.Murara, 012, Goma</p>
+            <p>Nord-Kivu, Congo-Kinshasa</p>
+            <p>RCCM : 81194815700029</p>
+            <p>N°Tel : +24397964940</p>
+          </div>
+          <div class="recipient">
+            <p class="bold">
+              <%= user ? user.fullName : 'Client' %>
+            </p>
+            <p>
+              <%= user ? (user.email || '' ) : '' %>
+            </p>
+            <p>
+              <%= user ? (user.phone || '' ) : '' %>
+            </p>
+          </div>
+        </div>
+
+        <!-- FACTURE / DATE -->
+        <div class="dates">
+          <div class="header-right">
+            <h1 class="invoice-title">
+              <%= translations.shipment_invoice || 'FACTURE' %>
+            </h1>
+            <div class="draft-text">
+              <%= translations.number || 'N°' %>
+                <%= shipment.trackingNumber %>
+            </div>
+          </div>
+          <div class="date-row">
+            <span class="label">
+              <%= translations.date || "Date d'émission" %>
+            </span>
+            <span>
+              <%= new Date().toLocaleDateString(lang==='en' ? 'en-US' : 'fr-FR' ) %>
+            </span>
+          </div>
+        </div>
+
+        <!-- DÉTAILS DU COLIS -->
+        <div class="package-section">
+          <div class="package-section-title">
+            <%= translations.package_details || 'Détails du colis' %>
+          </div>
+          <div class="package-info">
+            <div class="detail-item">
+              <span class="detail-label">
+                <%= translations.description || 'Description' %>
+              </span>
+              <span class="detail-value">
+                <%= shipment.package ? shipment.package.description : '—' %>
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">
+                <%= translations.weight || 'Poids' %>
+              </span>
+              <span class="detail-value">
+                <%= shipment.package && shipment.package.weight ? shipment.package.weight + ' kg' : '—' %>
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">
+                <%= translations.value || 'Valeur déclarée' %>
+              </span>
+              <span class="detail-value">
+                <%= shipment.package && shipment.package.value ? shipment.package.value + ' $' : '—' %>
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">
+                <%= translations.fragile || 'Fragile' %>
+              </span>
+              <span class="detail-value">
+                <% if (shipment.package && (shipment.package.fragile===true || shipment.package.fragile==='true' ||
+                  shipment.package.fragile==='oui' || shipment.package.fragile==='Oui' )) { %>
+                  <%= translations.yes || 'Oui' %>
+                    <% } else { %>
+                      <%= translations.no || 'Non' %>
+                        <% } %>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TABLEAU -->
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 2rem;">#</th>
+                <th>
+                  <%= translations.designation || 'Désignation' %>
+                </th>
+                <th>
+                  <%= translations.quantity || 'Qté' %>
+                </th>
+                <th>
+                  <%= translations.unit_price || 'Prix u. HT' %>
+                </th>
+                <th>
+                  <%= translations.amount || 'Montant' %>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td class="bold">
+                  <% const parts=[]; if (shipment.pickupEnabled) { parts.push( (translations.pickup || 'Ramassage' ) +
+                    (shipment.pickupFrom && shipment.pickupTo ? ' — de ' + shipment.pickupFrom + ' à ' +
+                    shipment.pickupTo : '' ) ); } if (shipment.shippingEnabled) { parts.push( (translations.shipping
+                    || 'Transport' ) + (shipment.shippingFrom && shipment.shippingTo ? ' — de ' + shipment.shippingFrom
+                    + ' à ' + shipment.shippingTo : '' ) ); } if (shipment.deliveryEnabled) { const
+                    deliveryAddr=shipment.deliveryFrom || (shipment.deliveryAddress && shipment.deliveryAddress.address)
+                    || '' ; const deliveryTo=shipment.deliveryTo || (shipment.deliveryAddress &&
+                    shipment.deliveryAddress.address) || '' ; parts.push( (translations.delivery || 'Livraison' ) +
+                    (deliveryAddr && deliveryTo ? ' — de ' + deliveryAddr + ' à ' + deliveryTo : (deliveryAddr ? ' — ' +
+                    deliveryAddr : '' )) ); } const designationText=parts.length> 0
+                    ? parts.join(' | ')
+                    : (translations.shipping_service || "Service d'expédition");
+                    %>
+                    <%= designationText %>
+                </td>
+                <td>1</td>
+                <td>
+                  <%= shippingPrice.toFixed(2) %> $
+                </td>
+                <td class="bold">
+                  <%= shippingPrice.toFixed(2) %> $
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- PAYMENT + TOTAUX -->
+        <div class="bottom-section">
+          <div class="terms">
+            <div>
+              <p class="label">
+                <%= translations.payment_method || 'Moyens de paiement' %>
+              </p>
+              <p>
+                <%= shipment.paymentMethod || translations.cash || 'Cash' %>
+              </p>
+            </div>
+          </div>
+          <div class="totals">
+            <div class="total-row">
+              <span class="label">
+                <%= translations.total_ht || 'Total HT' %>
+              </span>
+              <span class="value">
+                <%= totalPrice.toFixed(2) %> $
+              </span>
+            </div>
+            <div class="total-row vat">
+              <span class="label">
+                <%= translations.vat || 'TVA' %>
+              </span>
+              <span class="value">
+                <%= vatAmount.toFixed(2) %> $
+              </span>
+            </div>
+            <div class="total-row ttc">
+              <span class="label">
+                <%= translations.total_ttc || 'Total TTC' %>
+              </span>
+              <span class="value">
+                <%= totalTTC.toFixed(2) %> $
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- NOTES -->
+        <div class="invoice-notes">
+          <p class="notes-title">
+            <%= translations.notes_conditions || 'Notes et conditions' %>
+          </p>
+          <p>
+            <%= translations.shipment_note_1
+              || 'Cette facture est émise pour des prestations de services. TVA non applicable conformément à la réglementation en vigueur.'
+              %>
+          </p>
+          <p>
+            <%= translations.shipment_note_2
+              || 'En cas de contestation, veuillez nous contacter dans les 8 jours suivant la réception de la facture.'
+              %>
+          </p>
+        </div>
+
+        <!-- REMERCIEMENT -->
+        <p class="thank-you">
+          <%= translations.thank_you_footer || 'Merci pour votre confiance et votre collaboration.' %>
+        </p>
+
+        <!-- FOOTER LÉGAL -->
+        <div class="legal-footer">
+          <p>
+            <%= translations.legal_line_1 || 'Favor Help — Office 1, Q.Murara, 012, Goma, Nord-Kivu, Congo-Kinshasa' %>
+          </p>
+          <p>
+            <%= translations.legal_line_2
+              || 'RCCM : 81194815700029 — N°Tel : +24397964940 — Email : contact@favorhelp.cd' %>
+          </p>
+          <p>
+            <%= translations.legal_line_3 || 'Facture générée électroniquement — Valable sans signature manuscrite.' %>
+          </p>
+        </div>
+
+      </div>
+    </div>
+</body>
+
+</html>
