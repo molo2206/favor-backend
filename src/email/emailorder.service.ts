@@ -580,10 +580,7 @@ export class MailOrderService {
   async sendShipmentPdf(
     to: string,
     subject: string,
-    context: {
-      user: any;
-      shipment: any;
-    },
+    context: any,
     lang: string = 'fr',
   ) {
     const { user, shipment } = context;
@@ -640,16 +637,52 @@ export class MailOrderService {
       yes: await this.i18n.translate('common.yes', lang),
       no: await this.i18n.translate('common.no', lang),
       not_specified: await this.i18n.translate('common.not_specified', lang),
+
+      // ✅ Clés utilisées par shipment.ejs (présentes dans processShipmentNotifications)
+      shipment_title: await this.i18n.translate('shipment.email.confirmation_title', lang),
+      shipment_invoice: await this.i18n.translate('shipment.shipment_invoice', lang),
+      number: await this.i18n.translate('shipment.number', lang),
+      designation: await this.i18n.translate('shipment.designation', lang),
+      amount: await this.i18n.translate('shipment.amount', lang),
+      unit_price: await this.i18n.translate('shipment.unit_price', lang),
+      payment_method: await this.i18n.translate('shipment.payment_method', lang),
+      cash: await this.i18n.translate('shipment.cash', lang),
+      total_ht: await this.i18n.translate('shipment.total_ht', lang),
+      vat: await this.i18n.translate('shipment.vat', lang),
+      total_ttc: await this.i18n.translate('shipment.total_ttc', lang),
+      shipping: await this.i18n.translate('shipment.email.shipping_service', lang),
+      delivery: await this.i18n.translate('shipment.email.delivery_address', lang),
+      pickup: await this.i18n.translate('shipment.email.pickup_service', lang),
+      phone: await this.i18n.translate('shipment.email.phone', lang),
+      notes_conditions: await this.i18n.translate('shipment.email.note_pdf', lang),
+      shipment_note_1: await this.i18n.translate('shipment.email.keep_document', lang),
+      shipment_note_2: await this.i18n.translate('shipment.email.present_on_pickup', lang),
+      thank_you_footer: await this.i18n.translate('shipment.email.thank_you', lang),
+      legal_line_1: await this.i18n.translate('shipment.email.footer_contact', lang),
+      legal_line_2: 'RCCM : 81194815700029 — N°Tel : +24397964940 — Email : contact@favorhelp.cd',
+      legal_line_3: await this.i18n.translate('shipment.email.official_document', lang),
+      status_paid: await this.i18n.translate('shipment.status_paid', lang),
+      status_unpaid: await this.i18n.translate('shipment.status_unpaid', lang),
     };
 
     // ============================================================
-    // ✅ CORRECTION : passer `translations: t` au template
+    // ✅ FIX PRINCIPAL : passer TOUT le context à EJS
+    //    → invoiceConfig, package, shipment, user, lang sont transmis
+    //    → translations est overridé par `t` calculé ici
     // ============================================================
+    console.log('🔍 [MailOrder] sendShipmentPdf → context reçu :', {
+      keys: Object.keys(context || {}),
+      hasInvoiceConfig: !!context?.invoiceConfig,
+      invoiceHeader: context?.invoiceConfig?.header,
+      invoiceLogo: context?.invoiceConfig?.logo,
+    });
+
     const pdfBuffer = await this.generatePdfFromTemplate('shipment.ejs', {
+      ...context,          // ✅ spread : garde invoiceConfig + package
       user,
       shipment,
       lang,
-      translations: t,   // ⬅️ AJOUT OBLIGATOIRE
+      translations: t,     // ✅ override avec les traductions calculées ici
     });
 
     const htmlContent = `<!DOCTYPE html>...`;  // inchangé
@@ -658,7 +691,13 @@ export class MailOrderService {
       to,
       subject,
       html: htmlContent,
-      attachments: [{ filename: `colis-${shipment.trackingNumber}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }],
+      attachments: [
+        {
+          filename: `colis-${shipment.trackingNumber}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
     });
   }
 
