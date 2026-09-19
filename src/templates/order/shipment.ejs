@@ -353,15 +353,17 @@
 </head>
 
 <body>
-  <% // Variables principales de la facture const isPaid=shipment && (shipment.isPaid===true || shipment.paid===true);
-    const currency='USD' ; const shippingPrice=shipment?.shippingPrice ?? shipment?.totalPrice ?? 0; const
-    totalPrice=shipment?.totalPrice ?? shipment?.shippingPrice ?? 0; const vatAmount=0; const totalTTC=totalPrice +
-    vatAmount; // ✅ Config de facture (avec fallback) const cfg=typeof invoiceConfig !=='undefined' && invoiceConfig ?
-    invoiceConfig : {
+  <% //============================================================// VARIABLES PRINCIPALES
+    //============================================================const isPaid=shipment && (shipment.isPaid===true ||
+    shipment.paid===true); const currency='USD' ; const shippingPrice=shipment?.shippingPrice ?? shipment?.totalPrice ??
+    0; const totalPrice=shipment?.totalPrice ?? shipment?.shippingPrice ?? 0; const vatAmount=0; const
+    totalTTC=totalPrice + vatAmount; //============================================================// ✅ CONFIG FACTURE
+    (fallback + override) //============================================================let cfg={
     header: 'Favor Help\nOffice 1, Q.Murara, 012, Goma\nNord-Kivu, Congo-Kinshasa\nRCCM : 81194815700029\nN°Tel : +24397964940'
     , footer: 'Merci pour votre confiance.\nFavor Help — Écosystème digital par Favor Group' ,
     logo: 'https://admin.favorhelp.com/logos/logo-dark.png' , theme: { primaryColor: '#0118d8' ,
-    secondaryColor: '#64748b' , textColor: '#1e293b' , fontFamily: 'system-ui, sans-serif' } }; %>
+    secondaryColor: '#64748b' , textColor: '#1e293b' , fontFamily: 'system-ui, sans-serif' } }; if (typeof invoiceConfig
+    !=='undefined' && invoiceConfig) { cfg=invoiceConfig; } %>
 
     <div class="invoice-container">
 
