@@ -172,7 +172,7 @@ export class ShipmentService {
       }
 
       // ============================================================
-      // ✅ AJOUT : CHARGER LA CONFIG DE FACTURE
+      // ✅ CHARGER LA CONFIG DE FACTURE
       // Priorité : shippingCompany > pickupCompany > deliveryCompany
       // ============================================================
       let mainCompanyId: string | null = null;
@@ -184,22 +184,58 @@ export class ShipmentService {
         mainCompanyId = shipment.deliveryCompanyId;
       }
 
+      // 🔍 LOG 1 : IDs des companies
+      console.log('🔍 ============================================');
+      console.log('🔍 [Invoice] ÉTAPE 1 — IDs des companies');
+      console.log('🔍 ============================================');
+      console.log('   shipment.pickupCompanyId   :', shipment.pickupCompanyId);
+      console.log('   shipment.shippingCompanyId :', shipment.shippingCompanyId);
+      console.log('   shipment.deliveryCompanyId :', shipment.deliveryCompanyId);
+      console.log('   → mainCompanyId retenu     :', mainCompanyId);
+      console.log('🔍 ============================================');
+
       let invoiceConfig: InvoiceConfigurationEntity | null = null;
       if (mainCompanyId) {
         invoiceConfig = await this.invoiceConfigRepo.findOne({
           where: { companyId: mainCompanyId },
         });
-        console.log(`📄 [Shipment] Config facture chargée pour company ${mainCompanyId}:`, !!invoiceConfig);
+
+        // 🔍 LOG 2 : Config brute depuis la BDD
+        console.log('🔍 ============================================');
+        console.log('🔍 [Invoice] ÉTAPE 2 — Config chargée depuis la BDD');
+        console.log('🔍 ============================================');
+        console.log('   trouvée ?  :', !!invoiceConfig);
+        if (invoiceConfig) {
+          console.log('   id         :', invoiceConfig.id);
+          console.log('   companyId  :', invoiceConfig.companyId);
+          console.log('   header     :', JSON.stringify(invoiceConfig.header));
+          console.log('   footer     :', JSON.stringify(invoiceConfig.footer));
+          console.log('   logo       :', invoiceConfig.logo);
+          console.log('   theme      :', JSON.stringify(invoiceConfig.theme));
+          console.log('   theme type :', typeof invoiceConfig.theme);
+          console.log(
+            '   theme keys :',
+            invoiceConfig.theme ? Object.keys(invoiceConfig.theme) : [],
+          );
+        }
+        console.log('🔍 ============================================');
+      } else {
+        console.log('⚠️ [Invoice] Aucun mainCompanyId → pas de config à charger');
       }
 
-      const configHeader = invoiceConfig?.header
-        || 'Favor Help\nOffice 1, Q.Murara, 012, Goma\nNord-Kivu, Congo-Kinshasa\nRCCM : 81194815700029\nN°Tel : +24397964940';
+      // ✅ Fallbacks calculés (mais on ne les met PAS dans le context email,
+      //    on passe invoiceConfig BRUT pour que le template gère lui-même)
+      const configHeader =
+        invoiceConfig?.header ||
+        'Favor Help\nOffice 1, Q.Murara, 012, Goma\nNord-Kivu, Congo-Kinshasa\nRCCM : 81194815700029\nN°Tel : +24397964940';
 
-      const configFooter = invoiceConfig?.footer
-        || 'Merci pour votre confiance.\nFavor Help — Écosystème digital par Favor Group';
+      const configFooter =
+        invoiceConfig?.footer ||
+        'Merci pour votre confiance.\nFavor Help — Écosystème digital par Favor Group';
 
-      const configLogo = invoiceConfig?.logo
-        || 'https://admin.favorhelp.com/logos/logo-dark.png';
+      const configLogo =
+        invoiceConfig?.logo ||
+        'https://admin.favorhelp.com/logos/logo-dark.png';
 
       const configTheme = invoiceConfig?.theme || {
         primaryColor: '#0118d8',
@@ -207,16 +243,30 @@ export class ShipmentService {
         textColor: '#1e293b',
         fontFamily: 'system-ui, sans-serif',
       };
-      // ============================================================
-      // FIN AJOUT
-      // ============================================================
+
+      // 🔍 LOG 3 : Ce qui sera réellement envoyé (brut + fallback)
+      console.log('🔍 ============================================');
+      console.log('🔍 [Invoice] ÉTAPE 3 — Valeurs finales');
+      console.log('🔍 ============================================');
+      console.log('   header (fallback) :', JSON.stringify(configHeader));
+      console.log('   footer (fallback) :', JSON.stringify(configFooter));
+      console.log('   logo   (fallback) :', configLogo);
+      console.log('   theme  (fallback) :', JSON.stringify(configTheme));
+      console.log('🔍 ============================================');
 
       const notificationOptions: any = {
         userId: currentUser.id,
-        pushTitle: await this.i18n.translate('shipment.push.created_title', lang),
-        pushBody: await this.i18n.translate('shipment.push.created_body', lang, {
-          trackingNumber: shipment.trackingNumber,
-        }),
+        pushTitle: await this.i18n.translate(
+          'shipment.push.created_title',
+          lang,
+        ),
+        pushBody: await this.i18n.translate(
+          'shipment.push.created_body',
+          lang,
+          {
+            trackingNumber: shipment.trackingNumber,
+          },
+        ),
         pushData: { entity: 'SHIPMENT', entityId: shipment.id },
       };
 
@@ -232,81 +282,195 @@ export class ShipmentService {
         notificationOptions.emailTemplate = 'shipment.ejs';
         notificationOptions.sendShipmentPdf = true;
 
-        // ✅ Context COMPLET avec TOUTES les variables attendues par shipment.ejs
+        // ✅ Context COMPLET
         notificationOptions.emailContext = {
-          // ✅ Données brutes du template
           shipment: shipment,
           package: packageEntity,
           lang: lang,
           user: currentUser,
 
+          // ✅ On passe la config BRUTE (peut être null)
+          //    → le template gère le fallback lui-même
           invoiceConfig: invoiceConfig,
 
-          // ✅ Traductions (indispensable pour le template)
+          // ✅ Traductions
           translations: {
-            // Titres
-            shipment_title: await this.i18n.translate('shipment.email.confirmation_title', lang),
-            shipment: await this.i18n.translate('shipment.email.waybill', lang),
-            tracking: await this.i18n.translate('shipment.email.tracking_number', lang),
+            shipment_title: await this.i18n.translate(
+              'shipment.email.confirmation_title',
+              lang,
+            ),
+            shipment: await this.i18n.translate(
+              'shipment.email.waybill',
+              lang,
+            ),
+            tracking: await this.i18n.translate(
+              'shipment.email.tracking_number',
+              lang,
+            ),
             date: await this.i18n.translate('shipment.email.date', lang),
 
-            // Statuts
-            status_pending: await this.i18n.translate('shipment.status.pending', lang),
-            status_in_transit: await this.i18n.translate('shipment.status.in_transit', lang),
-            status_delivered: await this.i18n.translate('shipment.status.delivered', lang),
-            status_cancelled: await this.i18n.translate('shipment.status.cancelled', lang),
+            status_pending: await this.i18n.translate(
+              'shipment.status.pending',
+              lang,
+            ),
+            status_in_transit: await this.i18n.translate(
+              'shipment.status.in_transit',
+              lang,
+            ),
+            status_delivered: await this.i18n.translate(
+              'shipment.status.delivered',
+              lang,
+            ),
+            status_cancelled: await this.i18n.translate(
+              'shipment.status.cancelled',
+              lang,
+            ),
 
-            // Tableau colis
-            description: await this.i18n.translate('shipment.email.description', lang),
-            quantity: await this.i18n.translate('shipment.email.quantity', lang),
+            description: await this.i18n.translate(
+              'shipment.email.description',
+              lang,
+            ),
+            quantity: await this.i18n.translate(
+              'shipment.email.quantity',
+              lang,
+            ),
             weight: await this.i18n.translate('shipment.email.weight', lang),
             value: await this.i18n.translate('shipment.email.value', lang),
-            fragile: await this.i18n.translate('shipment.email.fragile', lang),
+            fragile: await this.i18n.translate(
+              'shipment.email.fragile',
+              lang,
+            ),
 
-            // Oui / Non
             yes: await this.i18n.translate('common.yes', lang),
             no: await this.i18n.translate('common.no', lang),
 
-            // Services
-            pickup: await this.i18n.translate('shipment.email.pickup_service', lang),
-            shipping: await this.i18n.translate('shipment.email.shipping_service', lang),
-            delivery: await this.i18n.translate('shipment.email.delivery_address', lang),
+            pickup: await this.i18n.translate(
+              'shipment.email.pickup_service',
+              lang,
+            ),
+            shipping: await this.i18n.translate(
+              'shipment.email.shipping_service',
+              lang,
+            ),
+            delivery: await this.i18n.translate(
+              'shipment.email.delivery_address',
+              lang,
+            ),
             from: await this.i18n.translate('shipment.email.from', lang),
             to: await this.i18n.translate('shipment.email.to', lang),
-            contact: await this.i18n.translate('shipment.email.contact', lang),
+            contact: await this.i18n.translate(
+              'shipment.email.contact',
+              lang,
+            ),
             phone: await this.i18n.translate('shipment.email.phone', lang),
-            address: await this.i18n.translate('shipment.email.address', lang),
+            address: await this.i18n.translate(
+              'shipment.email.address',
+              lang,
+            ),
 
-            // Notes & footer
-            notes_conditions: await this.i18n.translate('shipment.email.note_pdf', lang),
-            shipment_note_1: await this.i18n.translate('shipment.email.keep_document', lang),
-            shipment_note_2: await this.i18n.translate('shipment.email.present_on_pickup', lang),
-            thank_you_footer: await this.i18n.translate('shipment.email.thank_you', lang),
-            legal_line_1: await this.i18n.translate('shipment.email.footer_contact', lang),
-            legal_line_2: 'RCCM : 81194815700029 — N°Tel : +24397964940 — Email : contact@favorhelp.cd',
-            legal_line_3: await this.i18n.translate('shipment.email.official_document', lang),
+            notes_conditions: await this.i18n.translate(
+              'shipment.email.note_pdf',
+              lang,
+            ),
+            shipment_note_1: await this.i18n.translate(
+              'shipment.email.keep_document',
+              lang,
+            ),
+            shipment_note_2: await this.i18n.translate(
+              'shipment.email.present_on_pickup',
+              lang,
+            ),
+            thank_you_footer: await this.i18n.translate(
+              'shipment.email.thank_you',
+              lang,
+            ),
+            legal_line_1: await this.i18n.translate(
+              'shipment.email.footer_contact',
+              lang,
+            ),
+            legal_line_2:
+              'RCCM : 81194815700029 — N°Tel : +24397964940 — Email : contact@favorhelp.cd',
+            legal_line_3: await this.i18n.translate(
+              'shipment.email.official_document',
+              lang,
+            ),
 
-            // Divers
             email: await this.i18n.translate('shipment.email.email', lang),
-            website: await this.i18n.translate('shipment.email.website', lang),
-            invoice: await this.i18n.translate('shipment.email.invoice', lang),
-            package_details: await this.i18n.translate('shipment.email.package_details', lang),
+            website: await this.i18n.translate(
+              'shipment.email.website',
+              lang,
+            ),
+            invoice: await this.i18n.translate(
+              'shipment.email.invoice',
+              lang,
+            ),
+            package_details: await this.i18n.translate(
+              'shipment.email.package_details',
+              lang,
+            ),
 
-            shipment_invoice: await this.i18n.translate('shipment.shipment_invoice', lang),
+            shipment_invoice: await this.i18n.translate(
+              'shipment.shipment_invoice',
+              lang,
+            ),
             number: await this.i18n.translate('shipment.number', lang),
-            designation: await this.i18n.translate('shipment.designation', lang),
+            designation: await this.i18n.translate(
+              'shipment.designation',
+              lang,
+            ),
             amount: await this.i18n.translate('shipment.amount', lang),
-            unit_price: await this.i18n.translate('shipment.unit_price', lang),
-            payment_method: await this.i18n.translate('shipment.payment_method', lang),
+            unit_price: await this.i18n.translate(
+              'shipment.unit_price',
+              lang,
+            ),
+            payment_method: await this.i18n.translate(
+              'shipment.payment_method',
+              lang,
+            ),
             cash: await this.i18n.translate('shipment.cash', lang),
             total_ht: await this.i18n.translate('shipment.total_ht', lang),
             vat: await this.i18n.translate('shipment.vat', lang),
-            total_ttc: await this.i18n.translate('shipment.total_ttc', lang),
-            shipping_service: await this.i18n.translate('shipment.shipping_service', lang),
-            status_paid: await this.i18n.translate('shipment.status_paid', lang),
-            status_unpaid: await this.i18n.translate('shipment.status_unpaid', lang),
+            total_ttc: await this.i18n.translate(
+              'shipment.total_ttc',
+              lang,
+            ),
+            shipping_service: await this.i18n.translate(
+              'shipment.shipping_service',
+              lang,
+            ),
+            status_paid: await this.i18n.translate(
+              'shipment.status_paid',
+              lang,
+            ),
+            status_unpaid: await this.i18n.translate(
+              'shipment.status_unpaid',
+              lang,
+            ),
           },
         };
+
+        // 🔍 LOG 4 : Ce qu'on envoie au helper
+        console.log('🔍 ============================================');
+        console.log('🔍 [Invoice] ÉTAPE 4 — emailContext prêt');
+        console.log('🔍 ============================================');
+        console.log('   invoiceConfig présent ? :', !!notificationOptions.emailContext.invoiceConfig);
+        console.log(
+          '   invoiceConfig.header    :',
+          JSON.stringify(notificationOptions.emailContext.invoiceConfig?.header),
+        );
+        console.log(
+          '   invoiceConfig.footer    :',
+          JSON.stringify(notificationOptions.emailContext.invoiceConfig?.footer),
+        );
+        console.log(
+          '   invoiceConfig.logo      :',
+          notificationOptions.emailContext.invoiceConfig?.logo,
+        );
+        console.log(
+          '   invoiceConfig.theme     :',
+          JSON.stringify(notificationOptions.emailContext.invoiceConfig?.theme),
+        );
+        console.log('🔍 ============================================');
       }
 
       // ============================================================
@@ -314,13 +478,19 @@ export class ShipmentService {
       // ============================================================
       if (hasPhone) {
         notificationOptions.phoneNumber = currentUser.phone;
-        notificationOptions.smsBody = await this.i18n.translate('shipment.sms.created_body', lang, {
-          trackingNumber: shipment.trackingNumber,
-        });
+        notificationOptions.smsBody = await this.i18n.translate(
+          'shipment.sms.created_body',
+          lang,
+          {
+            trackingNumber: shipment.trackingNumber,
+          },
+        );
       }
 
       // ✅ Envoi (push + SMS + email)
+      console.log('📤 [Invoice] Envoi via pushNotificationHelper.sendAll...');
       await this.pushNotificationHelper.sendAll(notificationOptions);
+      console.log('✅ [Invoice] sendAll terminé');
 
       // ============================================================
       // 🏢 Notifier les companies
@@ -349,9 +519,13 @@ export class ShipmentService {
         {
           trackingNumber: shipment.trackingNumber,
           status: shipment.status,
-          message: await this.i18n.translate('shipment.inapp.created_message', lang, {
-            trackingNumber: shipment.trackingNumber,
-          }),
+          message: await this.i18n.translate(
+            'shipment.inapp.created_message',
+            lang,
+            {
+              trackingNumber: shipment.trackingNumber,
+            },
+          ),
         },
         'SHIPMENT',
         shipment.id,
