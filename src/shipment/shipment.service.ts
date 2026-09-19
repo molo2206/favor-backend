@@ -240,13 +240,7 @@ export class ShipmentService {
           lang: lang,
           user: currentUser,
 
-          // ✅ AJOUT : Config de facture
-          invoiceConfig: {
-            header: configHeader,
-            footer: configFooter,
-            logo: configLogo,
-            theme: configTheme,
-          },
+          invoiceConfig: invoiceConfig,
 
           // ✅ Traductions (indispensable pour le template)
           translations: {

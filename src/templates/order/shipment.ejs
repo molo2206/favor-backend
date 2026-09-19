@@ -353,247 +353,292 @@
 </head>
 
 <body>
-  <% //============================================================// VARIABLES PRINCIPALES
-    //============================================================const isPaid=shipment && (shipment.isPaid===true ||
-    shipment.paid===true); const currency='USD' ; const shippingPrice=shipment?.shippingPrice ?? shipment?.totalPrice ??
-    0; const totalPrice=shipment?.totalPrice ?? shipment?.shippingPrice ?? 0; const vatAmount=0; const
-    totalTTC=totalPrice + vatAmount; //============================================================// ✅ CONFIG FACTURE
-    (fallback + override) //============================================================let cfg={
-    header: 'Favor Help\nOffice 1, Q.Murara, 012, Goma\nNord-Kivu, Congo-Kinshasa\nRCCM : 81194815700029\nN°Tel : +24397964940'
-    , footer: 'Merci pour votre confiance.\nFavor Help — Écosystème digital par Favor Group' ,
-    logo: 'https://admin.favorhelp.com/logos/logo-dark.png' , theme: { primaryColor: '#0118d8' ,
-    secondaryColor: '#64748b' , textColor: '#1e293b' , fontFamily: 'system-ui, sans-serif' } }; if (typeof invoiceConfig
-    !=='undefined' && invoiceConfig) { cfg=invoiceConfig; } %>
+  <%
+    // ============================================================
+    // VARIABLES PRINCIPALES
+    // ============================================================
+    const isPaid = shipment && (shipment.isPaid === true || shipment.paid === true);
+    const currency = 'USD';
+    const shippingPrice = shipment?.shippingPrice ?? shipment?.totalPrice ?? 0;
+    const totalPrice = shipment?.totalPrice ?? shipment?.shippingPrice ?? 0;
+    const vatAmount = 0;
+    const totalTTC = totalPrice + vatAmount;
 
-    <div class="invoice-container">
+    // ============================================================
+    // ✅ CONFIG FACTURE (fallback + override)
+    // ============================================================
+    let cfg = {
+      header: 'Favor Help\nOffice 1, Q.Murara, 012, Goma\nNord-Kivu, Congo-Kinshasa\nRCCM : 81194815700029\nN°Tel : +24397964940',
+      footer: 'Merci pour votre confiance.\nFavor Help — Écosystème digital par Favor Group',
+      logo: 'https://admin.favorhelp.com/logos/logo-dark.png',
+      theme: {
+        primaryColor: '#0118d8',
+        secondaryColor: '#64748b',
+        textColor: '#1e293b',
+        fontFamily: 'system-ui, sans-serif'
+      }
+    };
 
-      <!-- TAMPON PAID / UNPAID -->
-      <div class="stamp-overlay">
-        <% if (isPaid) { %>
-          <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20GREEN.png"
-            alt="<%= translations.status_paid || 'Payé' %>" class="stamp-image" />
-          <% } else { %>
-            <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20RED.png"
-              alt="<%= translations.status_unpaid || 'Impayé' %>" class="stamp-image" />
-            <% } %>
-      </div>
+    if (typeof invoiceConfig !== 'undefined' && invoiceConfig) {
+      cfg = invoiceConfig;
+    }
+  %>
 
-      <div class="invoice-padding">
+  <div class="invoice-container">
 
-        <!-- EXPÉDITEUR / CLIENT -->
-        <div class="parties">
-          <div class="sender">
-            <img src="<%= cfg.logo %>" alt="Logo" class="logo" />
-            <% cfg.header.split('\n').forEach(function(line, i) { %>
-              <p class="<%= i === 0 ? 'bold' : '' %>">
-                <%= line %>
-              </p>
-              <% }); %>
-          </div>
-          <div class="recipient">
-            <p class="bold">
-              <%= user ? user.fullName : 'Client' %>
-            </p>
-            <p>
-              <%= user ? (user.email || '' ) : '' %>
-            </p>
-            <p>
-              <%= user ? (user.phone || '' ) : '' %>
-            </p>
-          </div>
-        </div>
+    <!-- TAMPON PAID / UNPAID -->
+    <div class="stamp-overlay">
+      <% if (isPaid) { %>
+        <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20GREEN.png"
+          alt="<%= translations.status_paid || 'Payé' %>" class="stamp-image" />
+        <% } else { %>
+          <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20RED.png"
+            alt="<%= translations.status_unpaid || 'Impayé' %>" class="stamp-image" />
+          <% } %>
+    </div>
 
-        <!-- FACTURE / DATE -->
-        <div class="dates">
-          <div class="header-right">
-            <h1 class="invoice-title">
-              <%= translations.shipment_invoice || 'FACTURE' %>
-            </h1>
-            <div class="draft-text">
-              <%= translations.number || 'N°' %>
-                <%= shipment.trackingNumber %>
-            </div>
-          </div>
-          <div class="date-row">
-            <span class="label">
-              <%= translations.date || "Date d'émission" %>
-            </span>
-            <span>
-              <%= new Date().toLocaleDateString(lang==='en' ? 'en-US' : 'fr-FR' ) %>
-            </span>
-          </div>
-        </div>
+    <div class="invoice-padding">
 
-        <!-- DÉTAILS DU COLIS -->
-        <div class="package-section">
-          <div class="package-section-title">
-            <%= translations.package_details || 'Détails du colis' %>
-          </div>
-          <div class="package-info">
-            <div class="detail-item">
-              <span class="detail-label">
-                <%= translations.description || 'Description' %>
-              </span>
-              <span class="detail-value">
-                <%= shipment.package ? shipment.package.description : '—' %>
-              </span>
-            </div>
-            <div class="detail-item">
-              <span class="detail-label">
-                <%= translations.weight || 'Poids' %>
-              </span>
-              <span class="detail-value">
-                <%= shipment.package && shipment.package.weight ? shipment.package.weight + ' kg' : '—' %>
-              </span>
-            </div>
-            <div class="detail-item">
-              <span class="detail-label">
-                <%= translations.value || 'Valeur déclarée' %>
-              </span>
-              <span class="detail-value">
-                <%= shipment.package && shipment.package.value ? shipment.package.value + ' $' : '—' %>
-              </span>
-            </div>
-            <div class="detail-item">
-              <span class="detail-label">
-                <%= translations.fragile || 'Fragile' %>
-              </span>
-              <span class="detail-value">
-                <% if (shipment.package && (shipment.package.fragile===true || shipment.package.fragile==='true' ||
-                  shipment.package.fragile==='oui' || shipment.package.fragile==='Oui' )) { %>
-                  <%= translations.yes || 'Oui' %>
-                    <% } else { %>
-                      <%= translations.no || 'Non' %>
-                        <% } %>
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- TABLEAU -->
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 2rem;">#</th>
-                <th>
-                  <%= translations.designation || 'Désignation' %>
-                </th>
-                <th>
-                  <%= translations.quantity || 'Qté' %>
-                </th>
-                <th>
-                  <%= translations.unit_price || 'Prix u. HT' %>
-                </th>
-                <th>
-                  <%= translations.amount || 'Montant' %>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>1</td>
-                <td class="bold">
-                  <% const parts=[]; if (shipment.pickupEnabled) { parts.push( (translations.pickup || 'Ramassage' ) +
-                    (shipment.pickupFrom && shipment.pickupTo ? ' — de ' + shipment.pickupFrom + ' à ' +
-                    shipment.pickupTo : '' ) ); } if (shipment.shippingEnabled) { parts.push( (translations.shipping
-                    || 'Transport' ) + (shipment.shippingFrom && shipment.shippingTo ? ' — de ' + shipment.shippingFrom
-                    + ' à ' + shipment.shippingTo : '' ) ); } if (shipment.deliveryEnabled) { const
-                    deliveryAddr=shipment.deliveryFrom || (shipment.deliveryAddress && shipment.deliveryAddress.address)
-                    || '' ; const deliveryTo=shipment.deliveryTo || (shipment.deliveryAddress &&
-                    shipment.deliveryAddress.address) || '' ; parts.push( (translations.delivery || 'Livraison' ) +
-                    (deliveryAddr && deliveryTo ? ' — de ' + deliveryAddr + ' à ' + deliveryTo : (deliveryAddr ? ' — ' +
-                    deliveryAddr : '' )) ); } const designationText=parts.length> 0
-                    ? parts.join(' | ')
-                    : (translations.shipping_service || "Service d'expédition");
-                    %>
-                    <%= designationText %>
-                </td>
-                <td>1</td>
-                <td>
-                  <%= shippingPrice.toFixed(2) %> $
-                </td>
-                <td class="bold">
-                  <%= shippingPrice.toFixed(2) %> $
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- PAYMENT + TOTAUX -->
-        <div class="bottom-section">
-          <div class="terms">
-            <div>
-              <p class="label">
-                <%= translations.payment_method || 'Moyens de paiement' %>
-              </p>
-              <p>
-                <%= shipment.paymentMethod || translations.cash || 'Cash' %>
-              </p>
-            </div>
-          </div>
-          <div class="totals">
-            <div class="total-row">
-              <span class="label">
-                <%= translations.total_ht || 'Total HT' %>
-              </span>
-              <span class="value">
-                <%= totalPrice.toFixed(2) %> $
-              </span>
-            </div>
-            <div class="total-row vat">
-              <span class="label">
-                <%= translations.vat || 'TVA' %>
-              </span>
-              <span class="value">
-                <%= vatAmount.toFixed(2) %> $
-              </span>
-            </div>
-            <div class="total-row ttc">
-              <span class="label">
-                <%= translations.total_ttc || 'Total TTC' %>
-              </span>
-              <span class="value">
-                <%= totalTTC.toFixed(2) %> $
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- NOTES -->
-        <div class="invoice-notes">
-          <p class="notes-title">
-            <%= translations.notes_conditions || 'Notes et conditions' %>
-          </p>
-          <p>
-            <%= translations.shipment_note_1
-              || 'Cette facture est émise pour des prestations de services. TVA non applicable conformément à la réglementation en vigueur.'
-              %>
-          </p>
-          <p>
-            <%= translations.shipment_note_2
-              || 'En cas de contestation, veuillez nous contacter dans les 8 jours suivant la réception de la facture.'
-              %>
-          </p>
-        </div>
-
-        <!-- REMERCIEMENT -->
-        <p class="thank-you">
-          <%= translations.thank_you_footer || 'Merci pour votre confiance et votre collaboration.' %>
-        </p>
-
-        <!-- FOOTER LÉGAL -->
-        <div class="legal-footer">
-          <% cfg.footer.split('\n').forEach(function(line) { %>
-            <p>
+      <!-- EXPÉDITEUR / CLIENT -->
+      <div class="parties">
+        <div class="sender">
+          <img src="<%= cfg.logo %>" alt="Logo" class="logo" />
+          <% cfg.header.split('\n').forEach(function(line, i) { %>
+            <p class="<%= i === 0 ? 'bold' : '' %>">
               <%= line %>
             </p>
             <% }); %>
         </div>
-
+        <div class="recipient">
+          <p class="bold">
+            <%= user ? user.fullName : 'Client' %>
+          </p>
+          <p>
+            <%= user ? (user.email || '' ) : '' %>
+          </p>
+          <p>
+            <%= user ? (user.phone || '' ) : '' %>
+          </p>
+        </div>
       </div>
+
+      <!-- FACTURE / DATE -->
+      <div class="dates">
+        <div class="header-right">
+          <h1 class="invoice-title">
+            <%= translations.shipment_invoice || 'FACTURE' %>
+          </h1>
+          <div class="draft-text">
+            <%= translations.number || 'N°' %>
+              <%= shipment.trackingNumber %>
+          </div>
+        </div>
+        <div class="date-row">
+          <span class="label">
+            <%= translations.date || "Date d'émission" %>
+          </span>
+          <span>
+            <%= new Date().toLocaleDateString(lang==='en' ? 'en-US' : 'fr-FR' ) %>
+          </span>
+        </div>
+      </div>
+
+      <!-- DÉTAILS DU COLIS -->
+      <div class="package-section">
+        <div class="package-section-title">
+          <%= translations.package_details || 'Détails du colis' %>
+        </div>
+        <div class="package-info">
+          <div class="detail-item">
+            <span class="detail-label">
+              <%= translations.description || 'Description' %>
+            </span>
+            <span class="detail-value">
+              <%= shipment.package ? shipment.package.description : '—' %>
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">
+              <%= translations.weight || 'Poids' %>
+            </span>
+            <span class="detail-value">
+              <%= shipment.package && shipment.package.weight ? shipment.package.weight + ' kg' : '—' %>
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">
+              <%= translations.value || 'Valeur déclarée' %>
+            </span>
+            <span class="detail-value">
+              <%= shipment.package && shipment.package.value ? shipment.package.value + ' $' : '—' %>
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">
+              <%= translations.fragile || 'Fragile' %>
+            </span>
+            <span class="detail-value">
+              <% if (shipment.package && (shipment.package.fragile===true || shipment.package.fragile==='true' ||
+                shipment.package.fragile==='oui' || shipment.package.fragile==='Oui' )) { %>
+                <%= translations.yes || 'Oui' %>
+                  <% } else { %>
+                    <%= translations.no || 'Non' %>
+                      <% } %>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABLEAU -->
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 2rem;">#</th>
+              <th>
+                <%= translations.designation || 'Désignation' %>
+              </th>
+              <th>
+                <%= translations.quantity || 'Qté' %>
+              </th>
+              <th>
+                <%= translations.unit_price || 'Prix u. HT' %>
+              </th>
+              <th>
+                <%= translations.amount || 'Montant' %>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td class="bold">
+                <%
+                  const parts = [];
+                  if (shipment.pickupEnabled) {
+                    parts.push(
+                      (translations.pickup || 'Ramassage') +
+                      (shipment.pickupFrom && shipment.pickupTo
+                        ? ' — de ' + shipment.pickupFrom + ' à ' + shipment.pickupTo
+                        : '')
+                    );
+                  }
+                  if (shipment.shippingEnabled) {
+                    parts.push(
+                      (translations.shipping || 'Transport') +
+                      (shipment.shippingFrom && shipment.shippingTo
+                        ? ' — de ' + shipment.shippingFrom + ' à ' + shipment.shippingTo
+                        : '')
+                    );
+                  }
+                  if (shipment.deliveryEnabled) {
+                    const deliveryAddr =
+                      shipment.deliveryFrom ||
+                      (shipment.deliveryAddress && shipment.deliveryAddress.address) ||
+                      '';
+                    const deliveryTo =
+                      shipment.deliveryTo ||
+                      (shipment.deliveryAddress && shipment.deliveryAddress.address) ||
+                      '';
+                    parts.push(
+                      (translations.delivery || 'Livraison') +
+                      (deliveryAddr && deliveryTo
+                        ? ' — de ' + deliveryAddr + ' à ' + deliveryTo
+                        : (deliveryAddr ? ' — ' + deliveryAddr : ''))
+                    );
+                  }
+                  const designationText =
+                    parts.length > 0
+                      ? parts.join(' | ')
+                      : (translations.shipping_service || "Service d'expédition");
+                %>
+                <%= designationText %>
+              </td>
+              <td>1</td>
+              <td>
+                <%= shippingPrice.toFixed(2) %> $
+              </td>
+              <td class="bold">
+                <%= shippingPrice.toFixed(2) %> $
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- PAYMENT + TOTAUX -->
+      <div class="bottom-section">
+        <div class="terms">
+          <div>
+            <p class="label">
+              <%= translations.payment_method || 'Moyens de paiement' %>
+            </p>
+            <p>
+              <%= shipment.paymentMethod || translations.cash || 'Cash' %>
+            </p>
+          </div>
+        </div>
+        <div class="totals">
+          <div class="total-row">
+            <span class="label">
+              <%= translations.total_ht || 'Total HT' %>
+            </span>
+            <span class="value">
+              <%= totalPrice.toFixed(2) %> $
+            </span>
+          </div>
+          <div class="total-row vat">
+            <span class="label">
+              <%= translations.vat || 'TVA' %>
+            </span>
+            <span class="value">
+              <%= vatAmount.toFixed(2) %> $
+            </span>
+          </div>
+          <div class="total-row ttc">
+            <span class="label">
+              <%= translations.total_ttc || 'Total TTC' %>
+            </span>
+            <span class="value">
+              <%= totalTTC.toFixed(2) %> $
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTES -->
+      <div class="invoice-notes">
+        <p class="notes-title">
+          <%= translations.notes_conditions || 'Notes et conditions' %>
+        </p>
+        <p>
+          <%= translations.shipment_note_1
+            || 'Cette facture est émise pour des prestations de services. TVA non applicable conformément à la réglementation en vigueur.'
+            %>
+        </p>
+        <p>
+          <%= translations.shipment_note_2
+            || 'En cas de contestation, veuillez nous contacter dans les 8 jours suivant la réception de la facture.'
+            %>
+        </p>
+      </div>
+
+      <!-- REMERCIEMENT -->
+      <p class="thank-you">
+        <%= translations.thank_you_footer || 'Merci pour votre confiance et votre collaboration.' %>
+      </p>
+
+      <!-- FOOTER LÉGAL -->
+      <div class="legal-footer">
+        <% cfg.footer.split('\n').forEach(function(line) { %>
+          <p>
+            <%= line %>
+          </p>
+          <% }); %>
+      </div>
+
     </div>
+  </div>
 </body>
 
 </html>
