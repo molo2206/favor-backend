@@ -119,7 +119,7 @@ export class ShipmentController {
       'Content-Disposition',
       `attachment; filename=shipment-${trackingNumber}.pdf`,
     );
-    return res.send(pdfBuffer);
+    res.end(pdfBuffer);   // ✅ end() au lieu de send() avec @Res()
   }
 
   @Get('my')
