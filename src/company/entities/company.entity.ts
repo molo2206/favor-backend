@@ -29,6 +29,7 @@ import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { CompanyHasPartnerEntity } from './company_has_partner.entity';
 import { Meal } from 'src/voyage/meal/entity/meal.entity';
 import { CompanySettingsEntity } from './company-settings.entity';
+import { InvoiceConfigurationEntity } from './invoice-configuration.entity';
 // Correction : importer CompanyHasResource (sans Entity)
 export enum FeeType {
   FIXED = 'FIXED',
@@ -219,5 +220,12 @@ export class CompanyEntity {
     cascade: true,
   })
   settings: CompanySettingsEntity;
+
+  @OneToOne(
+    () => InvoiceConfigurationEntity,
+    (config) => config.company,
+    { cascade: true },
+  )
+  invoiceConfiguration?: InvoiceConfigurationEntity;
 
 }

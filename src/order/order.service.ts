@@ -1576,16 +1576,16 @@ export class OrderService {
         if (hasEmail) {
           notificationOptions.emailTo = user.email;
           notificationOptions.emailSubject = this.i18nService.translate('order.paid_invoice_subject', lang);
-          // notificationOptions.emailContext = {
-          //   pinCode: order.pin,
-          //   invoiceNumber: order.invoiceNumber,
-          //   user: order.user,
-          //   subOrders,
-          //   order,
-          //   year: new Date().getFullYear(),
-          //   translations: emailTranslations,
-          //   lang,
-          // };
+          notificationOptions.emailContext = {
+            pinCode: order.pin,
+            invoiceNumber: order.invoiceNumber,
+            user: order.user,
+            subOrders,
+            order,
+            year: new Date().getFullYear(),
+            translations: emailTranslations,
+            lang,
+          };
           notificationOptions.sendInvoicePaidWithPdf = true;
         }
         if (hasPhone) {
@@ -1613,15 +1613,15 @@ export class OrderService {
         if (hasEmail) {
           notificationOptions.emailTo = user.email;
           notificationOptions.emailSubject = this.i18nService.translate('order.invoice_subject', lang);
-          // notificationOptions.emailContext = {
-          //   invoiceNumber: order.invoiceNumber,
-          //   user: order.user,
-          //   subOrders,
-          //   order,
-          //   year: new Date().getFullYear(),
-          //   translations: emailTranslations,
-          //   lang,
-          // };
+          notificationOptions.emailContext = {
+            invoiceNumber: order.invoiceNumber,
+            user: order.user,
+            subOrders,
+            order,
+            year: new Date().getFullYear(),
+            translations: emailTranslations,
+            lang,
+          };
           notificationOptions.sendInvoicePaidWithPdf = true;
         }
       }
@@ -2249,17 +2249,17 @@ export class OrderService {
           notificationOptions.emailTo = order.user.email;
           // ✅ Sujet pour facture PAYÉE
           notificationOptions.emailSubject = this.i18nService.translate('order.paid_invoice_subject', lang);
-          // notificationOptions.emailContext = {
-          //   pinCode: order.pin,
-          //   paymentQrCode: null,                  // ✅ AJOUTÉ (peut être null ou généré)
-          //   invoiceNumber: order.invoiceNumber,
-          //   user: order.user,
-          //   subOrders: order.subOrders || [],
-          //   order,
-          //   year: new Date().getFullYear(),
-          //   translations: emailTranslations,
-          //   lang,
-          // };
+          notificationOptions.emailContext = {
+            pinCode: order.pin,
+            paymentQrCode: null,                  // ✅ AJOUTÉ (peut être null ou généré)
+            invoiceNumber: order.invoiceNumber,
+            user: order.user,
+            subOrders: order.subOrders || [],
+            order,
+            year: new Date().getFullYear(),
+            translations: emailTranslations,
+            lang,
+          };
           // ✅ La commande est validée = PAYÉE → tampon VERT PAID
           notificationOptions.sendInvoicePaidWithPdf = true;
         }
