@@ -41,6 +41,7 @@ import { CompanySettingsEntity } from 'src/company/entities/company-settings.ent
 import { FpayModule } from 'src/fpay/fpay.module'; // ✅ CHANGER: importer FpayModule au lieu de FpayService
 import { CompanyEntity } from 'src/company/entities/company.entity';
 import { ConfigService } from '@nestjs/config'; // ✅ AJOUTER
+import { InvoiceConfigurationEntity } from 'src/company/entities/invoice-configuration.entity';
 
 @Module({
   imports: [
@@ -77,7 +78,8 @@ import { ConfigService } from '@nestjs/config'; // ✅ AJOUTER
       UserLoyaltyEntity,
       UserLoyaltyHistoryEntity,
       CompanySettingsEntity,
-      CompanyEntity
+      CompanyEntity, 
+      InvoiceConfigurationEntity,
     ]),
     forwardRef(() => MailModule),
     PawapayModule,

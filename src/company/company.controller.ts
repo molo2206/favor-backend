@@ -16,6 +16,7 @@ import {
   ForbiddenException,
   NotFoundException,
   Req,
+  Delete,
 } from '@nestjs/common';
 import { CompanyService } from './company.service';
 import {
@@ -53,6 +54,7 @@ import { CreatePartnerDto } from './dto/create-partner.dto';
 import { I18nService } from 'src/libs/common/src';
 import { Request } from 'express';
 import { CreateCompanySettingsDto, UpdateCompanySettingsDto } from './dto/create-company-settings.dto';
+import { CreateInvoiceConfigurationDto, UpdateInvoiceConfigurationDto } from './dto/invoice-configuration.dto';
 
 @Controller('company')
 export class CompanyController {
@@ -746,5 +748,138 @@ export class CompanyController {
     }
 
     return this.companyService.updateCompanySettings(user.activeCompanyId, dto, lang);
+  }
+
+  // ============================================
+  // ✅ INVOICE CONFIGURATION
+  // ============================================
+
+  /**
+   * Récupérer la configuration de facture d'une company
+   */
+  @Get('invoice-configuration/:companyId')
+  @UseGuards(AuthentificationGuard)
+  @AuditAction(ActionType.VIEW, 'invoice_configuration')
+  async getInvoiceConfiguration(
+    @Req() req: Request,
+    @Param('companyId') companyId: string,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    // Vérifier que l'utilisateur a accès à cette entreprise
+    const userHasCompany = await this.userHasCompanyRepository.findOne({
+      where: {
+        user: { id: user.id },
+        company: { id: companyId },
+      },
+    });
+
+    if (!userHasCompany && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException(
+        await this.i18n.translate('company_not_authorized', lang),
+      );
+    }
+
+    return this.companyService.getInvoiceConfiguration(companyId, lang);
+  }
+
+  /**
+   * Créer ou mettre à jour la configuration de facture
+   */
+  @Post('invoice-configuration/:companyId')
+  @UseGuards(AuthentificationGuard, CompanyPermissionsGuard)
+  @Permissions({ resource: 'COMPANY', action: 'canUpdate' })
+  @AuditAction(ActionType.UPDATE, 'invoice_configuration')
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async createOrUpdateInvoiceConfiguration(
+    @Req() req: Request,
+    @Param('companyId') companyId: string,
+    @Body() dto: CreateInvoiceConfigurationDto,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    // Vérifier que l'utilisateur a accès à cette entreprise
+    const userHasCompany = await this.userHasCompanyRepository.findOne({
+      where: {
+        user: { id: user.id },
+        company: { id: companyId },
+      },
+    });
+
+    if (!userHasCompany && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException(
+        await this.i18n.translate('company_not_authorized', lang),
+      );
+    }
+
+    return this.companyService.createOrUpdateInvoiceConfiguration(
+      companyId,
+      dto,
+      lang,
+    );
+  }
+
+  /**
+   * Mettre à jour partiellement la configuration de facture
+   */
+  @Patch('invoice-configuration/:companyId')
+  @UseGuards(AuthentificationGuard, CompanyPermissionsGuard)
+  @Permissions({ resource: 'COMPANY', action: 'canUpdate' })
+  @AuditAction(ActionType.UPDATE, 'invoice_configuration')
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async updateInvoiceConfiguration(
+    @Req() req: Request,
+    @Param('companyId') companyId: string,
+    @Body() dto: UpdateInvoiceConfigurationDto,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    const userHasCompany = await this.userHasCompanyRepository.findOne({
+      where: {
+        user: { id: user.id },
+        company: { id: companyId },
+      },
+    });
+
+    if (!userHasCompany && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException(
+        await this.i18n.translate('company_not_authorized', lang),
+      );
+    }
+
+    return this.companyService.updateInvoiceConfiguration(companyId, dto, lang);
+  }
+
+  /**
+   * Supprimer la configuration de facture
+   */
+  @Delete('invoice-configuration/:companyId')
+  @UseGuards(AuthentificationGuard, CompanyPermissionsGuard)
+  @Permissions({ resource: 'COMPANY', action: 'canManage' })
+  @AuditAction(ActionType.DELETE, 'invoice_configuration')
+  async deleteInvoiceConfiguration(
+    @Req() req: Request,
+    @Param('companyId') companyId: string,
+    @CurrentUser() user: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    const userHasCompany = await this.userHasCompanyRepository.findOne({
+      where: {
+        user: { id: user.id },
+        company: { id: companyId },
+      },
+    });
+
+    if (!userHasCompany && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException(
+        await this.i18n.translate('company_not_authorized', lang),
+      );
+    }
+
+    return this.companyService.deleteInvoiceConfiguration(companyId, lang);
   }
 }

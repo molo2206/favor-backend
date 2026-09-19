@@ -353,9 +353,15 @@
 </head>
 
 <body>
-  <% const isPaid=shipment && (shipment.isPaid===true || shipment.paid===true); const currency='USD' ; const
-    shippingPrice=shipment?.shippingPrice ?? shipment?.totalPrice ?? 0; const totalPrice=shipment?.totalPrice ??
-    shipment?.shippingPrice ?? 0; const vatAmount=0; const totalTTC=totalPrice + vatAmount; %>
+  <% // Variables principales de la facture const isPaid=shipment && (shipment.isPaid===true || shipment.paid===true);
+    const currency='USD' ; const shippingPrice=shipment?.shippingPrice ?? shipment?.totalPrice ?? 0; const
+    totalPrice=shipment?.totalPrice ?? shipment?.shippingPrice ?? 0; const vatAmount=0; const totalTTC=totalPrice +
+    vatAmount; // ✅ Config de facture (avec fallback) const cfg=typeof invoiceConfig !=='undefined' && invoiceConfig ?
+    invoiceConfig : {
+    header: 'Favor Help\nOffice 1, Q.Murara, 012, Goma\nNord-Kivu, Congo-Kinshasa\nRCCM : 81194815700029\nN°Tel : +24397964940'
+    , footer: 'Merci pour votre confiance.\nFavor Help — Écosystème digital par Favor Group' ,
+    logo: 'https://admin.favorhelp.com/logos/logo-dark.png' , theme: { primaryColor: '#0118d8' ,
+    secondaryColor: '#64748b' , textColor: '#1e293b' , fontFamily: 'system-ui, sans-serif' } }; %>
 
     <div class="invoice-container">
 
@@ -375,12 +381,12 @@
         <!-- EXPÉDITEUR / CLIENT -->
         <div class="parties">
           <div class="sender">
-            <img src="https://admin.favorhelp.com/logos/logo-dark.png" alt="Favor Help" class="logo" />
-            <p class="bold">Favor Help</p>
-            <p>Office 1, Q.Murara, 012, Goma</p>
-            <p>Nord-Kivu, Congo-Kinshasa</p>
-            <p>RCCM : 81194815700029</p>
-            <p>N°Tel : +24397964940</p>
+            <img src="<%= cfg.logo %>" alt="Logo" class="logo" />
+            <% cfg.header.split('\n').forEach(function(line, i) { %>
+              <p class="<%= i === 0 ? 'bold' : '' %>">
+                <%= line %>
+              </p>
+              <% }); %>
           </div>
           <div class="recipient">
             <p class="bold">
@@ -577,16 +583,11 @@
 
         <!-- FOOTER LÉGAL -->
         <div class="legal-footer">
-          <p>
-            <%= translations.legal_line_1 || 'Favor Help — Office 1, Q.Murara, 012, Goma, Nord-Kivu, Congo-Kinshasa' %>
-          </p>
-          <p>
-            <%= translations.legal_line_2
-              || 'RCCM : 81194815700029 — N°Tel : +24397964940 — Email : contact@favorhelp.cd' %>
-          </p>
-          <p>
-            <%= translations.legal_line_3 || 'Facture générée électroniquement — Valable sans signature manuscrite.' %>
-          </p>
+          <% cfg.footer.split('\n').forEach(function(line) { %>
+            <p>
+              <%= line %>
+            </p>
+            <% }); %>
         </div>
 
       </div>

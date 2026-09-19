@@ -61,6 +61,11 @@ import { PushNotificationHelper } from 'src/users/utility/helpers/push-notificat
 import { CompanySettingsEntity } from './entities/company-settings.entity';
 import { CreateCompanySettingsDto, UpdateCompanySettingsDto } from './dto/create-company-settings.dto';
 import { UpdateCityDto } from './dto/update-city.dto';
+import { InvoiceConfigurationEntity } from './entities/invoice-configuration.entity';
+import {
+  CreateInvoiceConfigurationDto,
+  UpdateInvoiceConfigurationDto,
+} from './dto/invoice-configuration.dto';
 
 @Injectable()
 export class CompanyService {
@@ -119,6 +124,9 @@ export class CompanyService {
 
     private pushNotificationHelper: PushNotificationHelper,
     private smsService: SmsHelper,
+
+    @InjectRepository(InvoiceConfigurationEntity)
+    private readonly invoiceConfigRepo: Repository<InvoiceConfigurationEntity>,
   ) { }
 
   // ======================== CREATE COMPANY WITH USER ========================
@@ -2895,6 +2903,142 @@ export class CompanyService {
     return {
       message: await this.i18n.translate('company_settings_retrieved', lang),
       data: settings,
+    };
+  }
+
+
+  // ============================================
+  // ✅ INVOICE CONFIGURATION
+  // ============================================
+
+  /**
+   * Récupérer la configuration de facture par companyId
+   */
+  async getInvoiceConfiguration(
+    companyId: string,
+    lang: string = 'fr',
+  ): Promise<{ message: string; data: InvoiceConfigurationEntity | null }> {
+    const company = await this.companyRepository.findOne({
+      where: { id: companyId },
+    });
+    if (!company) {
+      throw new NotFoundException(
+        await this.i18n.translate('company_not_found', lang),
+      );
+    }
+
+    const config = await this.invoiceConfigRepo.findOne({
+      where: { companyId },
+      relations: ['company'],
+    });
+
+    return {
+      message: await this.i18n.translate('company_settings_retrieved', lang),
+      data: config || null,
+    };
+  }
+
+  /**
+   * Créer ou mettre à jour la configuration de facture
+   */
+  async createOrUpdateInvoiceConfiguration(
+    companyId: string,
+    dto: CreateInvoiceConfigurationDto | UpdateInvoiceConfigurationDto,
+    lang: string = 'fr',
+  ): Promise<{ message: string; data: InvoiceConfigurationEntity }> {
+    // 1. Vérifier que la société existe
+    const company = await this.companyRepository.findOne({
+      where: { id: companyId },
+    });
+    if (!company) {
+      throw new NotFoundException(
+        await this.i18n.translate('company_not_found', lang),
+      );
+    }
+
+    // 2. Chercher la config existante
+    let config = await this.invoiceConfigRepo.findOne({
+      where: { companyId },
+    });
+
+    if (config) {
+      // Mise à jour
+      Object.assign(config, dto);
+      const updated = await this.invoiceConfigRepo.save(config);
+      return {
+        message: await this.i18n.translate('company_settings_updated', lang),
+        data: updated,
+      };
+    }
+
+    // Création
+    const newConfig = this.invoiceConfigRepo.create({
+      companyId,
+      header: dto.header ?? null,
+      footer: dto.footer ?? null,
+      logo: dto.logo ?? null,
+      theme: dto.theme ?? {
+        primaryColor: '#0118d8',
+        secondaryColor: '#64748b',
+        textColor: '#1e293b',
+        fontFamily: 'system-ui, sans-serif',
+      },
+    } as Partial<InvoiceConfigurationEntity>);
+
+    const saved = await this.invoiceConfigRepo.save(newConfig);
+    return {
+      message: await this.i18n.translate('company_settings_created', lang),
+      data: saved,
+    };
+  }
+
+  /**
+   * Mettre à jour partiellement la configuration de facture
+   */
+  async updateInvoiceConfiguration(
+    companyId: string,
+    dto: UpdateInvoiceConfigurationDto,
+    lang: string = 'fr',
+  ): Promise<{ message: string; data: InvoiceConfigurationEntity }> {
+    const config = await this.invoiceConfigRepo.findOne({
+      where: { companyId },
+    });
+
+    if (!config) {
+      throw new NotFoundException(
+        await this.i18n.translate('company_settings_not_found', lang),
+      );
+    }
+
+    Object.assign(config, dto);
+    const updated = await this.invoiceConfigRepo.save(config);
+
+    return {
+      message: await this.i18n.translate('company_settings_updated', lang),
+      data: updated,
+    };
+  }
+
+  /**
+   * Supprimer la configuration de facture
+   */
+  async deleteInvoiceConfiguration(
+    companyId: string,
+    lang: string = 'fr',
+  ): Promise<{ message: string }> {
+    const config = await this.invoiceConfigRepo.findOne({
+      where: { companyId },
+    });
+
+    if (!config) {
+      throw new NotFoundException(
+        await this.i18n.translate('company_settings_not_found', lang),
+      );
+    }
+
+    await this.invoiceConfigRepo.remove(config);
+    return {
+      message: await this.i18n.translate('company_settings_deleted', lang),
     };
   }
 }

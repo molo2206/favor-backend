@@ -49,6 +49,7 @@ import { FpayService } from 'src/fpay/fpay.service';
 import { LoyaltySourceType, LoyaltyTier, LoyaltyTransactionType, UserLoyaltyEntity } from 'src/users/entities/user-loyalty.entity';
 import { CompanySettingsEntity } from 'src/company/entities/company-settings.entity';
 import { UserLoyaltyHistoryEntity } from 'src/users/entities/user-loyalty-history.entity';
+import { InvoiceConfigurationEntity } from 'src/company/entities/invoice-configuration.entity';
 
 @Injectable()
 export class ShipmentService {
@@ -99,6 +100,9 @@ export class ShipmentService {
 
     private readonly i18n: I18nService,
     private readonly fpayService: FpayService,
+
+    @InjectRepository(InvoiceConfigurationEntity)
+    private readonly invoiceConfigRepo: Repository<InvoiceConfigurationEntity>,
 
   ) { }
 
@@ -167,6 +171,46 @@ export class ShipmentService {
         });
       }
 
+      // ============================================================
+      // ✅ AJOUT : CHARGER LA CONFIG DE FACTURE
+      // Priorité : shippingCompany > pickupCompany > deliveryCompany
+      // ============================================================
+      let mainCompanyId: string | null = null;
+      if (shipment.shippingCompanyId) {
+        mainCompanyId = shipment.shippingCompanyId;
+      } else if (shipment.pickupCompanyId) {
+        mainCompanyId = shipment.pickupCompanyId;
+      } else if (shipment.deliveryCompanyId) {
+        mainCompanyId = shipment.deliveryCompanyId;
+      }
+
+      let invoiceConfig: InvoiceConfigurationEntity | null = null;
+      if (mainCompanyId) {
+        invoiceConfig = await this.invoiceConfigRepo.findOne({
+          where: { companyId: mainCompanyId },
+        });
+        console.log(`📄 [Shipment] Config facture chargée pour company ${mainCompanyId}:`, !!invoiceConfig);
+      }
+
+      const configHeader = invoiceConfig?.header
+        || 'Favor Help\nOffice 1, Q.Murara, 012, Goma\nNord-Kivu, Congo-Kinshasa\nRCCM : 81194815700029\nN°Tel : +24397964940';
+
+      const configFooter = invoiceConfig?.footer
+        || 'Merci pour votre confiance.\nFavor Help — Écosystème digital par Favor Group';
+
+      const configLogo = invoiceConfig?.logo
+        || 'https://admin.favorhelp.com/logos/logo-dark.png';
+
+      const configTheme = invoiceConfig?.theme || {
+        primaryColor: '#0118d8',
+        secondaryColor: '#64748b',
+        textColor: '#1e293b',
+        fontFamily: 'system-ui, sans-serif',
+      };
+      // ============================================================
+      // FIN AJOUT
+      // ============================================================
+
       const notificationOptions: any = {
         userId: currentUser.id,
         pushTitle: await this.i18n.translate('shipment.push.created_title', lang),
@@ -195,6 +239,14 @@ export class ShipmentService {
           package: packageEntity,
           lang: lang,
           user: currentUser,
+
+          // ✅ AJOUT : Config de facture
+          invoiceConfig: {
+            header: configHeader,
+            footer: configFooter,
+            logo: configLogo,
+            theme: configTheme,
+          },
 
           // ✅ Traductions (indispensable pour le template)
           translations: {
