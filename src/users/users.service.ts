@@ -624,6 +624,8 @@ export class UsersService {
       .leftJoinAndSelect('company.companyResources', 'companyResources')
       .leftJoinAndSelect('companyResources.resource', 'resource')
       .leftJoinAndSelect('company.branches', 'branches')
+      .leftJoinAndSelect('company.settings', 'companySettings')
+      .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
       .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
       .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
       .leftJoinAndSelect('userPlatformRoles.role', 'role')
@@ -674,9 +676,10 @@ export class UsersService {
     // ============================================================
     let needsReload = false;
 
-    // ✅ Vérifier le referralCode
     if (!user.referralCode || user.referralCode.trim() === '') {
-      console.warn(`⚠️ [signin] Utilisateur ${user.id} sans referralCode, génération...`);
+      console.warn(
+        `⚠️ [signin] Utilisateur ${user.id} sans referralCode, génération...`,
+      );
 
       const existingCodesRows = await this.usersRepository
         .createQueryBuilder('u')
@@ -689,7 +692,9 @@ export class UsersService {
       const newCode = await this.generateReferralCode(user.id, existingCodes);
 
       if (!newCode || newCode.trim() === '') {
-        console.error(`❌ [signin] Impossible de générer un referralCode pour ${user.id}`);
+        console.error(
+          `❌ [signin] Impossible de générer un referralCode pour ${user.id}`,
+        );
         throw new InternalServerErrorException(
           await this.i18n.translate('user.referral_code_generation_failed', lang),
         );
@@ -701,14 +706,12 @@ export class UsersService {
       console.log(`✅ [signin] referralCode généré: ${newCode}`);
     }
 
-    // ✅ Vérifier le compte fidélité
     if (!user.loyalty || user.loyalty.length === 0) {
       const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
       needsReload = true;
     }
 
-    // ✅ Recharger si nécessaire
     if (needsReload) {
       const reloadedUser = await this.usersRepository
         .createQueryBuilder('users')
@@ -723,6 +726,8 @@ export class UsersService {
         .leftJoinAndSelect('company.companyResources', 'companyResources')
         .leftJoinAndSelect('companyResources.resource', 'resource')
         .leftJoinAndSelect('company.branches', 'branches')
+        .leftJoinAndSelect('company.settings', 'companySettings')
+        .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
         .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
         .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
         .leftJoinAndSelect('userPlatformRoles.role', 'role')
@@ -782,6 +787,7 @@ export class UsersService {
     const loyaltyTier = user.loyalty?.[0]?.currentTier ?? null;
     const loyaltyCode = user.loyalty?.[0]?.loyaltyCode ?? null;
 
+    // ✅ userHasCompany : ajout settings + invoiceConfiguration dans chaque company
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
         id: uhc.id,
@@ -793,6 +799,9 @@ export class UsersService {
             country: uhc.company.country ?? null,
             city: uhc.company.city ?? null,
             category: uhc.company.category ?? null,
+            settings: (uhc.company as any).settings ?? null,
+            invoiceConfiguration:
+              (uhc.company as any).invoiceConfiguration ?? null,
           }
           : null,
         branch: uhc.branch
@@ -820,6 +829,7 @@ export class UsersService {
           })) ?? [],
       })) ?? [];
 
+    // ✅ Requête activeCompany : ajout settings + invoiceConfiguration
     const activeCompanyRaw = await this.usersRepository
       .createQueryBuilder('users')
       .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
@@ -837,6 +847,8 @@ export class UsersService {
         'userCompanyResourceDetail',
       )
       .leftJoinAndSelect('company.branches', 'branches')
+      .leftJoinAndSelect('company.settings', 'companySettings')
+      .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
       .where('users.id = :id', { id: user.id })
       .getOne();
 
@@ -870,6 +882,7 @@ export class UsersService {
       }
       : null;
 
+    // ✅ activeCompany : ajout settings + invoiceConfiguration
     const activeCompany = activeCompanyEntity
       ? {
         ...activeCompanyEntity,
@@ -877,6 +890,9 @@ export class UsersService {
         country: activeCompanyEntity.country ?? null,
         city: activeCompanyEntity.city ?? null,
         category: activeCompanyEntity.category ?? null,
+        settings: (activeCompanyEntity as any).settings ?? null,
+        invoiceConfiguration:
+          (activeCompanyEntity as any).invoiceConfiguration ?? null,
         branch: activeCompanyBranch,
         companyResources:
           activeCompanyEntity.companyResources?.map((r) => ({
@@ -919,7 +935,6 @@ export class UsersService {
         role: upr.role,
       })) ?? [];
 
-    // ✅ Ajout des informations de parrainage
     const referralData = {
       referralCode: user.referralCode,
       referralCount: user.referralCount || 0,
@@ -927,7 +942,7 @@ export class UsersService {
       referredBy: user.referredBy,
       referrerName: user.referrer?.fullName || null,
       referralActive: user.referralActive !== false,
-      totalReferrals: user.referrals?.length || 0
+      totalReferrals: user.referrals?.length || 0,
     };
 
     return {
@@ -2968,6 +2983,8 @@ export class UsersService {
       .leftJoinAndSelect('company.companyResources', 'companyResources')
       .leftJoinAndSelect('companyResources.resource', 'resource')
       .leftJoinAndSelect('company.branches', 'branches')
+      .leftJoinAndSelect('company.settings', 'companySettings')
+      .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
       .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
       .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
       .leftJoinAndSelect('userPlatformRoles.role', 'role')
@@ -2995,7 +3012,6 @@ export class UsersService {
     // ============================================================
     let needsReload = false;
 
-    // ✅ Vérifier le referralCode
     if (!user.referralCode || user.referralCode.trim() === '') {
       console.warn(`⚠️ [getFullProfile] Utilisateur ${user.id} sans referralCode, génération...`);
 
@@ -3022,14 +3038,12 @@ export class UsersService {
       console.log(`✅ [getFullProfile] referralCode généré: ${newCode}`);
     }
 
-    // ✅ Vérifier le compte fidélité
     if (!user.loyalty || user.loyalty.length === 0) {
       const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
       needsReload = true;
     }
 
-    // ✅ Recharger si nécessaire
     if (needsReload) {
       const reloadedUser = await this.usersRepository
         .createQueryBuilder('users')
@@ -3044,6 +3058,8 @@ export class UsersService {
         .leftJoinAndSelect('company.companyResources', 'companyResources')
         .leftJoinAndSelect('companyResources.resource', 'resource')
         .leftJoinAndSelect('company.branches', 'branches')
+        .leftJoinAndSelect('company.settings', 'companySettings')
+        .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
         .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
         .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
         .leftJoinAndSelect('userPlatformRoles.role', 'role')
@@ -3071,6 +3087,7 @@ export class UsersService {
 
     const { password, ...userWithoutPassword } = user;
 
+    // ✅ userHasCompany : ajout settings + invoiceConfiguration
     const userHasCompany = (userWithoutPassword.userHasCompany || []).map(
       (uhc) => ({
         id: uhc.id,
@@ -3082,6 +3099,9 @@ export class UsersService {
             country: uhc.company.country ?? null,
             city: uhc.company.city ?? null,
             category: uhc.company.category ?? null,
+            settings: (uhc.company as any).settings ?? null,
+            invoiceConfiguration:
+              (uhc.company as any).invoiceConfiguration ?? null,
             branches: (uhc.company.branches || []).map((b) => ({
               id: b.id,
               name: b.name,
@@ -3119,6 +3139,7 @@ export class UsersService {
       }),
     );
 
+    // ✅ activeCompanyRaw : ajout settings + invoiceConfiguration
     const activeCompanyRaw = await this.usersRepository
       .createQueryBuilder('users')
       .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
@@ -3136,6 +3157,8 @@ export class UsersService {
         'userCompanyResourceDetail',
       )
       .leftJoinAndSelect('company.branches', 'branches')
+      .leftJoinAndSelect('company.settings', 'companySettings')
+      .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
       .where('users.id = :id', { id: userId })
       .getOne();
 
@@ -3169,6 +3192,7 @@ export class UsersService {
         : null,
     }));
 
+    // ✅ activeCompany : ajout settings + invoiceConfiguration
     const activeCompany = activeCompanyEntity
       ? {
         ...activeCompanyEntity,
@@ -3176,6 +3200,9 @@ export class UsersService {
         country: activeCompanyEntity.country ?? null,
         city: activeCompanyEntity.city ?? null,
         category: activeCompanyEntity.category ?? null,
+        settings: (activeCompanyEntity as any).settings ?? null,
+        invoiceConfiguration:
+          (activeCompanyEntity as any).invoiceConfiguration ?? null,
         branch: activeCompanyBranch,
         companyResources: (activeCompanyEntity.companyResources || []).map(
           (cr) => ({
@@ -3220,7 +3247,6 @@ export class UsersService {
       }),
     );
 
-    // ✅ defaultAddress avec country et city
     const defaultAddress = userWithoutPassword.defaultAddress
       ? {
         id: userWithoutPassword.defaultAddress.id,
@@ -3280,7 +3306,6 @@ export class UsersService {
       }
       : null;
 
-    // ✅ Ajout des informations de parrainage
     const referralData = {
       referralCode: user.referralCode,
       referralCount: user.referralCount || 0,

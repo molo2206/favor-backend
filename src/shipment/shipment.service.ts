@@ -615,6 +615,9 @@ export class ShipmentService {
         'pickupCompany',
         'shippingCompany',
         'deliveryCompany',
+        'pickupCompany.invoiceConfiguration',    // ✅ AJOUT
+        'shippingCompany.invoiceConfiguration',  // ✅ AJOUT
+        'deliveryCompany.invoiceConfiguration',  // ✅ AJOUT
       ],
     });
 
@@ -623,6 +626,33 @@ export class ShipmentService {
         await this.i18n.translate('shipment.error.not_found', lang, { id: trackingNumber }),
       );
     }
+
+    // ============================================================
+    // ✅ CHARGER LA CONFIG DE FACTURE
+    // Priorité : shippingCompany > pickupCompany > deliveryCompany
+    // ============================================================
+    let mainCompanyId: string | null = null;
+    if (shipment.shippingCompanyId) {
+      mainCompanyId = shipment.shippingCompanyId;
+    } else if (shipment.pickupCompanyId) {
+      mainCompanyId = shipment.pickupCompanyId;
+    } else if (shipment.deliveryCompanyId) {
+      mainCompanyId = shipment.deliveryCompanyId;
+    }
+
+    let invoiceConfig: InvoiceConfigurationEntity | null = null;
+    if (mainCompanyId) {
+      invoiceConfig = await this.invoiceConfigRepo.findOne({
+        where: { companyId: mainCompanyId },
+      });
+    }
+
+    console.log('🔍 [Invoice] generateShipmentInvoice → config chargée :', {
+      mainCompanyId,
+      found: !!invoiceConfig,
+      header: invoiceConfig?.header,
+      logo: invoiceConfig?.logo,
+    });
 
     // 2. Préparer les traductions pour le template
     const emailTranslations = {
@@ -633,13 +663,11 @@ export class ShipmentService {
       date: await this.i18n.translate('shipment.email.date', lang),
       number: await this.i18n.translate('shipment.number', lang),
 
-      // Statuts
       status_pending: await this.i18n.translate('shipment.status.pending', lang),
       status_in_transit: await this.i18n.translate('shipment.status.in_transit', lang),
       status_delivered: await this.i18n.translate('shipment.status.delivered', lang),
       status_cancelled: await this.i18n.translate('shipment.status.cancelled', lang),
 
-      // Colis
       package_details: await this.i18n.translate('shipment.email.package_details', lang),
       description: await this.i18n.translate('shipment.email.description', lang),
       quantity: await this.i18n.translate('shipment.email.quantity', lang),
@@ -648,16 +676,13 @@ export class ShipmentService {
       fragile: await this.i18n.translate('shipment.email.fragile', lang),
       dimensions: await this.i18n.translate('shipment.email.dimensions', lang),
 
-      // Oui / Non
       yes: await this.i18n.translate('common.yes', lang),
       no: await this.i18n.translate('common.no', lang),
 
-      // Tableau
       designation: await this.i18n.translate('shipment.designation', lang),
       unit_price: await this.i18n.translate('shipment.unit_price', lang),
       amount: await this.i18n.translate('shipment.amount', lang),
 
-      // Services
       pickup: await this.i18n.translate('shipment.email.pickup_service', lang),
       shipping: await this.i18n.translate('shipment.email.shipping_service', lang),
       delivery: await this.i18n.translate('shipment.email.delivery_address', lang),
@@ -667,14 +692,12 @@ export class ShipmentService {
       phone: await this.i18n.translate('shipment.email.phone', lang),
       address: await this.i18n.translate('shipment.email.address', lang),
 
-      // Paiement
       payment_method: await this.i18n.translate('shipment.payment_method', lang),
       cash: await this.i18n.translate('shipment.cash', lang),
       total_ht: await this.i18n.translate('shipment.total_ht', lang),
       vat: await this.i18n.translate('shipment.vat', lang),
       total_ttc: await this.i18n.translate('shipment.total_ttc', lang),
 
-      // Notes
       notes_conditions: await this.i18n.translate('shipment.email.note_pdf', lang),
       shipment_note_1: await this.i18n.translate('shipment.email.keep_document', lang),
       shipment_note_2: await this.i18n.translate('shipment.email.present_on_pickup', lang),
@@ -683,18 +706,18 @@ export class ShipmentService {
       legal_line_2: 'RCCM : 81194815700029 — N°Tel : +24397964940 — Email : contact@favorhelp.cd',
       legal_line_3: await this.i18n.translate('shipment.email.official_document', lang),
 
-      // Stamp
       status_paid: await this.i18n.translate('shipment.status_paid', lang),
       status_unpaid: await this.i18n.translate('shipment.status_unpaid', lang),
     };
 
-    // 3. Générer le PDF
+    // 3. Générer le PDF — ✅ on passe invoiceConfig
     const pdfBuffer = await this.mailService.generatePdfFromTemplate('shipment.ejs', {
       shipment,
       package: shipment.package,
       user: shipment.user,
       lang,
       translations: emailTranslations,
+      invoiceConfig,   // ✅ AJOUT
     });
 
     return {

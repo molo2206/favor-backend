@@ -1184,7 +1184,8 @@ export class CompanyService {
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('company.category', 'category')
       .leftJoinAndSelect('company.branches', 'branches')
-      .leftJoinAndSelect('company.settings', 'settings') // ✅ Ajouter la relation settings
+      .leftJoinAndSelect('company.settings', 'settings')
+      .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
       .orderBy('company.createdAt', 'DESC');
 
     if (type) query.where('company.typeCompany = :type', { type });
@@ -1194,7 +1195,10 @@ export class CompanyService {
         await this.i18n.translate('company_not_found', lang),
       );
     }
-    return { message: await this.i18n.translate('company_created', lang), data: companies };
+    return {
+      message: await this.i18n.translate('company_created', lang),
+      data: companies,
+    };
   }
   // ======================== GET COMPANY BY ID ========================
   async getCompanyById(id: string, lang: string = 'fr'): Promise<{ data: any }> {
@@ -1210,7 +1214,8 @@ export class CompanyService {
         'city',
         'category',
         'branches',
-        'settings', // ✅ Ajouter la relation settings
+        'settings',
+        'invoiceConfiguration',
       ],
     });
     if (!company) {
@@ -1294,15 +1299,16 @@ export class CompanyService {
       status: cr.status,
     }));
 
-    // ✅ Ajouter les settings (paramètres de la société)
     const settings = company.settings || null;
+    const invoiceConfiguration = (company as any).invoiceConfiguration || null;
 
     const result = {
       ...company,
       companyResources,
       userHasCompany,
       resources,
-      settings, // ✅ Ajouter settings dans la réponse
+      settings,
+      invoiceConfiguration,
     };
 
     delete (result as any).companyResourcesOriginal;
@@ -1325,7 +1331,8 @@ export class CompanyService {
         'branches',
         'branches.country',
         'branches.city',
-        'settings', // ✅ Ajouter la relation settings
+        'settings',
+        'invoiceConfiguration',
       ],
     });
 
@@ -1415,8 +1422,8 @@ export class CompanyService {
       relations: ['category', 'images'],
     });
 
-    // ✅ Ajouter les settings (paramètres de la société)
     const settings = company.settings || null;
+    const invoiceConfiguration = (company as any).invoiceConfiguration || null;
 
     return {
       data: {
@@ -1425,7 +1432,8 @@ export class CompanyService {
         userHasCompany,
         resources,
         products,
-        settings, // ✅ Ajouter settings dans la réponse
+        settings,
+        invoiceConfiguration,
       },
     };
   }
@@ -1458,6 +1466,8 @@ export class CompanyService {
       .leftJoinAndSelect('company.city', 'city')
       .leftJoinAndSelect('company.branches', 'branches')
       .leftJoinAndSelect('company.category', 'category')
+      .leftJoinAndSelect('company.settings', 'settings')
+      .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
       .where('users.id = :id', { id: userId })
       .getOne();
 
@@ -1495,6 +1505,8 @@ export class CompanyService {
             open_time: uhc.company.open_time,
             delivery_minutes: uhc.company.delivery_minutes,
             categoryId: (uhc.company as any).category?.id || null,
+            settings: (uhc.company as any).settings || null,
+            invoiceConfiguration: (uhc.company as any).invoiceConfiguration || null,
             branches: (uhc.company.branches ?? []).map((b) => ({
               id: b.id,
               name: b.name,
@@ -1544,7 +1556,6 @@ export class CompanyService {
       },
     };
   }
-
   // ======================== FIND ALL BY USER ========================
   async findAllByUser(userId: string, lang: string = 'fr'): Promise<Record<string, any>> {
     const user = await this.userRepository.findOne({
@@ -1554,13 +1565,15 @@ export class CompanyService {
         'activeCompany.country',
         'activeCompany.city',
         'activeCompany.branches',
-        'activeCompany.settings', // ✅ Ajouter settings pour activeCompany
+        'activeCompany.settings',
+        'activeCompany.invoiceConfiguration',
         'userHasCompany.company',
         'userHasCompany.company.country',
         'userHasCompany.company.city',
         'userHasCompany.company.category',
         'userHasCompany.company.branches',
-        'userHasCompany.company.settings', // ✅ Ajouter settings pour les autres companies
+        'userHasCompany.company.settings',
+        'userHasCompany.company.invoiceConfiguration',
       ],
     });
 
@@ -1574,7 +1587,8 @@ export class CompanyService {
         category: uhc.company.category,
         role: uhc.role,
         isOwner: uhc.isOwner,
-        settings: uhc.company.settings || null, // ✅ Ajouter settings
+        settings: uhc.company.settings || null,
+        invoiceConfiguration: (uhc.company as any).invoiceConfiguration || null,
         branches: (uhc.company.branches ?? []).map((b) => ({
           id: b.id,
           name: b.name,
@@ -1590,17 +1604,17 @@ export class CompanyService {
         })),
       })) || [];
 
-    // ✅ Ajouter settings à activeCompany
     const activeCompany = user.activeCompany;
     if (activeCompany) {
       (activeCompany as any).settings = activeCompany.settings || null;
+      (activeCompany as any).invoiceConfiguration =
+        (activeCompany as any).invoiceConfiguration || null;
     }
 
     const sanitizedUser = instanceToPlain(user);
     delete sanitizedUser.userHasCompany;
     return { ...sanitizedUser, companies };
   }
-
   // ======================== FIND COMPANY VALIDATED BY TYPE ========================
   async findCompanyValidatedByType(
     type?: string,
@@ -1622,7 +1636,8 @@ export class CompanyService {
         products: any[];
         categories: any[];
         companyResources: any[];
-        settings: any; // ✅ Ajouter settings dans le type
+        settings: any;
+        invoiceConfiguration: any;
       })[];
       total: number;
       page: number;
@@ -1638,7 +1653,8 @@ export class CompanyService {
       .leftJoinAndSelect('company.branches', 'branches')
       .leftJoinAndSelect('company.companyResources', 'companyResources')
       .leftJoinAndSelect('companyResources.resource', 'resource')
-      .leftJoinAndSelect('company.settings', 'settings') // ✅ Ajouter la relation settings
+      .leftJoinAndSelect('company.settings', 'settings')
+      .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
       .where('company.status = :status', { status: 'VALIDATED' });
 
     if (type) {
@@ -1705,15 +1721,16 @@ export class CompanyService {
 
         const { companyResources, ...companyWithoutResources } = company;
 
-        // ✅ Ajouter settings
         const settings = company.settings || null;
+        const invoiceConfiguration = (company as any).invoiceConfiguration || null;
 
         return {
           ...companyWithoutResources,
           products,
           categories,
           companyResources: transformedResources,
-          settings, // ✅ Ajouter settings dans la réponse
+          settings,
+          invoiceConfiguration,
           start: { totalProduct, totalCategory, totalCommande },
         };
       }),
