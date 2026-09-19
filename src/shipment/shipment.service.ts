@@ -615,21 +615,21 @@ export class ShipmentService {
         'pickupCompany',
         'shippingCompany',
         'deliveryCompany',
-        'pickupCompany.invoiceConfiguration',    // ✅ AJOUT
-        'shippingCompany.invoiceConfiguration',  // ✅ AJOUT
-        'deliveryCompany.invoiceConfiguration',  // ✅ AJOUT
       ],
     });
 
     if (!shipment) {
       throw new NotFoundException(
-        await this.i18n.translate('shipment.error.not_found', lang, { id: trackingNumber }),
+        await this.i18n.translate('shipment.error.not_found', lang, {
+          id: trackingNumber,
+        }),
       );
     }
 
     // ============================================================
     // ✅ CHARGER LA CONFIG DE FACTURE
     // Priorité : shippingCompany > pickupCompany > deliveryCompany
+    // (même logique que processShipmentNotifications)
     // ============================================================
     let mainCompanyId: string | null = null;
     if (shipment.shippingCompanyId) {
@@ -640,19 +640,37 @@ export class ShipmentService {
       mainCompanyId = shipment.deliveryCompanyId;
     }
 
+    console.log('🔍 ============================================');
+    console.log('🔍 [Invoice] ÉTAPE 1 — IDs des companies');
+    console.log('🔍 ============================================');
+    console.log('   shipment.pickupCompanyId   :', shipment.pickupCompanyId);
+    console.log('   shipment.shippingCompanyId :', shipment.shippingCompanyId);
+    console.log('   shipment.deliveryCompanyId :', shipment.deliveryCompanyId);
+    console.log('   → mainCompanyId retenu     :', mainCompanyId);
+    console.log('🔍 ============================================');
+
     let invoiceConfig: InvoiceConfigurationEntity | null = null;
     if (mainCompanyId) {
       invoiceConfig = await this.invoiceConfigRepo.findOne({
         where: { companyId: mainCompanyId },
       });
-    }
 
-    console.log('🔍 [Invoice] generateShipmentInvoice → config chargée :', {
-      mainCompanyId,
-      found: !!invoiceConfig,
-      header: invoiceConfig?.header,
-      logo: invoiceConfig?.logo,
-    });
+      console.log('🔍 ============================================');
+      console.log('🔍 [Invoice] ÉTAPE 2 — Config chargée depuis la BDD');
+      console.log('🔍 ============================================');
+      console.log('   trouvée ?  :', !!invoiceConfig);
+      if (invoiceConfig) {
+        console.log('   id         :', invoiceConfig.id);
+        console.log('   companyId  :', invoiceConfig.companyId);
+        console.log('   header     :', JSON.stringify(invoiceConfig.header));
+        console.log('   footer     :', JSON.stringify(invoiceConfig.footer));
+        console.log('   logo       :', invoiceConfig.logo);
+        console.log('   theme      :', JSON.stringify(invoiceConfig.theme));
+      }
+      console.log('🔍 ============================================');
+    } else {
+      console.log('⚠️ [Invoice] Aucun mainCompanyId → pas de config à charger');
+    }
 
     // 2. Préparer les traductions pour le template
     const emailTranslations = {
@@ -710,14 +728,30 @@ export class ShipmentService {
       status_unpaid: await this.i18n.translate('shipment.status_unpaid', lang),
     };
 
-    // 3. Générer le PDF — ✅ on passe invoiceConfig
+    // ✅ Fallback user : si shipment.user est null, utiliser clientName/clientPhone
+    const templateUser = shipment.user
+      ? shipment.user
+      : {
+        fullName: shipment.clientName || 'Client',
+        email: '',
+        phone: shipment.clientPhone || '',
+      };
+
+    console.log('🔍 [Invoice] ÉTAPE 3 — User du template :', {
+      hasShipmentUser: !!shipment.user,
+      fullName: templateUser.fullName,
+      email: templateUser.email,
+      phone: templateUser.phone,
+    });
+
+    // 3. Générer le PDF
     const pdfBuffer = await this.mailService.generatePdfFromTemplate('shipment.ejs', {
       shipment,
       package: shipment.package,
-      user: shipment.user,
+      user: templateUser,          // ✅ fallback clientName/clientPhone
       lang,
       translations: emailTranslations,
-      invoiceConfig,   // ✅ AJOUT
+      invoiceConfig,               // ✅ config brute (peut être null)
     });
 
     return {
