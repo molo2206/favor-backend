@@ -1352,6 +1352,13 @@ export class OrderService {
         notificationOptions.emailTo = user.email;
         notificationOptions.emailSubject = this.i18nService.translate('order.paid_invoice_subject', lang);
         notificationOptions.emailContext = {
+          user: user,
+          order: order,
+          subOrders: subOrders,
+          paymentQrCode: paymentQrCode,
+          translations: emailTranslations,
+          lang: lang,
+          subOrdersHtml: this.mailService.generateSubOrdersByInvoiceNumberHtml(subOrders, order.currency),
         };
         notificationOptions.sendInvoicePaidWithPdf = true;
       }
