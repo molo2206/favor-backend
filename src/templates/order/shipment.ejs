@@ -353,10 +353,9 @@
 </head>
 
 <body>
-  <% // Variables principales de la facture const isPaid=shipment && (shipment.isPaid===true || shipment.paid===true);
-    const currency='USD' ; const shippingPrice=shipment?.shippingPrice ?? shipment?.totalPrice ?? 0; const
-    totalPrice=shipment?.totalPrice ?? shipment?.shippingPrice ?? 0; const vatAmount=0; const totalTTC=totalPrice +
-    vatAmount; %>
+  <% const isPaid=shipment && (shipment.isPaid===true || shipment.paid===true); const currency='USD' ; const
+    shippingPrice=shipment?.shippingPrice ?? shipment?.totalPrice ?? 0; const totalPrice=shipment?.totalPrice ??
+    shipment?.shippingPrice ?? 0; const vatAmount=0; const totalTTC=totalPrice + vatAmount; %>
 
     <div class="invoice-container">
 
