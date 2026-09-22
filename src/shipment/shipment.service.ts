@@ -132,7 +132,7 @@ export class ShipmentService {
     }
     return errors;
   }
-private async processShipmentNotifications(
+  private async processShipmentNotifications(
     shipment: Shipment,
     packageEntity: PackageDetails,
     currentUser: UserEntity,
@@ -350,7 +350,7 @@ private async processShipmentNotifications(
               lang,
             ),
             legal_line_2:
-              'RCCM : 81194815700029 — N°Tel : +24397964940 — Email : contact@favorhelp.cd',
+              'RCCM: CD/BN/RCCM/26-B-223 — N°Tel : +243 991 225 122 — Email: contact@favorhelp.cd',
             legal_line_3: await this.i18n.translate(
               'shipment.email.official_document',
               lang,
@@ -711,7 +711,7 @@ private async processShipmentNotifications(
       shipment_note_2: await this.i18n.translate('shipment.email.present_on_pickup', lang),
       thank_you_footer: await this.i18n.translate('shipment.email.thank_you', lang),
       legal_line_1: await this.i18n.translate('shipment.email.footer_contact', lang),
-      legal_line_2: 'RCCM : 81194815700029 — N°Tel : +24397964940 — Email : contact@favorhelp.cd',
+      legal_line_2: 'RCCM: CD/BN/RCCM/26-B-223 — N°Tel : +243 991 225 122 — Email: contact@favorhelp.cd',
       legal_line_3: await this.i18n.translate('shipment.email.official_document', lang),
 
       status_paid: await this.i18n.translate('shipment.status_paid', lang),
