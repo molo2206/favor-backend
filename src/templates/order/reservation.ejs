@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Facture Réservation | FavorHelp</title>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --primary: #0014d2;
+        --primary-dark: #0010a8;
+        --secondary: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --bg: #f4f7fb;
+      }
+
+      body {
+        font-family: 'Inter', sans-serif;
+        background: var(--bg);
+        padding: 14px;
+        color: #1e293b;
+      }
+
+      .invoice-container {
+        max-width: 980px;
+        margin: auto;
+        background: #fff;
+        border-radius: 22px;
+        overflow: hidden;
+        box-shadow: 0 15px 40px rgba(15, 23, 42, 0.08);
+      }
+
+      .invoice {
+        padding: 1.2rem;
+      }
+
+      /* HEADER */
+
+      .brand-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #eff6ff;
+        margin-bottom: 1rem;
+      }
+
+      .logo-container {
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+      }
+
+      .logo-image {
+        width: 70px;
+        height: 70px;
+        object-fit: contain;
+        border-radius: 14px;
+        background: white;
+        border: 1px solid #dbeafe;
+        padding: 6px;
+      }
+
+      .brand {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: var(--secondary);
+      }
+
+      .slogan {
+        font-size: 0.7rem;
+        color: var(--primary);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+
+      .invoice-badge {
+        background: linear-gradient(135deg, #0014d2, #2563eb);
+        color: white;
+        padding: 0.9rem 1.1rem;
+        border-radius: 16px;
+        text-align: right;
+        min-width: 220px;
+      }
+
+      .invoice-badge small {
+        display: block;
+        font-size: 0.65rem;
+        opacity: 0.85;
+      }
+
+      .invoice-badge strong {
+        font-size: 1rem;
+      }
+
+      /* STATUS */
+
+      .top-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+
+      .client-short {
+        background: #f8fbff;
+        border: 1px solid #dbeafe;
+        padding: 0.9rem 1rem;
+        border-radius: 16px;
+        min-width: 260px;
+      }
+
+      .client-short span {
+        display: block;
+      }
+
+      .mini-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+
+      .client-name {
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: var(--secondary);
+      }
+
+      .invoice-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0.7rem 1rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 800;
+        border: 1px solid;
+      }
+
+      .invoice-status.confirmed,
+      .invoice-status.paid {
+        background: #dcfce7;
+        color: #15803d;
+        border-color: #86efac;
+      }
+
+      .invoice-status.pending {
+        background: #fff7ed;
+        color: #b45309;
+        border-color: #fde68a;
+      }
+
+      .invoice-status.cancelled {
+        background: #fee2e2;
+        color: #b91c1c;
+        border-color: #fecaca;
+      }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+
+      .status-dot.confirmed,
+      .status-dot.paid {
+        background: #22c55e;
+      }
+
+      .status-dot.pending {
+        background: #f59e0b;
+      }
+
+      .status-dot.cancelled {
+        background: #ef4444;
+      }
+
+      /* GRID */
+
+      .details-grid {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .card {
+        background: white;
+        border: 1px solid #edf2f7;
+        border-radius: 18px;
+        padding: 1rem;
+      }
+
+      .card-title {
+        font-size: 0.92rem;
+        font-weight: 800;
+        color: var(--primary-dark);
+        margin-bottom: 0.8rem;
+      }
+
+      .info-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 9px;
+        flex-wrap: wrap;
+        font-size: 0.82rem;
+      }
+
+      .info-label {
+        min-width: 95px;
+        font-weight: 700;
+        color: var(--secondary);
+      }
+
+      .invoice-date {
+        font-size: 0.82rem;
+        line-height: 1.8;
+      }
+
+      .total-box {
+        margin-top: 1rem;
+        background: linear-gradient(135deg, #0014d2, #2563eb);
+        border-radius: 18px;
+        padding: 1rem;
+        color: white;
+      }
+
+      .total-box small {
+        text-transform: uppercase;
+        opacity: 0.8;
+        font-size: 0.7rem;
+      }
+
+      .total-box h2 {
+        margin-top: 6px;
+        font-size: 1.7rem;
+        font-weight: 800;
+      }
+
+      /* TABLE */
+
+      .table-wrapper {
+        background: white;
+        border: 1px solid #edf2f7;
+        border-radius: 20px;
+        overflow: hidden;
+        margin-bottom: 1rem;
+      }
+
+      .invoice-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .invoice-table thead {
+        background: #eff6ff;
+      }
+
+      .invoice-table th {
+        padding: 0.85rem;
+        text-transform: uppercase;
+        font-size: 0.68rem;
+        color: #1e3a8a;
+        text-align: left;
+      }
+
+      .invoice-table td {
+        padding: 0.85rem;
+        border-top: 1px solid #f1f5f9;
+        font-size: 0.8rem;
+      }
+
+      .invoice-table tbody tr:nth-child(even) {
+        background: #fafcff;
+      }
+
+      .text-right {
+        text-align: right;
+      }
+
+      .line-number {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #0014d2, #3b82f6);
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      .product-name {
+        font-weight: 700;
+        color: var(--secondary);
+      }
+
+      /* PAYMENT */
+
+      .payment-summary {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 1rem;
+      }
+
+      .payment-box {
+        background: #fffdf4;
+        border: 1px solid #fde68a;
+      }
+
+      .payment-box strong {
+        display: block;
+        margin-bottom: 0.9rem;
+        color: #92400e;
+      }
+
+      .payment-box p {
+        margin-bottom: 7px;
+        font-size: 0.82rem;
+      }
+
+      .summary-line {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.7rem 0;
+        border-bottom: 1px dashed #dbeafe;
+        font-size: 0.82rem;
+      }
+
+      .summary-line.total {
+        border-top: 2px solid #0014d2;
+        border-bottom: none;
+        margin-top: 0.6rem;
+        padding-top: 0.9rem;
+        font-size: 1rem;
+        font-weight: 800;
+        color: #0014d2;
+      }
+
+      /* CONFIRMATION */
+
+      .confirmation-box {
+        margin-top: 1rem;
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+        padding: 1rem;
+        border-radius: 18px;
+        text-align: center;
+      }
+
+      .confirmation-box h2 {
+        color: #0014d2;
+        font-size: 1.1rem;
+        margin-bottom: 5px;
+      }
+
+      .confirmation-box p {
+        color: #475569;
+        font-size: 0.82rem;
+      }
+
+      /* COMPANY */
+
+      .company-card {
+        margin-top: 1rem;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        border-radius: 20px;
+        padding: 1rem;
+        color: white;
+      }
+
+      .company-header {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        padding-bottom: 0.9rem;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        margin-bottom: 1rem;
+      }
+
+      .company-logo {
+        width: 50px;
+        height: 50px;
+        object-fit: contain;
+        border-radius: 12px;
+        background: white;
+        padding: 5px;
+      }
+
+      .company-header h3 {
+        font-size: 1rem;
+        font-weight: 800;
+      }
+
+      .company-header p {
+        font-size: 0.72rem;
+        opacity: 0.7;
+      }
+
+      .company-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.8rem;
+      }
+
+      .company-item {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.06);
+        padding: 0.85rem;
+        border-radius: 14px;
+      }
+
+      .company-item span {
+        display: block;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        opacity: 0.7;
+        margin-bottom: 5px;
+      }
+
+      .company-item strong {
+        font-size: 0.8rem;
+        line-height: 1.5;
+      }
+
+      .bottom-note {
+        margin-top: 1rem;
+        background: #f8fbff;
+        border: 1px solid #dbeafe;
+        padding: 0.9rem;
+        border-radius: 14px;
+        text-align: center;
+        font-size: 0.7rem;
+        color: #64748b;
+      }
+
+      @media (max-width: 780px) {
+        .brand-section,
+        .payment-summary,
+        .details-grid {
+          grid-template-columns: 1fr;
+          flex-direction: column;
+        }
+
+        .invoice-badge {
+          width: 100%;
+          text-align: left;
+        }
+
+        .table-wrapper {
+          overflow-x: auto;
+        }
+
+        .invoice-table {
+          min-width: 700px;
+        }
+
+        .company-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media print {
+        body {
+          background: white;
+          padding: 0;
+        }
+
+        .invoice-container {
+          max-width: 100%;
+          box-shadow: none;
+          border-radius: 0;
+        }
+
+        .invoice {
+          padding: 0.4rem;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="invoice-container">
+      <div class="invoice">
+
+        <!-- HEADER -->
+
+        <div class="brand-section">
+          <div class="logo-container">
+            <img
+              src="https://cosamed.org/1%20Favor.png"
+              alt="FavorHelp"
+              class="logo-image"
+            />
+
+            <div>
+              <div class="brand">FACTURE RÉSERVATION</div>
+              <div class="slogan">FavorHelp • Hôtel & Réservation</div>
+            </div>
+          </div>
+
+          <div class="invoice-badge">
+            <small>FACTURE N°</small>
+            <strong>
+              #<%= reservation.invoiceNumber || reservation.id %>
+            </strong>
+
+            <br /><br />
+
+            <small>Date</small>
+            <strong>
+              <%= new Date().toLocaleDateString('fr-FR') %>
+            </strong>
+          </div>
+        </div>
+
+        <!-- STATUS -->
+
+        <% const status = (reservation.status || '').trim().toUpperCase(); %>
+
+        <div class="top-row">
+          <div class="client-short">
+            <span class="mini-label">Facturé à</span>
+
+            <span class="client-name">
+              <%= user.fullName %>
+            </span>
+          </div>
+
+          <div
+            class="invoice-status
+              <%= status === 'CONFIRMED' || status === 'PAID'
+                ? 'confirmed'
+                : status === 'PENDING'
+                ? 'pending'
+                : 'cancelled' %>"
+          >
+            <span
+              class="status-dot
+                <%= status === 'CONFIRMED' || status === 'PAID'
+                  ? 'confirmed'
+                  : status === 'PENDING'
+                  ? 'pending'
+                  : 'cancelled' %>"
+            ></span>
+
+            <span>
+              <%= status === 'CONFIRMED' || status === 'PAID'
+                ? 'PAYÉE'
+                : status === 'PENDING'
+                ? 'EN ATTENTE'
+                : 'ANNULÉE' %>
+            </span>
+          </div>
+        </div>
+
+        <!-- DETAILS -->
+
+        <div class="details-grid">
+
+          <div class="card">
+            <div class="card-title">
+              Informations Client
+            </div>
+
+            <div class="info-row">
+              <span class="info-label">Client :</span>
+              <span><%= user.fullName %></span>
+            </div>
+
+            <div class="info-row">
+              <span class="info-label">Email :</span>
+              <span><%= user.email %></span>
+            </div>
+
+            <div class="info-row">
+              <span class="info-label">Téléphone :</span>
+              <span>
+                <%= user.phone || 'Non renseigné' %>
+              </span>
+            </div>
+
+            <div class="info-row">
+              <span class="info-label">Ville :</span>
+              <span>
+                <%= user.city || 'Non renseignée' %>
+              </span>
+            </div>
+
+            <div class="info-row">
+              <span class="info-label">Pays :</span>
+              <span>
+                <%= user.country || 'Non renseigné' %>
+              </span>
+            </div>
+          </div>
+
+          <div>
+
+            <div class="card invoice-date">
+              <strong>Référence :</strong><br />
+              #<%= reservation.invoiceNumber || reservation.id %>
+
+              <br /><br />
+
+              <strong>Arrivée :</strong><br />
+              <%= new Date(reservation.startDate).toLocaleDateString('fr-FR') %>
+
+              <br /><br />
+
+              <strong>Départ :</strong><br />
+              <%= new Date(reservation.endDate).toLocaleDateString('fr-FR') %>
+            </div>
+
+            <div class="total-box">
+              <small>Total à payer</small>
+
+              <h2>
+                <%= reservation.totalPrice %>
+                <%= reservation.currency || 'USD' %>
+              </h2>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- TABLE -->
+
+        <div class="table-wrapper">
+          <table class="invoice-table">
+            <thead>
+              <tr>
+                <th style="width: 60px">N°</th>
+                <th>Description</th>
+                <th class="text-right">Prix/Nuit</th>
+                <th class="text-right">Nuits</th>
+                <th class="text-right">Chambres</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr>
+                <td style="text-align: center">
+                  <span class="line-number">1</span>
+                </td>
+
+                <td>
+                  <div class="product-name">
+                    <%= reservation.productName %>
+                  </div>
+                </td>
+
+                <td class="text-right">
+                  <%= reservation.productPrice || '0' %>
+                  <%= reservation.currency || 'USD' %>
+                </td>
+
+                <td class="text-right">
+                  <%= reservation.nights ||
+                  Math.ceil(
+                    (new Date(reservation.endDate) - new Date(reservation.startDate))
+                    / (1000 * 60 * 60 * 24)
+                  ) %>
+                </td>
+
+                <td class="text-right">
+                  <%= reservation.roomsBooked %>
+                </td>
+
+                <td class="text-right">
+                  <strong>
+                    <%= reservation.totalPrice %>
+                    <%= reservation.currency || 'USD' %>
+                  </strong>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- PAYMENT -->
+
+        <div class="payment-summary">
+
+          <% if ((reservation.status || '').toLowerCase() === 'pending') { %>
+
+          <div class="card payment-box">
+            <strong>
+              <i class="fas fa-credit-card"></i>
+              Informations de paiement
+            </strong>
+
+            <p><b>Nom :</b> Kavira Naomi</p>
+
+            <p><b>Mobile Money :</b> +243 962 646 653</p>
+
+            <p><b>Banque :</b> Equity Bank</p>
+
+            <p><b>Compte :</b> 688200060761632</p>
+
+            <p style="margin-top: 12px; color: #b91c1c;">
+              Après paiement, contactez le +243 962 646 653
+            </p>
+          </div>
+
+          <% } %>
+
+          <div class="card">
+            <div class="card-title">Résumé</div>
+
+            <div class="summary-line">
+              <span>Chambres</span>
+
+              <span>
+                <%= reservation.roomsBooked %>
+              </span>
+            </div>
+
+            <div class="summary-line">
+              <span>Adultes</span>
+
+              <span>
+                <%= reservation.adults %>
+              </span>
+            </div>
+
+            <div class="summary-line">
+              <span>Enfants</span>
+
+              <span>
+                <%= reservation.children || 0 %>
+              </span>
+            </div>
+
+            <div class="summary-line">
+              <span>Nuits</span>
+
+              <span>
+                <%= reservation.nights ||
+                Math.ceil(
+                  (new Date(reservation.endDate) - new Date(reservation.startDate))
+                  / (1000 * 60 * 60 * 24)
+                ) %>
+              </span>
+            </div>
+
+            <div class="summary-line total">
+              <span>Total</span>
+
+              <span>
+                <%= reservation.totalPrice %>
+                <%= reservation.currency || 'USD' %>
+              </span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- CONFIRMATION -->
+
+        <% if (
+          (reservation.status || '').toLowerCase() === 'confirmed' ||
+          (reservation.status || '').toLowerCase() === 'paid'
+        ) { %>
+
+        <div class="confirmation-box">
+          <h2>Réservation Confirmée</h2>
+
+          <p>
+            Votre réservation est confirmée.
+            Merci pour votre confiance.
+          </p>
+
+          <p style="margin-top: 8px;">
+            📞 +243 991 225 122 • ✉️favorhelp31@gmail.com
+          </p>
+        </div>
+
+        <% } %>
+
+        <!-- COMPANY -->
+
+        <div class="company-card">
+
+          <div class="company-header">
+            <img
+              src="https://cosamed.org/1%20Favor.png"
+              alt="FavorHelp"
+              class="company-logo"
+            />
+
+            <div>
+              <h3>FavorHelp</h3>
+              <p>Service Hôtel & Réservation</p>
+            </div>
+          </div>
+
+          <div class="company-grid">
+
+            <div class="company-item">
+              <span>RCCM</span>
+              <strong>21-A-770</strong>
+            </div>
+
+            <div class="company-item">
+              <span>N° IMPÔT</span>
+              <strong>A2156062L</strong>
+            </div>
+
+            <div class="company-item">
+              <span>National ID</span>
+              <strong>19-G4701-N74976H</strong>
+            </div>
+
+            <div class="company-item">
+              <span>Import / Export</span>
+              <strong>PP/0023/EWX-23/1002234MK/W</strong>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- FOOTER -->
+
+        <div class="bottom-note">
+          Merci pour votre confiance • FavorHelp •
+          +243 991 225 122 • www.favorhelp.com
+          <br /><br />
+          © <%= new Date().getFullYear() %> FavorHelp
+        </div>
+
+      </div>
+    </div>
+  </body>
+</html>

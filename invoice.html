@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FavorHelp Boarding Pass</title>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --blue: #0026b3;
+        --light: #dcdcdc;
+      }
+
+      /* AJOUTER OU REMPLACER LE BODY PAR CECI */
+
+      body {
+        background: transparent;
+        font-family: Arial, Helvetica, sans-serif;
+        margin: 0;
+        padding: 0;
+
+        /* CENTER */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        /* PDF / PAGE */
+        min-height: 100vh;
+      }
+
+      /* =========================
+         TICKET ONLY
+      ========================== */
+      .ticket {
+        width: 180mm;
+        height: 78mm;
+        background: var(--light);
+        border-radius: 5mm;
+        overflow: hidden;
+        display: flex;
+        position: relative;
+      }
+
+      .ticket::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+          radial-gradient(
+            circle at 20% 30%,
+            rgba(255, 255, 255, 0.22) 0,
+            rgba(255, 255, 255, 0.22) 12%,
+            transparent 12%
+          ),
+          radial-gradient(
+            circle at 60% 40%,
+            rgba(255, 255, 255, 0.18) 0,
+            rgba(255, 255, 255, 0.18) 15%,
+            transparent 15%
+          );
+        opacity: 0.5;
+      }
+
+      /* =========================
+         LEFT SIDE
+      ========================== */
+      .left-side {
+        flex: 1;
+        padding: 4mm;
+        position: relative;
+      }
+
+      /* HEADER */
+      .header {
+        background: var(--blue);
+        border-radius: 2.5mm;
+        padding: 2.5mm 3mm;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .company {
+        display: flex;
+        align-items: center;
+        gap: 2.5mm;
+        color: white;
+      }
+
+      .logo {
+        width: 11mm;
+        height: 11mm;
+        background: white;
+        border-radius: 1.5mm;
+        padding: 0.8mm;
+        object-fit: contain;
+      }
+
+      .company h1 {
+        font-size: 3.5mm;
+        line-height: 1;
+      }
+
+      .company span {
+        font-size: 1.7mm;
+      }
+
+      .boarding {
+        background: white;
+        color: #222;
+        padding: 1mm 3mm;
+        border-radius: 1.2mm;
+        font-size: 2.7mm;
+        font-weight: bold;
+        letter-spacing: 0.8mm;
+      }
+
+      /* INFO */
+      .info-row {
+        margin-top: 4mm;
+        display: grid;
+        grid-template-columns: 7mm repeat(5, 1fr);
+        gap: 2mm;
+      }
+
+      .barcode {
+        width: 5mm;
+        height: 24mm;
+        background: repeating-linear-gradient(
+          to bottom,
+          #000,
+          #000 0.7mm,
+          #fff 0.7mm,
+          #fff 1.3mm
+        );
+      }
+
+      .info small {
+        display: block;
+        color: #555;
+        font-size: 1.5mm;
+        margin-bottom: 0.4mm;
+      }
+
+      .info h2 {
+        font-size: 2.4mm;
+        color: #222;
+      }
+
+      /* FLIGHT */
+      .flight-box {
+        width: 65mm;
+        margin-top: 5mm;
+        margin-left: 9mm;
+        background: var(--blue);
+        border-radius: 2.5mm;
+        padding: 2.5mm 3mm;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: white;
+      }
+
+      .city {
+        width: 20mm;
+      }
+
+      .city small {
+        font-size: 1.7mm;
+      }
+
+      .city h2 {
+        font-size: 3.2mm;
+        margin-top: 0.3mm;
+      }
+
+      .line {
+        height: 0.2mm;
+        background: rgba(255, 255, 255, 0.7);
+        margin: 1mm 0;
+      }
+
+      .plane {
+        font-size: 4.5mm;
+      }
+
+      /* DATE */
+      .date-box {
+        position: absolute;
+        right: 4mm;
+        bottom: 4mm;
+      }
+
+      .date-box small {
+        display: block;
+        color: #555;
+        font-size: 1.6mm;
+        margin-top: 1.5mm;
+      }
+
+      .date-box h2 {
+        font-size: 2.7mm;
+        color: #222;
+      }
+
+      /* =========================
+         RIGHT SIDE
+      ========================== */
+      .right-side {
+        width: 54mm;
+        border-left: 0.5mm dashed rgba(255, 255, 255, 0.9);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .right-top {
+        padding: 4mm;
+      }
+
+      .class-box {
+        background: var(--blue);
+        border-radius: 2.5mm;
+        padding: 2.5mm;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: white;
+      }
+
+      .class-box h2 {
+        font-size: 3.2mm;
+      }
+
+      .mini-logo {
+        width: 9mm;
+        height: 9mm;
+        background: white;
+        border-radius: 1mm;
+        padding: 0.6mm;
+        object-fit: contain;
+      }
+
+      .mini-content {
+        display: flex;
+        gap: 2.5mm;
+        margin-top: 4mm;
+      }
+
+      .mini-barcode {
+        width: 5mm;
+        height: 18mm;
+        background: repeating-linear-gradient(
+          to bottom,
+          #000,
+          #000 0.7mm,
+          #fff 0.7mm,
+          #fff 1.3mm
+        );
+      }
+
+      .mini-details small {
+        display: block;
+        color: #555;
+        font-size: 1.5mm;
+      }
+
+      .mini-details h3 {
+        font-size: 2.2mm;
+        color: #222;
+      }
+
+      .mini-row {
+        display: flex;
+        gap: 2.5mm;
+        margin-top: 1.5mm;
+      }
+
+      /* BOTTOM */
+      .bottom-flight {
+        margin-top: auto;
+        background: var(--blue);
+        color: white;
+        padding: 2.5mm;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .bottom-flight small {
+        font-size: 1.5mm;
+      }
+
+      .bottom-flight h3 {
+        font-size: 2.5mm;
+      }
+
+      .bottom-plane {
+        font-size: 4mm;
+      }
+
+      /* PRINT */
+      @page {
+        size: auto;
+        margin: 0;
+      }
+
+      @media print {
+        body {
+          background: transparent;
+        }
+
+        .ticket {
+          box-shadow: none;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="ticket">
+      <!-- LEFT -->
+      <div class="left-side">
+        <div class="header">
+          <div class="company">
+            <img
+              src="https://api-prod.favorhelp.com/uploads/1%20Favor.webp"
+              alt="FavorHelp Logo"
+              class="logo"
+            />
+
+            <div>
+              <h1>FAVOR HELP</h1>
+              <span>Travel Agency</span>
+            </div>
+          </div>
+
+          <div class="boarding">BOARDING PASS</div>
+        </div>
+
+        <div class="info-row">
+          <div class="barcode"></div>
+
+          <div class="info">
+            <small>Passenger</small>
+            <h2>KYRIE PETRAKIS</h2>
+          </div>
+
+          <div class="info">
+            <small>Flight</small>
+            <h2>AS1234</h2>
+          </div>
+
+          <div class="info">
+            <small>Gate</small>
+            <h2>B-08</h2>
+          </div>
+
+          <div class="info">
+            <small>Seat</small>
+            <h2>37-C</h2>
+          </div>
+
+          <div class="info">
+            <small>Class</small>
+            <h2>FIRST</h2>
+          </div>
+        </div>
+
+        <div class="flight-box">
+          <div class="city">
+            <div class="line"></div>
+            <small>FROM</small>
+            <h2>GOMA</h2>
+            <div class="line"></div>
+          </div>
+
+          <div class="bottom-plane">➜</div>
+
+          <div class="city">
+            <div class="line"></div>
+            <small>TO</small>
+            <h2>KASINDI</h2>
+            <div class="line"></div>
+          </div>
+        </div>
+
+        <div class="date-box">
+          <small>Date</small>
+          <h2>APR 21, 2031</h2>
+
+          <small>Boarding</small>
+          <h2>08:00 AM</h2>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div class="right-side">
+        <div class="right-top">
+          <div class="class-box">
+            <h2>FIRST CLASS</h2>
+
+            <img
+              src="https://api-prod.favorhelp.com/uploads/1%20Favor.webp"
+              alt="FavorHelp Logo"
+              class="mini-logo"
+            />
+          </div>
+
+          <div class="mini-content">
+            <div class="mini-barcode"></div>
+
+            <div class="mini-details">
+              <small>Passenger</small>
+              <h3>KYRIE PETRAKIS</h3>
+
+              <div class="mini-row">
+                <div>
+                  <small>Flight</small>
+                  <h3>AS1234</h3>
+                </div>
+
+                <div>
+                  <small>Gate</small>
+                  <h3>B-08</h3>
+                </div>
+
+                <div>
+                  <small>Seat</small>
+                  <h3>37-C</h3>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-flight">
+          <div>
+            <small>FROM</small>
+            <h3>GOMA</h3>
+          </div>
+
+          <div class="bottom-plane">➜</div>
+
+          <div>
+            <small>TO</small>
+            <h3>KASINDI</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
