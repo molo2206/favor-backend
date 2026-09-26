@@ -2321,9 +2321,13 @@ export class ProductService {
     applyFilters(dataBuilder);
 
     // ============================================================
-    // ✅ COUNT (sur le builder minimal, sans jointures 1-N)
+    // ✅ COUNT EXPLICITE (COUNT DISTINCT) au lieu de getCount()
+    //    → évite le bug de getCount() avec les leftJoin
     // ============================================================
-    const total = await countBuilder.getCount();
+    const totalResult = await countBuilder
+      .select('COUNT(DISTINCT product.id)', 'total')
+      .getRawOne();
+    const total = Number(totalResult?.total || 0);
 
     if (total === 0) {
       const emptyFilters: string[] = [];
