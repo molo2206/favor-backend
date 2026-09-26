@@ -3397,10 +3397,6 @@ export class ProductService {
       })
       .andWhere('company.status = :companyStatus', {
         companyStatus: CompanyStatus.VALIDATED,
-      })
-      // ✅ NOUVEAU : filtrer les produits par type
-      .andWhere('product.type IN (:...productTypes)', {
-        productTypes: [CompanyType.SHOP, CompanyType.CAR],
       });
 
     if (words.length > 1) {
@@ -3439,8 +3435,13 @@ export class ProductService {
     if (cityId) {
       productQuery.andWhere('city.id = :cityId', { cityId });
     }
+    // ✅ CORRECTION : rechercher dans le type fourni OU recherche générale SHOP + CAR
     if (type) {
-      productQuery.andWhere('company.typeCompany = :type', { type });
+      productQuery.andWhere('product.type = :type', { type });
+    } else {
+      productQuery.andWhere('product.type IN (:...productTypes)', {
+        productTypes: [CompanyType.SHOP, CompanyType.CAR],
+      });
     }
 
     const products = await productQuery
