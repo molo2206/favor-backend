@@ -2168,7 +2168,7 @@ export class ProductService {
       }
 
       if (type) {
-        qb.andWhere('UPPER(product.type) = UPPER(:type)', { type });
+        qb.andWhere('product.type = :type', { type });
       }
 
       if (shopType?.trim()) {
