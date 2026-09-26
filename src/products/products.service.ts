@@ -2301,15 +2301,44 @@ export class ProductService {
     }
 
     // ============================================================
+    // ✅ COUNT AVANT PAGINATION + ORDER RANDOM
+    //    (corrige le bug total=0 et data=[] sur le même QueryBuilder)
+    // ============================================================
+    const total = await queryBuilder.getCount();
+
+    if (total === 0) {
+      const emptyFilters: string[] = [];
+      if (categoryId) emptyFilters.push(`catégorie: ${categoryId}`);
+      if (brandId) emptyFilters.push(`marque: ${brandId}`);
+      if (type) emptyFilters.push(`type: ${type}`);
+      if (shopType) emptyFilters.push(`type boutique: ${shopType}`);
+      if (fuelType) emptyFilters.push(`carburant: ${fuelType}`);
+      if (transmission) emptyFilters.push(`transmission: ${transmission}`);
+      if (typecar) emptyFilters.push(`type véhicule: ${typecar}`);
+      if (year) emptyFilters.push(`année: ${year}`);
+      if (companyId) emptyFilters.push(`entreprise: ${companyId}`);
+      if (cityId) emptyFilters.push(`ville: ${cityId}`);
+      if (countryId) emptyFilters.push(`pays: ${countryId}`);
+
+      let emptyMessage = await this.i18n.translate('no_products_found', lang);
+      if (emptyFilters.length > 0) {
+        emptyMessage += ` avec les filtres: ${emptyFilters.join(', ')}`;
+      }
+
+      return {
+        message: emptyMessage,
+        data: { data: [], total: 0, page, limit },
+      };
+    }
+
+    // ============================================================
     // TRI ALEATOIRE A CHAQUE EXECUTION
     // ============================================================
-
-    queryBuilder.orderBy('RAND()').skip(skip).take(limit);
-
-    const [products, total] = await Promise.all([
-      queryBuilder.getMany(),
-      queryBuilder.getCount(),
-    ]);
+    const products = await queryBuilder
+      .orderBy('RAND()')
+      .skip(skip)
+      .take(limit)
+      .getMany();
 
     if (products.length === 0) {
       return {
@@ -2447,13 +2476,6 @@ export class ProductService {
 
     if (filters.length > 0 && total > 0) {
       message += ` (filtres: ${filters.join(', ')})`;
-    }
-
-    if (total === 0) {
-      message = await this.i18n.translate('no_products_found', lang);
-      if (filters.length > 0) {
-        message += ` avec les filtres: ${filters.join(', ')}`;
-      }
     }
 
     return {
