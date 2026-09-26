@@ -2246,12 +2246,14 @@ export class ProductService {
       }
 
       // ============================================================
-      // ✅ FILTRE typecar
+      // ✅ FILTRE typecar (VERSION ROBUSTE)
       //    SALE   → SALE + BOTH
       //    RENTAL → RENTAL + BOTH
       //    BOTH   → SALE + RENTAL + BOTH
       // ============================================================
       if (typecar) {
+        const normalized = String(typecar).toUpperCase() as Type_rental_both_sale_car;
+
         const saleTypes = [
           Type_rental_both_sale_car.SALE,
           Type_rental_both_sale_car.BOTH,
@@ -2261,7 +2263,7 @@ export class ProductService {
           Type_rental_both_sale_car.BOTH,
         ];
 
-        if (saleTypes.includes(typecar)) {
+        if (saleTypes.includes(normalized)) {
           if (minSalePrice !== undefined) {
             qb.andWhere('product.salePrice >= :minSalePrice', {
               minSalePrice,
@@ -2273,7 +2275,7 @@ export class ProductService {
             });
           }
         }
-        if (rentalTypes.includes(typecar)) {
+        if (rentalTypes.includes(normalized)) {
           if (minDailyRate !== undefined) {
             qb.andWhere('product.dailyRate >= :minDailyRate', {
               minDailyRate,
@@ -2305,10 +2307,15 @@ export class ProductService {
           ],
         };
 
-        const allowedTypes = typecarFilterMap[typecar];
+        const allowedTypes = typecarFilterMap[normalized];
 
-        if (allowedTypes.length === 1) {
-          qb.andWhere('product.typecar = :typecar', { typecar });
+        if (!allowedTypes || allowedTypes.length === 0) {
+          // Valeur inconnue : on ignore le filtre plutôt que de tout bloquer
+          console.warn('⚠️ typecar inconnu, filtre ignoré:', normalized);
+        } else if (allowedTypes.length === 1) {
+          qb.andWhere('product.typecar = :typecar', {
+            typecar: allowedTypes[0],
+          });
         } else {
           qb.andWhere('product.typecar IN (:...typecars)', {
             typecars: allowedTypes,
@@ -2322,7 +2329,6 @@ export class ProductService {
 
     // ============================================================
     // ✅ COUNT EXPLICITE (COUNT DISTINCT) au lieu de getCount()
-    //    → évite le bug de getCount() avec les leftJoin
     // ============================================================
     const totalResult = await countBuilder
       .select('COUNT(DISTINCT product.id)', 'total')
