@@ -2107,7 +2107,20 @@ export class ProductService {
   }> {
     const skip = (page - 1) * limit;
 
-    const queryBuilder = this.productRepo
+    // ============================================================
+    // ✅ BUILDER 1 : COUNT (jointures minimales, pas de 1-N)
+    // ============================================================
+    const countBuilder = this.productRepo
+      .createQueryBuilder('product')
+      .leftJoin('product.company', 'company')
+      .leftJoin('company.country', 'country')
+      .leftJoin('company.city', 'city')
+      .where('product.status = :status', { status: ProductStatus.PUBLISHED });
+
+    // ============================================================
+    // ✅ BUILDER 2 : DATA (toutes les jointures pour le rendu)
+    // ============================================================
+    const dataBuilder = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('category.parent', 'categoryParent')
@@ -2135,176 +2148,182 @@ export class ProductService {
       )
       .where('product.status = :status', { status: ProductStatus.PUBLISHED });
 
-    if (brandId) {
-      queryBuilder.andWhere('product.brand_id = :brandId', { brandId });
-    }
+    // ============================================================
+    // ✅ APPLICATION DES FILTRES SUR LES DEUX BUILDERS
+    // ============================================================
+    const applyFilters = (qb: typeof countBuilder) => {
+      if (brandId) {
+        qb.andWhere('product.brand_id = :brandId', { brandId });
+      }
 
-    if (companyId) {
-      queryBuilder.andWhere('product.companyId = :companyId', { companyId });
-    }
+      if (companyId) {
+        qb.andWhere('product.companyId = :companyId', { companyId });
+      }
 
-    if (categoryId) {
-      queryBuilder.andWhere(
-        '(category.id = :categoryId OR categoryParent.id = :categoryId OR categoryChildren.id = :categoryId)',
-        { categoryId },
-      );
-    }
-
-    if (type) {
-      queryBuilder.andWhere('product.type = :type', { type });
-    }
-
-    if (shopType?.trim()) {
-      const activities: string[] = [];
-      if (shopType === CompanyActivity.WHOLESALER) {
-        activities.push(
-          CompanyActivity.WHOLESALER,
-          CompanyActivity.WHOLESALER_RETAILER,
+      if (categoryId) {
+        qb.andWhere(
+          '(category.id = :categoryId OR categoryParent.id = :categoryId OR categoryChildren.id = :categoryId)',
+          { categoryId },
         );
       }
-      if (shopType === CompanyActivity.RETAILER) {
-        activities.push(
-          CompanyActivity.RETAILER,
-          CompanyActivity.WHOLESALER_RETAILER,
-        );
-      }
-      if (shopType === CompanyActivity.WHOLESALER_RETAILER) {
-        activities.push(
-          CompanyActivity.WHOLESALER,
-          CompanyActivity.RETAILER,
-          CompanyActivity.WHOLESALER_RETAILER,
-        );
-      }
-      queryBuilder.andWhere('product.companyActivity IN (:...activities)', {
-        activities,
-      });
 
-      if (shopType === CompanyActivity.WHOLESALER) {
-        queryBuilder.andWhere('product.gros_price_original > 0');
+      if (type) {
+        qb.andWhere('UPPER(product.type) = UPPER(:type)', { type });
       }
-      if (shopType === CompanyActivity.RETAILER) {
-        queryBuilder.andWhere('product.detail_price_original > 0');
-      }
-      if (shopType === CompanyActivity.WHOLESALER_RETAILER) {
-        queryBuilder.andWhere(
-          '(product.gros_price_original > 0 OR product.detail_price_original > 0)',
-        );
-      }
-    }
 
-    if (fuelType) {
-      queryBuilder.andWhere('product.fuelType = :fuelType', { fuelType });
-    }
-    if (transmission) {
-      queryBuilder.andWhere('product.transmission = :transmission', {
-        transmission,
-      });
-    }
-    if (year) {
-      queryBuilder.andWhere('product.year = :year', { year });
-    }
-    if (yearStart !== undefined || yearEnd !== undefined) {
-      if (yearStart !== undefined && yearEnd !== undefined) {
-        queryBuilder.andWhere(
-          'CAST(product.year AS UNSIGNED) BETWEEN :yearStart AND :yearEnd',
-          { yearStart, yearEnd },
-        );
-      } else if (yearStart !== undefined) {
-        queryBuilder.andWhere('CAST(product.year AS UNSIGNED) >= :yearStart', {
-          yearStart,
+      if (shopType?.trim()) {
+        const activities: string[] = [];
+        if (shopType === CompanyActivity.WHOLESALER) {
+          activities.push(
+            CompanyActivity.WHOLESALER,
+            CompanyActivity.WHOLESALER_RETAILER,
+          );
+        }
+        if (shopType === CompanyActivity.RETAILER) {
+          activities.push(
+            CompanyActivity.RETAILER,
+            CompanyActivity.WHOLESALER_RETAILER,
+          );
+        }
+        if (shopType === CompanyActivity.WHOLESALER_RETAILER) {
+          activities.push(
+            CompanyActivity.WHOLESALER,
+            CompanyActivity.RETAILER,
+            CompanyActivity.WHOLESALER_RETAILER,
+          );
+        }
+        qb.andWhere('product.companyActivity IN (:...activities)', {
+          activities,
         });
-      } else if (yearEnd !== undefined) {
-        queryBuilder.andWhere('CAST(product.year AS UNSIGNED) <= :yearEnd', {
-          yearEnd,
+
+        if (shopType === CompanyActivity.WHOLESALER) {
+          qb.andWhere('product.gros_price_original > 0');
+        }
+        if (shopType === CompanyActivity.RETAILER) {
+          qb.andWhere('product.detail_price_original > 0');
+        }
+        if (shopType === CompanyActivity.WHOLESALER_RETAILER) {
+          qb.andWhere(
+            '(product.gros_price_original > 0 OR product.detail_price_original > 0)',
+          );
+        }
+      }
+
+      if (fuelType) {
+        qb.andWhere('product.fuelType = :fuelType', { fuelType });
+      }
+      if (transmission) {
+        qb.andWhere('product.transmission = :transmission', {
+          transmission,
         });
       }
-    }
-
-    if (cityId) {
-      queryBuilder.andWhere('city.id = :cityId', { cityId });
-    }
-
-    if (countryId) {
-      queryBuilder.andWhere('country.id = :countryId', { countryId });
-    }
-
-    // ============================================================
-    // ✅ FILTRE typecar
-    //    SALE   → SALE + BOTH
-    //    RENTAL → RENTAL + BOTH
-    //    BOTH   → SALE + RENTAL + BOTH
-    // ============================================================
-    if (typecar) {
-      const saleTypes = [
-        Type_rental_both_sale_car.SALE,
-        Type_rental_both_sale_car.BOTH,
-      ];
-      const rentalTypes = [
-        Type_rental_both_sale_car.RENTAL,
-        Type_rental_both_sale_car.BOTH,
-      ];
-
-      if (saleTypes.includes(typecar)) {
-        if (minSalePrice !== undefined) {
-          queryBuilder.andWhere('product.salePrice >= :minSalePrice', {
-            minSalePrice,
-          });
-        }
-        if (maxSalePrice !== undefined) {
-          queryBuilder.andWhere('product.salePrice <= :maxSalePrice', {
-            maxSalePrice,
-          });
-        }
+      if (year) {
+        qb.andWhere('product.year = :year', { year });
       }
-      if (rentalTypes.includes(typecar)) {
-        if (minDailyRate !== undefined) {
-          queryBuilder.andWhere('product.dailyRate >= :minDailyRate', {
-            minDailyRate,
+      if (yearStart !== undefined || yearEnd !== undefined) {
+        if (yearStart !== undefined && yearEnd !== undefined) {
+          qb.andWhere(
+            'CAST(product.year AS UNSIGNED) BETWEEN :yearStart AND :yearEnd',
+            { yearStart, yearEnd },
+          );
+        } else if (yearStart !== undefined) {
+          qb.andWhere('CAST(product.year AS UNSIGNED) >= :yearStart', {
+            yearStart,
           });
-        }
-        if (maxDailyRate !== undefined) {
-          queryBuilder.andWhere('product.dailyRate <= :maxDailyRate', {
-            maxDailyRate,
+        } else if (yearEnd !== undefined) {
+          qb.andWhere('CAST(product.year AS UNSIGNED) <= :yearEnd', {
+            yearEnd,
           });
         }
       }
 
-      // ✅ Mapping : SALE→SALE+BOTH | RENTAL→RENTAL+BOTH | BOTH→SALE+RENTAL+BOTH
-      const typecarFilterMap: Record<
-        Type_rental_both_sale_car,
-        Type_rental_both_sale_car[]
-      > = {
-        [Type_rental_both_sale_car.SALE]: [
+      if (cityId) {
+        qb.andWhere('city.id = :cityId', { cityId });
+      }
+
+      if (countryId) {
+        qb.andWhere('country.id = :countryId', { countryId });
+      }
+
+      // ============================================================
+      // ✅ FILTRE typecar
+      //    SALE   → SALE + BOTH
+      //    RENTAL → RENTAL + BOTH
+      //    BOTH   → SALE + RENTAL + BOTH
+      // ============================================================
+      if (typecar) {
+        const saleTypes = [
           Type_rental_both_sale_car.SALE,
           Type_rental_both_sale_car.BOTH,
-        ],
-        [Type_rental_both_sale_car.RENTAL]: [
+        ];
+        const rentalTypes = [
           Type_rental_both_sale_car.RENTAL,
           Type_rental_both_sale_car.BOTH,
-        ],
-        [Type_rental_both_sale_car.BOTH]: [
-          Type_rental_both_sale_car.SALE,
-          Type_rental_both_sale_car.RENTAL,
-          Type_rental_both_sale_car.BOTH,
-        ],
-      };
+        ];
 
-      const allowedTypes = typecarFilterMap[typecar];
+        if (saleTypes.includes(typecar)) {
+          if (minSalePrice !== undefined) {
+            qb.andWhere('product.salePrice >= :minSalePrice', {
+              minSalePrice,
+            });
+          }
+          if (maxSalePrice !== undefined) {
+            qb.andWhere('product.salePrice <= :maxSalePrice', {
+              maxSalePrice,
+            });
+          }
+        }
+        if (rentalTypes.includes(typecar)) {
+          if (minDailyRate !== undefined) {
+            qb.andWhere('product.dailyRate >= :minDailyRate', {
+              minDailyRate,
+            });
+          }
+          if (maxDailyRate !== undefined) {
+            qb.andWhere('product.dailyRate <= :maxDailyRate', {
+              maxDailyRate,
+            });
+          }
+        }
 
-      if (allowedTypes.length === 1) {
-        queryBuilder.andWhere('product.typecar = :typecar', { typecar });
-      } else {
-        queryBuilder.andWhere('product.typecar IN (:...typecars)', {
-          typecars: allowedTypes,
-        });
+        const typecarFilterMap: Record<
+          Type_rental_both_sale_car,
+          Type_rental_both_sale_car[]
+        > = {
+          [Type_rental_both_sale_car.SALE]: [
+            Type_rental_both_sale_car.SALE,
+            Type_rental_both_sale_car.BOTH,
+          ],
+          [Type_rental_both_sale_car.RENTAL]: [
+            Type_rental_both_sale_car.RENTAL,
+            Type_rental_both_sale_car.BOTH,
+          ],
+          [Type_rental_both_sale_car.BOTH]: [
+            Type_rental_both_sale_car.SALE,
+            Type_rental_both_sale_car.RENTAL,
+            Type_rental_both_sale_car.BOTH,
+          ],
+        };
+
+        const allowedTypes = typecarFilterMap[typecar];
+
+        if (allowedTypes.length === 1) {
+          qb.andWhere('product.typecar = :typecar', { typecar });
+        } else {
+          qb.andWhere('product.typecar IN (:...typecars)', {
+            typecars: allowedTypes,
+          });
+        }
       }
-    }
+    };
+
+    applyFilters(countBuilder);
+    applyFilters(dataBuilder);
 
     // ============================================================
-    // ✅ COUNT AVANT PAGINATION + ORDER RANDOM
-    //    (corrige le bug total=0 et data=[] sur le même QueryBuilder)
+    // ✅ COUNT (sur le builder minimal, sans jointures 1-N)
     // ============================================================
-    const total = await queryBuilder.getCount();
+    const total = await countBuilder.getCount();
 
     if (total === 0) {
       const emptyFilters: string[] = [];
@@ -2332,9 +2351,9 @@ export class ProductService {
     }
 
     // ============================================================
-    // TRI ALEATOIRE A CHAQUE EXECUTION
+    // ✅ TRI ALEATOIRE + PAGINATION (sur le builder complet)
     // ============================================================
-    const products = await queryBuilder
+    const products = await dataBuilder
       .orderBy('RAND()')
       .skip(skip)
       .take(limit)
