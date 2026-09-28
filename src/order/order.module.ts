@@ -38,9 +38,8 @@ import { ReferralEntity } from 'src/users/entities/referral.entity';
 
 // ✅ AJOUTS LIVRAISON
 import { OrderDeliveryAssignment } from './entities/order-delivery-assignment.entity';
-import { DeliveryService } from './delivery.service';
+import { OrderDeliveryService } from './order-delivery.service';   // 🔥 RENOMMÉ
 import { DeliveryController } from './delivery.controller';
-import { NotificationsGateway } from 'src/notification/notifications.gateway';
 
 @Module({
   imports: [
@@ -62,9 +61,9 @@ import { NotificationsGateway } from 'src/notification/notifications.gateway';
       CompanyHasUserResource,
       City,
       ReferralEntity,
-      OrderDeliveryAssignment,   // ✅ AJOUTÉ
+      OrderDeliveryAssignment,   // ✅
     ]),
-    forwardRef(() => NotificationsModule),   // ✅ pour le gateway
+    forwardRef(() => NotificationsModule),   // ✅
     PawapayModule,
     AddressUserModule,
     MailModule,
@@ -75,7 +74,7 @@ import { NotificationsGateway } from 'src/notification/notifications.gateway';
   ],
   providers: [
     OrderService,
-    DeliveryService,             // ✅ AJOUTÉ
+    OrderDeliveryService,        // 🔥 RENOMMÉ
     SmsHelper,
     OrderNotificationHelper,
     NotificationHelper,
@@ -86,11 +85,11 @@ import { NotificationsGateway } from 'src/notification/notifications.gateway';
   ],
   controllers: [
     OrderController,
-    DeliveryController,          // ✅ AJOUTÉ
+    DeliveryController,
   ],
   exports: [
     PushNotificationHelper,
-    DeliveryService,             // ✅ AJOUTÉ
+    OrderDeliveryService,        // 🔥 RENOMMÉ
   ],
 })
 export class OrderModule { }

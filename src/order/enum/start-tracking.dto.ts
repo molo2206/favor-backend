@@ -14,6 +14,8 @@ export class StartTrackingDto {
     @Max(180)
     longitude: number;
 
+    action:
+
     @IsOptional()
     @Type(() => Number)
     @IsNumber()

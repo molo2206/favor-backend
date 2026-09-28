@@ -16,6 +16,7 @@ import { RideService } from 'src/Course et Taxi/Ride/ride.service';
 import { NotificationsService } from './notifications.service';
 import { NotificationType } from './type/notification.type';
 import { DriverLocationService } from 'src/Course et Taxi/DriverLocation/driver-location.service';
+import { DeliveryService } from 'src/delivery/delivery.service';
 
 interface ActiveUser {
   id: string;
@@ -37,6 +38,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
   private activeUsers: ActiveUser[] = [];
 
+  // 🔥 Tracking actif par livreur : deliverId → Set<orderId>
+  private activeTrackings: Map<string, Set<string>> = new Map();
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
@@ -45,6 +49,10 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     @Inject(forwardRef(() => NotificationsService))
     private readonly notificationsService: NotificationsService,
     private readonly driverLocationService: DriverLocationService,
+
+    // 🔥 Injection du DeliveryService
+    @Inject(forwardRef(() => DeliveryService))
+    private readonly deliveryService: DeliveryService,
   ) { }
 
   onModuleInit() {
@@ -96,6 +104,22 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       const userId = this.activeUsers[userIndex].id;
       this.activeUsers.splice(userIndex, 1);
       console.log(`❌ User ${userId} disconnected`);
+
+      // 🔥 Nettoyer les trackings actifs de ce livreur
+      if (this.activeTrackings.has(userId)) {
+        const orders = Array.from(this.activeTrackings.get(userId)!);
+        for (const orderId of orders) {
+          const roomName = `order-${orderId}`;
+          this.server.to(roomName).emit('trackingStopped', {
+            orderId,
+            deliverId: userId,
+            reason: 'livreur_disconnected',
+            timestamp: new Date().toISOString(),
+          });
+        }
+        this.activeTrackings.delete(userId);
+        console.log(`🧹 Trackings nettoyés pour ${userId}`);
+      }
     }
     this.broadcastUsers();
   }
@@ -365,6 +389,144 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     return { success: true };
   }
 
+  // ============================================================
+  // 🚚 LIVREUR — DÉMARRER LE TRACKING
+  // ============================================================
+  @SubscribeMessage('livreur:start-tracking')
+  async handleLivreurStartTracking(
+    @MessageBody() data: { orderId: string; deliverId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const { orderId, deliverId } = data;
+    console.log(
+      `🚚 [Gateway] livreur:start-tracking - ${deliverId} → order ${orderId}`,
+    );
+
+    if (!orderId || !deliverId) {
+      return { success: false, message: 'orderId et deliverId requis' };
+    }
+
+    // 🔥 Rejoindre automatiquement la room de la commande
+    const roomName = `order-${orderId}`;
+    client.join(roomName);
+
+    // 🔥 Marquer le tracking comme actif
+    if (!this.activeTrackings.has(deliverId)) {
+      this.activeTrackings.set(deliverId, new Set());
+    }
+    this.activeTrackings.get(deliverId)!.add(orderId);
+
+    // 🔔 Informer la room que le tracking est actif
+    this.server.to(roomName).emit('trackingStarted', {
+      orderId,
+      deliverId,
+      timestamp: new Date().toISOString(),
+    });
+
+    console.log(`✅ Tracking STARTED - ${deliverId} → order-${orderId}`);
+
+    return {
+      success: true,
+      message: 'Tracking démarré',
+      room: roomName,
+    };
+  }
+
+  // ============================================================
+  // 🛑 LIVREUR — ARRÊTER LE TRACKING
+  // ============================================================
+  @SubscribeMessage('livreur:stop-tracking')
+  async handleLivreurStopTracking(
+    @MessageBody() data: { orderId: string; deliverId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const { orderId, deliverId } = data;
+    console.log(
+      `🛑 [Gateway] livreur:stop-tracking - ${deliverId} → order ${orderId}`,
+    );
+
+    if (!orderId || !deliverId) {
+      return { success: false, message: 'orderId et deliverId requis' };
+    }
+
+    // 🔥 Retirer du tracking actif
+    if (this.activeTrackings.has(deliverId)) {
+      this.activeTrackings.get(deliverId)!.delete(orderId);
+
+      // Nettoyer si vide
+      if (this.activeTrackings.get(deliverId)!.size === 0) {
+        this.activeTrackings.delete(deliverId);
+      }
+    }
+
+    // 🔔 Informer la room
+    const roomName = `order-${orderId}`;
+    this.server.to(roomName).emit('trackingStopped', {
+      orderId,
+      deliverId,
+      timestamp: new Date().toISOString(),
+    });
+
+    console.log(`✅ Tracking STOPPED - ${deliverId} → order-${orderId}`);
+
+    return {
+      success: true,
+      message: 'Tracking arrêté',
+    };
+  }
+
+  // ============================================================
+  // 📍 LIVREUR — ENVOYER UNE POSITION
+  // ============================================================
+  @SubscribeMessage('livreur:location')
+  async handleLivreurLocation(
+    @MessageBody()
+    data: {
+      orderId: string;
+      deliverId: string;
+      latitude: number;
+      longitude: number;
+      speed?: number;
+      heading?: number;
+    },
+  ) {
+    const { orderId, deliverId } = data;
+
+    // 🔥 Vérifier que le tracking est bien actif
+    const isTracking = this.activeTrackings.get(deliverId)?.has(orderId);
+    if (!isTracking) {
+      console.log(
+        `⚠️ [Gateway] livreur:location rejeté - tracking inactif pour ${deliverId} → order-${orderId}`,
+      );
+      return {
+        success: false,
+        message:
+          "Tracking inactif. Envoyez livreur:start-tracking d'abord.",
+      };
+    }
+
+    console.log(
+      `📍 [Gateway] livreur:location - ${deliverId} → order-${orderId} (${data.latitude}, ${data.longitude})`,
+    );
+
+    // 🔥 Appel direct au DeliveryService
+    try {
+      await this.deliveryService.updateLocation(orderId, {
+        latitude: data.latitude,
+        longitude: data.longitude,
+        speed: data.speed,
+        heading: data.heading,
+      });
+      return { success: true };
+    } catch (err) {
+      console.error(`❌ Erreur updateLocation: ${err.message}`);
+      return { success: false, message: err.message };
+    }
+  }
+
+  // ============================================================
+  // 🚗 ACCEPTER UNE COURSE (existant)
+  // ============================================================
   @SubscribeMessage('accept-ride')
   async handleAcceptRide(
     @MessageBody()

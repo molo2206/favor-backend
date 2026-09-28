@@ -12,9 +12,13 @@ import { NotificationsController } from './notifications.controller';
 import { UserHasCompanyEntity } from 'src/user_has_company/entities/user_has_company.entity';
 import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/company_has_userResource.entity';
 
+// 🔥 AJOUT IMPORTANT
+import { OrderModule } from 'src/order/order.module';
+
 @Module({
   imports: [
     forwardRef(() => RideModule),
+    forwardRef(() => OrderModule),   // 🔥 AJOUTÉ — pour OrderDeliveryService
     TypeOrmModule.forFeature([
       UserEntity,
       DeviceToken,
@@ -31,7 +35,7 @@ import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/com
     NotificationHelper,
   ],
   exports: [
-    NotificationsGateway,    // ✅ AJOUTÉ — indispensable pour DeliveryService
+    NotificationsGateway,
     NotificationsService,
     NotificationHelper,
     TypeOrmModule,

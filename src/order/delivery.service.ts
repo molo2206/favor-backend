@@ -21,8 +21,8 @@ import { NotificationsService } from 'src/notification/notifications.service';
 import { NotificationsGateway } from 'src/notification/notifications.gateway';
 
 @Injectable()
-export class DeliveryService {
-    private readonly logger = new Logger(DeliveryService.name);
+export class OrderDeliveryService {
+    private readonly logger = new Logger(OrderDeliveryService.name);
 
     constructor(
         @InjectRepository(OrderDeliveryAssignment)
@@ -86,9 +86,7 @@ export class DeliveryService {
         this.logger.log(`   lang       = ${lang}`);
         this.logger.log('========================================');
 
-        // ============================================================
         // 1. Récupérer la commande AVEC TOUTES les relations
-        // ============================================================
         this.logger.log(`🔍 [1/6] Recherche de la commande ${orderId}...`);
         const order = await this.orderRepo
             .createQueryBuilder('order')
@@ -144,27 +142,8 @@ export class DeliveryService {
         this.logger.log(`   city    = ${order.addressUser.city?.name ?? 'N/A'}`);
         this.logger.log(`   country = ${order.addressUser.country?.name ?? 'N/A'}`);
 
-        // ============================================================
-        // 2. Vérifier le statut de la commande
-        // ============================================================
-        this.logger.log(`🔍 [2/6] Vérification du statut de la commande...`);
-        const allowedStatuses = [OrderStatus.VALIDATED, OrderStatus.PROCESSING];
-        this.logger.log(`   statuts autorisés = ${allowedStatuses.join(', ')}`);
-        this.logger.log(`   statut actuel     = ${order.status}`);
 
-        if (!allowedStatuses.includes(order.status)) {
-            this.logger.warn(`❌ Statut non autorisé pour la livraison`);
-            throw new BadRequestException(
-                await this.i18n.translate('order_not_ready_for_delivery', lang, {
-                    status: order.status,
-                }),
-            );
-        }
-        this.logger.log(`✅ Statut OK`);
-
-        // ============================================================
         // 3. Vérifier le livreur
-        // ============================================================
         this.logger.log(`🔍 [3/6] Recherche du livreur ${deliverId}...`);
         const deliver = await this.userRepo.findOne({ where: { id: deliverId } });
 
@@ -187,9 +166,7 @@ export class DeliveryService {
         }
         this.logger.log(`✅ Rôle DELIVERY OK`);
 
-        // ============================================================
         // 4. Vérifier qu'il n'y a pas déjà une affectation active
-        // ============================================================
         this.logger.log(`🔍 [4/6] Vérification d'une affectation active...`);
         const existing = await this.assignmentRepo.findOne({
             where: {
@@ -213,9 +190,7 @@ export class DeliveryService {
         }
         this.logger.log(`✅ Aucune affectation active existante`);
 
-        // ============================================================
         // 5. Créer l'affectation
-        // ============================================================
         this.logger.log(`🔍 [5/6] Création de l'affectation...`);
         const assignment = this.assignmentRepo.create({
             orderId,
@@ -234,9 +209,7 @@ export class DeliveryService {
         this.logger.log(`   assignedAt = ${saved.assignedAt}`);
         this.logger.log(`   assignedBy = ${saved.assignedById}`);
 
-        // ============================================================
         // 6. Mettre à jour la commande
-        // ============================================================
         this.logger.log(`🔍 [6/6] Mise à jour de la commande...`);
         await this.orderRepo.update(orderId, {
             currentDeliveryUserId: deliverId,
@@ -245,9 +218,7 @@ export class DeliveryService {
             `✅ Commande mise à jour : currentDeliveryUserId = ${deliverId}`,
         );
 
-        // ============================================================
         // 7. Notifier le livreur via WebSocket
-        // ============================================================
         this.logger.log(`📡 Envoi de la notification WebSocket au livreur...`);
         this.notificationsGateway.sendNewDeliveryAssignment(deliverId, {
             assignmentId: saved.id,
@@ -257,9 +228,7 @@ export class DeliveryService {
             createdAt: saved.createdAt,
         });
 
-        // ============================================================
         // 8. Vérifier si le livreur est connecté
-        // ============================================================
         const activeUsers = this.notificationsGateway.getActiveUsers();
         const isConnected = activeUsers.includes(deliverId);
 
@@ -313,9 +282,7 @@ export class DeliveryService {
         this.logger.log(`   heading   = ${location.heading ?? 'N/A'}`);
         this.logger.log('========================================');
 
-        // ============================================================
         // 1. Récupérer l'affectation avec TOUTES les relations
-        // ============================================================
         this.logger.log(`🔍 [1/4] Recherche de l'affectation active...`);
         const assignment = await this.buildAssignmentQuery('assignment')
             .where('assignment.orderId = :orderId', { orderId })
@@ -336,9 +303,7 @@ export class DeliveryService {
         this.logger.log(`   status    = ${assignment.status}`);
         this.logger.log(`   deliverId = ${assignment.deliverId}`);
 
-        // ============================================================
         // 2. Récupérer les coordonnées cibles depuis Order.addressUser
-        // ============================================================
         const targetLatitude = assignment.order.addressUser?.latitude;
         const targetLongitude = assignment.order.addressUser?.longitude;
 
@@ -354,9 +319,7 @@ export class DeliveryService {
             );
         }
 
-        // ============================================================
         // 3. Calculer la distance (Haversine)
-        // ============================================================
         this.logger.log(`📐 [2/4] Calcul de la distance (Haversine)...`);
         const distanceKm = this.calculateDistance(
             location.latitude,
@@ -370,9 +333,7 @@ export class DeliveryService {
         this.logger.log(`✅ Distance calculée : ${distanceKm} km`);
         this.logger.log(`✅ ETA calculé : ${estimatedArrivalMinutes} min`);
 
-        // ============================================================
         // 4. Mise à jour de la position du livreur
-        // ============================================================
         this.logger.log(`📝 [3/4] Mise à jour de la position...`);
         assignment.currentLatitude = location.latitude;
         assignment.currentLongitude = location.longitude;
@@ -427,9 +388,7 @@ export class DeliveryService {
         this.logger.log(`✅ Affectation sauvegardée`);
         this.logger.log(`   nouveau status = ${updated.status}`);
 
-        // ============================================================
         // 5. Diffuser la position via WebSocket
-        // ============================================================
         this.logger.log(
             `📡 [4/4] Diffusion WebSocket à la room order-${orderId}...`,
         );
@@ -454,11 +413,11 @@ export class DeliveryService {
     }
 
     // ============================================================
-    // ✅ CHANGER LE STATUT MANUELLEMENT
+    // ✅ CHANGER LE STATUT MANUELLEMENT (PAR PIN)
     // ============================================================
     async updateStatus(
         orderId: string,
-        pin: string,              // 🔐 PIN fourni par le client
+        pin: string,
         note?: string,
     ) {
         this.logger.log('========================================');
@@ -468,7 +427,6 @@ export class DeliveryService {
         this.logger.log(`   note    = ${note ?? 'N/A'}`);
         this.logger.log('========================================');
 
-        // Récupérer l'affectation AVEC la commande (pour le PIN)
         const assignment = await this.assignmentRepo
             .createQueryBuilder('assignment')
             .leftJoinAndSelect('assignment.order', 'order')
@@ -485,7 +443,6 @@ export class DeliveryService {
             `✅ Affectation trouvée (status actuel: ${assignment.status})`,
         );
 
-        // 🔐 Vérification du PIN
         if (!pin) {
             this.logger.warn(`❌ PIN manquant`);
             throw new BadRequestException(
@@ -509,7 +466,6 @@ export class DeliveryService {
 
         this.logger.log(`✅ PIN correct → passage automatique à DELIVERED`);
 
-        // ✅ Statut forcé à DELIVERED
         assignment.status = AssignmentStatus.DELIVERED;
         assignment.deliveredAt = new Date();
         assignment.isActive = false;
@@ -526,7 +482,6 @@ export class DeliveryService {
             `✅ Affectation sauvegardée (nouveau status: ${updated.status})`,
         );
 
-        // Diffuser
         this.logger.log(`📡 Diffusion WebSocket...`);
         this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
             orderId,
@@ -563,7 +518,6 @@ export class DeliveryService {
         this.logger.log(`   lat/lng   = ${location.latitude}, ${location.longitude}`);
         this.logger.log('========================================');
 
-        // 1. Vérifier que l'affectation existe et appartient bien à ce livreur
         const assignment = await this.buildAssignmentQuery('assignment')
             .where('assignment.orderId = :orderId', { orderId })
             .andWhere('assignment.deliverId = :deliverId', { deliverId })
@@ -583,7 +537,6 @@ export class DeliveryService {
         this.logger.log(`   id     = ${assignment.id}`);
         this.logger.log(`   status = ${assignment.status}`);
 
-        // 2. Vérifier que le statut permet de démarrer le tracking
         const allowedStatuses = [
             AssignmentStatus.ASSIGNED,
             AssignmentStatus.PICKED_UP,
@@ -598,7 +551,6 @@ export class DeliveryService {
             );
         }
 
-        // 3. Coordonnées cibles (adresse client)
         const targetLatitude = assignment.order.addressUser?.latitude;
         const targetLongitude = assignment.order.addressUser?.longitude;
 
@@ -609,7 +561,6 @@ export class DeliveryService {
             );
         }
 
-        // 4. Calculer la distance initiale
         const distanceKm = this.calculateDistance(
             location.latitude,
             location.longitude,
@@ -622,7 +573,6 @@ export class DeliveryService {
         this.logger.log(`📐 Distance initiale : ${distanceKm} km`);
         this.logger.log(`⏱️ ETA initial : ${estimatedArrivalMinutes} min`);
 
-        // 5. Mettre à jour l'affectation
         assignment.currentLatitude = location.latitude;
         assignment.currentLongitude = location.longitude;
         assignment.currentSpeed = location.speed;
@@ -631,7 +581,6 @@ export class DeliveryService {
         assignment.estimatedArrivalMinutes = estimatedArrivalMinutes;
         assignment.lastLocationUpdate = new Date();
 
-        // ✅ Auto: ASSIGNED → PICKED_UP au démarrage
         if (assignment.status === AssignmentStatus.ASSIGNED) {
             this.logger.log(`🔄 AUTO STATUS: ASSIGNED → PICKED_UP (démarrage)`);
             assignment.status = AssignmentStatus.PICKED_UP;
@@ -641,7 +590,6 @@ export class DeliveryService {
         const updated = await this.assignmentRepo.save(assignment);
         this.logger.log(`✅ Tracking démarré - status = ${updated.status}`);
 
-        // 6. Diffuser à la room order-xxx
         this.notificationsGateway.sendDeliveryLocation(orderId, {
             orderId,
             deliverId: updated.deliverId,
@@ -654,7 +602,6 @@ export class DeliveryService {
             status: updated.status,
         });
 
-        // 7. Notifier aussi le changement de statut
         this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
             orderId,
             status: updated.status,
@@ -673,7 +620,6 @@ export class DeliveryService {
                 status: updated.status,
                 distanceRemainingKm: updated.distanceRemainingKm,
                 estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
-                // Coordonnées cibles pour info
                 targetLatitude,
                 targetLongitude,
             },
@@ -703,9 +649,9 @@ export class DeliveryService {
                 orderId: a.orderId,
                 status: a.status,
                 invoiceNumber: a.order?.invoiceNumber,
-                order: a.order,                       // ✅ Commande complète
-                deliver: a.deliver,                   // ✅ Livreur
-                assignedBy: a.assignedBy,             // ✅ Admin
+                order: a.order,
+                deliver: a.deliver,
+                assignedBy: a.assignedBy,
                 deliveryAddress: a.order?.addressUser
                     ? {
                         address: a.order.addressUser.address,
@@ -759,21 +705,18 @@ export class DeliveryService {
         return {
             orderId,
 
-            // 🚚 Livreur
             deliverId: assignment.deliverId,
             deliverName: assignment.deliver?.fullName,
             deliverPhone: assignment.deliver?.phone,
             deliverImage: assignment.deliver?.image,
-            deliver: assignment.deliver,             // ✅ Objet complet
-            assignedBy: assignment.assignedBy,       // ✅ Admin
+            deliver: assignment.deliver,
+            assignedBy: assignment.assignedBy,
 
-            // 📍 Position actuelle du livreur
             latitude: assignment.currentLatitude,
             longitude: assignment.currentLongitude,
             speed: assignment.currentSpeed,
             heading: assignment.currentHeading,
 
-            // 🎯 Destination (adresse du client)
             targetLatitude: assignment.order?.addressUser?.latitude,
             targetLongitude: assignment.order?.addressUser?.longitude,
             deliveryAddress: assignment.order?.addressUser
@@ -787,10 +730,8 @@ export class DeliveryService {
                 }
                 : null,
 
-            // 📦 Commande complète avec toutes relations
             order: assignment.order,
 
-            // 📏 Métadonnées
             distanceRemainingKm: assignment.distanceRemainingKm,
             estimatedArrivalMinutes: assignment.estimatedArrivalMinutes,
             status: assignment.status,
@@ -810,7 +751,7 @@ export class DeliveryService {
         lat2: number,
         lon2: number,
     ): number {
-        const R = 6371; // Rayon de la Terre en km
+        const R = 6371;
         const dLat = this.toRad(lat2 - lat1);
         const dLon = this.toRad(lon2 - lon1);
 

@@ -9,7 +9,6 @@ import {
     HttpCode,
     HttpStatus,
     Logger,
-    BadRequestException,
 } from '@nestjs/common';
 import { Request } from 'express';
 
@@ -17,17 +16,18 @@ import { AssignDeliveryDto } from './dto/assign-delivery.dto';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { DeliveryService } from './delivery.service';
-import { AssignmentStatus } from './enum/assignment-status.enum';
 import { StartTrackingDto } from './enum/start-tracking.dto';
 import { UpdateStatusDto } from './enum/update-status.dto';
 import { UpdateLocationDto } from './enum/update-location.dto';
+import { OrderDeliveryService } from './delivery.service';
 
 @Controller('delivery')
 export class DeliveryController {
     private readonly logger = new Logger(DeliveryController.name);
 
-    constructor(private readonly deliveryService: DeliveryService) { }
+    constructor(
+        private readonly orderDeliveryService: OrderDeliveryService,   // 🔥 renommé
+    ) { }
 
     // ============================================================
     // 👨‍💼 ADMIN — AFFECTER UN LIVREUR À UNE COMMANDE
@@ -45,7 +45,7 @@ export class DeliveryController {
         this.logger.log(
             `📥 POST /delivery/orders/${orderId}/assign by ${user.id}`,
         );
-        return this.deliveryService.assignDeliveryToOrder(
+        return this.orderDeliveryService.assignDeliveryToOrder(
             orderId,
             dto.deliverId,
             user.id,
@@ -54,7 +54,7 @@ export class DeliveryController {
     }
 
     // ============================================================
-    // 🚚 LIVREUR — DÉMARRER LE TRACKING DE SA POSITION
+    // 🚚 LIVREUR — DÉMARRER LE TRACKING
     // ============================================================
     @Post('orders/:orderId/start-tracking')
     @UseGuards(AuthentificationGuard)
@@ -69,7 +69,7 @@ export class DeliveryController {
         this.logger.log(
             `🚚 POST /delivery/orders/${orderId}/start-tracking by deliver ${user.id}`,
         );
-        return this.deliveryService.startTracking(
+        return this.orderDeliveryService.startTracking(
             orderId,
             user.id,
             dto,
@@ -92,7 +92,7 @@ export class DeliveryController {
         this.logger.log(
             `📍 POST /delivery/orders/${orderId}/location by deliver ${user.id}`,
         );
-        return this.deliveryService.updateLocation(orderId, {
+        return this.orderDeliveryService.updateLocation(orderId, {
             latitude: dto.latitude,
             longitude: dto.longitude,
             speed: dto.speed,
@@ -101,7 +101,7 @@ export class DeliveryController {
     }
 
     // ============================================================
-    // 🚚 LIVREUR — CHANGER LE STATUT
+    // 🚚 LIVREUR — CHANGER LE STATUT (PIN)
     // ============================================================
     @Post('orders/:orderId/status')
     @UseGuards(AuthentificationGuard)
@@ -115,7 +115,7 @@ export class DeliveryController {
         this.logger.log(
             `✅ POST /delivery/orders/${orderId}/status (PIN) by deliver ${user.id}`,
         );
-        return this.deliveryService.updateStatus(
+        return this.orderDeliveryService.updateStatus(
             orderId,
             dto.pin,
             dto.note,
@@ -123,11 +123,11 @@ export class DeliveryController {
     }
 
     // ============================================================
-    // 📍 TOUS — DERNIÈRE POSITION DU LIVREUR
+    // 📍 TOUS — DERNIÈRE POSITION
     // ============================================================
     @Get('orders/:orderId/location')
     async getLastLocation(@Param('orderId') orderId: string) {
-        return this.deliveryService.getLastLocation(orderId);
+        return this.orderDeliveryService.getLastLocation(orderId);
     }
 
     // ============================================================
@@ -137,7 +137,7 @@ export class DeliveryController {
     @UseGuards(AuthentificationGuard)
     async getMyAssignments(@CurrentUser() user: UserEntity) {
         this.logger.log(`📋 GET /delivery/my-assignments for ${user.id}`);
-        return this.deliveryService.getDeliverAssignments(user.id);
+        return this.orderDeliveryService.getDeliverAssignments(user.id);
     }
 
     // ============================================================
