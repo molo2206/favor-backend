@@ -16,7 +16,7 @@ import { RideService } from 'src/Course et Taxi/Ride/ride.service';
 import { NotificationsService } from './notifications.service';
 import { NotificationType } from './type/notification.type';
 import { DriverLocationService } from 'src/Course et Taxi/DriverLocation/driver-location.service';
-import { DeliveryService } from 'src/delivery/delivery.service';
+import { OrderDeliveryService } from 'src/order/order-delivery.service';   // 🔥 CORRIGÉ
 
 interface ActiveUser {
   id: string;
@@ -50,9 +50,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     private readonly notificationsService: NotificationsService,
     private readonly driverLocationService: DriverLocationService,
 
-    // 🔥 Injection du DeliveryService
-    @Inject(forwardRef(() => DeliveryService))
-    private readonly deliveryService: DeliveryService,
+    // 🔥 Injection du OrderDeliveryService
+    @Inject(forwardRef(() => OrderDeliveryService))   // 🔥 CORRIGÉ
+    private readonly deliveryService: OrderDeliveryService,   // 🔥 CORRIGÉ
   ) { }
 
   onModuleInit() {
@@ -360,8 +360,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       `📍 [Gateway] Location update from deliver ${data.deliverId} for order ${data.orderId}`,
     );
 
-    // On émet un événement local que le DeliveryService écoutera
-    // (ou on peut directement appeler le service si injecté)
     this.server.emit('internal:updateDeliveryLocation', data);
 
     return { success: true };
@@ -406,17 +404,14 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       return { success: false, message: 'orderId et deliverId requis' };
     }
 
-    // 🔥 Rejoindre automatiquement la room de la commande
     const roomName = `order-${orderId}`;
     client.join(roomName);
 
-    // 🔥 Marquer le tracking comme actif
     if (!this.activeTrackings.has(deliverId)) {
       this.activeTrackings.set(deliverId, new Set());
     }
     this.activeTrackings.get(deliverId)!.add(orderId);
 
-    // 🔔 Informer la room que le tracking est actif
     this.server.to(roomName).emit('trackingStarted', {
       orderId,
       deliverId,
@@ -449,17 +444,14 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       return { success: false, message: 'orderId et deliverId requis' };
     }
 
-    // 🔥 Retirer du tracking actif
     if (this.activeTrackings.has(deliverId)) {
       this.activeTrackings.get(deliverId)!.delete(orderId);
 
-      // Nettoyer si vide
       if (this.activeTrackings.get(deliverId)!.size === 0) {
         this.activeTrackings.delete(deliverId);
       }
     }
 
-    // 🔔 Informer la room
     const roomName = `order-${orderId}`;
     this.server.to(roomName).emit('trackingStopped', {
       orderId,
@@ -492,7 +484,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
   ) {
     const { orderId, deliverId } = data;
 
-    // 🔥 Vérifier que le tracking est bien actif
     const isTracking = this.activeTrackings.get(deliverId)?.has(orderId);
     if (!isTracking) {
       console.log(
@@ -509,7 +500,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       `📍 [Gateway] livreur:location - ${deliverId} → order-${orderId} (${data.latitude}, ${data.longitude})`,
     );
 
-    // 🔥 Appel direct au DeliveryService
     try {
       await this.deliveryService.updateLocation(orderId, {
         latitude: data.latitude,
