@@ -109,55 +109,7 @@ export class OrderService {
     const supported = ['fr', 'en', 'sw', 'es', 'ar'];
     return supported.includes(lang) ? lang : 'fr';
   }
-
-  /**
- * 🔄 Renomme `deliveryAssignments` → `courier` dans la réponse
- * et retire les données sensibles (password) du livreur.
- */
-  private mapOrderForResponse(order: OrderEntity | null): any {
-    if (!order) return order;
-
-    const courier = ((order as any).deliveryAssignments || []).map((a: any) => ({
-      id: a.id,
-      status: a.status,
-      isActive: a.isActive,
-      assignedAt: a.assignedAt,
-      pickedUpAt: a.pickedUpAt,
-      deliveredAt: a.deliveredAt,
-      currentLatitude: a.currentLatitude,
-      currentLongitude: a.currentLongitude,
-      currentSpeed: a.currentSpeed,
-      currentHeading: a.currentHeading,
-      distanceRemainingKm: a.distanceRemainingKm,
-      estimatedArrivalMinutes: a.estimatedArrivalMinutes,
-      lastLocationUpdate: a.lastLocationUpdate,
-      notes: a.notes,
-      createdAt: a.createdAt,
-      updatedAt: a.updatedAt,
-      deliver: a.deliver
-        ? {
-          id: a.deliver.id,
-          fullName: a.deliver.fullName,
-          email: a.deliver.email,
-          phone: a.deliver.phone,
-          image: a.deliver.image,
-          role: a.deliver.role,
-        }
-        : null,
-      assignedBy: a.assignedBy
-        ? {
-          id: a.assignedBy.id,
-          fullName: a.assignedBy.fullName,
-          email: a.assignedBy.email,
-          role: a.assignedBy.role,
-        }
-        : null,
-    }));
-
-    // On retire `deliveryAssignments` et on ajoute `courier`
-    const { deliveryAssignments, ...rest } = order as any;
-    return { ...rest, courier };
-  }
+  
 
   private async generateReferralCode(
     userId: string,
@@ -2543,7 +2495,7 @@ export class OrderService {
     shippingCost: number,
     user: UserEntity,
     lang: string = 'fr'
-  ): Promise<{ message: string; data: any }> {
+  ): Promise<{ message: string; data: OrderEntity }> {
     // 1️⃣ Récupérer la commande avec ses relations
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
@@ -2559,9 +2511,6 @@ export class OrderService {
         'subOrders.company',
         'user',
         'addressUser',
-        'deliveryAssignments',              // 🔥 AJOUT
-        'deliveryAssignments.deliver',      // 🔥 AJOUT
-        'deliveryAssignments.assignedBy',   // 🔥 AJOUT
       ],
     });
 
@@ -2635,9 +2584,6 @@ export class OrderService {
         'subOrders.company',
         'user',
         'addressUser',
-        'deliveryAssignments',              // 🔥 AJOUT
-        'deliveryAssignments.deliver',      // 🔥 AJOUT
-        'deliveryAssignments.assignedBy',   // 🔥 AJOUT
       ],
     });
 
@@ -2659,13 +2605,12 @@ export class OrderService {
       console.error('[Order] Erreur notifications frais de livraison:', err),
     );
 
-    // 🔥 MAPPER avec courier
     return {
       message: this.i18nService.translate('order.shipping_cost_updated', lang, {
         oldCost: oldShippingCost,
         newCost: shippingCost,
       }),
-      data: this.mapOrderForResponse(finalOrder),
+      data: finalOrder,
     };
   }
 
@@ -2783,8 +2728,8 @@ export class OrderService {
     };
   }
 
-  async getOrdersByUser(userId: string, pageNumber?: number, limitNumber?: number): Promise<any[]> {
-    const orders = await this.orderRepo.find({
+  async getOrdersByUser(userId: string, pageNumber?: number, limitNumber?: number): Promise<OrderEntity[]> {
+    return this.orderRepo.find({
       where: { user: { id: userId } },
       relations: [
         'orderItems.product.company',
@@ -2797,14 +2742,12 @@ export class OrderService {
         'subOrders.company',
         'user',
         'addressUser',
-        'deliveryAssignments',
-        'deliveryAssignments.deliver',
-        'deliveryAssignments.assignedBy',
+        'deliveryAssignments',              // 🔥 AJOUT
+        'deliveryAssignments.deliver',      // 🔥 AJOUT
+        'deliveryAssignments.assignedBy',   // 🔥 AJOUT
       ],
       order: { createdAt: 'DESC' },
     });
-    // 🔥 MAPPER avec courier + retirer password
-    return orders.map((o) => this.mapOrderForResponse(o));
   }
 
   //   async getOrdersByUser(
@@ -2842,7 +2785,7 @@ export class OrderService {
     page: number = 1,
     limit: number = 10,
     langHeader?: string,
-  ): Promise<{ message: string; data: PaginatedResponseDto<any> }> {
+  ): Promise<{ message: string; data: PaginatedResponseDto<OrderEntity> }> {
     const lang = langHeader || this.getUserLanguage(user);
 
     if (!user.activeCompanyId) {
@@ -2964,16 +2907,21 @@ export class OrderService {
       query.where('order.type = :type', { type: company.typeCompany });
     }
 
-    // 🔥 Règle métier
+    // 🔥 Règle métier :
+    // - SUPER ADMIN voit tout (pas de filtre)
+    // - UTILISATEUR avec canManage voit tout (pas de filtre) 🔥 NOUVEAU
+    // - AUTRES utilisateurs voient UNIQUEMENT les commandes de leur ville
     if (isSuperAdmin) {
       console.log('✅ SUPER ADMIN - Pas de filtre');
     } else if (hasManagePermission) {
+      // 🔥 NOUVEAU: Les utilisateurs avec canManage voient toutes les commandes
       console.log('✅ canManage - Pas de filtre');
     } else if (!fullUser.activeBranchId) {
       throw new BadRequestException(
         this.i18nService.translate('order.no_active_branch', lang)
       );
     } else if (hasCityFilter) {
+      // 🔥 FILTRE STRICT pour les utilisateurs sans canManage
       query.andWhere('subOrderCompany.cityId = :userCityId', { userCityId });
       console.log('✅ Filtre appliqué: subOrderCompany.cityId =', userCityId);
     } else {
@@ -2990,7 +2938,7 @@ export class OrderService {
     const [orders, total] = await query.getManyAndCount();
     console.log('📊 Nombre de commandes trouvées:', total);
 
-    // 🔥 Enrichir les commandes avec la ville + courier
+    // 🔥 Enrichir les commandes avec la ville de l'entreprise
     const enrichedOrders = orders.map(order => {
       let cityId: string | null = null;
       let cityName: string | null = null;
@@ -3004,7 +2952,7 @@ export class OrderService {
       }
 
       return {
-        ...this.mapOrderForResponse(order),
+        ...order,
         cityId,
         cityName,
       };
@@ -3025,6 +2973,7 @@ export class OrderService {
         resource: 'TOUTES LES COMMANDES'
       });
     } else if (hasManagePermission) {
+      // 🔥 Message pour les utilisateurs avec canManage
       message = this.i18nService.translate('order.orders_fetched_manage_all', lang, {
         resource: targetResource
       });
@@ -3045,8 +2994,7 @@ export class OrderService {
     };
   }
 
-
-  async findOne(orderId: string): Promise<{ data: any }> {
+  async findOne(orderId: string): Promise<{ data: OrderEntity }> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: [
@@ -3060,19 +3008,19 @@ export class OrderService {
         'subOrders.company',
         'user',
         'addressUser',
-        'deliveryAssignments',
-        'deliveryAssignments.deliver',
-        'deliveryAssignments.assignedBy',
+        'deliveryAssignments',              // 🔥 AJOUT
+        'deliveryAssignments.deliver',      // 🔥 AJOUT
+        'deliveryAssignments.assignedBy',   // 🔥 AJOUT
       ],
     });
     if (!order) {
       const lang = 'fr';
       throw new NotFoundException(this.i18nService.translate('order.order_not_found_by_id', lang, { orderId }));
     }
-    return { data: this.mapOrderForResponse(order) };
+    return { data: order };
   }
 
-  async findAll(): Promise<{ data: any[] }> {
+  async findAll(): Promise<{ data: OrderEntity[] }> {
     const orders = await this.orderRepo.find({
       relations: [
         'orderItems.product.company',
@@ -3085,17 +3033,16 @@ export class OrderService {
         'subOrders.company',
         'user',
         'addressUser',
-        'deliveryAssignments',
-        'deliveryAssignments.deliver',
-        'deliveryAssignments.assignedBy',
+        'deliveryAssignments',              // 🔥 AJOUT
+        'deliveryAssignments.deliver',      // 🔥 AJOUT
+        'deliveryAssignments.assignedBy',   // 🔥 AJOUT
       ],
       order: { createdAt: 'DESC' },
     });
-    // 🔥 MAPPER chaque order avec courier + retirer password
-    return { data: orders.map((o) => this.mapOrderForResponse(o)) };
+    return { data: orders };
   }
 
-  async findSubOrdersByCompanys(companyId: string): Promise<{ data: any[] }> {
+  async findSubOrdersByCompanys(companyId: string): Promise<{ data: SubOrderEntity[] }> {
     const orders = await this.orderRepo.find({
       relations: [
         'user',
@@ -3105,30 +3052,12 @@ export class OrderService {
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',
-        // 🔥 AJOUT
-        'deliveryAssignments',
-        'deliveryAssignments.deliver',
-        'deliveryAssignments.assignedBy',
       ],
       order: { createdAt: 'DESC' },
     });
-
-    const subOrders: any[] = orders
-      .flatMap(order =>
-        order.subOrders.map(sub => {
-          // 🔥 mapper le courier + retirer password
-          const orderMapped = this.mapOrderForResponse(order);
-          return {
-            ...sub,
-            user: order.user,
-            addressUser: order.addressUser,
-            // 🔥 ajouter le courier (renommé)
-            courier: orderMapped.courier,
-          };
-        })
-      )
+    const subOrders: SubOrderEntity[] = orders
+      .flatMap(order => order.subOrders.map(sub => ({ ...sub, user: order.user, addressUser: order.addressUser })))
       .filter(sub => sub.company.id === companyId);
-
     return { data: subOrders };
   }
 
@@ -3194,7 +3123,7 @@ export class OrderService {
     }, {} as Record<string, number>);
 
     // ============================================================
-    // 📊 ordersByDay
+    // 📊 ordersByDay (inchangé)
     // ============================================================
     const ordersByDay = await this.orderRepo
       .createQueryBuilder('order')
@@ -3249,7 +3178,7 @@ export class OrderService {
     const revenueByDay = Object.values(revenueByDayMap);
 
     // ============================================================
-    // 📊 topProducts
+    // 📊 topProducts (inchangé)
     // ============================================================
     const topProductsQueryBuilder = this.orderItemRepo
       .createQueryBuilder('oi')
@@ -3275,7 +3204,7 @@ export class OrderService {
       .getRawMany();
 
     // ============================================================
-    // 📊 Compteurs
+    // 📊 Compteurs (inchangés)
     // ============================================================
     const totalProductsQueryBuilder = this.productRepo
       .createQueryBuilder('product')
@@ -3324,13 +3253,14 @@ export class OrderService {
       },
     };
   }
+
   // ======================== ANNULATION DE COMMANDE (UNIQUEMENT PENDING) ========================
   async cancelOrder(
     orderId: string,
     user: UserEntity,
     cancelDto: CancelOrderDto,
     langHeader?: string,
-  ): Promise<{ message: string; data: any }> {
+  ): Promise<{ message: string; data: OrderEntity }> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: [
@@ -3340,9 +3270,9 @@ export class OrderService {
         'subOrders',
         'subOrders.items',
         'subOrders.items.product',
-        'deliveryAssignments',
-        'deliveryAssignments.deliver',
-        'deliveryAssignments.assignedBy',
+        'deliveryAssignments',              // 🔥 AJOUT
+        'deliveryAssignments.deliver',      // 🔥 AJOUT
+        'deliveryAssignments.assignedBy',   // 🔥 AJOUT
       ],
     });
 
@@ -3393,12 +3323,11 @@ export class OrderService {
       message: this.i18nService.translate('order.order_cancelled_success', lang, {
         orderId: order.invoiceNumber,
       }),
-      data: this.mapOrderForResponse(updatedOrder),
+      data: updatedOrder,
     };
   }
 
   // ======================== NOTIFICATIONS D'ANNULATION ========================
-
   private async processOrderCancellation(
     order: OrderEntity,
     reason: string | undefined,
