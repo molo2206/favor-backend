@@ -24,8 +24,6 @@ import { UserSettingsEntity } from 'src/users/entities/user-settings.entity';
 import { UserPlatformRoleEntity } from 'src/users/entities/user_plateform_roles.entity';
 import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/company_has_userResource.entity';
 import { PermissionHelper } from 'src/users/utility/helpers/permission.helper';
-import { NotificationsService } from 'src/notification/notifications.service';
-import { NotificationsGateway } from 'src/notification/notifications.gateway';
 import { FcmService } from 'src/notification/fcm.service';
 import { PawapayModule } from 'src/pawapay/pawapay.module';
 import { RideModule } from 'src/Course et Taxi/Ride/ride.module';
@@ -33,7 +31,7 @@ import { DriverLocationModule } from 'src/Course et Taxi/DriverLocation/driver-l
 import { MailOrderService } from 'src/email/emailorder.service';
 import { Meal } from '../meal/entity/meal.entity';
 import { VehicleBaggageRule } from '../baggage-rules/entities/baggage-rule.entity';
-import { CommonModule } from 'src/libs/common/src/common.module'; // ✅ chemin correct
+import { CommonModule } from 'src/libs/common/src/common.module';
 
 @Module({
   imports: [
@@ -54,9 +52,9 @@ import { CommonModule } from 'src/libs/common/src/common.module'; // ✅ chemin 
       UserPlatformRoleEntity,
       CompanyHasUserResource,
       Meal,
-      VehicleBaggageRule
+      VehicleBaggageRule,
     ]),
-    CommonModule, // ✅ pour avoir I18nService
+    CommonModule,
     forwardRef(() => NotificationsModule),
     forwardRef(() => MailModule),
     forwardRef(() => PawapayModule),
@@ -70,9 +68,9 @@ import { CommonModule } from 'src/libs/common/src/common.module'; // ✅ chemin 
     NotificationHelper,
     PermissionHelper,
     MailOrderService,
-    NotificationsService,
-    NotificationsGateway,
     FcmService,
+    // ❌ RETIRÉ : NotificationsService  (déjà fourni par NotificationsModule)
+    // ❌ RETIRÉ : NotificationsGateway  (déjà fourni par NotificationsModule)
   ],
   controllers: [TripsController],
   exports: [
@@ -80,7 +78,7 @@ import { CommonModule } from 'src/libs/common/src/common.module'; // ✅ chemin 
     PushNotificationHelper,
     NotificationHelper,
     PermissionHelper,
-    NotificationsService,
+    // ❌ RETIRÉ : NotificationsService  (déjà exporté par NotificationsModule)
   ],
 })
-export class TripsModule {}
+export class TripsModule { }
