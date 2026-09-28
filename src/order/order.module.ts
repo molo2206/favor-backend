@@ -39,7 +39,7 @@ import { ReferralEntity } from 'src/users/entities/referral.entity';
 // ✅ AJOUTS LIVRAISON
 import { OrderDeliveryAssignment } from './entities/order-delivery-assignment.entity';
 import { DeliveryController } from './delivery.controller';
-import { OrderDeliveryService } from './delivery.service';
+import { OrderDeliveryService } from './order-delivery.service';
 
 @Module({
   imports: [

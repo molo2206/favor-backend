@@ -19,7 +19,7 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { StartTrackingDto } from './enum/start-tracking.dto';
 import { UpdateStatusDto } from './enum/update-status.dto';
 import { UpdateLocationDto } from './enum/update-location.dto';
-import { OrderDeliveryService } from './delivery.service';
+import { OrderDeliveryService } from './order-delivery.service';
 
 @Controller('delivery')
 export class DeliveryController {
