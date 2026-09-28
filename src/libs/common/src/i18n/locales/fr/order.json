@@ -177,5 +177,13 @@
   "order.email.thank_you_footer": "Merci pour votre confiance et votre collaboration.",
   "order.email.legal_line_1": "Favor Help — Office 1, Q.Murara, 012, Goma, Nord-Kivu, Congo-Kinshasa",
   "order.email.legal_line_2": "RCCM : 81194815700029 — N°Tel : +24397964940 — Email : contact@favorhelp.cd",
-  "order.email.legal_line_3": "Facture générée électroniquement — Valable sans signature manuscrite."
+  "order.email.legal_line_3": "Facture générée électroniquement — Valable sans signature manuscrite.",
+  "order_not_found": "Commande introuvable",
+  "order_not_ready_for_delivery": "La commande n'est pas prête pour la livraison (statut actuel: {{status}})",
+  "user_not_found": "Utilisateur introuvable",
+  "user_not_delivery": "L'utilisateur n'a pas le rôle DELIVERY",
+  "order_already_assigned": "Cette commande a déjà un livreur affecté",
+  "delivery_assigned": "Livreur affecté avec succès",
+  "new_delivery_assignment_title": "Nouvelle livraison assignée",
+  "new_delivery_assignment_body": "Vous avez une nouvelle livraison pour la commande {{orderId}}"
 }

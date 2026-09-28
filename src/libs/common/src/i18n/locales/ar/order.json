@@ -177,5 +177,13 @@
   "order.email.thank_you_footer": "شكراً لثقتكم وتعاونكم.",
   "order.email.legal_line_1": "فيفور هيلب — مكتب 1، Q.Murara، 012، غوما، شمال كيفو، جمهورية الكونغو الديمقراطية",
   "order.email.legal_line_2": "RCCM: 81194815700029 — الهاتف: +24397964940 — البريد الإلكتروني: contact@favorhelp.cd",
-  "order.email.legal_line_3": "تم إنشاء الفاتورة إلكترونياً — صالحة بدون توقيع يدوي."
+  "order.email.legal_line_3": "تم إنشاء الفاتورة إلكترونياً — صالحة بدون توقيع يدوي.",
+  "order_not_found": "الطلب غير موجود",
+  "order_not_ready_for_delivery": "الطلب غير جاهز للتسليم (الحالة الحالية: {{status}})",
+  "user_not_found": "المستخدم غير موجود",
+  "user_not_delivery": "المستخدم لا يملك دور DELIVERY",
+  "order_already_assigned": "هذا الطلب لديه بالفعل موصل معين",
+  "delivery_assigned": "تم تعيين الموصل بنجاح",
+  "new_delivery_assignment_title": "تم تعيين توصيل جديد",
+  "new_delivery_assignment_body": "لديك توصيل جديد للطلب {{orderId}}"
 }

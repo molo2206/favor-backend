@@ -1,0 +1,153 @@
+import {
+    Controller,
+    Post,
+    Get,
+    Body,
+    Param,
+    Req,
+    UseGuards,
+    HttpCode,
+    HttpStatus,
+    Logger,
+    BadRequestException,
+} from '@nestjs/common';
+import { Request } from 'express';
+
+import { AssignDeliveryDto } from './dto/assign-delivery.dto';
+import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
+import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
+import { UserEntity } from 'src/users/entities/user.entity';
+import { DeliveryService } from './delivery.service';
+import { AssignmentStatus } from './enum/assignment-status.enum';
+import { StartTrackingDto } from './enum/start-tracking.dto';
+import { UpdateStatusDto } from './enum/update-status.dto';
+import { UpdateLocationDto } from './enum/update-location.dto';
+
+@Controller('delivery')
+export class DeliveryController {
+    private readonly logger = new Logger(DeliveryController.name);
+
+    constructor(private readonly deliveryService: DeliveryService) { }
+
+    // ============================================================
+    // 👨‍💼 ADMIN — AFFECTER UN LIVREUR À UNE COMMANDE
+    // ============================================================
+    @Post('orders/:orderId/assign')
+    @UseGuards(AuthentificationGuard)
+    @HttpCode(HttpStatus.OK)
+    async assignDelivery(
+        @Req() req: Request,
+        @Param('orderId') orderId: string,
+        @Body() dto: AssignDeliveryDto,
+        @CurrentUser() user: UserEntity,
+    ) {
+        const lang = this.extractLanguage(req);
+        this.logger.log(
+            `📥 POST /delivery/orders/${orderId}/assign by ${user.id}`,
+        );
+        return this.deliveryService.assignDeliveryToOrder(
+            orderId,
+            dto.deliverId,
+            user.id,
+            lang,
+        );
+    }
+
+    // ============================================================
+    // 🚚 LIVREUR — DÉMARRER LE TRACKING DE SA POSITION
+    // ============================================================
+    @Post('orders/:orderId/start-tracking')
+    @UseGuards(AuthentificationGuard)
+    @HttpCode(HttpStatus.OK)
+    async startTracking(
+        @Req() req: Request,
+        @Param('orderId') orderId: string,
+        @Body() dto: StartTrackingDto,
+        @CurrentUser() user: UserEntity,
+    ) {
+        const lang = this.extractLanguage(req);
+        this.logger.log(
+            `🚚 POST /delivery/orders/${orderId}/start-tracking by deliver ${user.id}`,
+        );
+        return this.deliveryService.startTracking(
+            orderId,
+            user.id,
+            dto,
+            lang,
+        );
+    }
+
+    // ============================================================
+    // 🚚 LIVREUR — ENVOYER SA POSITION (REST fallback)
+    // ============================================================
+    @Post('orders/:orderId/location')
+    @UseGuards(AuthentificationGuard)
+    @HttpCode(HttpStatus.OK)
+    async updateLocation(
+        @Req() req: Request,
+        @Param('orderId') orderId: string,
+        @Body() dto: UpdateLocationDto,
+        @CurrentUser() user: UserEntity,
+    ) {
+        this.logger.log(
+            `📍 POST /delivery/orders/${orderId}/location by deliver ${user.id}`,
+        );
+        return this.deliveryService.updateLocation(orderId, {
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+            speed: dto.speed,
+            heading: dto.heading,
+        });
+    }
+
+    // ============================================================
+    // 🚚 LIVREUR — CHANGER LE STATUT
+    // ============================================================
+    @Post('orders/:orderId/status')
+    @UseGuards(AuthentificationGuard)
+    @HttpCode(HttpStatus.OK)
+    async updateStatus(
+        @Req() req: Request,
+        @Param('orderId') orderId: string,
+        @Body() dto: UpdateStatusDto,
+        @CurrentUser() user: UserEntity,
+    ) {
+        this.logger.log(
+            `✅ POST /delivery/orders/${orderId}/status (PIN) by deliver ${user.id}`,
+        );
+        return this.deliveryService.updateStatus(
+            orderId,
+            dto.pin,
+            dto.note,
+        );
+    }
+
+    // ============================================================
+    // 📍 TOUS — DERNIÈRE POSITION DU LIVREUR
+    // ============================================================
+    @Get('orders/:orderId/location')
+    async getLastLocation(@Param('orderId') orderId: string) {
+        return this.deliveryService.getLastLocation(orderId);
+    }
+
+    // ============================================================
+    // 🚚 LIVREUR — MES AFFECTATIONS ACTIVES
+    // ============================================================
+    @Get('my-assignments')
+    @UseGuards(AuthentificationGuard)
+    async getMyAssignments(@CurrentUser() user: UserEntity) {
+        this.logger.log(`📋 GET /delivery/my-assignments for ${user.id}`);
+        return this.deliveryService.getDeliverAssignments(user.id);
+    }
+
+    // ============================================================
+    // 🌐 LANGUE
+    // ============================================================
+    private extractLanguage(req: Request): string {
+        const acceptLanguage = req.headers['accept-language'];
+        if (!acceptLanguage) return 'fr';
+        const primary = acceptLanguage.split(',')[0].split(';')[0].trim();
+        const supported = ['fr', 'en', 'sw', 'es', 'ar'];
+        return supported.includes(primary) ? primary : 'fr';
+    }
+}

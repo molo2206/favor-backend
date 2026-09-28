@@ -1,6 +1,6 @@
-// order.module.ts
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { OrderService } from './order.service';
 import { OrderEntity } from './entities/order.entity';
 import { OrderItemEntity } from '../order-item/entities/order-item.entity';
@@ -26,7 +26,7 @@ import { OperationEntity } from 'src/operation/entity/operation.entity';
 import { DeviceToken } from 'src/firebase/entities/device-token.entity';
 import { PushNotificationHelper } from 'src/users/utility/helpers/push-notification.helper';
 import { NotificationHelper } from 'src/notification/utils/notification.helper';
-import { FcmService } from 'src/notification/fcm.service'; // ✅ ajout
+import { FcmService } from 'src/notification/fcm.service';
 import { UserSettingsEntity } from 'src/users/entities/user-settings.entity';
 import { PermissionHelper } from 'src/users/utility/helpers/permission.helper';
 import { I18nService } from 'src/libs/common/src';
@@ -35,6 +35,12 @@ import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/com
 import { City } from 'src/company/entities/city.entity';
 import { FpayModule } from 'src/fpay/fpay.module';
 import { ReferralEntity } from 'src/users/entities/referral.entity';
+
+// ✅ AJOUTS LIVRAISON
+import { OrderDeliveryAssignment } from './entities/order-delivery-assignment.entity';
+import { DeliveryService } from './delivery.service';
+import { DeliveryController } from './delivery.controller';
+import { NotificationsGateway } from 'src/notification/notifications.gateway';
 
 @Module({
   imports: [
@@ -55,28 +61,36 @@ import { ReferralEntity } from 'src/users/entities/referral.entity';
       BranchEntity,
       CompanyHasUserResource,
       City,
-      ReferralEntity
+      ReferralEntity,
+      OrderDeliveryAssignment,   // ✅ AJOUTÉ
     ]),
+    forwardRef(() => NotificationsModule),   // ✅ pour le gateway
     PawapayModule,
     AddressUserModule,
     MailModule,
     InvoiceModule,
     PdfModule,
     TransactionModule,
-    NotificationsModule,
-    FpayModule
+    FpayModule,
   ],
   providers: [
     OrderService,
+    DeliveryService,             // ✅ AJOUTÉ
     SmsHelper,
     OrderNotificationHelper,
     NotificationHelper,
-    FcmService, // ✅ ajout
-    PushNotificationHelper, // ✅ ajout
+    FcmService,
+    PushNotificationHelper,
     PermissionHelper,
     I18nService,
   ],
-  controllers: [OrderController],
-  exports: [PushNotificationHelper],
+  controllers: [
+    OrderController,
+    DeliveryController,          // ✅ AJOUTÉ
+  ],
+  exports: [
+    PushNotificationHelper,
+    DeliveryService,             // ✅ AJOUTÉ
+  ],
 })
-export class OrderModule {}
+export class OrderModule { }

@@ -177,5 +177,13 @@
   "order.email.thank_you_footer": "Asante kwa imani yako na ushirikiano wako.",
   "order.email.legal_line_1": "Favor Help — Ofisi 1, Q.Murara, 012, Goma, Kivu Kaskazini, Jamhuri ya Kidemokrasia ya Kongo",
   "order.email.legal_line_2": "RCCM: 81194815700029 — Simu: +24397964940 — Barua pepe: contact@favorhelp.cd",
-  "order.email.legal_line_3": "Ankara iliyotengenezwa kielektroniki — Inatumika bila sahihi ya mkono."
+  "order.email.legal_line_3": "Ankara iliyotengenezwa kielektroniki — Inatumika bila sahihi ya mkono.",
+  "order_not_found": "Oda haipatikani",
+  "order_not_ready_for_delivery": "Oda haiko tayari kwa usafirishaji (hali ya sasa: {{status}})",
+  "user_not_found": "Mtumiaji haipatikani",
+  "user_not_delivery": "Mtumiaji hana jukumu la DELIVERY",
+  "order_already_assigned": "Oda hii tayari ina mtu wa usafirishaji",
+  "delivery_assigned": "Usafirishaji umepangwa kwa mafanikio",
+  "new_delivery_assignment_title": "Usafirishaji mpya umepangwa",
+  "new_delivery_assignment_body": "Una usafirishaji mpya kwa oda {{orderId}}"
 }

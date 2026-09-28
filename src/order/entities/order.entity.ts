@@ -19,6 +19,7 @@ import {
 import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 import { DeliveryEntity } from 'src/delivery/entities/delivery.entity';
 import { PaymentMethod } from 'src/operation/enum/payment-method.enum';
+import { OrderDeliveryAssignment } from './order-delivery-assignment.entity';
 
 @Entity('orders')
 export class OrderEntity {
@@ -158,4 +159,19 @@ export class OrderEntity {
 
   @Column({ type: 'boolean', default: false })
   readyToPay: boolean;
+
+  @OneToMany(
+    () => OrderDeliveryAssignment,
+    (assignment) => assignment.order,      // ✅
+    { cascade: true },
+  )
+  deliveryAssignments: OrderDeliveryAssignment[];
+
+  /** 🚚 Livreur actuellement affecté (dénormalisation) */
+  @ManyToOne(() => UserEntity, { nullable: true })
+  @JoinColumn({ name: 'currentDeliveryUserId' })
+  currentDeliveryUser?: UserEntity;
+
+  @Column({ nullable: true })
+  currentDeliveryUserId?: string;
 }

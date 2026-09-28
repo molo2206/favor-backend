@@ -34,6 +34,7 @@ import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { UserSettingsEntity } from './user-settings.entity';
 import { UserLoyaltyEntity } from './user-loyalty.entity';
 import { ReferralEntity } from './referral.entity';
+import { OrderDeliveryAssignment } from 'src/order/entities/order-delivery-assignment.entity';
 // import { DriverVehicle } from 'src/Course/Traitment/Entity/DriverVehicle.entity';
 // import { Ride } from 'src/Course/Traitment/Entity/Ride.entity';
 
@@ -257,4 +258,22 @@ export class UserEntity {
   // Statut du parrainage (actif/inactif)
   @Column({ default: true })
   referralActive: boolean;
+
+  // ============================================================
+  // 📦 AFFECTATIONS LIVRAISON  ← ✅ AJOUTÉ
+  // ============================================================
+
+  /** 📦 Affectations en tant que livreur (role DELIVERY) */
+  @OneToMany(
+    () => OrderDeliveryAssignment,
+    (assignment) => assignment.deliver,
+  )
+  deliveryAssignments: OrderDeliveryAssignment[];
+
+  /** 📦 Affectations créées par cet utilisateur (admin) */
+  @OneToMany(
+    () => OrderDeliveryAssignment,
+    (assignment) => assignment.assignedBy,
+  )
+  assignmentsMade: OrderDeliveryAssignment[];
 }

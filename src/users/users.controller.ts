@@ -14,6 +14,8 @@ import {
   BadRequestException,
   Query,
   Req,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { classToPlain } from 'class-transformer';
@@ -40,6 +42,8 @@ import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { Repository } from 'typeorm';
 import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { Request } from 'express';
+import { Permissions } from './utility/guards/permissions.guard';
+import { ChangeUserRoleDto } from './dto/change-role.dto';
 
 
 
@@ -290,14 +294,69 @@ export class UsersController {
   }
 
   @Get('/get/all-users')
-  async getAllUsers(@Req() req: Request) {
+  async getAllUsers(
+    @Req() req: Request,
+    @Query('role') role?: UserRole,
+  ) {
     const lang = this.extractLanguage(req);
-    const users = await this.usersService.findAllWithDetails();
-    const message = await this.usersService['i18n'].translate('user.users_list_retrieved', lang);
+
+    const users = await this.usersService.findAllWithDetails(role);
+
+    const message = await this.usersService['i18n'].translate(
+      'user.users_list_retrieved',
+      lang,
+    );
+
     return {
       message,
       data: users,
     };
+  }
+
+  @Get('/get/all-users-paginate')
+  async getAllUsersPaginate(
+    @Req() req: Request,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('role') role?: UserRole,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    const { data } = await this.usersService.findAllWithDetailsPaginate(
+      Number(page),
+      Number(limit),
+      role,
+    );
+
+    const message = await this.usersService['i18n'].translate(
+      'user.users_list_retrieved',
+      lang,
+    );
+
+    return {
+      message,
+      data,
+    };
+  }
+
+  @Patch(':id/role')
+  @UseGuards(AuthentificationGuard)
+  @HttpCode(HttpStatus.OK)
+  async changeUserRole(
+    @Req() req: Request,
+    @Param('id') targetUserId: string,
+    @Body() dto: ChangeUserRoleDto,
+    @CurrentUser() currentUser: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+
+    return this.usersService.changeUserRole(
+      targetUserId,
+      dto.role,
+      currentUser,
+      lang,
+      dto.reason,
+    );
   }
 
   @Patch(':id/user/active')

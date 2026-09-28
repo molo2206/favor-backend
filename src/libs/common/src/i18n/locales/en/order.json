@@ -177,5 +177,13 @@
   "order.email.thank_you_footer": "Thank you for your trust and collaboration.",
   "order.email.legal_line_1": "Favor Help — Office 1, Q.Murara, 012, Goma, North Kivu, DR Congo",
   "order.email.legal_line_2": "RCCM: 81194815700029 — Tel: +24397964940 — Email: contact@favorhelp.cd",
-  "order.email.legal_line_3": "Invoice generated electronically — Valid without handwritten signature."
+  "order.email.legal_line_3": "Invoice generated electronically — Valid without handwritten signature.",
+  "order_not_found": "Order not found",
+  "order_not_ready_for_delivery": "Order is not ready for delivery (current status: {{status}})",
+  "user_not_found": "User not found",
+  "user_not_delivery": "User does not have the DELIVERY role",
+  "order_already_assigned": "This order already has an assigned delivery person",
+  "delivery_assigned": "Delivery assigned successfully",
+  "new_delivery_assignment_title": "New delivery assigned",
+  "new_delivery_assignment_body": "You have a new delivery for order {{orderId}}"
 }

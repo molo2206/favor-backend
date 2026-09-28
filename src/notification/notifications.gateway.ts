@@ -45,7 +45,7 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     @Inject(forwardRef(() => NotificationsService))
     private readonly notificationsService: NotificationsService,
     private readonly driverLocationService: DriverLocationService,
-  ) {}
+  ) { }
 
   onModuleInit() {
     console.log('✅ WebSocket Gateway initialized');
@@ -224,6 +224,145 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     } else {
       console.log(`⚠️ User ${userId} is not connected`);
     }
+  }
+
+  // ============================================================
+  // 📦 AFFECTATION LIVRAISON - NOTIFIER LE LIVREUR
+  // ============================================================
+  sendNewDeliveryAssignment(deliverId: string, payload: any) {
+    console.log(
+      `📦 [Gateway] sendNewDeliveryAssignment called for deliver ${deliverId}`,
+    );
+
+    const userExists = this.activeUsers.some((user) => user.id === deliverId);
+
+    if (userExists) {
+      this.server.to(deliverId).emit('newDeliveryAssignment', {
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+      console.log(`✅ newDeliveryAssignment emitted to deliver ${deliverId}`);
+    } else {
+      console.log(`⚠️ Deliver ${deliverId} is not connected`);
+    }
+  }
+
+  // ============================================================
+  // 📍 MISE À JOUR DE POSITION (diffusion à la room order:xxx)
+  // ============================================================
+  sendDeliveryLocation(
+    orderId: string,
+    payload: {
+      orderId: string;
+      deliverId: string;
+      latitude: number;
+      longitude: number;
+      speed?: number;
+      heading?: number;
+      distanceRemainingKm?: number;
+      estimatedArrivalMinutes?: number;
+      status: string;
+    },
+  ) {
+    const roomName = `order-${orderId}`;
+
+    this.server.to(roomName).emit('deliveryLocation', {
+      ...payload,
+      timestamp: new Date().toISOString(),
+    });
+
+    console.log(`📍 deliveryLocation emitted to room ${roomName}`);
+  }
+
+  // ============================================================
+  // ✅ MISE À JOUR DE STATUT DE LIVRAISON
+  // ============================================================
+  sendDeliveryStatusUpdate(
+    orderId: string,
+    payload: {
+      orderId: string;
+      status: string;
+      note?: string;
+    },
+  ) {
+    const roomName = `order-${orderId}`;
+
+    this.server.to(roomName).emit('deliveryStatusUpdate', {
+      ...payload,
+      timestamp: new Date().toISOString(),
+    });
+
+    console.log(`✅ deliveryStatusUpdate emitted to room ${roomName}`);
+  }
+
+  // ============================================================
+  // 📦 REJOINDRE LA ROOM D'UNE COMMANDE (pour le client)
+  // ============================================================
+  @SubscribeMessage('join-order-tracking')
+  handleJoinOrderTracking(
+    @MessageBody() data: { orderId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const roomName = `order-${data.orderId}`;
+    client.join(roomName);
+    console.log(`🔌 Client ${client.id} joined order room: ${roomName}`);
+    return { success: true, room: roomName };
+  }
+
+  @SubscribeMessage('leave-order-tracking')
+  handleLeaveOrderTracking(
+    @MessageBody() data: { orderId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const roomName = `order-${data.orderId}`;
+    client.leave(roomName);
+    console.log(`🔌 Client ${client.id} left order room: ${roomName}`);
+    return { success: true, room: roomName };
+  }
+
+  @SubscribeMessage('updateDeliveryLocation')
+  async handleUpdateDeliveryLocation(
+    @MessageBody()
+    data: {
+      orderId: string;
+      deliverId: string;
+      latitude: number;
+      longitude: number;
+      speed?: number;
+      heading?: number;
+    },
+  ) {
+    console.log(
+      `📍 [Gateway] Location update from deliver ${data.deliverId} for order ${data.orderId}`,
+    );
+
+    // On émet un événement local que le DeliveryService écoutera
+    // (ou on peut directement appeler le service si injecté)
+    this.server.emit('internal:updateDeliveryLocation', data);
+
+    return { success: true };
+  }
+
+  // ============================================================
+  // ✅ LE LIVREUR CHANGE LE STATUT
+  // ============================================================
+  @SubscribeMessage('updateDeliveryStatus')
+  async handleUpdateDeliveryStatus(
+    @MessageBody()
+    data: {
+      orderId: string;
+      deliverId: string;
+      status: string;
+      note?: string;
+    },
+  ) {
+    console.log(
+      `✅ [Gateway] Status update from deliver ${data.deliverId} for order ${data.orderId}: ${data.status}`,
+    );
+
+    this.server.emit('internal:updateDeliveryStatus', data);
+
+    return { success: true };
   }
 
   @SubscribeMessage('accept-ride')
