@@ -26,7 +26,7 @@ export class DeliveryController {
     private readonly logger = new Logger(DeliveryController.name);
 
     constructor(
-        private readonly orderDeliveryService: OrderDeliveryService,   // 🔥 renommé
+        private readonly orderDeliveryService: OrderDeliveryService,
     ) { }
 
     // ============================================================
@@ -54,12 +54,34 @@ export class DeliveryController {
     }
 
     // ============================================================
-    // 🚚 LIVREUR — DÉMARRER LE TRACKING
+    // 1️⃣ LIVREUR — CONNECTER À LA ROOM (REST → info WebSocket)
     // ============================================================
-    @Post('orders/:orderId/start-tracking')
+    @Post('orders/:orderId/connect')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
-    async startTracking(
+    async connectToRoom(
+        @Req() req: Request,
+        @Param('orderId') orderId: string,
+        @CurrentUser() user: UserEntity,
+    ) {
+        const lang = this.extractLanguage(req);
+        this.logger.log(
+            `🔌 POST /delivery/orders/${orderId}/connect by deliver ${user.id}`,
+        );
+        return this.orderDeliveryService.connectToOrderRoom(
+            orderId,
+            user.id,
+            lang,
+        );
+    }
+
+    // ============================================================
+    // 2️⃣ LIVREUR — DÉMARRER / ARRÊTER LE TRACKING
+    // ============================================================
+    @Post('orders/:orderId/tracking')
+    @UseGuards(AuthentificationGuard)
+    @HttpCode(HttpStatus.OK)
+    async toggleTracking(
         @Req() req: Request,
         @Param('orderId') orderId: string,
         @Body() dto: StartTrackingDto,
@@ -67,35 +89,41 @@ export class DeliveryController {
     ) {
         const lang = this.extractLanguage(req);
         this.logger.log(
-            `🚚 POST /delivery/orders/${orderId}/start-tracking [${dto.action}] by deliver ${user.id}`,
+            `🚚 POST /delivery/orders/${orderId}/tracking [${dto.action}] by deliver ${user.id}`,
         );
-        return this.orderDeliveryService.startTracking(
+        return this.orderDeliveryService.toggleTracking(
             orderId,
             user.id,
-            dto.action,        // 🔥 passe juste l'action
+            dto.action,
             lang,
         );
     }
 
     // ============================================================
-    // 🚚 LIVREUR — ENVOYER SA POSITION (REST fallback)
+    // 3️⃣ LIVREUR — ENVOYER SA POSITION (REST fallback)
     // ============================================================
-    @Post('orders/:orderId/location')
+    @Post('orders/:orderId/position')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
-    async updateLocation(
+    async sendPosition(
         @Req() req: Request,
         @Param('orderId') orderId: string,
         @Body() dto: UpdateLocationDto,
         @CurrentUser() user: UserEntity,
     ) {
+        const lang = this.extractLanguage(req);
         this.logger.log(
-            `📍 POST /delivery/orders/${orderId}/location by deliver ${user.id}`,
+            `📍 POST /delivery/orders/${orderId}/position by deliver ${user.id}`,
         );
-        return this.orderDeliveryService.updateLocation(orderId, {
-            latitude: dto.latitude,
-            longitude: dto.longitude,
-        });
+        return this.orderDeliveryService.sendPosition(
+            orderId,
+            user.id,
+            {
+                latitude: dto.latitude,
+                longitude: dto.longitude,
+            },
+            lang,
+        );
     }
 
     // ============================================================
