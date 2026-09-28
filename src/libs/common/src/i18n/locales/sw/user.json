@@ -143,5 +143,17 @@
   "referral.status_pending": "Inasubiri",
   "referral.status_completed": "Imekamilika",
   "referral.status_rewarded": "Imepata tuzo",
-  "referral.status_expired": "Imeisha muda wake"
+  "referral.status_expired": "Imeisha muda wake",
+  "user.cannot_change_own_role": "Hauwezi kubadilisha jukumu lako mwenyewe.",
+  "user.cannot_modify_super_admin": "Ni SUPER ADMIN pekee anayeweza kurekebisha SUPER ADMIN.",
+  "user.cannot_promote_super_admin": "Ni SUPER ADMIN pekee anayeweza kumpandisha mtu kuwa SUPER ADMIN.",
+  "user.cannot_deactivate_self": "Hauwezi kuzima akaunti yako mwenyewe.",
+  "user.same_role": "Mtumiaji tayari ana jukumu la {{role}}.",
+  "user.role_changed": "Jukumu la {{fullName}} limebadilishwa kuwa {{role}} kwa mafanikio.",
+  "user.not_found": "Mtumiaji hapatikani.",
+  "user.phone_already_exists": "Nambari hii ya simu tayari inatumika.",
+  "user.user_created_by_admin": "Mtumiaji {{fullName}} ameundwa kwa mafanikio.",
+  "user.user_updated_by_admin": "Taarifa za {{fullName}} zimesasishwa kwa mafanikio.",
+  "user.must_change_password": "Lazima ubadilishe nenosiri lako kabla ya kuendelea.",
+  "user.referral_code_generation_failed": "Imeshindwa kutengeneza nambari ya rufaa."
 }

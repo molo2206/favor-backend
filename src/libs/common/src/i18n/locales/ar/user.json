@@ -143,5 +143,17 @@
   "referral.status_pending": "معلق",
   "referral.status_completed": "مكتمل",
   "referral.status_rewarded": "مكافأ",
-  "referral.status_expired": "منتهي الصلاحية"
+  "referral.status_expired": "منتهي الصلاحية",
+  "user.cannot_change_own_role": "لا يمكنك تغيير دورك الخاص.",
+  "user.cannot_modify_super_admin": "فقط المشرف الأعلى يمكنه تعديل المشرف الأعلى.",
+  "user.cannot_promote_super_admin": "فقط المشرف الأعلى يمكنه ترقية مستخدم إلى مشرف أعلى.",
+  "user.cannot_deactivate_self": "لا يمكنك تعطيل حسابك الخاص.",
+  "user.same_role": "المستخدم لديه بالفعل دور {{role}}.",
+  "user.role_changed": "تم تغيير دور {{fullName}} إلى {{role}} بنجاح.",
+  "user.not_found": "المستخدم غير موجود.",
+  "user.phone_already_exists": "رقم الهاتف هذا مستخدم بالفعل.",
+  "user.user_created_by_admin": "تم إنشاء المستخدم {{fullName}} بنجاح.",
+  "user.user_updated_by_admin": "تم تحديث معلومات {{fullName}} بنجاح.",
+  "user.must_change_password": "يجب عليك تغيير كلمة المرور قبل المتابعة.",
+  "user.referral_code_generation_failed": "فشل في إنشاء رمز الإحالة."
 }

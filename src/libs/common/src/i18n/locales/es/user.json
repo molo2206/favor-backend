@@ -143,5 +143,17 @@
   "referral.status_pending": "Pendiente",
   "referral.status_completed": "Completado",
   "referral.status_rewarded": "Recompensado",
-  "referral.status_expired": "Expirado"
+  "referral.status_expired": "Expirado",
+  "user.cannot_change_own_role": "No puedes cambiar tu propio rol.",
+  "user.cannot_modify_super_admin": "Solo un SUPER ADMIN puede modificar a un SUPER ADMIN.",
+  "user.cannot_promote_super_admin": "Solo un SUPER ADMIN puede promover a SUPER ADMIN.",
+  "user.cannot_deactivate_self": "No puedes desactivar tu propia cuenta.",
+  "user.same_role": "El usuario ya tiene el rol {{role}}.",
+  "user.role_changed": "El rol de {{fullName}} ha sido cambiado a {{role}} correctamente.",
+  "user.not_found": "Usuario no encontrado.",
+  "user.phone_already_exists": "Este número de teléfono ya está en uso.",
+  "user.user_created_by_admin": "El usuario {{fullName}} ha sido creado correctamente.",
+  "user.user_updated_by_admin": "La información de {{fullName}} ha sido actualizada correctamente.",
+  "user.must_change_password": "Debes cambiar tu contraseña antes de continuar.",
+  "user.referral_code_generation_failed": "Error al generar el código de referido."
 }

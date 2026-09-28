@@ -160,5 +160,17 @@
   "fpay.deposit.user_not_found": "Utilisateur non trouvé",
   "fpay.deposit.otp_invalid": "Code OTP invalide ou expiré. Veuillez refaire une demande.",
   "fpay.deposit.otp_required": "Le code OTP est requis pour confirmer votre demande",
-  "fpay.deposit.no_email_or_phone": "Aucun email ou téléphone trouvé pour cet utilisateur"
+  "fpay.deposit.no_email_or_phone": "Aucun email ou téléphone trouvé pour cet utilisateur",
+  "user.cannot_change_own_role": "Vous ne pouvez pas modifier votre propre rôle.",
+  "user.cannot_modify_super_admin": "Seul un SUPER ADMIN peut modifier un SUPER ADMIN.",
+  "user.cannot_promote_super_admin": "Seul un SUPER ADMIN peut promouvoir en SUPER ADMIN.",
+  "user.cannot_deactivate_self": "Vous ne pouvez pas désactiver votre propre compte.",
+  "user.same_role": "L'utilisateur a déjà le rôle {{role}}.",
+  "user.role_changed": "Le rôle de {{fullName}} a été changé en {{role}} avec succès.",
+  "user.not_found": "Utilisateur introuvable.",
+  "user.phone_already_exists": "Ce numéro de téléphone est déjà utilisé.",
+  "user.user_created_by_admin": "L'utilisateur {{fullName}} a été créé avec succès.",
+  "user.user_updated_by_admin": "Les informations de {{fullName}} ont été mises à jour avec succès.",
+  "user.must_change_password": "Vous devez changer votre mot de passe avant de continuer.",
+  "user.referral_code_generation_failed": "Échec de la génération du code de parrainage."
 }

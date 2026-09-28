@@ -47,6 +47,8 @@ import { ReferralEntity, ReferralStatus } from './entities/referral.entity';
 import { OrderStatus } from 'src/order/enum/order.status.enum';
 import { FpayService } from 'src/fpay/fpay.service';
 import { PaginatedResponseDto } from 'src/products/dto/paginated-response.dto';
+import { CreateUserByAdminDto } from './dto/create-user-by-admin.dto';
+import { UpdateUserByAdminDto } from './dto/update-user-by-admin.dto';
 
 @Injectable()
 export class UsersService {
@@ -3849,7 +3851,7 @@ export class UsersService {
     page: number = 1,
     limit: number = 10,
     role?: UserRole,
-  ): Promise<{ data: PaginatedResponseDto<any>}> {
+  ): Promise<{ data: PaginatedResponseDto<any> }> {
     const query = this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
@@ -4325,6 +4327,396 @@ export class UsersService {
     return {
       message: await this.i18n.translate('user.settings_updated', lang),
       data: settings,
+    };
+  }
+
+  // ============================================================
+  // 🔧 CRÉER UN UTILISATEUR PAR UN ADMIN
+  // ============================================================
+  async createUserByAdmin(
+    dto: CreateUserByAdminDto,
+    currentUser: UserEntity,
+    lang: string = 'fr',
+  ): Promise<{ message: string; data: any }> {
+    // 1. Sécurité : SUPER_ADMIN uniquement par SUPER_ADMIN
+    if (
+      dto.role === UserRole.SUPER_ADMIN &&
+      currentUser.role !== UserRole.SUPER_ADMIN
+    ) {
+      throw new ForbiddenException(
+        await this.i18n.translate('user.cannot_promote_super_admin', lang),
+      );
+    }
+    const DEFAULT_USER_PASSWORD = 'FavorHelp@2025';
+    if (!dto.email && !dto.phone) {
+      throw new BadRequestException(
+        await this.i18n.translate('user.email_or_phone_required', lang),
+      );
+    }
+
+    // 2. Doublons
+    const existing = await this.usersRepository.findOne({
+      where: [
+        ...(dto.email ? [{ email: dto.email }] : []),
+        ...(dto.phone ? [{ phone: dto.phone }] : []),
+      ],
+    });
+
+    if (existing) {
+      throw new BadRequestException(
+        await this.i18n.translate('user.account_exists', lang),
+      );
+    }
+
+    // 3. Mot de passe (par défaut si non fourni)
+    const usedDefaultPassword = !dto.password || dto.password.trim() === '';
+    const rawPassword = usedDefaultPassword ? DEFAULT_USER_PASSWORD : dto.password!;
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+    // 4. Création
+    const newUser = this.usersRepository.create({
+      fullName: dto.fullName,
+      email: dto.email || undefined,
+      phone: dto.phone || undefined,
+      password: hashedPassword,
+      role: dto.role,
+      isActive: true,
+      provider: 'admin',
+      country: dto.country,
+      city: dto.city,
+      address: dto.address,
+      image: dto.image,
+      vehicleType: dto.vehicleType,
+      plateNumber: dto.plateNumber,
+    });
+
+    const savedUser = await this.usersRepository.save(newUser);
+
+    // 5. Génération du referralCode
+    const referralCodeGenerated = await this.generateReferralCode(savedUser.id);
+    savedUser.referralCode = referralCodeGenerated;
+    await this.usersRepository.save(savedUser);
+
+    // 6. Compte fidélité
+    const loyalty = await this.getOrCreateLoyaltyAccount(savedUser.id);
+    await this.loyaltyRepository.save(loyalty);
+
+    // 7. Recharger avec relations
+    const fullUser = await this.usersRepository
+      .createQueryBuilder('users')
+      .addSelect('users.password')
+      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
+      .leftJoinAndSelect('userHasCompany.company', 'company')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.category', 'category')
+      .leftJoinAndSelect('company.companyResources', 'companyResources')
+      .leftJoinAndSelect('companyResources.resource', 'resource')
+      .leftJoinAndSelect('company.branches', 'branches')
+      .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
+      .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
+      .leftJoinAndSelect('userPlatformRoles.role', 'role')
+      .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+      .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
+      .leftJoinAndSelect(
+        'userCompanyResources.resource',
+        'userCompanyResourceDetail',
+      )
+      .leftJoinAndSelect('users.activeBranch', 'activeBranch')
+      .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
+      .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+      .leftJoinAndSelect('users.loyalty', 'loyalty')
+      .where('users.id = :id', { id: savedUser.id })
+      .getOne();
+
+    if (!fullUser)
+      throw new NotFoundException(
+        await this.i18n.translate('user.user_not_found', lang),
+      );
+
+    const { password: _pw, ...userWithoutPassword } = fullUser;
+
+    // 8. Mapper userHasCompany
+    const userHasCompany = (userWithoutPassword.userHasCompany || []).map(
+      (uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+        company: uhc.company
+          ? {
+            ...uhc.company,
+            tauxCompanies: uhc.company.tauxCompanies ?? [],
+            country: uhc.company.country ?? null,
+            city: uhc.company.city ?? null,
+            category: uhc.company.category ?? null,
+            branches: (uhc.company.branches || []).map((b) => ({
+              id: b.id,
+              name: b.name,
+              address: b.address,
+              phone: b.phone,
+              email: b.email,
+              status: b.status,
+              deleted: b.deleted,
+              country: b.country
+                ? { id: b.country.id, name: b.country.name }
+                : null,
+              city: b.city ? { id: b.city.id, name: b.city.name } : null,
+            })),
+          }
+          : null,
+        branch: uhc.branch
+          ? { id: uhc.branch.id, name: uhc.branch.name }
+          : null,
+        userResources: (uhc.resources || []).map((r) => ({
+          id: r.id,
+          canCreate: r.canCreate,
+          canRead: r.canRead,
+          canUpdate: r.canUpdate,
+          canDelete: r.canDelete,
+          canManage: r.canManage,
+          status: r.status,
+          resource: r.resource
+            ? {
+              id: r.resource.id,
+              name: r.resource.name,
+              label: r.resource.label,
+            }
+            : null,
+        })),
+      }),
+    );
+
+    // 9. Réponse
+    return {
+      message: await this.i18n.translate('user.user_created_by_admin', lang, {
+        fullName: fullUser.fullName,
+      }),
+      data: instanceToPlain({
+        ...userWithoutPassword,
+        userHasCompany,
+        loyalty: {
+          points: fullUser.loyalty?.[0]?.pointsBalance ?? 0,
+          tier: fullUser.loyalty?.[0]?.currentTier ?? null,
+          code: fullUser.loyalty?.[0]?.loyaltyCode ?? null,
+        },
+        ...(usedDefaultPassword && {
+          defaultPasswordUsed: true,
+          defaultPasswordHint:
+            'Un mot de passe par défaut a été attribué.',
+        }),
+      }),
+    };
+  }
+
+  // ============================================================
+  // 🔧 MODIFIER UN UTILISATEUR PAR UN ADMIN
+  // ============================================================
+  async updateUserByAdmin(
+    targetUserId: string,
+    dto: UpdateUserByAdminDto,
+    currentUser: UserEntity,
+    lang: string = 'fr',
+  ): Promise<{ message: string; data: any }> {
+    // 1. Récupérer l'utilisateur cible
+    const targetUser = await this.usersRepository.findOne({
+      where: { id: targetUserId },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException(
+        await this.i18n.translate('user.user_not_found', lang),
+      );
+    }
+
+    // 2. Sécurité
+    if (
+      targetUser.role === UserRole.SUPER_ADMIN &&
+      currentUser.role !== UserRole.SUPER_ADMIN
+    ) {
+      throw new ForbiddenException(
+        await this.i18n.translate('user.cannot_modify_super_admin', lang),
+      );
+    }
+
+    if (
+      dto.role === UserRole.SUPER_ADMIN &&
+      currentUser.role !== UserRole.SUPER_ADMIN
+    ) {
+      throw new ForbiddenException(
+        await this.i18n.translate('user.cannot_promote_super_admin', lang),
+      );
+    }
+
+    if (targetUser.id === currentUser.id && dto.isActive === false) {
+      throw new BadRequestException(
+        await this.i18n.translate('user.cannot_deactivate_self', lang),
+      );
+    }
+
+    // 3. Doublons email / phone
+    if (dto.email && dto.email !== targetUser.email) {
+      const emailExists = await this.usersRepository.findOne({
+        where: { email: dto.email },
+      });
+      if (emailExists && emailExists.id !== targetUserId) {
+        throw new BadRequestException(
+          await this.i18n.translate('user.email_already_exists', lang),
+        );
+      }
+    }
+
+    if (dto.phone && dto.phone !== targetUser.phone) {
+      const phoneExists = await this.usersRepository.findOne({
+        where: { phone: dto.phone },
+      });
+      if (phoneExists && phoneExists.id !== targetUserId) {
+        throw new BadRequestException(
+          await this.i18n.translate('user.phone_already_exists', lang),
+        );
+      }
+    }
+
+    // 4. Mot de passe (hash si fourni)
+    let hashedPassword: string | undefined;
+    let passwordChanged = false;
+
+    if (dto.password && dto.password.trim() !== '') {
+      hashedPassword = await bcrypt.hash(dto.password, 10);
+      passwordChanged = true;
+    }
+
+    // 5. Appliquer les modifications
+    const oldRole = targetUser.role;
+
+    Object.assign(targetUser, {
+      ...(dto.fullName !== undefined && { fullName: dto.fullName }),
+      ...(dto.email !== undefined && { email: dto.email }),
+      ...(dto.phone !== undefined && { phone: dto.phone }),
+      ...(hashedPassword !== undefined && { password: hashedPassword }),
+      ...(dto.country !== undefined && { country: dto.country }),
+      ...(dto.city !== undefined && { city: dto.city }),
+      ...(dto.address !== undefined && { address: dto.address }),
+      ...(dto.image !== undefined && { image: dto.image }),
+      ...(dto.preferredLanguage !== undefined && {
+        preferredLanguage: dto.preferredLanguage,
+      }),
+      ...(dto.role !== undefined && { role: dto.role }),
+      ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+      ...(dto.vehicleType !== undefined && { vehicleType: dto.vehicleType }),
+      ...(dto.plateNumber !== undefined && { plateNumber: dto.plateNumber }),
+      ...(dto.licenseDocumentUrl !== undefined && {
+        licenseDocumentUrl: dto.licenseDocumentUrl,
+      }),
+    });
+
+    await this.usersRepository.save(targetUser);
+
+    // 6. Recharger avec relations
+    const fullUser = await this.usersRepository
+      .createQueryBuilder('users')
+      .addSelect('users.password')
+      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
+      .leftJoinAndSelect('userHasCompany.company', 'company')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.category', 'category')
+      .leftJoinAndSelect('company.companyResources', 'companyResources')
+      .leftJoinAndSelect('companyResources.resource', 'resource')
+      .leftJoinAndSelect('company.branches', 'branches')
+      .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
+      .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
+      .leftJoinAndSelect('userPlatformRoles.role', 'role')
+      .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+      .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
+      .leftJoinAndSelect(
+        'userCompanyResources.resource',
+        'userCompanyResourceDetail',
+      )
+      .leftJoinAndSelect('users.activeBranch', 'activeBranch')
+      .leftJoinAndSelect('activeBranch.country', 'activeBranchCountry')
+      .leftJoinAndSelect('activeBranch.city', 'activeBranchCity')
+      .leftJoinAndSelect('users.loyalty', 'loyalty')
+      .where('users.id = :id', { id: targetUserId })
+      .getOne();
+
+    if (!fullUser)
+      throw new NotFoundException(
+        await this.i18n.translate('user.user_not_found', lang),
+      );
+
+    const { password: _pw, ...userWithoutPassword } = fullUser;
+
+    // 7. Mapper userHasCompany
+    const userHasCompany = (userWithoutPassword.userHasCompany || []).map(
+      (uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+        company: uhc.company
+          ? {
+            ...uhc.company,
+            tauxCompanies: uhc.company.tauxCompanies ?? [],
+            country: uhc.company.country ?? null,
+            city: uhc.company.city ?? null,
+            category: uhc.company.category ?? null,
+            branches: (uhc.company.branches || []).map((b) => ({
+              id: b.id,
+              name: b.name,
+              address: b.address,
+              phone: b.phone,
+              email: b.email,
+              status: b.status,
+              deleted: b.deleted,
+              country: b.country
+                ? { id: b.country.id, name: b.country.name }
+                : null,
+              city: b.city ? { id: b.city.id, name: b.city.name } : null,
+            })),
+          }
+          : null,
+        branch: uhc.branch
+          ? { id: uhc.branch.id, name: uhc.branch.name }
+          : null,
+        userResources: (uhc.resources || []).map((r) => ({
+          id: r.id,
+          canCreate: r.canCreate,
+          canRead: r.canRead,
+          canUpdate: r.canUpdate,
+          canDelete: r.canDelete,
+          canManage: r.canManage,
+          status: r.status,
+          resource: r.resource
+            ? {
+              id: r.resource.id,
+              name: r.resource.name,
+              label: r.resource.label,
+            }
+            : null,
+        })),
+      }),
+    );
+
+    // 8. Réponse
+    return {
+      message: await this.i18n.translate('user.user_updated_by_admin', lang, {
+        fullName: fullUser.fullName,
+      }),
+      data: instanceToPlain({
+        ...userWithoutPassword,
+        userHasCompany,
+        loyalty: {
+          points: fullUser.loyalty?.[0]?.pointsBalance ?? 0,
+          tier: fullUser.loyalty?.[0]?.currentTier ?? null,
+          code: fullUser.loyalty?.[0]?.loyaltyCode ?? null,
+        },
+        ...(oldRole !== fullUser.role && {
+          oldRole,
+          newRole: fullUser.role,
+        }),
+        ...(passwordChanged && { passwordChanged: true }),
+      }),
     };
   }
 }
