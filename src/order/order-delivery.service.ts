@@ -498,26 +498,22 @@ export class OrderDeliveryService {
     }
 
     // ============================================================
-    // 🚚 DÉMARRER LE TRACKING (LIVREUR)
+    // 🚚 DÉMARRER / ARRÊTER LE TRACKING (LIVREUR)
     // ============================================================
     async startTracking(
         orderId: string,
         deliverId: string,
-        location: {
-            latitude: number;
-            longitude: number;
-            speed?: number;
-            heading?: number;
-        },
+        action: 'start' | 'stop',
         lang: string = 'fr',
     ) {
         this.logger.log('========================================');
         this.logger.log(`🚚 START TRACKING - DÉBUT`);
         this.logger.log(`   orderId   = ${orderId}`);
         this.logger.log(`   deliverId = ${deliverId}`);
-        this.logger.log(`   lat/lng   = ${location.latitude}, ${location.longitude}`);
+        this.logger.log(`   action    = ${action}`);
         this.logger.log('========================================');
 
+        // 1. Vérifier que l'affectation existe et appartient bien à ce livreur
         const assignment = await this.buildAssignmentQuery('assignment')
             .where('assignment.orderId = :orderId', { orderId })
             .andWhere('assignment.deliverId = :deliverId', { deliverId })
@@ -537,95 +533,89 @@ export class OrderDeliveryService {
         this.logger.log(`   id     = ${assignment.id}`);
         this.logger.log(`   status = ${assignment.status}`);
 
-        const allowedStatuses = [
-            AssignmentStatus.ASSIGNED,
-            AssignmentStatus.PICKED_UP,
-        ];
+        // ============================================================
+        // ✅ ACTION: START
+        // ============================================================
+        if (action === 'start') {
+            const allowedStatuses = [
+                AssignmentStatus.ASSIGNED,
+                AssignmentStatus.PICKED_UP,
+            ];
 
-        if (!allowedStatuses.includes(assignment.status)) {
-            this.logger.warn(
-                `❌ Statut incompatible : ${assignment.status}. Autorisés : ${allowedStatuses.join(', ')}`,
-            );
-            throw new BadRequestException(
-                `Impossible de démarrer le tracking. Statut actuel : ${assignment.status}`,
-            );
-        }
+            if (!allowedStatuses.includes(assignment.status)) {
+                this.logger.warn(
+                    `❌ Statut incompatible : ${assignment.status}. Autorisés : ${allowedStatuses.join(', ')}`,
+                );
+                throw new BadRequestException(
+                    `Impossible de démarrer le tracking. Statut actuel : ${assignment.status}`,
+                );
+            }
 
-        const targetLatitude = assignment.order.addressUser?.latitude;
-        const targetLongitude = assignment.order.addressUser?.longitude;
+            if (assignment.status === AssignmentStatus.ASSIGNED) {
+                this.logger.log(`🔄 AUTO STATUS: ASSIGNED → PICKED_UP (démarrage)`);
+                assignment.status = AssignmentStatus.PICKED_UP;
+                assignment.pickedUpAt = new Date();
+            }
 
-        if (targetLatitude == null || targetLongitude == null) {
-            this.logger.warn(`❌ Adresse sans coordonnées GPS`);
-            throw new BadRequestException(
-                `Adresse de livraison sans coordonnées GPS`,
-            );
-        }
+            assignment.lastLocationUpdate = new Date();
+            const updated = await this.assignmentRepo.save(assignment);
 
-        const distanceKm = this.calculateDistance(
-            location.latitude,
-            location.longitude,
-            targetLatitude,
-            targetLongitude,
-        );
+            this.logger.log(`✅ Tracking démarré - status = ${updated.status}`);
 
-        const estimatedArrivalMinutes = Math.round((distanceKm / 30) * 60);
-
-        this.logger.log(`📐 Distance initiale : ${distanceKm} km`);
-        this.logger.log(`⏱️ ETA initial : ${estimatedArrivalMinutes} min`);
-
-        assignment.currentLatitude = location.latitude;
-        assignment.currentLongitude = location.longitude;
-        assignment.currentSpeed = location.speed;
-        assignment.currentHeading = location.heading;
-        assignment.distanceRemainingKm = distanceKm;
-        assignment.estimatedArrivalMinutes = estimatedArrivalMinutes;
-        assignment.lastLocationUpdate = new Date();
-
-        if (assignment.status === AssignmentStatus.ASSIGNED) {
-            this.logger.log(`🔄 AUTO STATUS: ASSIGNED → PICKED_UP (démarrage)`);
-            assignment.status = AssignmentStatus.PICKED_UP;
-            assignment.pickedUpAt = new Date();
-        }
-
-        const updated = await this.assignmentRepo.save(assignment);
-        this.logger.log(`✅ Tracking démarré - status = ${updated.status}`);
-
-        this.notificationsGateway.sendDeliveryLocation(orderId, {
-            orderId,
-            deliverId: updated.deliverId,
-            latitude: location.latitude,
-            longitude: location.longitude,
-            speed: location.speed,
-            heading: location.heading,
-            distanceRemainingKm: updated.distanceRemainingKm,
-            estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
-            status: updated.status,
-        });
-
-        this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
-            orderId,
-            status: updated.status,
-            note: 'Tracking démarré',
-        });
-
-        this.logger.log('========================================');
-        this.logger.log(`✅ START TRACKING - SUCCÈS`);
-        this.logger.log('========================================');
-
-        return {
-            message: 'Tracking démarré avec succès',
-            data: {
-                assignmentId: updated.id,
-                orderId: updated.orderId,
+            this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
+                orderId,
                 status: updated.status,
-                distanceRemainingKm: updated.distanceRemainingKm,
-                estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
-                targetLatitude,
-                targetLongitude,
-            },
-        };
-    }
+                note: 'Tracking démarré',
+            });
 
+            this.logger.log('========================================');
+            this.logger.log(`✅ START TRACKING - SUCCÈS`);
+            this.logger.log('========================================');
+
+            return {
+                message: 'Tracking démarré avec succès',
+                data: {
+                    assignmentId: updated.id,
+                    orderId: updated.orderId,
+                    status: updated.status,
+                    action: 'start',
+                    startedAt: updated.lastLocationUpdate,
+                },
+            };
+        }
+
+        // ============================================================
+        // ✅ ACTION: STOP
+        // ============================================================
+        if (action === 'stop') {
+            this.logger.log(`🛑 Arrêt du tracking demandé`);
+
+            this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
+                orderId,
+                status: assignment.status,
+                note: 'Tracking arrêté',
+            });
+
+            this.logger.log('========================================');
+            this.logger.log(`✅ STOP TRACKING - SUCCÈS`);
+            this.logger.log('========================================');
+
+            return {
+                message: 'Tracking arrêté avec succès',
+                data: {
+                    assignmentId: assignment.id,
+                    orderId: assignment.orderId,
+                    status: assignment.status,
+                    action: 'stop',
+                    stoppedAt: new Date(),
+                },
+            };
+        }
+
+        throw new BadRequestException(
+            `Action non reconnue : ${action}. Utilisez 'start' ou 'stop'.`,
+        );
+    }
     // ============================================================
     // 🚚 LISTE DES AFFECTATIONS ACTIVES DU LIVREUR
     // ============================================================

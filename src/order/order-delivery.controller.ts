@@ -67,12 +67,12 @@ export class DeliveryController {
     ) {
         const lang = this.extractLanguage(req);
         this.logger.log(
-            `🚚 POST /delivery/orders/${orderId}/start-tracking by deliver ${user.id}`,
+            `🚚 POST /delivery/orders/${orderId}/start-tracking [${dto.action}] by deliver ${user.id}`,
         );
         return this.orderDeliveryService.startTracking(
             orderId,
             user.id,
-            dto,
+            dto.action,        // 🔥 passe juste l'action
             lang,
         );
     }
