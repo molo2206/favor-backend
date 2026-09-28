@@ -38,8 +38,9 @@ import { ReferralEntity } from 'src/users/entities/referral.entity';
 
 // ✅ AJOUTS LIVRAISON
 import { OrderDeliveryAssignment } from './entities/order-delivery-assignment.entity';
-import { DeliveryController } from './delivery.controller';
+import { DeliveryController } from './order-delivery.controller';
 import { OrderDeliveryService } from './order-delivery.service';
+import { GoogleModule } from 'src/Course et Taxi/google-maps/google-maps.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { OrderDeliveryService } from './order-delivery.service';
     PdfModule,
     TransactionModule,
     FpayModule,
+    GoogleModule
   ],
   providers: [
     OrderService,

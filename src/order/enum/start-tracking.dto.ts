@@ -1,31 +1,13 @@
-import { IsNumber, IsOptional, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsEnum } from 'class-validator';
+
+export enum TrackingAction {
+    START = 'start',
+    STOP = 'stop',
+}
 
 export class StartTrackingDto {
-    @Type(() => Number)
-    @IsNumber()
-    @Min(-90)
-    @Max(90)
-    latitude: number;
-
-    @Type(() => Number)
-    @IsNumber()
-    @Min(-180)
-    @Max(180)
-    longitude: number;
-
-    action:
-
-    @IsOptional()
-    @Type(() => Number)
-    @IsNumber()
-    @Min(0)
-    speed?: number;
-
-    @IsOptional()
-    @Type(() => Number)
-    @IsNumber()
-    @Min(0)
-    @Max(360)
-    heading?: number;
+    @IsEnum(TrackingAction, {
+        message: "L'action doit être 'start' ou 'stop'.",
+    })
+    action: TrackingAction;
 }

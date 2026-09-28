@@ -185,5 +185,14 @@
   "order_already_assigned": "This order already has an assigned delivery person",
   "delivery_assigned": "Delivery assigned successfully",
   "new_delivery_assignment_title": "New delivery assigned",
-  "new_delivery_assignment_body": "You have a new delivery for order {{orderId}}"
+  "new_delivery_assignment_body": "You have a new delivery for order {{orderId}}",
+  "client.delivery_assigned.push_title": "A delivery person has been assigned",
+  "client.delivery_assigned.push_body": "A delivery person has been assigned to your order {{invoiceNumber}}. They will contact you shortly for delivery.",
+  "client.delivery_assigned.sms_body": "Your order {{invoiceNumber}} has been assigned to a delivery person. They will contact you for delivery.",
+  "deliver.delivery_assigned.push_title": "New delivery assigned",
+  "deliver.delivery_assigned.push_body": "Order {{invoiceNumber}} - Customer: {{clientName}} - Address: {{address}}",
+  "deliver.delivery_assigned.sms_body": "New delivery: order {{invoiceNumber}}, customer {{clientName}}, address {{address}}",
+  "owner.delivery_assigned.push_title": "Delivery person assigned to an order",
+  "owner.delivery_assigned.push_body": "Delivery person {{deliverName}} has been assigned to order {{invoiceNumber}} (customer: {{clientName}}).",
+  "owner.delivery_assigned.sms_body": "Delivery person {{deliverName}} assigned to order {{invoiceNumber}} for customer {{clientName}}."
 }

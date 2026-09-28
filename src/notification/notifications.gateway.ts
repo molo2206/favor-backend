@@ -30,19 +30,18 @@ interface ActiveUser {
   },
   namespace: '/',
   transports: ['websocket', 'polling'],
-  pingInterval: 25000,       // 🔥 Ping toutes les 25s
-  pingTimeout: 60000,        // 🔥 Timeout étendu à 60s (au lieu de 20s)
-  connectTimeout: 45000,     // 🔥 Timeout de connexion initial
-  allowEIO3: true,           // 🔥 Compatibilité vieux clients
+  pingInterval: 25000,
+  pingTimeout: 60000,
+  connectTimeout: 45000,
+  allowEIO3: true,
 })
 @Injectable()
 export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private activeUsers: ActiveUser[] = [];
 
-  // 🔥 Tracking actif par livreur : deliverId → Set<orderId>
   private activeTrackings: Map<string, Set<string>> = new Map();
 
   constructor(
@@ -54,7 +53,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     private readonly notificationsService: NotificationsService,
     private readonly driverLocationService: DriverLocationService,
 
-    // 🔥 Injection du OrderDeliveryService
     @Inject(forwardRef(() => OrderDeliveryService))
     private readonly deliveryService: OrderDeliveryService,
   ) { }
@@ -64,9 +62,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     this.server.emit('confirmation');
   }
 
-  // ============================================================
-  // 🔌 CONNEXION D'UN UTILISATEUR
-  // ============================================================
   @SubscribeMessage('connection')
   async sendConfirm(
     @MessageBody() userId: string,
@@ -75,7 +70,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     console.log(`📡 Connection event received for user: ${userId}`);
     console.log(`   Socket ID: ${socket.id}`);
 
-    // 🔥 Validation
     if (!userId || typeof userId !== 'string') {
       console.warn(`⚠️ Connection sans userId valide - Socket ${socket.id}`);
       socket.emit('connection-error', { message: 'userId requis' });
@@ -89,7 +83,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     socket.join(userId);
 
     if (existingDriverIndex !== -1) {
-      // 🔥 Vérifier si c'est le même socket (reconnexion rapide)
       const oldSocketId = this.activeUsers[existingDriverIndex].socketId;
       if (oldSocketId === socket.id) {
         console.log(`ℹ️ User ${userId} already connected with same socket`);
@@ -119,9 +112,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     console.log(`✅ Confirmation sent to ${userId}`);
   }
 
-  // ============================================================
-  // ❌ DÉCONNEXION D'UN CLIENT
-  // ============================================================
   handleDisconnect(client: Socket) {
     const userIndex = this.activeUsers.findIndex(
       (user) => user.socketId === client.id,
@@ -133,7 +123,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       console.log(`❌ User ${userId} disconnected (socket: ${client.id})`);
       console.log(`   Reason: ${(client as any).disconnected ? 'unknown' : 'transport close'}`);
 
-      // 🔥 Nettoyer les trackings actifs de ce livreur
       if (this.activeTrackings.has(userId)) {
         const orders = Array.from(this.activeTrackings.get(userId)!);
         for (const orderId of orders) {
@@ -167,9 +156,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     this.broadcastUsers();
   }
 
-  // ============================================================
-  // 📨 ENVOYER UNE NOTIFICATION À UN UTILISATEUR
-  // ============================================================
   sendNotificationToUser(userId: string, notification: any) {
     console.log(`📨 [Gateway] sendNotificationToUser called for ${userId}`);
     const userExists = this.activeUsers.some((user) => user.id === userId);
@@ -185,17 +171,11 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     }
   }
 
-  // ============================================================
-  // 📨 ENVOYER UNE NOTIFICATION À UNE ROOM
-  // ============================================================
   sendNotificationToRoom(roomId: string, event: string, payload: any) {
     this.server.to(roomId).emit(event, payload);
     console.log(`📢 Notification "${event}" to room ${roomId}`);
   }
 
-  // ============================================================
-  // 🏢 REJOINDRE UNE ROOM DE COMPAGNIE
-  // ============================================================
   @SubscribeMessage('join-company-room')
   handleJoinCompanyRoom(
     @MessageBody() data: { companyId: string },
@@ -218,9 +198,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     return { success: true, room: roomName };
   }
 
-  // ============================================================
-  // 📢 BROADCAST À TOUS
-  // ============================================================
   broadcastNotification(notification: any) {
     this.server.emit('notification', notification);
     console.log('📢 Broadcast notification to all');
@@ -231,16 +208,10 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     this.server.emit('active-users', users);
   }
 
-  // ============================================================
-  // 📋 UTILISATEURS ACTIFS
-  // ============================================================
   getActiveUsers(): string[] {
     return this.activeUsers.map((user) => user.id);
   }
 
-  // ============================================================
-  // 📦 SHIPMENT CREATED TO COMPANY
-  // ============================================================
   sendShipmentCreatedToCompany(
     companyId: string,
     shipmentData: {
@@ -255,7 +226,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       ` [Gateway] sendShipmentCreatedToCompany called for company ${companyId}`,
     );
 
-    // Émettre à la room de la compagnie
     this.server
       .to(`company-${companyId}`)
       .emit('shipment-created-for-company', {
@@ -269,9 +239,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     );
   }
 
-  // ============================================================
-  // 📦 SHIPMENT CREATED EVENT (user)
-  // ============================================================
   sendShipmentCreatedEvent(
     userId: string,
     shipmentData: {
@@ -295,9 +262,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     }
   }
 
-  // ============================================================
-  // 📦 AFFECTATION LIVRAISON - NOTIFIER LE LIVREUR
-  // ============================================================
   sendNewDeliveryAssignment(deliverId: string, payload: any) {
     console.log(
       `📦 [Gateway] sendNewDeliveryAssignment called for deliver ${deliverId}`,
@@ -316,9 +280,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     }
   }
 
-  // ============================================================
-  // 📍 MISE À JOUR DE POSITION (diffusion à la room order:xxx)
-  // ============================================================
   sendDeliveryLocation(
     orderId: string,
     payload: {
@@ -343,9 +304,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     console.log(`📍 deliveryLocation emitted to room ${roomName}`);
   }
 
-  // ============================================================
-  // ✅ MISE À JOUR DE STATUT DE LIVRAISON
-  // ============================================================
   sendDeliveryStatusUpdate(
     orderId: string,
     payload: {
@@ -364,9 +322,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     console.log(`✅ deliveryStatusUpdate emitted to room ${roomName}`);
   }
 
-  // ============================================================
-  // 📦 REJOINDRE LA ROOM D'UNE COMMANDE (pour le client)
-  // ============================================================
   @SubscribeMessage('join-order-tracking')
   handleJoinOrderTracking(
     @MessageBody() data: { orderId: string },
@@ -390,8 +345,47 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
   }
 
   // ============================================================
-  // 📍 UPDATE DELIVERY LOCATION (via socket)
+  // 🔌 CONNECTER UN LIVREUR À UNE ROOM ORDER (par userId)
   // ============================================================
+  joinOrderRoom(userId: string, orderId: string): void {
+    const roomName = `order-${orderId}`;
+    const activeUser = this.activeUsers.find((u) => u.id === userId);
+
+    if (!activeUser) {
+      console.warn(`⚠️ [joinOrderRoom] User ${userId} non connecté`);
+      return;
+    }
+
+    const socket = this.server.sockets.sockets.get(activeUser.socketId);
+    if (socket) {
+      socket.join(roomName);
+      console.log(`🔌 User ${userId} joined room ${roomName}`);
+    } else {
+      console.warn(`⚠️ [joinOrderRoom] Socket introuvable pour ${userId}`);
+    }
+  }
+
+  // ============================================================
+  // 🚪 DÉCONNECTER UN LIVREUR D'UNE ROOM ORDER (par userId)
+  // ============================================================
+  leaveOrderRoom(userId: string, orderId: string): void {
+    const roomName = `order-${orderId}`;
+    const activeUser = this.activeUsers.find((u) => u.id === userId);
+
+    if (!activeUser) {
+      console.warn(`⚠️ [leaveOrderRoom] User ${userId} non connecté`);
+      return;
+    }
+
+    const socket = this.server.sockets.sockets.get(activeUser.socketId);
+    if (socket) {
+      socket.leave(roomName);
+      console.log(`🚪 User ${userId} left room ${roomName}`);
+    } else {
+      console.warn(`⚠️ [leaveOrderRoom] Socket introuvable pour ${userId}`);
+    }
+  }
+
   @SubscribeMessage('updateDeliveryLocation')
   async handleUpdateDeliveryLocation(
     @MessageBody()
@@ -413,9 +407,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     return { success: true };
   }
 
-  // ============================================================
-  // ✅ LE LIVREUR CHANGE LE STATUT
-  // ============================================================
   @SubscribeMessage('updateDeliveryStatus')
   async handleUpdateDeliveryStatus(
     @MessageBody()
@@ -436,135 +427,156 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
   }
 
   // ============================================================
-  // 🚚 LIVREUR — DÉMARRER LE TRACKING
+  // 1️⃣ LIVREUR — CONNECTER À LA ROOM
   // ============================================================
-  @SubscribeMessage('livreur:start-tracking')
-  async handleLivreurStartTracking(
+  @SubscribeMessage('livreur:connect')
+  async handleLivreurConnect(
     @MessageBody() data: { orderId: string; deliverId: string },
     @ConnectedSocket() client: Socket,
   ) {
     const { orderId, deliverId } = data;
-    console.log(
-      `🚚 [Gateway] livreur:start-tracking - ${deliverId} → order ${orderId}`,
-    );
+    console.log(`🔌 [Gateway] livreur:connect - ${deliverId} → order ${orderId}`);
 
     if (!orderId || !deliverId) {
-      return { success: false, message: 'orderId et deliverId requis' };
+      return { status: 'error', message: 'orderId et deliverId requis' };
     }
 
-    const roomName = `order-${orderId}`;
-    client.join(roomName);
+    try {
+      const roomName = `order-${orderId}`;
+      client.join(roomName);
 
-    if (!this.activeTrackings.has(deliverId)) {
-      this.activeTrackings.set(deliverId, new Set());
+      console.log(`✅ Livreur ${deliverId} joined room ${roomName}`);
+
+      return {
+        status: 'connected',
+        message: 'Connecté à la room',
+        data: { orderId, deliverId, roomName },
+      };
+    } catch (err: any) {
+      console.error(`❌ Erreur connect: ${err.message}`);
+      return { status: 'error', message: err.message };
     }
-    this.activeTrackings.get(deliverId)!.add(orderId);
-
-    this.server.to(roomName).emit('trackingStarted', {
-      orderId,
-      deliverId,
-      timestamp: new Date().toISOString(),
-    });
-
-    console.log(`✅ Tracking STARTED - ${deliverId} → order-${orderId}`);
-
-    return {
-      success: true,
-      message: 'Tracking démarré',
-      room: roomName,
-    };
   }
 
   // ============================================================
-  // 🛑 LIVREUR — ARRÊTER LE TRACKING
+  // 2️⃣ LIVREUR — DÉMARRER / ARRÊTER LE TRACKING
   // ============================================================
-  @SubscribeMessage('livreur:stop-tracking')
-  async handleLivreurStopTracking(
-    @MessageBody() data: { orderId: string; deliverId: string },
+  @SubscribeMessage('livreur:tracking')
+  async handleLivreurTracking(
+    @MessageBody()
+    data: { orderId: string; deliverId: string; action: 'start' | 'stop' },
     @ConnectedSocket() client: Socket,
   ) {
-    const { orderId, deliverId } = data;
-    console.log(
-      `🛑 [Gateway] livreur:stop-tracking - ${deliverId} → order ${orderId}`,
-    );
+    const { orderId, deliverId, action } = data;
+    console.log(`🚚 [Gateway] livreur:tracking - ${action} → order ${orderId}`);
 
-    if (!orderId || !deliverId) {
-      return { success: false, message: 'orderId et deliverId requis' };
+    if (!orderId || !deliverId || !action) {
+      return { status: 'error', message: 'orderId, deliverId et action requis' };
     }
 
-    if (this.activeTrackings.has(deliverId)) {
-      this.activeTrackings.get(deliverId)!.delete(orderId);
+    try {
+      // Gestion du tracking actif en mémoire
+      if (action === 'start') {
+        if (!this.activeTrackings.has(deliverId)) {
+          this.activeTrackings.set(deliverId, new Set());
+        }
+        this.activeTrackings.get(deliverId)!.add(orderId);
 
-      if (this.activeTrackings.get(deliverId)!.size === 0) {
-        this.activeTrackings.delete(deliverId);
+        const roomName = `order-${orderId}`;
+        this.server.to(roomName).emit('trackingStarted', {
+          orderId,
+          deliverId,
+          timestamp: new Date().toISOString(),
+        });
+
+        console.log(`✅ Tracking STARTED - ${deliverId} → order-${orderId}`);
+
+        return {
+          status: 'started',
+          message: 'Tracking démarré',
+          data: { orderId, deliverId, action: 'start' },
+        };
       }
+
+      if (action === 'stop') {
+        if (this.activeTrackings.has(deliverId)) {
+          this.activeTrackings.get(deliverId)!.delete(orderId);
+
+          if (this.activeTrackings.get(deliverId)!.size === 0) {
+            this.activeTrackings.delete(deliverId);
+          }
+        }
+
+        const roomName = `order-${orderId}`;
+        this.server.to(roomName).emit('trackingStopped', {
+          orderId,
+          deliverId,
+          timestamp: new Date().toISOString(),
+        });
+
+        console.log(`✅ Tracking STOPPED - ${deliverId} → order-${orderId}`);
+
+        return {
+          status: 'stopped',
+          message: 'Tracking arrêté',
+          data: { orderId, deliverId, action: 'stop' },
+        };
+      }
+
+      return { status: 'error', message: `Action inconnue : ${action}` };
+    } catch (err: any) {
+      console.error(`❌ Erreur tracking: ${err.message}`);
+      return { status: 'error', message: err.message };
     }
-
-    const roomName = `order-${orderId}`;
-    this.server.to(roomName).emit('trackingStopped', {
-      orderId,
-      deliverId,
-      timestamp: new Date().toISOString(),
-    });
-
-    console.log(`✅ Tracking STOPPED - ${deliverId} → order-${orderId}`);
-
-    return {
-      success: true,
-      message: 'Tracking arrêté',
-    };
   }
 
   // ============================================================
-  // 📍 LIVREUR — ENVOYER UNE POSITION
+  // 3️⃣ LIVREUR — ENVOYER UNE POSITION
   // ============================================================
-  @SubscribeMessage('livreur:location')
-  async handleLivreurLocation(
+  @SubscribeMessage('livreur:position')
+  async handleLivreurPosition(
     @MessageBody()
     data: {
       orderId: string;
       deliverId: string;
       latitude: number;
       longitude: number;
-      speed?: number;
-      heading?: number;
     },
   ) {
-    const { orderId, deliverId } = data;
+    const { orderId, deliverId, latitude, longitude } = data;
+    console.log(`📍 [Gateway] livreur:position - ${deliverId} → order ${orderId}`);
 
+    if (!orderId || !deliverId || latitude == null || longitude == null) {
+      return { status: 'error', message: 'orderId, deliverId, latitude, longitude requis' };
+    }
+
+    // Vérifier que le tracking est actif
     const isTracking = this.activeTrackings.get(deliverId)?.has(orderId);
     if (!isTracking) {
-      console.log(
-        `⚠️ [Gateway] livreur:location rejeté - tracking inactif pour ${deliverId} → order-${orderId}`,
-      );
+      console.log(`⚠️ Tracking inactif pour ${deliverId} → order-${orderId}`);
       return {
-        success: false,
-        message:
-          "Tracking inactif. Envoyez livreur:start-tracking d'abord.",
+        status: 'error',
+        message: "Tracking inactif. Envoyez livreur:tracking (action='start') d'abord.",
       };
     }
 
-    console.log(
-      `📍 [Gateway] livreur:location - ${deliverId} → order-${orderId} (${data.latitude}, ${data.longitude})`,
-    );
-
     try {
       await this.deliveryService.updateLocation(orderId, {
-        latitude: data.latitude,
-        longitude: data.longitude,
-        speed: data.speed,
-        heading: data.heading,
+        latitude,
+        longitude,
       });
-      return { success: true };
-    } catch (err) {
-      console.error(`❌ Erreur updateLocation: ${err.message}`);
-      return { success: false, message: err.message };
+
+      return {
+        status: 'position_received',
+        message: 'Position enregistrée et diffusée',
+        data: { orderId, deliverId, latitude, longitude },
+      };
+    } catch (err: any) {
+      console.error(`❌ Erreur position: ${err.message}`);
+      return { status: 'error', message: err.message };
     }
   }
 
-  // ============================================================
-  // 🚗 ACCEPTER UNE COURSE (existant)
-  // ============================================================
   @SubscribeMessage('accept-ride')
   async handleAcceptRide(
     @MessageBody()

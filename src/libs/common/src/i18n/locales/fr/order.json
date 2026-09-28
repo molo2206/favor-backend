@@ -185,5 +185,14 @@
   "order_already_assigned": "Cette commande a déjà un livreur affecté",
   "delivery_assigned": "Livreur affecté avec succès",
   "new_delivery_assignment_title": "Nouvelle livraison assignée",
-  "new_delivery_assignment_body": "Vous avez une nouvelle livraison pour la commande {{orderId}}"
+  "new_delivery_assignment_body": "Vous avez une nouvelle livraison pour la commande {{orderId}}",
+  "client.delivery_assigned.push_title": "Un livreur vous a été assigné",
+  "client.delivery_assigned.push_body": "Un livreur a été assigné à votre commande {{invoiceNumber}}. Il vous contactera prochainement pour la livraison.",
+  "client.delivery_assigned.sms_body": "Votre commande {{invoiceNumber}} a été assignée à un livreur. Il vous contactera pour la livraison.",
+  "deliver.delivery_assigned.push_title": "Nouvelle livraison assignée",
+  "deliver.delivery_assigned.push_body": "Commande {{invoiceNumber}} - Client: {{clientName}} - Adresse: {{address}}",
+  "deliver.delivery_assigned.sms_body": "Nouvelle livraison: commande {{invoiceNumber}}, client {{clientName}}, adresse {{address}}",
+  "owner.delivery_assigned.push_title": "Livreur affecté à une commande",
+  "owner.delivery_assigned.push_body": "Le livreur {{deliverName}} a été affecté à la commande {{invoiceNumber}} (client: {{clientName}}).",
+  "owner.delivery_assigned.sms_body": "Livreur {{deliverName}} affecté à la commande {{invoiceNumber}} du client {{clientName}}."
 }

@@ -95,8 +95,6 @@ export class DeliveryController {
         return this.orderDeliveryService.updateLocation(orderId, {
             latitude: dto.latitude,
             longitude: dto.longitude,
-            speed: dto.speed,
-            heading: dto.heading,
         });
     }
 

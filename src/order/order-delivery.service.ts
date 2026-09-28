@@ -19,6 +19,14 @@ import { UserRole } from 'src/users/enum/user-role-enum';
 import { I18nService } from 'src/libs/common/src';
 import { NotificationsService } from 'src/notification/notifications.service';
 import { NotificationsGateway } from 'src/notification/notifications.gateway';
+import { NotificationHelper } from 'src/notification/utils/notification.helper';
+import { PushNotificationHelper } from 'src/users/utility/helpers/push-notification.helper';
+import { SubOrderEntity } from 'src/sub-order/entities/sub-order.entity';
+import { SubOrderItemEntity } from 'src/sub-order-item/entities/sub-order-item.entity';
+import { PaymentStatus } from 'src/transaction/enum/payment.status.enum';
+import { GeneratePin } from 'src/users/utility/helpers/GeneratePin.util';
+import { NotificationType } from 'src/notification/type/notification.type';
+import { GoogleService } from 'src/Course et Taxi/google-maps/google-maps.service';
 
 @Injectable()
 export class OrderDeliveryService {
@@ -39,6 +47,11 @@ export class OrderDeliveryService {
 
         @Inject(forwardRef(() => NotificationsGateway))
         private readonly notificationsGateway: NotificationsGateway,
+
+        private readonly notificationHelpers: NotificationHelper,
+        private readonly pushNotificationHelper: PushNotificationHelper,
+
+        private readonly googleService: GoogleService,
     ) { }
 
     // ============================================================
@@ -69,6 +82,179 @@ export class OrderDeliveryService {
             .leftJoinAndSelect(`${alias}.assignedBy`, 'assignedBy');
     }
 
+    async processOrderNotifications(
+        finalOrder: OrderEntity,
+        user: UserEntity,
+        order: OrderEntity,
+        lang: string = 'fr',
+        deliverId?: string,
+        deliverName?: string,
+        deliverPhone?: string,
+        ownerId?: string,
+    ): Promise<void> {
+        try {
+            let imageUrl: string | undefined;
+            if (finalOrder.orderItems?.length) {
+                const firstItem = finalOrder.orderItems[0];
+                if (firstItem.product?.images?.length) imageUrl = firstItem.product.images[0].url;
+                else if (firstItem.product?.image) imageUrl = firstItem.product.image;
+            }
+
+            // ============================================================
+            // 🔥 1. NOTIFICATION AU CLIENT
+            // ============================================================
+            const hasClientPhone = user.phone && user.phone.trim() !== '';
+
+            const clientOptions: any = {
+                userId: user.id,
+                pushTitle: await this.i18n.translate('client.delivery_assigned.push_title', lang),
+                pushBody: await this.i18n.translate('client.delivery_assigned.push_body', lang, {
+                    invoiceNumber: order.invoiceNumber,
+                }),
+                pushData: { entity: 'ORDER', entityId: finalOrder.id },
+                imageUrl,
+            };
+
+            if (hasClientPhone) {
+                clientOptions.phoneNumber = user.phone;
+                clientOptions.smsBody = await this.i18n.translate('client.delivery_assigned.sms_body', lang, {
+                    invoiceNumber: order.invoiceNumber,
+                });
+            }
+
+            await this.pushNotificationHelper.sendAll(clientOptions);
+
+            await this.notificationHelpers.sendNotification(
+                this.notificationsService,
+                user.id,
+                NotificationType.ORDER_CREATED,
+                lang,
+                {
+                    invoiceNumber: finalOrder.invoiceNumber,
+                    totalAmount: finalOrder.totalAmount,
+                    currency: finalOrder.currency,
+                },
+                'ORDER',
+                finalOrder.id,
+            );
+
+            this.logger.log(`✅ [processOrderNotifications] Client notifié: ${user.id}`);
+
+            // ============================================================
+            // 🔥 2. NOTIFICATION AU LIVREUR
+            // ============================================================
+            if (deliverId) {
+                try {
+                    const deliver = await this.userRepo.findOne({ where: { id: deliverId } });
+                    const hasDeliverPhone = deliver?.phone && deliver.phone.trim() !== '';
+
+                    const deliverOptions: any = {
+                        userId: deliverId,
+                        pushTitle: await this.i18n.translate('deliver.delivery_assigned.push_title', lang),
+                        pushBody: await this.i18n.translate('deliver.delivery_assigned.push_body', lang, {
+                            invoiceNumber: order.invoiceNumber,
+                            clientName: user.fullName || user.phone || '',
+                            address: order.addressUser?.address || '',
+                        }),
+                        pushData: {
+                            entity: 'ORDER',
+                            entityId: finalOrder.id,
+                            orderId: finalOrder.id,
+                        },
+                        imageUrl,
+                    };
+
+                    if (hasDeliverPhone) {
+                        deliverOptions.phoneNumber = deliver!.phone;
+                        deliverOptions.smsBody = await this.i18n.translate('deliver.delivery_assigned.sms_body', lang, {
+                            invoiceNumber: order.invoiceNumber,
+                            clientName: user.fullName || user.phone || '',
+                            address: order.addressUser?.address || '',
+                        });
+                    }
+
+                    await this.pushNotificationHelper.sendAll(deliverOptions);
+
+                    await this.notificationHelpers.sendNotification(
+                        this.notificationsService,
+                        deliverId,
+                        NotificationType.ORDER_CREATED,
+                        lang,
+                        {
+                            invoiceNumber: finalOrder.invoiceNumber,
+                            totalAmount: finalOrder.totalAmount,
+                            currency: finalOrder.currency,
+                        },
+                        'ORDER',
+                        finalOrder.id,
+                    );
+
+                    this.logger.log(`✅ [processOrderNotifications] Livreur notifié: ${deliverId}`);
+                } catch (err: any) {
+                    this.logger.warn(`⚠️ Erreur notification livreur: ${err.message}`);
+                }
+            }
+
+            // ============================================================
+            // 🔥 3. NOTIFICATION AU PROPRIÉTAIRE
+            // ============================================================
+            if (ownerId) {
+                try {
+                    const owner = await this.userRepo.findOne({ where: { id: ownerId } });
+                    const hasOwnerPhone = owner?.phone && owner.phone.trim() !== '';
+
+                    const ownerOptions: any = {
+                        userId: ownerId,
+                        pushTitle: await this.i18n.translate('owner.delivery_assigned.push_title', lang),
+                        pushBody: await this.i18n.translate('owner.delivery_assigned.push_body', lang, {
+                            invoiceNumber: order.invoiceNumber,
+                            deliverName: deliverName || '',
+                            clientName: user.fullName || user.phone || '',
+                        }),
+                        pushData: {
+                            entity: 'ORDER',
+                            entityId: finalOrder.id,
+                            orderId: finalOrder.id,
+                        },
+                        imageUrl,
+                    };
+
+                    if (hasOwnerPhone) {
+                        ownerOptions.phoneNumber = owner!.phone;
+                        ownerOptions.smsBody = await this.i18n.translate('owner.delivery_assigned.sms_body', lang, {
+                            invoiceNumber: order.invoiceNumber,
+                            deliverName: deliverName || '',
+                            clientName: user.fullName || user.phone || '',
+                        });
+                    }
+
+                    await this.pushNotificationHelper.sendAll(ownerOptions);
+
+                    await this.notificationHelpers.sendNotification(
+                        this.notificationsService,
+                        ownerId,
+                        NotificationType.ORDER_CREATED,
+                        lang,
+                        {
+                            invoiceNumber: finalOrder.invoiceNumber,
+                            totalAmount: finalOrder.totalAmount,
+                            currency: finalOrder.currency,
+                        },
+                        'ORDER',
+                        finalOrder.id,
+                    );
+
+                    this.logger.log(`✅ [processOrderNotifications] Propriétaire notifié: ${ownerId}`);
+                } catch (err: any) {
+                    this.logger.warn(`⚠️ Erreur notification propriétaire: ${err.message}`);
+                }
+            }
+
+            this.logger.log('✅ [processOrderNotifications] Terminé');
+        } catch (error) {
+            console.error('❌ Erreur dans processOrderNotifications:', error);
+        }
+    }
     // ============================================================
     // 📦 AFFECTER UN LIVREUR À UNE COMMANDE
     // ============================================================
@@ -118,9 +304,9 @@ export class OrderDeliveryService {
         }
 
         this.logger.log(`✅ Commande trouvée : ${order.id}`);
-        this.logger.log(`   status      = ${order.status}`);
+        this.logger.log(`   status        = ${order.status}`);
         this.logger.log(`   invoiceNumber = ${order.invoiceNumber}`);
-        this.logger.log(`   addressUser = ${order.addressUser?.id || 'AUCUNE'}`);
+        this.logger.log(`   addressUser   = ${order.addressUser?.id || 'AUCUNE'}`);
 
         // ✅ Vérifier que l'adresse a des coordonnées GPS
         if (
@@ -141,7 +327,6 @@ export class OrderDeliveryService {
         this.logger.log(`   phone   = ${order.addressUser.phone}`);
         this.logger.log(`   city    = ${order.addressUser.city?.name ?? 'N/A'}`);
         this.logger.log(`   country = ${order.addressUser.country?.name ?? 'N/A'}`);
-
 
         // 3. Vérifier le livreur
         this.logger.log(`🔍 [3/6] Recherche du livreur ${deliverId}...`);
@@ -166,7 +351,7 @@ export class OrderDeliveryService {
         }
         this.logger.log(`✅ Rôle DELIVERY OK`);
 
-        // 4. Vérifier qu'il n'y a pas déjà une affectation active
+        // 4. 🔥 Chercher une affectation active existante
         this.logger.log(`🔍 [4/6] Vérification d'une affectation active...`);
         const existing = await this.assignmentRepo.findOne({
             where: {
@@ -181,17 +366,29 @@ export class OrderDeliveryService {
         });
 
         if (existing) {
-            this.logger.warn(
-                ` Affectation active existante : ${existing.id} (status: ${existing.status})`,
-            );
-            throw new ConflictException(
-                await this.i18n.translate('order_already_assigned', lang),
-            );
-        }
-        this.logger.log(`✅ Aucune affectation active existante`);
+            // 🔥 Si c'est le même livreur → ne rien changer
+            if (existing.deliverId === deliverId) {
+                this.logger.log(`ℹ️ Le livreur est déjà affecté à cette commande`);
+                return {
+                    message: await this.i18n.translate('delivery_assigned', lang),
+                    data: existing,
+                };
+            }
 
-        // 5. Créer l'affectation
-        this.logger.log(`🔍 [5/6] Création de l'affectation...`);
+            // 🔥 Sinon → désactiver l'ancienne affectation
+            this.logger.log(
+                `🔄 Remplacement du livreur : ${existing.deliverId} → ${deliverId}`,
+            );
+            existing.isActive = false;
+            existing.notes = `Remplacé par le livreur ${deliverId}`;
+            await this.assignmentRepo.save(existing);
+            this.logger.log(`✅ Ancienne affectation désactivée`);
+        } else {
+            this.logger.log(`✅ Aucune affectation active existante`);
+        }
+
+        // 5. Créer la nouvelle affectation
+        this.logger.log(`🔍 [5/6] Création de la nouvelle affectation...`);
         const assignment = this.assignmentRepo.create({
             orderId,
             deliverId,
@@ -203,7 +400,7 @@ export class OrderDeliveryService {
 
         const saved = await this.assignmentRepo.save(assignment);
 
-        this.logger.log(`✅ Affectation créée :`);
+        this.logger.log(`✅ Nouvelle affectation créée :`);
         this.logger.log(`   id         = ${saved.id}`);
         this.logger.log(`   status     = ${saved.status}`);
         this.logger.log(`   assignedAt = ${saved.assignedAt}`);
@@ -218,7 +415,51 @@ export class OrderDeliveryService {
             `✅ Commande mise à jour : currentDeliveryUserId = ${deliverId}`,
         );
 
-        // 7. Notifier le livreur via WebSocket
+        // ============================================================
+        // 🔥 7. NOTIFICATIONS (client + livreur + propriétaire)
+        // ============================================================
+        this.logger.log(`📨 [processOrderNotifications] Début...`);
+
+        try {
+            // 🔥 Récupérer l'ID du propriétaire depuis la première sous-commande
+            // ⚠️ Adaptez le champ selon votre CompanyEntity (ownerId / userId / createdById)
+            let ownerId: string | undefined = undefined;
+            if (order.subOrders && order.subOrders.length > 0) {
+                const firstSubOrder = order.subOrders[0];
+                const company = firstSubOrder.company as any;
+                if (company) {
+                    ownerId =
+                        company.ownerId ||
+                        company.userId ||
+                        company.createdById ||
+                        company.owner?.id ||
+                        undefined;
+                }
+            }
+
+            this.logger.log(`   clientId  = ${order.user.id}`);
+            this.logger.log(`   deliverId = ${deliverId}`);
+            this.logger.log(`   ownerId   = ${ownerId || 'N/A'}`);
+
+            await this.processOrderNotifications(
+                order,              // finalOrder
+                order.user,         // user (client)
+                order,              // order
+                lang,               // lang
+                deliverId,          // deliverId
+                deliver.fullName,   // deliverName
+                deliver.phone,      // deliverPhone
+                ownerId,            // ownerId
+            );
+
+            this.logger.log(`✅ [processOrderNotifications] Terminé avec succès`);
+        } catch (err: any) {
+            this.logger.warn(
+                `⚠️ Erreur processOrderNotifications: ${err.message}`,
+            );
+        }
+
+        // 8. Notifier le livreur via WebSocket
         this.logger.log(`📡 Envoi de la notification WebSocket au livreur...`);
         this.notificationsGateway.sendNewDeliveryAssignment(deliverId, {
             assignmentId: saved.id,
@@ -228,7 +469,7 @@ export class OrderDeliveryService {
             createdAt: saved.createdAt,
         });
 
-        // 8. Vérifier si le livreur est connecté
+        // 9. Vérifier si le livreur est connecté
         const activeUsers = this.notificationsGateway.getActiveUsers();
         const isConnected = activeUsers.includes(deliverId);
 
@@ -246,9 +487,9 @@ export class OrderDeliveryService {
                 'DELIVERY' as any,
                 saved,
             );
-            this.logger.log(`✅ Notification push envoyée`);
+            this.logger.log(`✅ Notification push envoyée au livreur`);
         } else {
-            this.logger.log(`✅ Notification WebSocket envoyée directement`);
+            this.logger.log(`✅ Notification WebSocket envoyée au livreur`);
         }
 
         this.logger.log('========================================');
@@ -260,7 +501,6 @@ export class OrderDeliveryService {
             data: saved,
         };
     }
-
     // ============================================================
     // 📍 METTRE À JOUR LA POSITION DU LIVREUR
     // ============================================================
@@ -269,8 +509,6 @@ export class OrderDeliveryService {
         location: {
             latitude: number;
             longitude: number;
-            speed?: number;
-            heading?: number;
         },
     ) {
         this.logger.log('========================================');
@@ -278,11 +516,9 @@ export class OrderDeliveryService {
         this.logger.log(`   orderId   = ${orderId}`);
         this.logger.log(`   latitude  = ${location.latitude}`);
         this.logger.log(`   longitude = ${location.longitude}`);
-        this.logger.log(`   speed     = ${location.speed ?? 'N/A'}`);
-        this.logger.log(`   heading   = ${location.heading ?? 'N/A'}`);
         this.logger.log('========================================');
 
-        // 1. Récupérer l'affectation avec TOUTES les relations
+        // 1. Récupérer l'affectation active
         this.logger.log(`🔍 [1/4] Recherche de l'affectation active...`);
         const assignment = await this.buildAssignmentQuery('assignment')
             .where('assignment.orderId = :orderId', { orderId })
@@ -290,9 +526,7 @@ export class OrderDeliveryService {
             .getOne();
 
         if (!assignment) {
-            this.logger.warn(
-                `❌ Aucune affectation active pour la commande ${orderId}`,
-            );
+            this.logger.warn(`❌ Aucune affectation active pour la commande ${orderId}`);
             throw new NotFoundException(
                 `Aucune affectation active pour la commande ${orderId}`,
             );
@@ -303,11 +537,11 @@ export class OrderDeliveryService {
         this.logger.log(`   status    = ${assignment.status}`);
         this.logger.log(`   deliverId = ${assignment.deliverId}`);
 
-        // 2. Récupérer les coordonnées cibles depuis Order.addressUser
+        // 2. Coordonnées cibles
         const targetLatitude = assignment.order.addressUser?.latitude;
         const targetLongitude = assignment.order.addressUser?.longitude;
 
-        this.logger.log(`🎯 Coordonnées cibles (Order.addressUser) :`);
+        this.logger.log(`🎯 Coordonnées cibles :`);
         this.logger.log(`   address         = ${assignment.order.addressUser?.address}`);
         this.logger.log(`   targetLatitude  = ${targetLatitude}`);
         this.logger.log(`   targetLongitude = ${targetLongitude}`);
@@ -319,86 +553,62 @@ export class OrderDeliveryService {
             );
         }
 
-        // 3. Calculer la distance (Haversine)
-        this.logger.log(`📐 [2/4] Calcul de la distance (Haversine)...`);
-        const distanceKm = this.calculateDistance(
-            location.latitude,
-            location.longitude,
-            targetLatitude,
-            targetLongitude,
-        );
+        // 3. Calculer la distance via Google (fallback Haversine)
+        this.logger.log(`📐 [2/4] Calcul de la distance (Google)...`);
 
-        const estimatedArrivalMinutes = Math.round((distanceKm / 30) * 60);
+        let distanceKm: number;
+        let estimatedArrivalMinutes: number;
 
-        this.logger.log(`✅ Distance calculée : ${distanceKm} km`);
-        this.logger.log(`✅ ETA calculé : ${estimatedArrivalMinutes} min`);
+        try {
+            const origin = `${location.latitude},${location.longitude}`;
+            const destination = `${targetLatitude},${targetLongitude}`;
 
-        // 4. Mise à jour de la position du livreur
+            const googleData = await this.googleService.getDistance(
+                origin,
+                destination,
+                false,
+                { mode: 'driving', language: 'fr' },
+            );
+
+            const element = googleData?.rows?.[0]?.elements?.[0];
+
+            if (element && element.status === 'OK') {
+                distanceKm = Math.round((element.distance.value / 1000) * 100) / 100;
+                estimatedArrivalMinutes = Math.round(element.duration.value / 60);
+                this.logger.log(`✅ Google → ${distanceKm} km / ${estimatedArrivalMinutes} min`);
+            } else {
+                throw new Error(`Google status: ${element?.status || 'NOT_FOUND'}`);
+            }
+        } catch (error: any) {
+            this.logger.warn(`⚠️ Google échoué (${error.message}) → fallback Haversine`);
+            distanceKm = this.calculateDistance(
+                location.latitude,
+                location.longitude,
+                targetLatitude,
+                targetLongitude,
+            );
+            estimatedArrivalMinutes = Math.round((distanceKm / 30) * 60);
+            this.logger.log(`✅ Haversine → ${distanceKm} km / ${estimatedArrivalMinutes} min`);
+        }
+
+        // 4. Mise à jour de la position
         this.logger.log(`📝 [3/4] Mise à jour de la position...`);
         assignment.currentLatitude = location.latitude;
         assignment.currentLongitude = location.longitude;
-        assignment.currentSpeed = location.speed;
-        assignment.currentHeading = location.heading;
         assignment.distanceRemainingKm = distanceKm;
         assignment.estimatedArrivalMinutes = estimatedArrivalMinutes;
         assignment.lastLocationUpdate = new Date();
 
-        // ✅ Auto: ASSIGNED → PICKED_UP (< 50 km)
-        if (
-            assignment.status === AssignmentStatus.ASSIGNED &&
-            distanceKm < 50
-        ) {
-            this.logger.log(
-                `🔄 AUTO STATUS: ASSIGNED → PICKED_UP (distance: ${distanceKm} km < 50)`,
-            );
-            assignment.status = AssignmentStatus.PICKED_UP;
-            assignment.pickedUpAt = new Date();
-        }
-
-        // ✅ Auto: PICKED_UP → IN_TRANSIT (< 20 km)
-        if (
-            assignment.status === AssignmentStatus.PICKED_UP &&
-            distanceKm < 20
-        ) {
-            this.logger.log(
-                `🔄 AUTO STATUS: PICKED_UP → IN_TRANSIT (distance: ${distanceKm} km < 20)`,
-            );
-            assignment.status = AssignmentStatus.IN_TRANSIT;
-        }
-
-        // ✅ Auto: IN_TRANSIT → DELIVERED (< 0.1 km = 100m)
-        if (
-            assignment.status === AssignmentStatus.IN_TRANSIT &&
-            distanceKm < 0.1
-        ) {
-            this.logger.log(
-                `🔄 AUTO STATUS: IN_TRANSIT → DELIVERED (distance: ${distanceKm} km < 0.1)`,
-            );
-            assignment.status = AssignmentStatus.DELIVERED;
-            assignment.deliveredAt = new Date();
-            assignment.isActive = false;
-
-            await this.orderRepo.update(orderId, {
-                status: OrderStatus.DELIVERED,
-            });
-            this.logger.log(`✅ Order status mis à jour : DELIVERED`);
-        }
-
         const updated = await this.assignmentRepo.save(assignment);
         this.logger.log(`✅ Affectation sauvegardée`);
-        this.logger.log(`   nouveau status = ${updated.status}`);
 
-        // 5. Diffuser la position via WebSocket
-        this.logger.log(
-            `📡 [4/4] Diffusion WebSocket à la room order-${orderId}...`,
-        );
+        // 5. Diffuser la position
+        this.logger.log(`📡 [4/4] Diffusion WebSocket à la room order-${orderId}...`);
         this.notificationsGateway.sendDeliveryLocation(orderId, {
             orderId,
             deliverId: updated.deliverId,
             latitude: location.latitude,
             longitude: location.longitude,
-            speed: location.speed,
-            heading: location.heading,
             distanceRemainingKm: updated.distanceRemainingKm,
             estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
             status: updated.status,
@@ -498,22 +708,20 @@ export class OrderDeliveryService {
     }
 
     // ============================================================
-    // 🚚 DÉMARRER / ARRÊTER LE TRACKING (LIVREUR)
+    // 1️⃣ CONNECTER LE LIVREUR À LA ROOM
     // ============================================================
-    async startTracking(
+    async connectToOrderRoom(
         orderId: string,
         deliverId: string,
-        action: 'start' | 'stop',
         lang: string = 'fr',
     ) {
         this.logger.log('========================================');
-        this.logger.log(`🚚 START TRACKING - DÉBUT`);
+        this.logger.log(`🔌 CONNECT TO ORDER ROOM - DÉBUT`);
         this.logger.log(`   orderId   = ${orderId}`);
         this.logger.log(`   deliverId = ${deliverId}`);
-        this.logger.log(`   action    = ${action}`);
         this.logger.log('========================================');
 
-        // 1. Vérifier que l'affectation existe et appartient bien à ce livreur
+        // Vérifier que l'affectation existe
         const assignment = await this.buildAssignmentQuery('assignment')
             .where('assignment.orderId = :orderId', { orderId })
             .andWhere('assignment.deliverId = :deliverId', { deliverId })
@@ -521,20 +729,60 @@ export class OrderDeliveryService {
             .getOne();
 
         if (!assignment) {
-            this.logger.warn(
-                `❌ Aucune affectation active trouvée pour orderId=${orderId}, deliverId=${deliverId}`,
-            );
+            this.logger.warn(`❌ Aucune affectation active`);
             throw new NotFoundException(
                 `Aucune affectation active pour cette commande avec ce livreur`,
             );
         }
 
-        this.logger.log(`✅ Affectation trouvée :`);
-        this.logger.log(`   id     = ${assignment.id}`);
-        this.logger.log(`   status = ${assignment.status}`);
+        // Connecter à la room
+        this.notificationsGateway.joinOrderRoom(deliverId, orderId);
+
+        this.logger.log(`✅ Livreur connecté à la room order-${orderId}`);
+
+        return {
+            status: 'connected',
+            message: 'Connecté à la room de la commande',
+            data: {
+                orderId,
+                deliverId,
+                assignmentId: assignment.id,
+                roomName: `order-${orderId}`,
+            },
+        };
+    }
+
+    // ============================================================
+    // 2️⃣ DÉMARRER / ARRÊTER LE TRACKING
+    // ============================================================
+    async toggleTracking(
+        orderId: string,
+        deliverId: string,
+        action: 'start' | 'stop',
+        lang: string = 'fr',
+    ) {
+        this.logger.log('========================================');
+        this.logger.log(`🚚 TOGGLE TRACKING - DÉBUT`);
+        this.logger.log(`   orderId   = ${orderId}`);
+        this.logger.log(`   deliverId = ${deliverId}`);
+        this.logger.log(`   action    = ${action}`);
+        this.logger.log('========================================');
+
+        const assignment = await this.buildAssignmentQuery('assignment')
+            .where('assignment.orderId = :orderId', { orderId })
+            .andWhere('assignment.deliverId = :deliverId', { deliverId })
+            .andWhere('assignment.isActive = :isActive', { isActive: true })
+            .getOne();
+
+        if (!assignment) {
+            this.logger.warn(`❌ Aucune affectation active`);
+            throw new NotFoundException(
+                `Aucune affectation active pour cette commande avec ce livreur`,
+            );
+        }
 
         // ============================================================
-        // ✅ ACTION: START
+        // ACTION: START
         // ============================================================
         if (action === 'start') {
             const allowedStatuses = [
@@ -543,16 +791,12 @@ export class OrderDeliveryService {
             ];
 
             if (!allowedStatuses.includes(assignment.status)) {
-                this.logger.warn(
-                    `❌ Statut incompatible : ${assignment.status}. Autorisés : ${allowedStatuses.join(', ')}`,
-                );
                 throw new BadRequestException(
                     `Impossible de démarrer le tracking. Statut actuel : ${assignment.status}`,
                 );
             }
 
             if (assignment.status === AssignmentStatus.ASSIGNED) {
-                this.logger.log(`🔄 AUTO STATUS: ASSIGNED → PICKED_UP (démarrage)`);
                 assignment.status = AssignmentStatus.PICKED_UP;
                 assignment.pickedUpAt = new Date();
             }
@@ -560,19 +804,16 @@ export class OrderDeliveryService {
             assignment.lastLocationUpdate = new Date();
             const updated = await this.assignmentRepo.save(assignment);
 
-            this.logger.log(`✅ Tracking démarré - status = ${updated.status}`);
-
             this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
                 orderId,
                 status: updated.status,
                 note: 'Tracking démarré',
             });
 
-            this.logger.log('========================================');
-            this.logger.log(`✅ START TRACKING - SUCCÈS`);
-            this.logger.log('========================================');
+            this.logger.log(`✅ Tracking démarré`);
 
             return {
+                status: 'started',
                 message: 'Tracking démarré avec succès',
                 data: {
                     assignmentId: updated.id,
@@ -585,22 +826,19 @@ export class OrderDeliveryService {
         }
 
         // ============================================================
-        // ✅ ACTION: STOP
+        // ACTION: STOP
         // ============================================================
         if (action === 'stop') {
-            this.logger.log(`🛑 Arrêt du tracking demandé`);
-
             this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
                 orderId,
                 status: assignment.status,
                 note: 'Tracking arrêté',
             });
 
-            this.logger.log('========================================');
-            this.logger.log(`✅ STOP TRACKING - SUCCÈS`);
-            this.logger.log('========================================');
+            this.logger.log(`✅ Tracking arrêté`);
 
             return {
+                status: 'stopped',
                 message: 'Tracking arrêté avec succès',
                 data: {
                     assignmentId: assignment.id,
@@ -616,6 +854,117 @@ export class OrderDeliveryService {
             `Action non reconnue : ${action}. Utilisez 'start' ou 'stop'.`,
         );
     }
+
+    // ============================================================
+    // 3️⃣ ENVOYER UNE POSITION
+    // ============================================================
+    async sendPosition(
+        orderId: string,
+        deliverId: string,
+        location: { latitude: number; longitude: number },
+        lang: string = 'fr',
+    ) {
+        this.logger.log('========================================');
+        this.logger.log(`📍 SEND POSITION - DÉBUT`);
+        this.logger.log(`   orderId   = ${orderId}`);
+        this.logger.log(`   deliverId = ${deliverId}`);
+        this.logger.log(`   lat/lng   = ${location.latitude}, ${location.longitude}`);
+        this.logger.log('========================================');
+
+        const assignment = await this.buildAssignmentQuery('assignment')
+            .where('assignment.orderId = :orderId', { orderId })
+            .andWhere('assignment.deliverId = :deliverId', { deliverId })
+            .andWhere('assignment.isActive = :isActive', { isActive: true })
+            .getOne();
+
+        if (!assignment) {
+            throw new NotFoundException(
+                `Aucune affectation active pour cette commande avec ce livreur`,
+            );
+        }
+
+        const targetLatitude = assignment.order.addressUser?.latitude;
+        const targetLongitude = assignment.order.addressUser?.longitude;
+
+        if (targetLatitude == null || targetLongitude == null) {
+            throw new BadRequestException(
+                `Adresse de livraison sans coordonnées GPS`,
+            );
+        }
+
+        // Calculer la distance via Google (fallback Haversine)
+        let distanceKm: number;
+        let estimatedArrivalMinutes: number;
+
+        try {
+            const origin = `${location.latitude},${location.longitude}`;
+            const destination = `${targetLatitude},${targetLongitude}`;
+
+            const googleData = await this.googleService.getDistance(
+                origin,
+                destination,
+                false,
+                { mode: 'driving', language: 'fr' },
+            );
+
+            const element = googleData?.rows?.[0]?.elements?.[0];
+
+            if (element && element.status === 'OK') {
+                distanceKm = Math.round((element.distance.value / 1000) * 100) / 100;
+                estimatedArrivalMinutes = Math.round(element.duration.value / 60);
+                this.logger.log(`✅ Google → ${distanceKm} km / ${estimatedArrivalMinutes} min`);
+            } else {
+                throw new Error(`Google status: ${element?.status || 'NOT_FOUND'}`);
+            }
+        } catch (error: any) {
+            this.logger.warn(`⚠️ Google échoué → fallback Haversine`);
+            distanceKm = this.calculateDistance(
+                location.latitude,
+                location.longitude,
+                targetLatitude,
+                targetLongitude,
+            );
+            estimatedArrivalMinutes = Math.round((distanceKm / 30) * 60);
+        }
+
+        // Mettre à jour la position
+        assignment.currentLatitude = location.latitude;
+        assignment.currentLongitude = location.longitude;
+        assignment.distanceRemainingKm = distanceKm;
+        assignment.estimatedArrivalMinutes = estimatedArrivalMinutes;
+        assignment.lastLocationUpdate = new Date();
+
+        const updated = await this.assignmentRepo.save(assignment);
+
+        // Diffuser via WebSocket
+        this.notificationsGateway.sendDeliveryLocation(orderId, {
+            orderId,
+            deliverId: updated.deliverId,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            distanceRemainingKm: updated.distanceRemainingKm,
+            estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
+            status: updated.status,
+        });
+
+        this.logger.log(`✅ Position diffusée`);
+
+        return {
+            status: 'position_received',
+            message: 'Position enregistrée et diffusée',
+            data: {
+                orderId,
+                deliverId: updated.deliverId,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                distanceRemainingKm: updated.distanceRemainingKm,
+                estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
+                status: updated.status,
+                updatedAt: updated.lastLocationUpdate,
+            },
+        };
+    }
+
     // ============================================================
     // 🚚 LISTE DES AFFECTATIONS ACTIVES DU LIVREUR
     // ============================================================
