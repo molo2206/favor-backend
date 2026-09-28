@@ -16,7 +16,7 @@ import { RideService } from 'src/Course et Taxi/Ride/ride.service';
 import { NotificationsService } from './notifications.service';
 import { NotificationType } from './type/notification.type';
 import { DriverLocationService } from 'src/Course et Taxi/DriverLocation/driver-location.service';
-import { OrderDeliveryService } from 'src/order/order-delivery.service';   // 🔥 CORRIGÉ
+import { OrderDeliveryService } from 'src/order/order-delivery.service';
 
 interface ActiveUser {
   id: string;
@@ -30,6 +30,10 @@ interface ActiveUser {
   },
   namespace: '/',
   transports: ['websocket', 'polling'],
+  pingInterval: 25000,       // 🔥 Ping toutes les 25s
+  pingTimeout: 60000,        // 🔥 Timeout étendu à 60s (au lieu de 20s)
+  connectTimeout: 45000,     // 🔥 Timeout de connexion initial
+  allowEIO3: true,           // 🔥 Compatibilité vieux clients
 })
 @Injectable()
 export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
@@ -51,8 +55,8 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     private readonly driverLocationService: DriverLocationService,
 
     // 🔥 Injection du OrderDeliveryService
-    @Inject(forwardRef(() => OrderDeliveryService))   // 🔥 CORRIGÉ
-    private readonly deliveryService: OrderDeliveryService,   // 🔥 CORRIGÉ
+    @Inject(forwardRef(() => OrderDeliveryService))
+    private readonly deliveryService: OrderDeliveryService,
   ) { }
 
   onModuleInit() {
@@ -60,13 +64,23 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     this.server.emit('confirmation');
   }
 
-  // Écouter l'événement 'connection' comme l'envoie le client
+  // ============================================================
+  // 🔌 CONNEXION D'UN UTILISATEUR
+  // ============================================================
   @SubscribeMessage('connection')
   async sendConfirm(
     @MessageBody() userId: string,
     @ConnectedSocket() socket: Socket,
   ) {
     console.log(`📡 Connection event received for user: ${userId}`);
+    console.log(`   Socket ID: ${socket.id}`);
+
+    // 🔥 Validation
+    if (!userId || typeof userId !== 'string') {
+      console.warn(`⚠️ Connection sans userId valide - Socket ${socket.id}`);
+      socket.emit('connection-error', { message: 'userId requis' });
+      return;
+    }
 
     const existingDriverIndex = this.activeUsers.findIndex(
       (user) => user.id === userId,
@@ -75,9 +89,14 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     socket.join(userId);
 
     if (existingDriverIndex !== -1) {
-      // Mettre à jour le socketId
-      this.activeUsers[existingDriverIndex].socketId = socket.id;
-      console.log(`🔄 User ${userId} reconnected`);
+      // 🔥 Vérifier si c'est le même socket (reconnexion rapide)
+      const oldSocketId = this.activeUsers[existingDriverIndex].socketId;
+      if (oldSocketId === socket.id) {
+        console.log(`ℹ️ User ${userId} already connected with same socket`);
+      } else {
+        this.activeUsers[existingDriverIndex].socketId = socket.id;
+        console.log(`🔄 User ${userId} reconnected (old: ${oldSocketId}, new: ${socket.id})`);
+      }
     } else if (userId) {
       const user = await this.userRepository.findOne({
         where: { id: userId },
@@ -87,14 +106,22 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
           id: userId,
           socketId: socket.id,
         });
-        console.log(`🔌 User ${userId} connected`);
+        console.log(`🔌 User ${userId} connected (${user.fullName}, role: ${user.role})`);
+      } else {
+        console.warn(`⚠️ User ${userId} introuvable en base`);
+        socket.emit('connection-error', { message: 'Utilisateur introuvable' });
+        return;
       }
     }
 
     this.broadcastUsers();
     socket.emit('confirmation');
+    console.log(`✅ Confirmation sent to ${userId}`);
   }
 
+  // ============================================================
+  // ❌ DÉCONNEXION D'UN CLIENT
+  // ============================================================
   handleDisconnect(client: Socket) {
     const userIndex = this.activeUsers.findIndex(
       (user) => user.socketId === client.id,
@@ -103,7 +130,8 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     if (userIndex !== -1) {
       const userId = this.activeUsers[userIndex].id;
       this.activeUsers.splice(userIndex, 1);
-      console.log(`❌ User ${userId} disconnected`);
+      console.log(`❌ User ${userId} disconnected (socket: ${client.id})`);
+      console.log(`   Reason: ${(client as any).disconnected ? 'unknown' : 'transport close'}`);
 
       // 🔥 Nettoyer les trackings actifs de ce livreur
       if (this.activeTrackings.has(userId)) {
@@ -139,7 +167,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     this.broadcastUsers();
   }
 
-  // Méthode pour envoyer une notification à un utilisateur spécifique
+  // ============================================================
+  // 📨 ENVOYER UNE NOTIFICATION À UN UTILISATEUR
+  // ============================================================
   sendNotificationToUser(userId: string, notification: any) {
     console.log(`📨 [Gateway] sendNotificationToUser called for ${userId}`);
     const userExists = this.activeUsers.some((user) => user.id === userId);
@@ -155,12 +185,17 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     }
   }
 
-  // Méthode pour envoyer une notification à une room
+  // ============================================================
+  // 📨 ENVOYER UNE NOTIFICATION À UNE ROOM
+  // ============================================================
   sendNotificationToRoom(roomId: string, event: string, payload: any) {
     this.server.to(roomId).emit(event, payload);
     console.log(`📢 Notification "${event}" to room ${roomId}`);
   }
 
+  // ============================================================
+  // 🏢 REJOINDRE UNE ROOM DE COMPAGNIE
+  // ============================================================
   @SubscribeMessage('join-company-room')
   handleJoinCompanyRoom(
     @MessageBody() data: { companyId: string },
@@ -183,7 +218,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     return { success: true, room: roomName };
   }
 
-  // Méthode pour broadcaster à tous
+  // ============================================================
+  // 📢 BROADCAST À TOUS
+  // ============================================================
   broadcastNotification(notification: any) {
     this.server.emit('notification', notification);
     console.log('📢 Broadcast notification to all');
@@ -194,11 +231,16 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     this.server.emit('active-users', users);
   }
 
-  // Méthode utilitaire pour obtenir les utilisateurs actifs
+  // ============================================================
+  // 📋 UTILISATEURS ACTIFS
+  // ============================================================
   getActiveUsers(): string[] {
     return this.activeUsers.map((user) => user.id);
   }
 
+  // ============================================================
+  // 📦 SHIPMENT CREATED TO COMPANY
+  // ============================================================
   sendShipmentCreatedToCompany(
     companyId: string,
     shipmentData: {
@@ -227,6 +269,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     );
   }
 
+  // ============================================================
+  // 📦 SHIPMENT CREATED EVENT (user)
+  // ============================================================
   sendShipmentCreatedEvent(
     userId: string,
     shipmentData: {
@@ -344,6 +389,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     return { success: true, room: roomName };
   }
 
+  // ============================================================
+  // 📍 UPDATE DELIVERY LOCATION (via socket)
+  // ============================================================
   @SubscribeMessage('updateDeliveryLocation')
   async handleUpdateDeliveryLocation(
     @MessageBody()
