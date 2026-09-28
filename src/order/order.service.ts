@@ -109,7 +109,12 @@ export class OrderService {
     const supported = ['fr', 'en', 'sw', 'es', 'ar'];
     return supported.includes(lang) ? lang : 'fr';
   }
-  
+
+  /**
+ * 🔄 Renomme `deliveryAssignments` → `courier` dans la réponse
+ * et retire les données sensibles (password) du livreur.
+ */
+
 
   private async generateReferralCode(
     userId: string,
@@ -2496,7 +2501,6 @@ export class OrderService {
     user: UserEntity,
     lang: string = 'fr'
   ): Promise<{ message: string; data: OrderEntity }> {
-    // 1️⃣ Récupérer la commande avec ses relations
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: [
@@ -2511,6 +2515,9 @@ export class OrderService {
         'subOrders.company',
         'user',
         'addressUser',
+        'deliveryAssignments',
+        'deliveryAssignments.deliver',
+        'deliveryAssignments.assignedBy',
       ],
     });
 
@@ -2520,24 +2527,12 @@ export class OrderService {
       );
     }
 
-    // 2️⃣ Vérifier les permissions
-    // const isAdmin = user.role === UserRole.SUPER_ADMIN;
-    // const isOwner = order.userId === user.id;
-
-    // if (!isAdmin && !isOwner) {
-    //   throw new ForbiddenException(
-    //     this.i18nService.translate('order.access_denied', lang)
-    //   );
-    // }
-
-    // 3️⃣ Vérifier que le prix de livraison est valide
     if (shippingCost < 0) {
       throw new BadRequestException(
         this.i18nService.translate('order.shipping_cost_positive', lang)
       );
     }
 
-    // 4️⃣ Vérifier que la commande n'est pas déjà finalisée
     if (
       order.status === OrderStatus.DELIVERED ||
       order.status === OrderStatus.VALIDATED ||
@@ -2548,17 +2543,14 @@ export class OrderService {
       );
     }
 
-    // 5️⃣ Enregistrer l'ancien prix
     const oldShippingCost = order.shippingCost || 0;
 
-    // 6️⃣ Mettre à jour le prix de livraison
     order.shippingCost = shippingCost;
     order.readyToPay = true;
     if (user) {
       order.validatedBy = user;
     }
 
-    // 7️⃣ Recalculer le grand total
     const itemsTotal = order.orderItems?.reduce(
       (sum, item) => sum + (item.price * item.quantity),
       0
@@ -2566,10 +2558,8 @@ export class OrderService {
 
     order.grandTotal = itemsTotal + shippingCost + (order.transactionFee || 0);
 
-    // 8️⃣ Sauvegarder la commande
     const updatedOrder = await this.orderRepo.save(order);
 
-    // 9️⃣ Récupérer la commande mise à jour avec toutes les relations
     const finalOrder = await this.orderRepo.findOne({
       where: { id: order.id },
       relations: [
@@ -2584,6 +2574,9 @@ export class OrderService {
         'subOrders.company',
         'user',
         'addressUser',
+        'deliveryAssignments',
+        'deliveryAssignments.deliver',
+        'deliveryAssignments.assignedBy',
       ],
     });
 
@@ -2593,9 +2586,6 @@ export class OrderService {
       );
     }
 
-    // ============================================================
-    // ✅ 1️⃣0️⃣ ENVOYER LES NOTIFICATIONS
-    // ============================================================
     this.processShippingCostUpdate(
       finalOrder,
       oldShippingCost,
@@ -2742,9 +2732,9 @@ export class OrderService {
         'subOrders.company',
         'user',
         'addressUser',
-        'deliveryAssignments',              // 🔥 AJOUT
-        'deliveryAssignments.deliver',      // 🔥 AJOUT
-        'deliveryAssignments.assignedBy',   // 🔥 AJOUT
+        'deliveryAssignments',
+        'deliveryAssignments.deliver',
+        'deliveryAssignments.assignedBy',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -2792,7 +2782,6 @@ export class OrderService {
       throw new BadRequestException(this.i18nService.translate('order.no_active_company', lang));
     }
 
-    // 🔥 FORCER le rechargement de l'utilisateur avec ses relations
     const userWithRelations = await this.userRepository.findOne({
       where: { id: user.id },
       relations: ['activeBranch', 'activeBranch.city']
@@ -2804,7 +2793,6 @@ export class OrderService {
 
     const fullUser = userWithRelations;
 
-    // Récupérer l'entreprise active
     const company = await this.companyRepo.findOne({
       where: { id: fullUser.activeCompanyId },
     });
@@ -2816,10 +2804,8 @@ export class OrderService {
     const isSuperAdmin = fullUser.role === 'SUPER ADMIN';
     const orderType = type || company.typeCompany;
 
-    // 🔥 Filtrage par ville pour RESTAURANT et GROCERY uniquement
     const isCityFilterable = orderType === 'RESTAURANT' || orderType === 'GROCERY';
 
-    // 🔥 Récupérer la ville de la branche active de l'utilisateur
     let userCityId: string | null = null;
     let userCityName: string | null = null;
 
@@ -2845,7 +2831,6 @@ export class OrderService {
 
     const hasCityFilter = isCityFilterable && !!userCityId;
 
-    // 🔥 LOGS DE DEBUG
     console.log('🔍 DEBUG findByType:');
     console.log('user.id:', fullUser.id);
     console.log('user.activeBranchId:', fullUser.activeBranchId);
@@ -2856,7 +2841,6 @@ export class OrderService {
     console.log('isCityFilterable:', isCityFilterable);
     console.log('orderType:', orderType);
 
-    // Déterminer la ressource et les permissions
     let hasManagePermission = false;
     let targetResource: string;
 
@@ -2877,7 +2861,6 @@ export class OrderService {
     hasManagePermission = await this.permissionHelper.hasManageOnResource(fullUser, targetResource);
     console.log('hasManagePermission:', hasManagePermission);
 
-    // 🔥 Construire la requête
     const query = this.orderRepo
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.user', 'user')
@@ -2895,40 +2878,32 @@ export class OrderService {
       .leftJoinAndSelect('subOrderProduct.measure', 'subOrderProductMeasure')
       .leftJoinAndSelect('subOrder.company', 'subOrderCompany')
       .leftJoinAndSelect('subOrderCompany.city', 'subOrderCompanyCity')
-      .leftJoinAndSelect('order.deliveryAssignments', 'courier')
-      .leftJoinAndSelect('courier.deliver', 'courierDeliver')
-      .leftJoinAndSelect('courier.assignedBy', 'courierAssignedBy')
+      .leftJoinAndSelect('order.deliveryAssignments', 'deliveryAssignments')
+      .leftJoinAndSelect('deliveryAssignments.deliver', 'deliveryAssignmentsDeliver')
+      .leftJoinAndSelect('deliveryAssignments.assignedBy', 'deliveryAssignmentsAssignedBy')
       .orderBy('order.createdAt', 'DESC');
 
-    // 🔥 Appliquer les filtres
     if (type) {
       query.where('order.type = :type', { type });
     } else {
       query.where('order.type = :type', { type: company.typeCompany });
     }
 
-    // 🔥 Règle métier :
-    // - SUPER ADMIN voit tout (pas de filtre)
-    // - UTILISATEUR avec canManage voit tout (pas de filtre) 🔥 NOUVEAU
-    // - AUTRES utilisateurs voient UNIQUEMENT les commandes de leur ville
     if (isSuperAdmin) {
       console.log('✅ SUPER ADMIN - Pas de filtre');
     } else if (hasManagePermission) {
-      // 🔥 NOUVEAU: Les utilisateurs avec canManage voient toutes les commandes
       console.log('✅ canManage - Pas de filtre');
     } else if (!fullUser.activeBranchId) {
       throw new BadRequestException(
         this.i18nService.translate('order.no_active_branch', lang)
       );
     } else if (hasCityFilter) {
-      // 🔥 FILTRE STRICT pour les utilisateurs sans canManage
       query.andWhere('subOrderCompany.cityId = :userCityId', { userCityId });
       console.log('✅ Filtre appliqué: subOrderCompany.cityId =', userCityId);
     } else {
       console.log('⚠️ Type non filtrable - pas de filtre supplémentaire');
     }
 
-    // 🔥 Pagination
     const skip = (page - 1) * limit;
     query.skip(skip).take(limit);
 
@@ -2938,7 +2913,6 @@ export class OrderService {
     const [orders, total] = await query.getManyAndCount();
     console.log('📊 Nombre de commandes trouvées:', total);
 
-    // 🔥 Enrichir les commandes avec la ville de l'entreprise
     const enrichedOrders = orders.map(order => {
       let cityId: string | null = null;
       let cityName: string | null = null;
@@ -2960,7 +2934,6 @@ export class OrderService {
 
     const paginatedData = new PaginatedResponseDto(enrichedOrders, total, page, limit);
 
-    // 🔥 Message
     let message: string;
 
     if (total === 0 && hasCityFilter && userCityName && !hasManagePermission) {
@@ -2973,7 +2946,6 @@ export class OrderService {
         resource: 'TOUTES LES COMMANDES'
       });
     } else if (hasManagePermission) {
-      // 🔥 Message pour les utilisateurs avec canManage
       message = this.i18nService.translate('order.orders_fetched_manage_all', lang, {
         resource: targetResource
       });
@@ -2994,6 +2966,7 @@ export class OrderService {
     };
   }
 
+
   async findOne(orderId: string): Promise<{ data: OrderEntity }> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
@@ -3008,9 +2981,9 @@ export class OrderService {
         'subOrders.company',
         'user',
         'addressUser',
-        'deliveryAssignments',              // 🔥 AJOUT
-        'deliveryAssignments.deliver',      // 🔥 AJOUT
-        'deliveryAssignments.assignedBy',   // 🔥 AJOUT
+        'deliveryAssignments',
+        'deliveryAssignments.deliver',
+        'deliveryAssignments.assignedBy',
       ],
     });
     if (!order) {
@@ -3033,9 +3006,9 @@ export class OrderService {
         'subOrders.company',
         'user',
         'addressUser',
-        'deliveryAssignments',              // 🔥 AJOUT
-        'deliveryAssignments.deliver',      // 🔥 AJOUT
-        'deliveryAssignments.assignedBy',   // 🔥 AJOUT
+        'deliveryAssignments',
+        'deliveryAssignments.deliver',
+        'deliveryAssignments.assignedBy',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -3052,6 +3025,9 @@ export class OrderService {
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',
+        'deliveryAssignments',
+        'deliveryAssignments.deliver',
+        'deliveryAssignments.assignedBy',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -3123,7 +3099,7 @@ export class OrderService {
     }, {} as Record<string, number>);
 
     // ============================================================
-    // 📊 ordersByDay (inchangé)
+    // 📊 ordersByDay
     // ============================================================
     const ordersByDay = await this.orderRepo
       .createQueryBuilder('order')
@@ -3178,7 +3154,7 @@ export class OrderService {
     const revenueByDay = Object.values(revenueByDayMap);
 
     // ============================================================
-    // 📊 topProducts (inchangé)
+    // 📊 topProducts
     // ============================================================
     const topProductsQueryBuilder = this.orderItemRepo
       .createQueryBuilder('oi')
@@ -3204,7 +3180,7 @@ export class OrderService {
       .getRawMany();
 
     // ============================================================
-    // 📊 Compteurs (inchangés)
+    // 📊 Compteurs
     // ============================================================
     const totalProductsQueryBuilder = this.productRepo
       .createQueryBuilder('product')
@@ -3253,7 +3229,6 @@ export class OrderService {
       },
     };
   }
-
   // ======================== ANNULATION DE COMMANDE (UNIQUEMENT PENDING) ========================
   async cancelOrder(
     orderId: string,
@@ -3270,9 +3245,9 @@ export class OrderService {
         'subOrders',
         'subOrders.items',
         'subOrders.items.product',
-        'deliveryAssignments',              // 🔥 AJOUT
-        'deliveryAssignments.deliver',      // 🔥 AJOUT
-        'deliveryAssignments.assignedBy',   // 🔥 AJOUT
+        'deliveryAssignments',
+        'deliveryAssignments.deliver',
+        'deliveryAssignments.assignedBy',
       ],
     });
 
@@ -3283,12 +3258,10 @@ export class OrderService {
 
     const lang = langHeader || this.getUserLanguage(order.user);
 
-    // Vérifier que l'utilisateur est bien le propriétaire de la commande
     if (order.user.id !== user.id) {
       throw new ForbiddenException(this.i18nService.translate('order.cannot_cancel_others_order', lang));
     }
 
-    // Vérifier que la commande est bien en statut PENDING
     if (order.status !== OrderStatus.PENDING) {
       throw new BadRequestException(
         this.i18nService.translate('order.cannot_cancel_order_only_pending', lang, {
@@ -3297,14 +3270,12 @@ export class OrderService {
       );
     }
 
-    // Enregistrer la raison et la date d'annulation
     order.cancellationReason = cancelDto.reason || undefined;
     order.cancelledAt = new Date();
     order.status = OrderStatus.REJECTED;
     order.rejectedBy = user;
     order.rejectedAt = new Date();
 
-    // Mettre à jour les sous-commandes
     if (order.subOrders?.length) {
       for (const subOrder of order.subOrders) {
         subOrder.status = OrderStatus.REJECTED;
@@ -3314,7 +3285,6 @@ export class OrderService {
 
     const updatedOrder = await this.orderRepo.save(order);
 
-    // Envoyer les notifications d'annulation
     await this.processOrderCancellation(order, cancelDto.reason, lang).catch((err) =>
       console.error('Erreur notifications annulation commande:', err),
     );
@@ -3328,6 +3298,7 @@ export class OrderService {
   }
 
   // ======================== NOTIFICATIONS D'ANNULATION ========================
+
   private async processOrderCancellation(
     order: OrderEntity,
     reason: string | undefined,
