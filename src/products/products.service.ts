@@ -186,24 +186,36 @@ export class ProductService {
     const company = await this.companyRepo.findOne({
       where: { id: user.activeCompanyId },
     });
-    if (!company) throw new NotFoundException(await this.i18n.translate('company_not_found', lang));
+    if (!company)
+      throw new NotFoundException(
+        await this.i18n.translate('company_not_found', lang),
+      );
 
     let category: CategoryEntity | null = null;
     if (categoryId) {
       category = await this.categoryRepo.findOne({ where: { id: categoryId } });
-      if (!category) throw new NotFoundException(await this.i18n.translate('category_not_found', lang));
+      if (!category)
+        throw new NotFoundException(
+          await this.i18n.translate('category_not_found', lang),
+        );
     }
 
     let brand: Brand | null = null;
     if (brandId) {
       brand = await this.brandRepository.findOne({ where: { id: brandId } });
-      if (!brand) throw new NotFoundException(await this.i18n.translate('brand_not_found', lang));
+      if (!brand)
+        throw new NotFoundException(
+          await this.i18n.translate('brand_not_found', lang),
+        );
     }
 
     let measure: MeasureEntity | null = null;
     if (measureId) {
       measure = await this.measureRepo.findOne({ where: { id: measureId } });
-      if (!measure) throw new NotFoundException(await this.i18n.translate('measure_not_found', lang));
+      if (!measure)
+        throw new NotFoundException(
+          await this.i18n.translate('measure_not_found', lang),
+        );
     }
 
     if (
@@ -238,18 +250,35 @@ export class ProductService {
 
       const savedProduct = await manager.save(product);
 
-      const uploadedImages: string[] = [];
+      // ============================================================
+      // 🖼️🎬 UPLOAD DES FICHIERS — SÉPARATION IMAGES / VIDÉOS
+      // ============================================================
+      const uploadedImages: string[] = []; // 🖼️ images + docs
+      const uploadedVideos: string[] = []; // 🎬 vidéos (URL uniquement)
+
       for (const file of files) {
         const uploadedFile = await this.filesService.uploadFile(
           file,
           'product',
           'product',
         );
-        uploadedImages.push(uploadedFile.data);
+
+        // 🔥 Normalisation :
+        //    - image/doc  → uploadedFile.data est une string
+        //    - vidéo      → uploadedFile.data est un objet { video, thumb }
+        if (typeof uploadedFile.data === 'string') {
+          uploadedImages.push(uploadedFile.data);
+        } else if (uploadedFile.data?.video) {
+          uploadedVideos.push(uploadedFile.data.video);
+        }
       }
 
+      // 🔥 Ordre : vidéos d'abord, puis images
+      //    → la 1ère vidéo (si elle existe) deviendra product.image
+      const allUrls = [...uploadedVideos, ...uploadedImages];
+
       const imageEntities: ImageProductEntity[] = [];
-      for (const url of uploadedImages) {
+      for (const url of allUrls) {
         const imageEntity = manager.create(ImageProductEntity, {
           url,
           product: savedProduct,
@@ -259,6 +288,7 @@ export class ProductService {
       }
 
       if (imageEntities.length > 0) {
+        // ✅ La vidéo est en première position si elle existe
         savedProduct.image = imageEntities[0].url;
         await manager.save(savedProduct);
       }
@@ -270,7 +300,9 @@ export class ProductService {
           });
           if (!specification) {
             throw new BadRequestException(
-              await this.i18n.translate('specification_not_found', lang, { id: spec.specificationId }),
+              await this.i18n.translate('specification_not_found', lang, {
+                id: spec.specificationId,
+              }),
             );
           }
 
@@ -290,7 +322,9 @@ export class ProductService {
           });
           if (!attribute) {
             throw new BadRequestException(
-              await this.i18n.translate('attribute_not_found', lang, { id: attributeId }),
+              await this.i18n.translate('attribute_not_found', lang, {
+                id: attributeId,
+              }),
             );
           }
 
@@ -334,7 +368,9 @@ export class ProductService {
             });
             if (!foundImage) {
               throw new NotFoundException(
-                await this.i18n.translate('image_not_found', lang, { id: imageId }),
+                await this.i18n.translate('image_not_found', lang, {
+                  id: imageId,
+                }),
               );
             }
             variationImage = foundImage;
@@ -389,7 +425,9 @@ export class ProductService {
       });
 
       if (!finalProduct) {
-        throw new NotFoundException(await this.i18n.translate('product_not_found', lang));
+        throw new NotFoundException(
+          await this.i18n.translate('product_not_found', lang),
+        );
       }
 
       finalProduct.images = imageEntities;
@@ -414,7 +452,9 @@ export class ProductService {
           availabilityList.push(availability);
         }
         await manager.save(availabilityList);
-        this.logger.log(`RoomAvailability généré pour ${daysToGenerate} jours pour le produit hôtel : ${finalProduct.name}`);
+        this.logger.log(
+          `RoomAvailability généré pour ${daysToGenerate} jours pour le produit hôtel : ${finalProduct.name}`,
+        );
       }
 
       const platformUsers = await this.userPlatformRoleRepo.find({
@@ -493,7 +533,9 @@ export class ProductService {
     });
 
     if (!product) {
-      throw new NotFoundException(await this.i18n.translate('product_not_found', lang));
+      throw new NotFoundException(
+        await this.i18n.translate('product_not_found', lang),
+      );
     }
 
     return await this.dataSource.transaction(async (manager) => {
@@ -504,7 +546,10 @@ export class ProductService {
           const category = await manager.findOne(CategoryEntity, {
             where: { id: categoryId },
           });
-          if (!category) throw new NotFoundException(await this.i18n.translate('category_not_found', lang));
+          if (!category)
+            throw new NotFoundException(
+              await this.i18n.translate('category_not_found', lang),
+            );
           product.category = category;
         } else {
           product.category = undefined;
@@ -514,7 +559,10 @@ export class ProductService {
           const brand = await manager.findOne(Brand, {
             where: { id: brandId },
           });
-          if (!brand) throw new NotFoundException(await this.i18n.translate('brand_not_found', lang));
+          if (!brand)
+            throw new NotFoundException(
+              await this.i18n.translate('brand_not_found', lang),
+            );
           product.brand = brand;
         } else {
           product.brand = undefined;
@@ -524,26 +572,63 @@ export class ProductService {
           const measure = await manager.findOne(MeasureEntity, {
             where: { id: measureId },
           });
-          if (!measure) throw new NotFoundException(await this.i18n.translate('measure_not_found', lang));
+          if (!measure)
+            throw new NotFoundException(
+              await this.i18n.translate('measure_not_found', lang),
+            );
           product.measure = measure;
         } else {
           product.measure = undefined;
         }
 
+        // ============================================================
+        // 🖼️🎬 UPLOAD DES NOUVEAUX FICHIERS — SÉPARATION IMAGES / VIDÉOS
+        // ============================================================
         if (files && files.length > 0) {
-          const newImages: ImageProductEntity[] = [];
+          const uploadedImages: string[] = []; // 🖼️ images + docs
+          const uploadedVideos: string[] = []; // 🎬 vidéos (URL uniquement)
+
           for (const file of files) {
             const uploadedFile = await this.filesService.uploadFile(
               file,
               'product',
               'product',
             );
-            const url = uploadedFile.data;
-            const img = manager.create(ImageProductEntity, { url, product });
+
+            // 🔥 Normalisation :
+            //    - image/doc  → uploadedFile.data est une string
+            //    - vidéo      → uploadedFile.data est un objet { video, thumb }
+            if (typeof uploadedFile.data === 'string') {
+              uploadedImages.push(uploadedFile.data);
+            } else if (uploadedFile.data?.video) {
+              uploadedVideos.push(uploadedFile.data.video);
+            }
+          }
+
+          // 🔥 Ordre : vidéos d'abord, puis images
+          const newUrls = [...uploadedVideos, ...uploadedImages];
+
+          const newImages: ImageProductEntity[] = [];
+          for (const url of newUrls) {
+            const img = manager.create(ImageProductEntity, {
+              url,
+              product,
+            });
             const savedImg = await manager.save(img);
             newImages.push(savedImg);
           }
+
+          // Ajout aux images existantes (on ne supprime rien)
           product.images = [...(product.images || []), ...newImages];
+
+          // 🔥 Si une nouvelle vidéo a été uploadée → elle devient l'image principale
+          //    Sinon on garde l'image principale existante
+          if (uploadedVideos.length > 0) {
+            product.image = uploadedVideos[0];
+          } else if (!product.image && uploadedImages.length > 0) {
+            // Si le produit n'avait aucune image principale, on en met une
+            product.image = uploadedImages[0];
+          }
         }
 
         const updatedProduct = await manager.save(product);
@@ -566,7 +651,9 @@ export class ProductService {
               });
               if (!specExists) {
                 throw new BadRequestException(
-                  await this.i18n.translate('specification_not_found', lang, { id: spec.specificationId }),
+                  await this.i18n.translate('specification_not_found', lang, {
+                    id: spec.specificationId,
+                  }),
                 );
               }
 
@@ -591,7 +678,9 @@ export class ProductService {
             });
             if (!attribute) {
               throw new BadRequestException(
-                await this.i18n.translate('attribute_not_found', lang, { id: attributeId }),
+                await this.i18n.translate('attribute_not_found', lang, {
+                  id: attributeId,
+                }),
               );
             }
 
@@ -635,7 +724,9 @@ export class ProductService {
               const imageIdNumber = parseInt(imageId, 10);
               if (isNaN(imageIdNumber)) {
                 throw new BadRequestException(
-                  await this.i18n.translate('invalid_image_id', lang, { id: imageId }),
+                  await this.i18n.translate('invalid_image_id', lang, {
+                    id: imageId,
+                  }),
                 );
               }
 
@@ -644,7 +735,9 @@ export class ProductService {
               });
               if (!foundImage) {
                 throw new NotFoundException(
-                  await this.i18n.translate('image_not_found', lang, { id: imageId }),
+                  await this.i18n.translate('image_not_found', lang, {
+                    id: imageId,
+                  }),
                 );
               }
               variationImage = foundImage;
@@ -731,7 +824,9 @@ export class ProductService {
     } = createProductAdminDto;
 
     if (!files || files.length < 1 || files.length > 30) {
-      throw new BadRequestException(await this.i18n.translate('image_count_invalid', lang));
+      throw new BadRequestException(
+        await this.i18n.translate('image_count_invalid', lang),
+      );
     }
 
     let targetCompanyId: string;
@@ -742,17 +837,23 @@ export class ProductService {
         where: { id: companyId },
       });
       if (!targetCompany)
-        throw new NotFoundException(await this.i18n.translate('company_not_found', lang));
+        throw new NotFoundException(
+          await this.i18n.translate('company_not_found', lang),
+        );
       targetCompanyId = companyId;
     } else {
       if (!user.activeCompanyId) {
-        throw new BadRequestException(await this.i18n.translate('no_active_company', lang));
+        throw new BadRequestException(
+          await this.i18n.translate('no_active_company', lang),
+        );
       }
       targetCompany = await this.companyRepo.findOne({
         where: { id: user.activeCompanyId },
       });
       if (!targetCompany)
-        throw new NotFoundException(await this.i18n.translate('company_not_found', lang));
+        throw new NotFoundException(
+          await this.i18n.translate('company_not_found', lang),
+        );
       targetCompanyId = user.activeCompanyId;
     }
 
@@ -770,18 +871,24 @@ export class ProductService {
     if (hasManage) {
       if (!companyId) {
         throw new BadRequestException(
-          await this.i18n.translate('company_id_required_for_manage', lang, { resource: requiredResource }),
+          await this.i18n.translate('company_id_required_for_manage', lang, {
+            resource: requiredResource,
+          }),
         );
       }
       finalCompanyId = companyId;
     } else {
       if (companyId && companyId !== user.activeCompanyId) {
         throw new ForbiddenException(
-          await this.i18n.translate('create_product_forbidden', lang, { resource: requiredResource }),
+          await this.i18n.translate('create_product_forbidden', lang, {
+            resource: requiredResource,
+          }),
         );
       }
       if (!user.activeCompanyId) {
-        throw new BadRequestException(await this.i18n.translate('no_active_company', lang));
+        throw new BadRequestException(
+          await this.i18n.translate('no_active_company', lang),
+        );
       }
       finalCompanyId = user.activeCompanyId;
     }
@@ -789,13 +896,17 @@ export class ProductService {
     const company = await this.companyRepo.findOne({
       where: { id: finalCompanyId },
     });
-    if (!company) throw new NotFoundException(await this.i18n.translate('company_not_found', lang));
+    if (!company)
+      throw new NotFoundException(
+        await this.i18n.translate('company_not_found', lang),
+      );
 
-    const hasCreatePermission = await this.permissionHelper.hasPermissionOnResource(
-      user,
-      requiredResource,
-      'canCreate',
-    );
+    const hasCreatePermission =
+      await this.permissionHelper.hasPermissionOnResource(
+        user,
+        requiredResource,
+        'canCreate',
+      );
 
     if (!hasCreatePermission) {
       throw new ForbiddenException(
@@ -809,19 +920,28 @@ export class ProductService {
     let category: CategoryEntity | null = null;
     if (categoryId) {
       category = await this.categoryRepo.findOne({ where: { id: categoryId } });
-      if (!category) throw new NotFoundException(await this.i18n.translate('category_not_found', lang));
+      if (!category)
+        throw new NotFoundException(
+          await this.i18n.translate('category_not_found', lang),
+        );
     }
 
     let brand: Brand | null = null;
     if (brandId) {
       brand = await this.brandRepository.findOne({ where: { id: brandId } });
-      if (!brand) throw new NotFoundException(await this.i18n.translate('brand_not_found', lang));
+      if (!brand)
+        throw new NotFoundException(
+          await this.i18n.translate('brand_not_found', lang),
+        );
     }
 
     let measure: MeasureEntity | null = null;
     if (measureId) {
       measure = await this.measureRepo.findOne({ where: { id: measureId } });
-      if (!measure) throw new NotFoundException(await this.i18n.translate('measure_not_found', lang));
+      if (!measure)
+        throw new NotFoundException(
+          await this.i18n.translate('measure_not_found', lang),
+        );
     }
 
     if (
@@ -856,18 +976,35 @@ export class ProductService {
 
       const savedProduct = await manager.save(product);
 
-      const uploadedImages: string[] = [];
+      // ============================================================
+      // 🖼️🎬 UPLOAD DES FICHIERS — SÉPARATION IMAGES / VIDÉOS
+      // ============================================================
+      const uploadedImages: string[] = []; // 🖼️ images + docs
+      const uploadedVideos: string[] = []; // 🎬 vidéos (URL uniquement)
+
       for (const file of files) {
         const uploadResult = await this.filesService.uploadFile(
           file,
           'product',
           'product',
         );
-        uploadedImages.push(uploadResult.data);
+
+        // 🔥 Normalisation :
+        //    - image/doc  → uploadResult.data est une string
+        //    - vidéo      → uploadResult.data est un objet { video, thumb }
+        if (typeof uploadResult.data === 'string') {
+          uploadedImages.push(uploadResult.data);
+        } else if (uploadResult.data?.video) {
+          uploadedVideos.push(uploadResult.data.video);
+        }
       }
 
+      // 🔥 Ordre : vidéos d'abord, puis images
+      //    → la 1ère vidéo (si elle existe) deviendra product.image
+      const allUrls = [...uploadedVideos, ...uploadedImages];
+
       const imageEntities: ImageProductEntity[] = [];
-      for (const url of uploadedImages) {
+      for (const url of allUrls) {
         const imageEntity = manager.create(ImageProductEntity, {
           url,
           product: savedProduct,
@@ -877,6 +1014,7 @@ export class ProductService {
       }
 
       if (imageEntities.length > 0) {
+        // ✅ La vidéo est en première position si elle existe
         savedProduct.image = imageEntities[0].url;
         await manager.save(savedProduct);
       }
@@ -888,13 +1026,12 @@ export class ProductService {
           });
           if (!specification) {
             throw new BadRequestException(
-              await this.i18n.translate('specification_not_found', lang, { id: spec.specificationId }),
+              await this.i18n.translate('specification_not_found', lang, {
+                id: spec.specificationId,
+              }),
             );
           }
-          const formattedValue = convertSpecValue(
-            specification.type,
-            spec.value,
-          );
+          const formattedValue = convertSpecValue(specification.type, spec.value);
           const specValue = manager.create(ProductSpecificationValue, {
             product: savedProduct,
             specification,
@@ -911,7 +1048,9 @@ export class ProductService {
           });
           if (!attribute) {
             throw new BadRequestException(
-              await this.i18n.translate('attribute_not_found', lang, { id: attributeId }),
+              await this.i18n.translate('attribute_not_found', lang, {
+                id: attributeId,
+              }),
             );
           }
           const productAttribute = manager.create(ProductAttribute, {
@@ -952,7 +1091,9 @@ export class ProductService {
             const imageIdNumber = parseInt(imageId, 10);
             if (isNaN(imageIdNumber)) {
               throw new BadRequestException(
-                await this.i18n.translate('invalid_image_id', lang, { id: imageId }),
+                await this.i18n.translate('invalid_image_id', lang, {
+                  id: imageId,
+                }),
               );
             }
             const foundImage = await manager.findOne(ImageProductEntity, {
@@ -960,7 +1101,9 @@ export class ProductService {
             });
             if (!foundImage) {
               throw new NotFoundException(
-                await this.i18n.translate('image_not_found', lang, { id: imageId }),
+                await this.i18n.translate('image_not_found', lang, {
+                  id: imageId,
+                }),
               );
             }
             variationImage = foundImage;
@@ -1016,12 +1159,16 @@ export class ProductService {
       });
 
       if (!finalProduct) {
-        throw new NotFoundException(await this.i18n.translate('product_not_found', lang));
+        throw new NotFoundException(
+          await this.i18n.translate('product_not_found', lang),
+        );
       }
 
       finalProduct.images = imageEntities;
 
-      this.logger.log(`Produit "${finalProduct.name}" créé avec succès. Slug: ${finalProduct.slug}`);
+      this.logger.log(
+        `Produit "${finalProduct.name}" créé avec succès. Slug: ${finalProduct.slug}`,
+      );
 
       return {
         message: await this.i18n.translate('product_created', lang),
@@ -1066,7 +1213,10 @@ export class ProductService {
         'variations.attributeValues.attribute',
       ],
     });
-    if (!product) throw new NotFoundException(await this.i18n.translate('product_not_found', lang));
+    if (!product)
+      throw new NotFoundException(
+        await this.i18n.translate('product_not_found', lang),
+      );
 
     const hasManage = await this.permissionHelper.hasManageOnResource(
       currentUser,
@@ -1075,13 +1225,19 @@ export class ProductService {
 
     if (!hasManage) {
       if (!currentUser.activeCompanyId) {
-        throw new BadRequestException(await this.i18n.translate('no_active_company', lang));
+        throw new BadRequestException(
+          await this.i18n.translate('no_active_company', lang),
+        );
       }
       if (product.company?.id !== currentUser.activeCompanyId) {
-        throw new ForbiddenException(await this.i18n.translate('update_product_forbidden', lang));
+        throw new ForbiddenException(
+          await this.i18n.translate('update_product_forbidden', lang),
+        );
       }
       if (companyId && companyId !== currentUser.activeCompanyId) {
-        throw new ForbiddenException(await this.i18n.translate('cannot_change_company', lang));
+        throw new ForbiddenException(
+          await this.i18n.translate('cannot_change_company', lang),
+        );
       }
     } else {
       if (companyId && (!product.company || product.company.id !== companyId)) {
@@ -1089,7 +1245,9 @@ export class ProductService {
           where: { id: companyId },
         });
         if (!newCompany)
-          throw new NotFoundException(await this.i18n.translate('company_not_found', lang));
+          throw new NotFoundException(
+            await this.i18n.translate('company_not_found', lang),
+          );
         product.company = newCompany;
       }
     }
@@ -1101,7 +1259,10 @@ export class ProductService {
         const category = await manager.findOne(CategoryEntity, {
           where: { id: categoryId },
         });
-        if (!category) throw new NotFoundException(await this.i18n.translate('category_not_found', lang));
+        if (!category)
+          throw new NotFoundException(
+            await this.i18n.translate('category_not_found', lang),
+          );
         product.category = category;
       } else {
         product.category = undefined;
@@ -1109,7 +1270,10 @@ export class ProductService {
 
       if (brandId) {
         const brand = await manager.findOne(Brand, { where: { id: brandId } });
-        if (!brand) throw new NotFoundException(await this.i18n.translate('brand_not_found', lang));
+        if (!brand)
+          throw new NotFoundException(
+            await this.i18n.translate('brand_not_found', lang),
+          );
         product.brand = brand;
       } else {
         product.brand = undefined;
@@ -1119,28 +1283,63 @@ export class ProductService {
         const measure = await manager.findOne(MeasureEntity, {
           where: { id: measureId },
         });
-        if (!measure) throw new NotFoundException(await this.i18n.translate('measure_not_found', lang));
+        if (!measure)
+          throw new NotFoundException(
+            await this.i18n.translate('measure_not_found', lang),
+          );
         product.measure = measure;
       } else {
         product.measure = undefined;
       }
 
+      // ============================================================
+      // 🖼️🎬 UPLOAD DES NOUVEAUX FICHIERS — SÉPARATION IMAGES / VIDÉOS
+      // ============================================================
       if (files && files.length > 0) {
-        const newImages: ImageProductEntity[] = [];
+        const uploadedImages: string[] = []; // 🖼️ images + docs
+        const uploadedVideos: string[] = []; // 🎬 vidéos (URL uniquement)
+
         for (const file of files) {
           const uploadResult = await this.filesService.uploadFile(
             file,
             'product',
             'product',
           );
+
+          // 🔥 Normalisation :
+          //    - image/doc  → uploadResult.data est une string
+          //    - vidéo      → uploadResult.data est un objet { video, thumb }
+          if (typeof uploadResult.data === 'string') {
+            uploadedImages.push(uploadResult.data);
+          } else if (uploadResult.data?.video) {
+            uploadedVideos.push(uploadResult.data.video);
+          }
+        }
+
+        // 🔥 Ordre : vidéos d'abord, puis images
+        const newUrls = [...uploadedVideos, ...uploadedImages];
+
+        const newImages: ImageProductEntity[] = [];
+        for (const url of newUrls) {
           const imageEntity = manager.create(ImageProductEntity, {
-            url: uploadResult.data,
+            url,
             product: product,
           });
           const savedImage = await manager.save(imageEntity);
           newImages.push(savedImage);
         }
+
+        // Ajout aux images existantes (on ne supprime rien)
         product.images = [...(product.images || []), ...newImages];
+
+        // 🔥 Si une nouvelle vidéo a été uploadée → elle devient l'image principale
+        //    Sinon on garde l'image principale existante
+        if (uploadedVideos.length > 0) {
+          product.image = uploadedVideos[0];
+        } else if (!product.image && uploadedImages.length > 0) {
+          // Si le produit n'avait aucune image principale, on en met une
+          product.image = uploadedImages[0];
+        }
       }
 
       const updatedProduct = await manager.save(product);
@@ -1160,7 +1359,9 @@ export class ProductService {
             });
             if (!specExists) {
               throw new BadRequestException(
-                await this.i18n.translate('specification_not_found', lang, { id: spec.specificationId }),
+                await this.i18n.translate('specification_not_found', lang, {
+                  id: spec.specificationId,
+                }),
               );
             }
             const specValue = manager.create(ProductSpecificationValue, {
@@ -1183,7 +1384,9 @@ export class ProductService {
             });
             if (!attribute) {
               throw new BadRequestException(
-                await this.i18n.translate('attribute_not_found', lang, { id: attributeId }),
+                await this.i18n.translate('attribute_not_found', lang, {
+                  id: attributeId,
+                }),
               );
             }
             const productAttribute = manager.create(ProductAttribute, {
@@ -1227,7 +1430,9 @@ export class ProductService {
               const imageIdNumber = parseInt(imageId, 10);
               if (isNaN(imageIdNumber)) {
                 throw new BadRequestException(
-                  await this.i18n.translate('invalid_image_id', lang, { id: imageId }),
+                  await this.i18n.translate('invalid_image_id', lang, {
+                    id: imageId,
+                  }),
                 );
               }
               const foundImage = await manager.findOne(ImageProductEntity, {
@@ -1235,7 +1440,9 @@ export class ProductService {
               });
               if (!foundImage) {
                 throw new NotFoundException(
-                  await this.i18n.translate('image_not_found', lang, { id: imageId }),
+                  await this.i18n.translate('image_not_found', lang, {
+                    id: imageId,
+                  }),
                 );
               }
               variationImage = foundImage;
@@ -1290,7 +1497,9 @@ export class ProductService {
       });
 
       if (!productWithRelations) {
-        throw new NotFoundException(await this.i18n.translate('product_not_found', lang));
+        throw new NotFoundException(
+          await this.i18n.translate('product_not_found', lang),
+        );
       }
 
       return {
