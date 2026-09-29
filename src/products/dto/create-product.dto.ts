@@ -171,6 +171,7 @@ export class CreateProductDto {
   model: string;
 
   @IsOptional()
+  @Transform(({ value }) => (value === '' ? null : value))
   @IsEnum(Type_rental_both_sale_car)
   typecar?: Type_rental_both_sale_car | null;
 
