@@ -172,7 +172,7 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsEnum(Type_rental_both_sale_car)
-  typecar?: Type_rental_both_sale_car;
+  typecar?: Type_rental_both_sale_car | null;
 
   @IsOptional()
   @IsString()

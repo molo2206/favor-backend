@@ -116,9 +116,10 @@ export class Product {
   @Column({
     type: 'enum',
     enum: Type_rental_both_sale_car,
-    default: Type_rental_both_sale_car.SALE,
+    nullable: true,
+    default: null,
   })
-  typecar?: Type_rental_both_sale_car;
+  typecar?: Type_rental_both_sale_car | null;
 
   @Column({
     type: 'decimal',

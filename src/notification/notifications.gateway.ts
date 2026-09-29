@@ -292,6 +292,11 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       distanceRemainingKm?: number;
       estimatedArrivalMinutes?: number;
       status: string;
+      direction?: {              // 🔥 NOUVEAU
+        polyline: string | null;
+        steps: any[];
+        destination: { latitude: number; longitude: number };
+      };
     },
   ) {
     const roomName = `order-${orderId}`;

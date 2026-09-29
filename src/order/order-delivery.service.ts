@@ -504,6 +504,7 @@ export class OrderDeliveryService {
     // ============================================================
     // 📍 METTRE À JOUR LA POSITION DU LIVREUR
     // ============================================================
+    // ============================================================
     async updateLocation(
         orderId: string,
         location: {
@@ -553,34 +554,57 @@ export class OrderDeliveryService {
             );
         }
 
-        // 3. Calculer la distance via Google (fallback Haversine)
-        this.logger.log(`📐 [2/4] Calcul de la distance (Google)...`);
+        // ============================================================
+        // 3. Calculer la direction via Google (fallback Haversine)
+        // ============================================================
+        this.logger.log(`📐 [2/4] Calcul de la direction (Google Directions)...`);
 
         let distanceKm: number;
         let estimatedArrivalMinutes: number;
+        let polyline: string | null = null;
+        let steps: any[] = [];
 
         try {
             const origin = `${location.latitude},${location.longitude}`;
             const destination = `${targetLatitude},${targetLongitude}`;
 
-            const googleData = await this.googleService.getDistance(
+            const googleData = await this.googleService.getDirections(
                 origin,
                 destination,
                 false,
-                { mode: 'driving', language: 'fr' },
+                {
+                    mode: 'driving',
+                    language: 'fr',
+                    units: 'metric',
+                },
             );
 
-            const element = googleData?.rows?.[0]?.elements?.[0];
+            const route = googleData?.routes?.[0];
+            const leg = route?.legs?.[0];
 
-            if (element && element.status === 'OK') {
-                distanceKm = Math.round((element.distance.value / 1000) * 100) / 100;
-                estimatedArrivalMinutes = Math.round(element.duration.value / 60);
-                this.logger.log(`✅ Google → ${distanceKm} km / ${estimatedArrivalMinutes} min`);
+            if (leg && route) {
+                distanceKm = Math.round((leg.distance.value / 1000) * 100) / 100;
+                estimatedArrivalMinutes = Math.round(leg.duration.value / 60);
+                polyline = route.overview_polyline?.points || null;
+
+                steps = (leg.steps || []).map((step: any) => ({
+                    distance: step.distance?.text,
+                    duration: step.duration?.text,
+                    instruction: step.html_instructions
+                        ? step.html_instructions.replace(/<[^>]*>/g, '')
+                        : null,
+                    startLocation: step.start_location,
+                    endLocation: step.end_location,
+                }));
+
+                this.logger.log(`✅ Google Directions → ${distanceKm} km / ${estimatedArrivalMinutes} min`);
+                this.logger.log(`   Polyline: ${polyline ? 'présent' : 'absent'}`);
+                this.logger.log(`   Steps: ${steps.length}`);
             } else {
-                throw new Error(`Google status: ${element?.status || 'NOT_FOUND'}`);
+                throw new Error(`Google Directions: aucune route trouvée`);
             }
         } catch (error: any) {
-            this.logger.warn(`⚠️ Google échoué (${error.message}) → fallback Haversine`);
+            this.logger.warn(`⚠️ Google Directions échoué (${error.message}) → fallback Haversine`);
             distanceKm = this.calculateDistance(
                 location.latitude,
                 location.longitude,
@@ -588,6 +612,8 @@ export class OrderDeliveryService {
                 targetLongitude,
             );
             estimatedArrivalMinutes = Math.round((distanceKm / 30) * 60);
+            polyline = null;
+            steps = [];
             this.logger.log(`✅ Haversine → ${distanceKm} km / ${estimatedArrivalMinutes} min`);
         }
 
@@ -602,7 +628,9 @@ export class OrderDeliveryService {
         const updated = await this.assignmentRepo.save(assignment);
         this.logger.log(`✅ Affectation sauvegardée`);
 
-        // 5. Diffuser la position
+        // ============================================================
+        // 5. Diffuser la position AVEC la direction
+        // ============================================================
         this.logger.log(`📡 [4/4] Diffusion WebSocket à la room order-${orderId}...`);
         this.notificationsGateway.sendDeliveryLocation(orderId, {
             orderId,
@@ -612,8 +640,16 @@ export class OrderDeliveryService {
             distanceRemainingKm: updated.distanceRemainingKm,
             estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
             status: updated.status,
+            direction: {
+                polyline,
+                steps,
+                destination: {
+                    latitude: targetLatitude,
+                    longitude: targetLongitude,
+                },
+            },
         });
-        this.logger.log(`✅ Diffusé`);
+        this.logger.log(`✅ Diffusé (avec direction)`);
 
         this.logger.log('========================================');
         this.logger.log(`✅ UPDATE LOCATION - SUCCÈS`);
@@ -621,7 +657,6 @@ export class OrderDeliveryService {
 
         return updated;
     }
-
     // ============================================================
     // ✅ CHANGER LE STATUT MANUELLEMENT (PAR PIN)
     // ============================================================
