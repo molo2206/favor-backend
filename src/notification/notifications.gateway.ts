@@ -637,7 +637,7 @@ export class NotificationsGateway
     @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
-    console.log(client)
+
     const payload = this.parseBody<{ orderId: string }>(data);
     if (!payload?.orderId) {
       return { success: false, message: 'orderId est requis' };
