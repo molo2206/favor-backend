@@ -1091,7 +1091,7 @@ export class OrderDeliveryService {
         const query = this.buildAssignmentQuery('assignment');
 
         // 🔐 Filtre dynamique selon le rôle
-        if (user.role === UserRole.CLIENT) {
+        if (user.role === UserRole.CUSTOMER) {
             // ✅ Client → ses commandes
             query.andWhere('order.userId = :userId', { userId });
             this.logger.log(`👤 Client → order.userId = ${userId}`);
