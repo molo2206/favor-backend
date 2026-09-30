@@ -2727,29 +2727,36 @@ export class OrderService {
     // 🔥 Récupérer le user pour connaître son rôle
     const user = await this.userRepository.findOne({
       where: { id: userId },
+      select: ['id', 'role'],
     });
 
     if (!user) {
       throw new NotFoundException(`Utilisateur ${userId} introuvable`);
     }
 
-    // 🔐 Filtre dynamique selon le rôle
-    let where: any = {};
+    // ============================================================
+    // 🎯 ÉTAPE 1 : RÉCUPÉRER LES IDs PAGINÉS (rapide)
+    // ============================================================
+    const idsQuery = this.orderRepo
+      .createQueryBuilder('order')
+      .select('order.id', 'id')
+      .orderBy('order.createdAt', 'DESC');
 
+    // 🔐 Filtre dynamique selon le rôle
     if (user.role === UserRole.CUSTOMER) {
-      where = { user: { id: userId } };
+      idsQuery.andWhere('order.userId = :userId', { userId });
     } else if (user.role === UserRole.DELIVER) {
-      where = {
-        deliveryAssignments: {
-          deliverId: userId,
-          isActive: true,
-        },
-      };
+      idsQuery.innerJoin(
+        'order.deliveryAssignments',
+        'assignment',
+        'assignment.deliverId = :userId AND assignment.isActive = true',
+        { userId },
+      );
     } else if (
       user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.ADMIN
     ) {
-      where = {};
+      // Admin → accès total
     } else {
       return {
         message: 'Aucune commande disponible pour ce rôle',
@@ -2757,57 +2764,59 @@ export class OrderService {
       };
     }
 
-    // ✅ find() — version qui FONCTIONNE
+    // 🔥 Pagination sur les IDs uniquement
+    if (pageNumber && limitNumber) {
+      idsQuery.skip((pageNumber - 1) * limitNumber).take(limitNumber);
+    } else if (limitNumber) {
+      idsQuery.take(limitNumber);
+    }
+
+    const rawIds = await idsQuery.getRawMany();
+    const orderIds = rawIds.map((r) => r.id);
+
+    if (orderIds.length === 0) {
+      return {
+        message: 'Commandes récupérées avec succès',
+        data: [],
+      };
+    }
+
+    // ============================================================
+    // 🎯 ÉTAPE 2 : CHARGER LES COMMANDES PAR IDs (sans pagination)
+    // ============================================================
     const orders = await this.orderRepo.find({
-      where,
+      where: { id: In(orderIds) },
       relations: [
-        // 📦 Items principaux
         'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
-
-        // 🏢 Sous-commandes
         'subOrders',
         'subOrders.items.product.company',
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',
         'subOrders.company.city',
-
-        // 👤 Client
         'user',
-
-        // 📍 Adresse
         'addressUser',
         'addressUser.city',
         'addressUser.country',
-
-        // 🚚 Affectations
         'deliveryAssignments',
         'deliveryAssignments.deliver',
         'deliveryAssignments.assignedBy',
-
-        // 👤 Validations
         'currentDeliveryUser',
         'validatedBy',
         'processingBy',
         'completedBy',
         'deliveredBy',
         'rejectedBy',
-
-        // 📦 Livraison
         'delivery',
       ],
       order: { createdAt: 'DESC' },
-      // 🔥 Pagination
-      skip:
-        pageNumber && limitNumber
-          ? (pageNumber - 1) * limitNumber
-          : undefined,
-      take: limitNumber || undefined,
     });
 
-    // 🔥 RETOURNER UN TABLEAU DE COMMANDES
+    // ============================================================
+    // 🎯 ÉTAPE 3 : CONSTRUIRE LA RÉPONSE
+    // ============================================================
     return {
       message: 'Commandes récupérées avec succès',
       data: orders.map((o) => {
@@ -2817,7 +2826,7 @@ export class OrderService {
 
         return {
           // ============================================================
-          // 📦 INFOS COMPLÈTES DE LA COMMANDE
+          // 📦 INFOS COMMANDE
           // ============================================================
           id: o.id,
           invoiceNumber: o.invoiceNumber,
