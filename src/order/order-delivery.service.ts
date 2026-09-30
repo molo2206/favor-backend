@@ -383,6 +383,10 @@ export class OrderDeliveryService {
             existing.notes = `Remplacé par le livreur ${deliverId}`;
             await this.assignmentRepo.save(existing);
             this.logger.log(`✅ Ancienne affectation désactivée`);
+
+            // ✅ CORRECTION : retirer l'ancien livreur de la room
+            this.notificationsGateway.leaveOrderRoom(existing.deliverId, orderId);
+            this.logger.log(`🚪 Ancien livreur ${existing.deliverId} retiré de la room order-${orderId}`);
         } else {
             this.logger.log(`✅ Aucune affectation active existante`);
         }
@@ -458,6 +462,10 @@ export class OrderDeliveryService {
                 `⚠️ Erreur processOrderNotifications: ${err.message}`,
             );
         }
+
+        // ✅ CORRECTION : ajouter le livreur à la room AVANT la notification WS
+        this.notificationsGateway.joinOrderRoom(deliverId, orderId);
+        this.logger.log(`🔌 Livreur ${deliverId} ajouté à la room order-${orderId}`);
 
         // 8. Notifier le livreur via WebSocket
         this.logger.log(`📡 Envoi de la notification WebSocket au livreur...`);
@@ -639,7 +647,7 @@ export class OrderDeliveryService {
             longitude: location.longitude,
             distanceRemainingKm: updated.distanceRemainingKm,
             estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
-            status: updated.status,
+            status: updated.status as string,
             direction: {
                 polyline,
                 steps,
@@ -730,10 +738,14 @@ export class OrderDeliveryService {
         this.logger.log(`📡 Diffusion WebSocket...`);
         this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
             orderId,
-            status: updated.status,
+            status: updated.status as string,
             note: note ?? 'Livraison confirmée par PIN',
         });
         this.logger.log(`✅ Diffusé`);
+
+        // ✅ CORRECTION : retirer le livreur de la room après livraison
+        this.notificationsGateway.leaveOrderRoom(updated.deliverId, orderId);
+        this.logger.log(`🚪 Livreur ${updated.deliverId} retiré de la room order-${orderId}`);
 
         this.logger.log('========================================');
         this.logger.log(`✅ UPDATE STATUS - SUCCÈS`);
@@ -841,7 +853,7 @@ export class OrderDeliveryService {
 
             this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
                 orderId,
-                status: updated.status,
+                status: updated.status as string,
                 note: 'Tracking démarré',
             });
 
@@ -866,7 +878,7 @@ export class OrderDeliveryService {
         if (action === 'stop') {
             this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
                 orderId,
-                status: assignment.status,
+                status: assignment.status as string,
                 note: 'Tracking arrêté',
             });
 
@@ -927,32 +939,47 @@ export class OrderDeliveryService {
             );
         }
 
-        // Calculer la distance via Google (fallback Haversine)
+        // Calculer la distance + direction via Google (fallback Haversine)
         let distanceKm: number;
         let estimatedArrivalMinutes: number;
+        let polyline: string | null = null;
+        let steps: any[] = [];
 
         try {
             const origin = `${location.latitude},${location.longitude}`;
             const destination = `${targetLatitude},${targetLongitude}`;
 
-            const googleData = await this.googleService.getDistance(
+            const googleData = await this.googleService.getDirections(
                 origin,
                 destination,
                 false,
-                { mode: 'driving', language: 'fr' },
+                { mode: 'driving', language: 'fr', units: 'metric' },
             );
 
-            const element = googleData?.rows?.[0]?.elements?.[0];
+            const route = googleData?.routes?.[0];
+            const leg = route?.legs?.[0];
 
-            if (element && element.status === 'OK') {
-                distanceKm = Math.round((element.distance.value / 1000) * 100) / 100;
-                estimatedArrivalMinutes = Math.round(element.duration.value / 60);
+            if (leg && route) {
+                distanceKm = Math.round((leg.distance.value / 1000) * 100) / 100;
+                estimatedArrivalMinutes = Math.round(leg.duration.value / 60);
+                polyline = route.overview_polyline?.points || null;
+
+                steps = (leg.steps || []).map((step: any) => ({
+                    distance: step.distance?.text,
+                    duration: step.duration?.text,
+                    instruction: step.html_instructions
+                        ? step.html_instructions.replace(/<[^>]*>/g, '')
+                        : null,
+                    startLocation: step.start_location,
+                    endLocation: step.end_location,
+                }));
+
                 this.logger.log(`✅ Google → ${distanceKm} km / ${estimatedArrivalMinutes} min`);
             } else {
-                throw new Error(`Google status: ${element?.status || 'NOT_FOUND'}`);
+                throw new Error(`Google: aucune route trouvée`);
             }
         } catch (error: any) {
-            this.logger.warn(`⚠️ Google échoué → fallback Haversine`);
+            this.logger.warn(`⚠️ Google échoué (${error.message}) → fallback Haversine`);
             distanceKm = this.calculateDistance(
                 location.latitude,
                 location.longitude,
@@ -960,6 +987,8 @@ export class OrderDeliveryService {
                 targetLongitude,
             );
             estimatedArrivalMinutes = Math.round((distanceKm / 30) * 60);
+            polyline = null;
+            steps = [];
         }
 
         // Mettre à jour la position
@@ -979,7 +1008,15 @@ export class OrderDeliveryService {
             longitude: location.longitude,
             distanceRemainingKm: updated.distanceRemainingKm,
             estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
-            status: updated.status,
+            status: updated.status as string,
+            direction: {
+                polyline,
+                steps,
+                destination: {
+                    latitude: targetLatitude,
+                    longitude: targetLongitude,
+                },
+            },
         });
 
         this.logger.log(`✅ Position diffusée`);

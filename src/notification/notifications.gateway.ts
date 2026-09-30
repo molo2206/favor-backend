@@ -95,6 +95,11 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
         where: { id: userId },
       });
       if (user) {
+        // 🔥 STOCKER LES INFOS SUR LE SOCKET
+        socket.data.userId = userId;
+        socket.data.role = user.role;
+        socket.data.fullName = user.fullName;
+
         this.activeUsers.push({
           id: userId,
           socketId: socket.id,
@@ -292,7 +297,7 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       distanceRemainingKm?: number;
       estimatedArrivalMinutes?: number;
       status: string;
-      direction?: {              // 🔥 NOUVEAU
+      direction?: {
         polyline: string | null;
         steps: any[];
         destination: { latitude: number; longitude: number };
@@ -367,17 +372,22 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
   @SubscribeMessage('leave-order')
   handleLeaveOrderTracking(
-    @MessageBody() data: { orderId: string },
+    @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
-    const roomName = `order-${data.orderId}`;
+    const payload = this.parseBody<{ orderId: string }>(data);
+    if (!payload?.orderId) {
+      return { success: false, message: 'orderId est requis' };
+    }
+
+    const roomName = `order-${payload.orderId}`;
     client.leave(roomName);
     console.log(`🔌 Client ${client.id} left order room: ${roomName}`);
 
     client.emit('order-left', {
       success: true,
       room: roomName,
-      orderId: data.orderId,
+      orderId: payload.orderId,
     });
 
     return { success: true, room: roomName };
@@ -650,5 +660,89 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       .to('drivers')
       .emit('ride-cancelled', { rideId: ride.data.id });
     client.emit('ride-accepted', { rideId: ride.data.id });
+  }
+
+  // ============================================================
+  // 📋 RÉCUPÉRATION DES UTILISATEURS DANS LES ROOMS
+  // ============================================================
+
+  /**
+   * Récupérer tous les utilisateurs d'une room order
+   */
+  async getUsersInOrderRoom(orderId: string): Promise<any[]> {
+    const roomName = `order-${orderId}`;
+
+    try {
+      const sockets = await this.server.in(roomName).fetchSockets();
+
+      console.log(`📋 Room ${roomName} contient ${sockets.length} socket(s)`);
+
+      return sockets.map((s: any) => ({
+        socketId: s.id,
+        userId: s.data?.userId || null,
+        role: s.data?.role || null,
+        fullName: s.data?.fullName || null,
+      }));
+    } catch (error) {
+      console.error(`❌ Erreur getUsersInOrderRoom:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Récupérer tous les utilisateurs d'une room company
+   */
+  async getUsersInCompanyRoom(companyId: string): Promise<any[]> {
+    const roomName = `company-${companyId}`;
+
+    try {
+      const sockets = await this.server.in(roomName).fetchSockets();
+
+      return sockets.map((s: any) => ({
+        socketId: s.id,
+        userId: s.data?.userId || null,
+        role: s.data?.role || null,
+        fullName: s.data?.fullName || null,
+      }));
+    } catch (error) {
+      console.error(`❌ Erreur getUsersInCompanyRoom:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Récupérer tous les chauffeurs connectés
+   */
+  async getConnectedDrivers(): Promise<any[]> {
+    try {
+      const sockets = await this.server.in('drivers').fetchSockets();
+
+      return sockets.map((s: any) => ({
+        socketId: s.id,
+        userId: s.data?.userId || null,
+        role: s.data?.role || null,
+        fullName: s.data?.fullName || null,
+      }));
+    } catch (error) {
+      console.error(`❌ Erreur getConnectedDrivers:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Vérifier si un utilisateur est dans une room order
+   */
+  async isUserInOrderRoom(orderId: string, userId: string): Promise<boolean> {
+    const users = await this.getUsersInOrderRoom(orderId);
+    return users.some((u) => u.userId === userId);
+  }
+
+  /**
+   * Compter le nombre d'utilisateurs dans une room order
+   */
+  async countUsersInOrderRoom(orderId: string): Promise<number> {
+    const roomName = `order-${orderId}`;
+    const sockets = await this.server.in(roomName).fetchSockets();
+    return sockets.length;
   }
 }
