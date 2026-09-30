@@ -44,6 +44,12 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
   private activeTrackings: Map<string, Set<string>> = new Map();
 
+  /**
+   * 🗺️ Map inversée : userId → Set<roomName>
+   * Permet de savoir dans quelles rooms est un utilisateur
+   */
+  private userRooms: Map<string, Set<string>> = new Map();
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
@@ -81,6 +87,8 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     );
 
     socket.join(userId);
+    // ✅ AJOUT : tracer la room perso
+    this.addUserRoom(userId, userId);
 
     if (existingDriverIndex !== -1) {
       const oldSocketId = this.activeUsers[existingDriverIndex].socketId;
@@ -128,6 +136,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       console.log(`❌ User ${userId} disconnected (socket: ${client.id})`);
       console.log(`   Reason: ${(client as any).disconnected ? 'unknown' : 'transport close'}`);
 
+      // ✅ AJOUT : nettoyer la Map inversée
+      this.userRooms.delete(userId);
+
       if (this.activeTrackings.has(userId)) {
         const orders = Array.from(this.activeTrackings.get(userId)!);
         for (const orderId of orders) {
@@ -155,6 +166,10 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     if (userIndex !== -1) {
       this.activeUsers.splice(userIndex, 1);
     }
+
+    // ✅ AJOUT : nettoyer la Map inversée
+    this.userRooms.delete(userId);
+
     client.leave(userId);
     client.disconnect();
     console.log(`Utilisateur ${userId} déconnecté manuellement`);
@@ -188,6 +203,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
   ) {
     const roomName = `company-${data.companyId}`;
     client.join(roomName);
+    // ✅ AJOUT : tracer la room
+    const userId = client.data?.userId;
+    if (userId) this.addUserRoom(userId, roomName);
     console.log(`🔌 Client joined company room: ${roomName}`);
     return { success: true, room: roomName };
   }
@@ -199,6 +217,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
   ) {
     const roomName = `company-${data.companyId}`;
     client.leave(roomName);
+    // ✅ AJOUT : retirer de la Map inversée
+    const userId = client.data?.userId;
+    if (userId) this.removeUserRoom(userId, roomName);
     console.log(`🔌 Client left company room: ${roomName}`);
     return { success: true, room: roomName };
   }
@@ -215,6 +236,43 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
   getActiveUsers(): string[] {
     return this.activeUsers.map((user) => user.id);
+  }
+
+  // ============================================================
+  // 🗺️ HELPERS : gestion de la Map inversée userRooms
+  // ============================================================
+  private addUserRoom(userId: string, roomName: string): void {
+    if (!userId) return;
+    if (!this.userRooms.has(userId)) {
+      this.userRooms.set(userId, new Set());
+    }
+    this.userRooms.get(userId)!.add(roomName);
+  }
+
+  private removeUserRoom(userId: string, roomName: string): void {
+    if (!userId) return;
+    const rooms = this.userRooms.get(userId);
+    if (!rooms) return;
+    rooms.delete(roomName);
+    if (rooms.size === 0) this.userRooms.delete(userId);
+  }
+
+  /**
+   * 🔍 API publique : dans quelles rooms est un user ?
+   */
+  getUserRooms(userId: string): string[] {
+    return Array.from(this.userRooms.get(userId) ?? []);
+  }
+
+  /**
+   * 🔍 API publique : snapshot global userId → rooms
+   */
+  getAllUserRooms(): Record<string, string[]> {
+    const result: Record<string, string[]> = {};
+    for (const [userId, rooms] of this.userRooms.entries()) {
+      result[userId] = Array.from(rooms);
+    }
+    return result;
   }
 
   sendShipmentCreatedToCompany(
@@ -359,6 +417,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
     const roomName = `order-${payload.orderId}`;
     client.join(roomName);
+    // ✅ AJOUT : tracer la room
+    const userId = client.data?.userId;
+    if (userId) this.addUserRoom(userId, roomName);
     console.log(`🔌 Client ${client.id} joined order room: ${roomName}`);
 
     client.emit('order-joined', {
@@ -382,6 +443,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
     const roomName = `order-${payload.orderId}`;
     client.leave(roomName);
+    // ✅ AJOUT : retirer de la Map inversée
+    const userId = client.data?.userId;
+    if (userId) this.removeUserRoom(userId, roomName);
     console.log(`🔌 Client ${client.id} left order room: ${roomName}`);
 
     client.emit('order-left', {
@@ -408,6 +472,8 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     const socket = this.server.sockets.sockets.get(activeUser.socketId);
     if (socket) {
       socket.join(roomName);
+      // ✅ AJOUT : tracer dans la Map inversée
+      this.addUserRoom(userId, roomName);
       console.log(`🔌 User ${userId} joined room ${roomName}`);
     } else {
       console.warn(`⚠️ [joinOrderRoom] Socket introuvable pour ${userId}`);
@@ -429,6 +495,8 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     const socket = this.server.sockets.sockets.get(activeUser.socketId);
     if (socket) {
       socket.leave(roomName);
+      // ✅ AJOUT : retirer de la Map inversée
+      this.removeUserRoom(userId, roomName);
       console.log(`🚪 User ${userId} left room ${roomName}`);
     } else {
       console.warn(`⚠️ [leaveOrderRoom] Socket introuvable pour ${userId}`);
@@ -493,6 +561,8 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     try {
       const roomName = `order-${orderId}`;
       client.join(roomName);
+      // ✅ AJOUT : tracer la room
+      this.addUserRoom(deliverId, roomName);
 
       console.log(`✅ Livreur ${deliverId} joined room ${roomName}`);
 
