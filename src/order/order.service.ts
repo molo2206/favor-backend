@@ -3,9 +3,7 @@ import { OrderNotificationHelper } from 'src/notification/utils/order-notificati
 import {
   BadRequestException,
   ForbiddenException,
-  forwardRef,
   HttpStatus,
-  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -58,7 +56,6 @@ import { randomBytes } from 'crypto';
 import { PayOrderDto } from './dto/pay-order.dto';
 import { FpaySendDto } from 'src/fpay/dto/send.dto';
 import { ReferralEntity, ReferralStatus } from 'src/users/entities/referral.entity';
-import { NotificationsGateway } from 'src/notification/notifications.gateway';
 
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -106,9 +103,6 @@ export class OrderService {
     @InjectRepository(CompanyHasUserResource) private readonly companyHasUserResourceRepo: Repository<CompanyHasUserResource>,
     @InjectRepository(ReferralEntity)
     private readonly referralRepo: Repository<ReferralEntity>,
-
-    @Inject(forwardRef(() => NotificationsGateway))
-    private readonly notificationsGateway: NotificationsGateway,
   ) { }
 
   private getUserLanguage(user: UserEntity): string {
@@ -2733,32 +2727,48 @@ export class OrderService {
     // 🔥 Récupérer le user pour connaître son rôle
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      select: ['id', 'role'],
     });
 
     if (!user) {
       throw new NotFoundException(`Utilisateur ${userId} introuvable`);
     }
 
-    // ============================================================
-    // 🔍 ÉTAPE 1 : RÉCUPÉRER UNIQUEMENT LES IDs DES COMMANDES (paginés)
-    // ============================================================
-    const idsQuery = this.orderRepo
+    // 🔍 Construire la requête avec les mêmes relations
+    const query = this.orderRepo
       .createQueryBuilder('order')
-      .select('order.id', 'id')
-      .orderBy('order.createdAt', 'DESC');
+      .leftJoinAndSelect('order.user', 'user')
+      .leftJoinAndSelect('order.addressUser', 'addressUser')
+      .leftJoinAndSelect('addressUser.country', 'addressCountry')
+      .leftJoinAndSelect('addressUser.city', 'addressCity')
+      .leftJoinAndSelect('order.orderItems', 'orderItem')
+      .leftJoinAndSelect('orderItem.product', 'product')
+      .leftJoinAndSelect('product.company', 'productCompany')
+      .leftJoinAndSelect('product.category', 'productCategory')
+      .leftJoinAndSelect('product.measure', 'productMeasure')
+      .leftJoinAndSelect('order.subOrders', 'subOrder')
+      .leftJoinAndSelect('subOrder.items', 'subOrderItem')
+      .leftJoinAndSelect('subOrderItem.product', 'subOrderProduct')
+      .leftJoinAndSelect('subOrderProduct.company', 'subOrderProductCompany')
+      .leftJoinAndSelect('subOrderProduct.category', 'subOrderProductCategory')
+      .leftJoinAndSelect('subOrderProduct.measure', 'subOrderProductMeasure')
+      .leftJoinAndSelect('subOrder.company', 'subOrderCompany')
+      .leftJoinAndSelect('subOrderCompany.city', 'subOrderCompanyCity')
+      .leftJoinAndSelect('order.deliveryAssignments', 'assignment')
+      .leftJoinAndSelect('assignment.deliver', 'deliver')
+      .leftJoinAndSelect('assignment.assignedBy', 'assignedBy')
+      .leftJoinAndSelect('order.currentDeliveryUser', 'currentDeliveryUser')
+      .leftJoinAndSelect('order.validatedBy', 'validatedBy')
+      .leftJoinAndSelect('order.processingBy', 'processingBy')
+      .leftJoinAndSelect('order.completedBy', 'completedBy')
+      .leftJoinAndSelect('order.deliveredBy', 'deliveredBy')
+      .leftJoinAndSelect('order.rejectedBy', 'rejectedBy')
+      .leftJoinAndSelect('order.delivery', 'delivery');
 
     // 🔐 Filtre dynamique selon le rôle
     if (user.role === UserRole.CUSTOMER) {
-      idsQuery.andWhere('order.userId = :userId', { userId });
+      query.andWhere('order.userId = :userId', { userId });
     } else if (user.role === UserRole.DELIVER) {
-      idsQuery
-        .innerJoin(
-          'order.deliveryAssignments',
-          'assignment',
-          'assignment.deliverId = :userId AND assignment.isActive = true',
-          { userId },
-        );
+      query.andWhere('assignment.deliverId = :userId', { userId });
     } else if (
       user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.ADMIN
@@ -2771,81 +2781,21 @@ export class OrderService {
       };
     }
 
-    // 🔥 Pagination appliquée UNIQUEMENT sur les IDs
+    // 🔽 Tri
+    query.orderBy('order.createdAt', 'DESC');
+
+    // 🔥 Pagination
     if (pageNumber && limitNumber) {
-      idsQuery.skip((pageNumber - 1) * limitNumber).take(limitNumber);
+      query.skip((pageNumber - 1) * limitNumber).take(limitNumber);
     } else if (limitNumber) {
-      idsQuery.take(limitNumber);
+      query.take(limitNumber);
     }
 
-    const rawIds = await idsQuery.getRawMany();
-    const orderIds = rawIds.map((r) => r.id);
+    const orders = await query.getMany();
 
-    if (orderIds.length === 0) {
-      return {
-        message: 'Commandes récupérées avec succès',
-        data: [],
-      };
-    }
+    // 🔥 Trackings actifs en mémoire
 
-    // ============================================================
-    // 🔍 ÉTAPE 2 : CHARGER LES COMMANDES AVEC RELATIONS (via IDs)
-    // ============================================================
-    const orders = await this.orderRepo.find({
-      where: { id: In(orderIds) },
-      relations: [
-        // 📦 Items principaux
-        'orderItems',
-        'orderItems.product',
-        'orderItems.product.company',
-        'orderItems.product.category',
-        'orderItems.product.measure',
-
-        // 🏢 Sous-commandes
-        'subOrders',
-        'subOrders.items',
-        'subOrders.items.product',
-        'subOrders.items.product.company',
-        'subOrders.items.product.category',
-        'subOrders.items.product.measure',
-        'subOrders.company',
-        'subOrders.company.city',
-
-        // 👤 Client
-        'user',
-
-        // 📍 Adresse
-        'addressUser',
-        'addressUser.city',
-        'addressUser.country',
-
-        // 🚚 Affectations
-        'deliveryAssignments',
-        'deliveryAssignments.deliver',
-        'deliveryAssignments.assignedBy',
-
-        // 👤 Validations
-        'currentDeliveryUser',
-        'validatedBy',
-        'processingBy',
-        'completedBy',
-        'deliveredBy',
-        'rejectedBy',
-
-        // 📦 Livraison
-        'delivery',
-      ],
-      order: { createdAt: 'DESC' },
-    });
-
-    // ============================================================
-    // 🔍 ÉTAPE 3 : TRACKING EN MÉMOIRE
-    // ============================================================
-    const activeOrderIds = this.notificationsGateway.getActiveTrackings(userId);
-
-    // ============================================================
-    // 🔍 ÉTAPE 4 : CONSTRUIRE LA RÉPONSE
-    // ============================================================
+    // 🔥 RETOURNER UN TABLEAU DE COMMANDES
     return {
       message: 'Commandes récupérées avec succès',
       data: orders.map((o) => {
@@ -2863,19 +2813,23 @@ export class OrderService {
           pin: o.pin,
           readyToPay: o.readyToPay,
 
+          // 💰 Montants
           totalAmount: o.totalAmount,
           grandTotal: o.grandTotal,
           shippingCost: o.shippingCost,
           currency: o.currency,
 
+          // 💳 Paiement
           paymentMethod: o.paymentMethod,
           appliedFeeRate: o.appliedFeeRate,
           transactionFee: o.transactionFee,
 
+          // 🏢 Type de commande
           type: o.type,
           shopType: o.shopType,
           whatsapp_number: o.whatsapp_number,
 
+          // 🕐 Dates
           createdAt: o.createdAt,
           updatedAt: o.updatedAt,
           validatedAt: o.validatedAt,
@@ -2912,10 +2866,11 @@ export class OrderService {
             }
             : null,
 
+          // 📦 Items & sous-commandes
           orderItems: o.orderItems,
           subOrders: o.subOrders,
 
-          // 🚚 Livreur courant
+          // 🚚 Livreur affecté (courant)
           currentDeliveryUser: o.currentDeliveryUser
             ? {
               id: o.currentDeliveryUser.id,
@@ -2925,21 +2880,44 @@ export class OrderService {
             }
             : null,
 
-          // 👤 Validations
+          // 👤 Validé par
           validatedBy: o.validatedBy
-            ? { id: o.validatedBy.id, fullName: o.validatedBy.fullName }
+            ? {
+              id: o.validatedBy.id,
+              fullName: o.validatedBy.fullName,
+            }
             : null,
+
+          // 👤 Traité par
           processingBy: o.processingBy
-            ? { id: o.processingBy.id, fullName: o.processingBy.fullName }
+            ? {
+              id: o.processingBy.id,
+              fullName: o.processingBy.fullName,
+            }
             : null,
+
+          // 👤 Complété par
           completedBy: o.completedBy
-            ? { id: o.completedBy.id, fullName: o.completedBy.fullName }
+            ? {
+              id: o.completedBy.id,
+              fullName: o.completedBy.fullName,
+            }
             : null,
+
+          // 👤 Livré par
           deliveredBy: o.deliveredBy
-            ? { id: o.deliveredBy.id, fullName: o.deliveredBy.fullName }
+            ? {
+              id: o.deliveredBy.id,
+              fullName: o.deliveredBy.fullName,
+            }
             : null,
+
+          // 👤 Rejeté par
           rejectedBy: o.rejectedBy
-            ? { id: o.rejectedBy.id, fullName: o.rejectedBy.fullName }
+            ? {
+              id: o.rejectedBy.id,
+              fullName: o.rejectedBy.fullName,
+            }
             : null,
 
           // ============================================================
@@ -2977,7 +2955,7 @@ export class OrderService {
           // 📍 TRACKING
           // ============================================================
           tracking: {
-            isActive: activeOrderIds.includes(o.id),
+            // isActive: activeOrderIds.includes(o.id),
             currentLatitude: activeAssignment?.currentLatitude ?? null,
             currentLongitude: activeAssignment?.currentLongitude ?? null,
             distanceRemainingKm: activeAssignment?.distanceRemainingKm ?? null,
