@@ -327,7 +327,7 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     console.log(`✅ deliveryStatusUpdate emitted to room ${roomName}`);
   }
 
-  @SubscribeMessage('join-order-tracking')
+  @SubscribeMessage('join-order')
   handleJoinOrderTracking(
     @MessageBody() data: { orderId: string },
     @ConnectedSocket() client: Socket,
@@ -335,10 +335,18 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     const roomName = `order-${data.orderId}`;
     client.join(roomName);
     console.log(`🔌 Client ${client.id} joined order room: ${roomName}`);
+
+    // ✅ Émettre un événement de confirmation
+    client.emit('order-joined', {
+      success: true,
+      room: roomName,
+      orderId: data.orderId,
+    });
+
     return { success: true, room: roomName };
   }
 
-  @SubscribeMessage('leave-order-tracking')
+  @SubscribeMessage('leave-order')
   handleLeaveOrderTracking(
     @MessageBody() data: { orderId: string },
     @ConnectedSocket() client: Socket,
@@ -346,6 +354,13 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     const roomName = `order-${data.orderId}`;
     client.leave(roomName);
     console.log(`🔌 Client ${client.id} left order room: ${roomName}`);
+
+    client.emit('order-left', {
+      success: true,
+      room: roomName,
+      orderId: data.orderId,
+    });
+
     return { success: true, room: roomName };
   }
 
