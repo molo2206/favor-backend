@@ -78,7 +78,7 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     @ConnectedSocket() socket: Socket,
   ) {
     // ============================================================
-    // 🔥 DEBUG : voir ce que le client envoie vraiment
+    // 🔥 DEBUG
     // ============================================================
     const queryToken = socket.handshake?.query?.token;
     const queryTokenPreview = Array.isArray(queryToken)
@@ -94,32 +94,54 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     console.log('═══════════════════════════════════════════');
 
     // ============================================================
-    // 🔑 EXTRACTION DU TOKEN (plusieurs sources)
+    // 🔑 EXTRACTION INTELLIGENTE DU JWT
     // ============================================================
     let token: string | null = null;
 
-    // 1. Depuis le body (string OU objet { token })
-    if (typeof data === 'string') {
-      token = data;
-    } else if (data && typeof data === 'object' && data.token) {
-      token = data.token;
+    // 🎯 PRIORITÉ 1 : Header Authorization (source la plus fiable)
+    const authHeader = socket.handshake?.headers?.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+      console.log('🔑 Token trouvé dans header Authorization');
     }
 
-    // 2. Fallback : handshake (auth + headers Authorization + query)
+    // 🎯 PRIORITÉ 2 : Body SI c'est un JWT (pas un userId)
+    if (!token && typeof data === 'string') {
+      // Un JWT contient 2 points : xxx.yyy.zzz
+      if (data.split('.').length === 3) {
+        token = data;
+        console.log('🔑 Token trouvé dans body (string JWT)');
+      } else {
+        console.log('ℹ️ body.data est un userId, ignoré');
+      }
+    } else if (!token && data && typeof data === 'object' && data.token) {
+      if (typeof data.token === 'string' && data.token.split('.').length === 3) {
+        token = data.token;
+        console.log('🔑 Token trouvé dans body (objet.token)');
+      } else {
+        console.log('ℹ️ data.token n\'est pas un JWT, ignoré');
+      }
+    }
+
+    // 🎯 PRIORITÉ 3 : Fallback via WsAuthHelper (auth + query)
     if (!token) {
       token = this.wsAuthHelper.extractToken(socket);
+      if (token) console.log('🔑 Token trouvé via extractToken (fallback)');
     }
 
-    console.log('🔑 Token extrait :', token ? token.substring(0, 40) + '...' : '❌ AUCUN');
-    console.log('🔑 Longueur     :', token?.length);
+    console.log('🔑 Token final :', token ? token.substring(0, 40) + '...' : '❌ AUCUN');
+    console.log('🔑 Longueur   :', token?.length);
 
     // ============================================================
-    // ❌ CAS 1 : Aucun token trouvé
+    // ❌ CAS 1 : Aucun token
     // ============================================================
     if (!token) {
       console.warn(`⚠️ Connection sans token - Socket ${socket.id}`);
       socket.emit('connection-error', { message: 'Token requis' });
-      return;
+      return {
+        success: false,
+        message: 'Token requis',
+      };
     }
 
     // ============================================================
@@ -129,20 +151,25 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     if (!wsUser) {
       console.warn(`⚠️ Token invalide - Socket ${socket.id}`);
       socket.emit('connection-error', { message: 'Token invalide' });
-      return;
+      return {
+        success: false,
+        message: 'Token invalide',
+      };
     }
 
     // ============================================================
-    // ✅ CAS 3 : Token valide → identification
+    // ✅ CAS 3 : Token valide
     // ============================================================
     const userId = wsUser.id;
     console.log(`📡 Connection event received for user: ${userId}`);
     console.log(`   Socket ID: ${socket.id}`);
 
+    // Vérifier si l'utilisateur est déjà connecté
     const existingDriverIndex = this.activeUsers.findIndex(
       (user) => user.id === userId,
     );
 
+    // Rejoindre la room personnelle
     socket.join(userId);
     this.addUserRoom(userId, userId);
 
@@ -185,16 +212,44 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       } else {
         console.warn(`⚠️ User ${userId} introuvable en base`);
         socket.emit('connection-error', { message: 'Utilisateur introuvable' });
-        return;
+        return {
+          success: false,
+          message: 'Utilisateur introuvable',
+        };
       }
     }
 
     // ============================================================
-    // 📢 BROADCAST + CONFIRMATION
+    // 📢 BROADCAST + CONFIRMATION AVEC USER
     // ============================================================
     this.broadcastUsers();
-    socket.emit('confirmation');
-    console.log(`✅ Confirmation sent to ${userId}`);
+
+    // ✅ Construire l'objet user à retourner
+    const userData = {
+      id: socket.data.userId,
+      role: socket.data.role,
+      fullName: socket.data.fullName,
+    };
+
+    // 🔥 Émettre `confirmation` avec les infos du user
+    socket.emit('confirmation', {
+      success: true,
+      message: 'Connexion réussie',
+      user: userData,
+      socketId: socket.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    // 🔥 Retourner aussi l'ACK (au cas où le client utilise un callback)
+    console.log(`✅ Confirmation sent to ${userId} :`, JSON.stringify(userData));
+
+    return {
+      success: true,
+      message: 'Connexion réussie',
+      user: userData,
+      socketId: socket.id,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   handleDisconnect(client: Socket) {
