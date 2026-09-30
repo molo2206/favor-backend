@@ -465,18 +465,38 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     // ✅ AJOUT : récupérer les utilisateurs actuellement dans la room
     const usersInRoom = await this.getUsersInOrderRoom(payload.orderId);
 
+    // ============================================================
+    // 🔒 PRIVÉ : le client qui rejoint reçoit la liste complète
+    // ============================================================
     client.emit('order-joined', {
       success: true,
       room: roomName,
       orderId: payload.orderId,
-      users: usersInRoom,   // ⬅️ liste des users dans la room
+      users: usersInRoom,   // ⬅️ liste des users dans la room (privé)
       userCount: usersInRoom.length,
     });
 
+    // ============================================================
+    // 📢 BROADCAST : à tous les autres membres de la room
+    // (sans la liste des users, juste une notification)
+    // ============================================================
+    client.to(roomName).emit('order-user-joined', {
+      success: true,
+      room: roomName,
+      orderId: payload.orderId,
+      userId: userId || null,
+      socketId: client.id,
+      userCount: usersInRoom.length,
+      timestamp: new Date().toISOString(),
+    });
+
+    // ============================================================
+    // 🔙 RETOUR ACK (REST)
+    // ============================================================
     return {
       success: true,
       room: roomName,
-      users: usersInRoom,        // ⬅️ retour REST aussi
+      users: usersInRoom,        // ⬅️ retour REST (seul le demandeur le voit)
       userCount: usersInRoom.length,
     };
   }
