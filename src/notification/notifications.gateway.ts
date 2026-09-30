@@ -637,42 +637,80 @@ export class NotificationsGateway
     @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
-
     const payload = this.parseBody<{ orderId: string }>(data);
     if (!payload?.orderId) {
       return { success: false, message: 'orderId est requis' };
     }
 
-    // 🚫 VÉRIFICATION : le client doit être identifié
+    // ============================================================
+    // 🚫 VÉRIFICATION 1 : le client doit être identifié
+    // ============================================================
     const userId = client.data?.userId;
     if (!userId) {
-      console.warn(`🚫 [join-order] Socket ${client.id} NON identifié → envoie "connection" d'abord`);
+      console.warn(`🚫 [join-order] Socket ${client.id} NON identifié`);
       console.warn(`   socket.data = ${JSON.stringify(client.data)}`);
 
-      client.emit('join-order-error', {
+      const errResp = {
         success: false,
-        message: "Vous devez d'abord envoyer l'event 'connection' avec un JWT valide",
         code: 'NOT_AUTHENTICATED',
-      });
-
-      return {
-        success: false,
         message: "Vous devez d'abord envoyer l'event 'connection' avec un JWT valide",
-        code: 'NOT_AUTHENTICATED',
       };
+      client.emit('join-order-error', errResp);
+      return errResp;
     }
 
-    const roomName = `order-${payload.orderId}`;
+    const { orderId } = payload;
+
+    // ============================================================
+    // 🚫 VÉRIFICATION 2 : l'orderId doit exister dans la base
+    // ============================================================
+    try {
+      // Vérifier via l'affectation en base
+      const assignment = await this.deliveryService.findAssignmentByOrderId(orderId);
+
+      if (!assignment) {
+        console.warn(`🚫 [join-order] Aucune affectation pour orderId = ${orderId}`);
+
+        const errResp = {
+          success: false,
+          code: 'ORDER_NOT_FOUND',
+          message: `Aucune affectation active pour la commande ${orderId}`,
+          orderId,
+        };
+        client.emit('join-order-error', errResp);
+        return errResp;
+      }
+
+      console.log(`✅ [join-order] Affectation trouvée pour ${orderId}`);
+
+    } catch (err: any) {
+      // Si le service throw aussi
+      console.warn(`🚫 [join-order] Erreur: ${err.message}`);
+
+      const errResp = {
+        success: false,
+        code: 'ORDER_NOT_FOUND',
+        message: `Aucune affectation active pour la commande ${orderId}`,
+        orderId,
+      };
+      client.emit('join-order-error', errResp);
+      return errResp;
+    }
+
+    // ============================================================
+    // ✅ Rejoindre la room
+    // ============================================================
+    const roomName = `order-${orderId}`;
     client.join(roomName);
     this.addUserRoom(userId, roomName);
     console.log(`🔌 Client ${client.id} (user: ${userId}) joined order room: ${roomName}`);
 
-    const usersInRoom = await this.getUsersInOrderRoom(payload.orderId);
+    const usersInRoom = await this.getUsersInOrderRoom(orderId);
 
     client.emit('order-joined', {
       success: true,
       room: roomName,
-      orderId: payload.orderId,
+      orderId,
       users: usersInRoom,
       userCount: usersInRoom.length,
     });
@@ -680,8 +718,8 @@ export class NotificationsGateway
     client.to(roomName).emit('order-user-joined', {
       success: true,
       room: roomName,
-      orderId: payload.orderId,
-      userId: userId,
+      orderId,
+      userId,
       socketId: client.id,
       userCount: usersInRoom.length,
       timestamp: new Date().toISOString(),
@@ -724,8 +762,17 @@ export class NotificationsGateway
   // ============================================================
   // 🔌 CONNECTER UN LIVREUR À UNE ROOM ORDER (par userId)
   // ============================================================
+  // ============================================================
+  // 🔌 CONNECTER UN LIVREUR À UNE ROOM ORDER (par userId)
+  // ============================================================
   joinOrderRoom(userId: string, orderId: string): void {
     const roomName = `order-${orderId}`;
+
+    if (!this.server) {
+      console.warn(`⚠️ [joinOrderRoom] this.server undefined`);
+      return;
+    }
+
     const activeUser = this.activeUsers.find((u) => u.id === userId);
 
     if (!activeUser) {
@@ -733,14 +780,15 @@ export class NotificationsGateway
       return;
     }
 
-    const socket = this.server.sockets.sockets.get(activeUser.socketId);
-    if (socket) {
-      socket.join(roomName);
-      // ✅ AJOUT : tracer dans la Map inversée
+    try {
+      // ✅ METHODE ROBUSTE : socketsJoin permet de faire rejoindre une room
+      // à un socket par son ID, sans accéder à this.server.sockets.sockets
+      this.server.in(activeUser.socketId).socketsJoin(roomName);
+
       this.addUserRoom(userId, roomName);
-      console.log(`🔌 User ${userId} joined room ${roomName}`);
-    } else {
-      console.warn(`⚠️ [joinOrderRoom] Socket introuvable pour ${userId}`);
+      console.log(`🔌 User ${userId} joined room ${roomName} (via socketsJoin)`);
+    } catch (err: any) {
+      console.warn(`⚠️ [joinOrderRoom] Erreur: ${err.message}`);
     }
   }
 
