@@ -2734,29 +2734,23 @@ export class OrderService {
       throw new NotFoundException(`Utilisateur ${userId} introuvable`);
     }
 
-    // ============================================================
-    // 🎯 ÉTAPE 1 : RÉCUPÉRER LES IDs PAGINÉS (rapide)
-    // ============================================================
-    const idsQuery = this.orderRepo
-      .createQueryBuilder('order')
-      .select('order.id', 'id')
-      .orderBy('order.createdAt', 'DESC');
-
     // 🔐 Filtre dynamique selon le rôle
+    let where: any = {};
+
     if (user.role === UserRole.CUSTOMER) {
-      idsQuery.andWhere('order.userId = :userId', { userId });
+      where = { user: { id: userId } };
     } else if (user.role === UserRole.DELIVER) {
-      idsQuery.innerJoin(
-        'order.deliveryAssignments',
-        'assignment',
-        'assignment.deliverId = :userId AND assignment.isActive = true',
-        { userId },
-      );
+      where = {
+        deliveryAssignments: {
+          deliverId: userId,
+          isActive: true,
+        },
+      };
     } else if (
       user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.ADMIN
     ) {
-      // Admin → accès total
+      where = {};
     } else {
       return {
         message: 'Aucune commande disponible pour ce rôle',
@@ -2764,55 +2758,71 @@ export class OrderService {
       };
     }
 
-    // 🔥 Pagination sur les IDs uniquement
-    if (pageNumber && limitNumber) {
-      idsQuery.skip((pageNumber - 1) * limitNumber).take(limitNumber);
-    } else if (limitNumber) {
-      idsQuery.take(limitNumber);
-    }
-
-    const rawIds = await idsQuery.getRawMany();
-    const orderIds = rawIds.map((r) => r.id);
-
-    if (orderIds.length === 0) {
-      return {
-        message: 'Commandes récupérées avec succès',
-        data: [],
-      };
-    }
-
-    // ============================================================
-    // 🎯 ÉTAPE 2 : CHARGER LES COMMANDES PAR IDs (sans pagination)
-    // ============================================================
+    // ✅ UTILISER EXACTEMENT LES 13 RELATIONS QUI MARCHENT
     const orders = await this.orderRepo.find({
-      where: { id: In(orderIds) },
+      where,
       relations: [
+        // 📦 Items principaux
         'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
+
+        // 🏢 Sous-commandes
         'subOrders',
         'subOrders.items.product.company',
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',
-        'subOrders.company.city',
+
+        // 👤 Client
         'user',
+
+        // 📍 Adresse
         'addressUser',
-        'addressUser.city',
-        'addressUser.country',
+
+        // 🚚 Affectations
         'deliveryAssignments',
         'deliveryAssignments.deliver',
         'deliveryAssignments.assignedBy',
-        'currentDeliveryUser',
-        'validatedBy',
-        'processingBy',
-        'completedBy',
-        'deliveredBy',
-        'rejectedBy',
-        'delivery',
       ],
       order: { createdAt: 'DESC' },
+      // 🔥 Pagination
+      skip:
+        pageNumber && limitNumber
+          ? (pageNumber - 1) * limitNumber
+          : undefined,
+      take: limitNumber || undefined,
     });
+
+    // ============================================================
+    // 🎯 ÉTAPE 2 : RÉCUPÉRER LES INFOS SUPPLÉMENTAIRES EN 1 SEULE REQUÊTE
+    // ============================================================
+    const orderIds = orders.map((o) => o.id);
+
+    // Récupérer les villes + pays + users de validation en une seule requête
+    const enrichedData = await this.orderRepo
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.addressUser', 'addressUser')
+      .leftJoinAndSelect('addressUser.city', 'addressCity')
+      .leftJoinAndSelect('addressUser.country', 'addressCountry')
+      .leftJoinAndSelect('order.subOrders', 'subOrder')
+      .leftJoinAndSelect('subOrder.company', 'company')
+      .leftJoinAndSelect('company.city', 'companyCity')
+      .leftJoinAndSelect('order.currentDeliveryUser', 'currentDeliveryUser')
+      .leftJoinAndSelect('order.validatedBy', 'validatedBy')
+      .leftJoinAndSelect('order.processingBy', 'processingBy')
+      .leftJoinAndSelect('order.completedBy', 'completedBy')
+      .leftJoinAndSelect('order.deliveredBy', 'deliveredBy')
+      .leftJoinAndSelect('order.rejectedBy', 'rejectedBy')
+      .leftJoinAndSelect('order.delivery', 'delivery')
+      .where('order.id IN (:...orderIds)', { orderIds })
+      .getMany();
+
+    // Map par ID pour lookup rapide
+    const enrichedMap = new Map<string, any>();
+    for (const e of enrichedData) {
+      enrichedMap.set(e.id, e);
+    }
 
     // ============================================================
     // 🎯 ÉTAPE 3 : CONSTRUIRE LA RÉPONSE
@@ -2820,14 +2830,12 @@ export class OrderService {
     return {
       message: 'Commandes récupérées avec succès',
       data: orders.map((o) => {
+        const enriched = enrichedMap.get(o.id);
         const activeAssignment = o.deliveryAssignments?.find(
           (a) => a.isActive,
         );
 
         return {
-          // ============================================================
-          // 📦 INFOS COMMANDE
-          // ============================================================
           id: o.id,
           invoiceNumber: o.invoiceNumber,
           status: o.status,
@@ -2870,54 +2878,65 @@ export class OrderService {
             }
             : null,
 
-          // 📍 Adresse
-          addressUser: o.addressUser
+          // 📍 Adresse AVEC city + country (depuis enriched)
+          addressUser: enriched?.addressUser
             ? {
-              id: o.addressUser.id,
-              address: o.addressUser.address,
-              firstName: o.addressUser.firstName,
-              lastName: o.addressUser.lastName,
-              phone: o.addressUser.phone,
-              latitude: o.addressUser.latitude,
-              longitude: o.addressUser.longitude,
-              city: o.addressUser.city,
-              country: o.addressUser.country,
+              id: enriched.addressUser.id,
+              address: enriched.addressUser.address,
+              firstName: enriched.addressUser.firstName,
+              lastName: enriched.addressUser.lastName,
+              phone: enriched.addressUser.phone,
+              latitude: enriched.addressUser.latitude,
+              longitude: enriched.addressUser.longitude,
+              city: enriched.addressUser.city,
+              country: enriched.addressUser.country,
             }
-            : null,
+            : o.addressUser
+              ? {
+                id: o.addressUser.id,
+                address: o.addressUser.address,
+                firstName: o.addressUser.firstName,
+                lastName: o.addressUser.lastName,
+                phone: o.addressUser.phone,
+                latitude: o.addressUser.latitude,
+                longitude: o.addressUser.longitude,
+                city: null,
+                country: null,
+              }
+              : null,
 
+          // 📦 Items & sous-commandes AVEC city (depuis enriched)
           orderItems: o.orderItems,
-          subOrders: o.subOrders,
+          subOrders: enriched?.subOrders || o.subOrders,
 
-          // 🚚 Livreur courant
-          currentDeliveryUser: o.currentDeliveryUser
+          // 🚚 Livreur courant (depuis enriched)
+          currentDeliveryUser: enriched?.currentDeliveryUser
             ? {
-              id: o.currentDeliveryUser.id,
-              fullName: o.currentDeliveryUser.fullName,
-              phone: o.currentDeliveryUser.phone,
-              image: o.currentDeliveryUser.image,
+              id: enriched.currentDeliveryUser.id,
+              fullName: enriched.currentDeliveryUser.fullName,
+              phone: enriched.currentDeliveryUser.phone,
+              image: enriched.currentDeliveryUser.image,
             }
             : null,
 
-          // 👤 Validations
-          validatedBy: o.validatedBy
-            ? { id: o.validatedBy.id, fullName: o.validatedBy.fullName }
+          // 👤 Validations (depuis enriched)
+          validatedBy: enriched?.validatedBy
+            ? { id: enriched.validatedBy.id, fullName: enriched.validatedBy.fullName }
             : null,
-          processingBy: o.processingBy
-            ? { id: o.processingBy.id, fullName: o.processingBy.fullName }
+          processingBy: enriched?.processingBy
+            ? { id: enriched.processingBy.id, fullName: enriched.processingBy.fullName }
             : null,
-          completedBy: o.completedBy
-            ? { id: o.completedBy.id, fullName: o.completedBy.fullName }
+          completedBy: enriched?.completedBy
+            ? { id: enriched.completedBy.id, fullName: enriched.completedBy.fullName }
             : null,
-          deliveredBy: o.deliveredBy
-            ? { id: o.deliveredBy.id, fullName: o.deliveredBy.fullName }
+          deliveredBy: enriched?.deliveredBy
+            ? { id: enriched.deliveredBy.id, fullName: enriched.deliveredBy.fullName }
             : null,
-          rejectedBy: o.rejectedBy
-            ? { id: o.rejectedBy.id, fullName: o.rejectedBy.fullName }
+          rejectedBy: enriched?.rejectedBy
+            ? { id: enriched.rejectedBy.id, fullName: enriched.rejectedBy.fullName }
             : null,
 
-          // ============================================================
-          // 🚚 INFOS AFFECTATION
-          // ============================================================
+          // 🚚 Affectation
           deliver: activeAssignment?.deliver
             ? {
               id: activeAssignment.deliver.id,
@@ -2946,9 +2965,7 @@ export class OrderService {
             }
             : null,
 
-          // ============================================================
-          // 📍 TRACKING
-          // ============================================================
+          // 📍 Tracking
           tracking: {
             currentLatitude: activeAssignment?.currentLatitude ?? null,
             currentLongitude: activeAssignment?.currentLongitude ?? null,
