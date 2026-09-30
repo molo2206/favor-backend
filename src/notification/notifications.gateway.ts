@@ -77,28 +77,49 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     @MessageBody() data: any,
     @ConnectedSocket() socket: Socket,
   ) {
-    // 🎯 Extraire le token depuis plusieurs sources
+    // ============================================================
+    // 🔥 DEBUG : voir ce que le client envoie vraiment
+    // ============================================================
+    console.log('═══════════════════════════════════════════');
+    console.log('📥 [connection] DEBUG');
+    console.log('   body.data       :', JSON.stringify(data));
+    console.log('   handshake.auth  :', JSON.stringify(socket.handshake?.auth));
+    console.log('   handshake.query :', JSON.stringify(socket.handshake?.query?.token?.substring(0, 40)));
+    console.log('   headers.authorization :', socket.handshake?.headers?.authorization?.substring(0, 50));
+    console.log('═══════════════════════════════════════════');
+
+    // ============================================================
+    // 🔑 EXTRACTION DU TOKEN (plusieurs sources)
+    // ============================================================
     let token: string | null = null;
 
-    // 1. Depuis le body (si l'event 'connection' envoie le token)
+    // 1. Depuis le body (string OU objet { token })
     if (typeof data === 'string') {
       token = data;
     } else if (data && typeof data === 'object' && data.token) {
       token = data.token;
     }
 
-    // 2. Fallback : depuis le handshake (auth / headers / query)
+    // 2. Fallback : handshake (auth + headers Authorization + query)
     if (!token) {
       token = this.wsAuthHelper.extractToken(socket);
     }
 
+    console.log('🔑 Token extrait :', token ? token.substring(0, 40) + '...' : '❌ AUCUN');
+    console.log('🔑 Longueur     :', token?.length);
+
+    // ============================================================
+    // ❌ CAS 1 : Aucun token trouvé
+    // ============================================================
     if (!token) {
       console.warn(`⚠️ Connection sans token - Socket ${socket.id}`);
       socket.emit('connection-error', { message: 'Token requis' });
       return;
     }
 
-    // 🔐 Valider le JWT
+    // ============================================================
+    // ❌ CAS 2 : Token invalide (signature, exp, malformed)
+    // ============================================================
     const wsUser = await this.wsAuthHelper.validateToken(token);
     if (!wsUser) {
       console.warn(`⚠️ Token invalide - Socket ${socket.id}`);
@@ -106,48 +127,76 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       return;
     }
 
+    // ============================================================
+    // ✅ CAS 3 : Token valide → identification de l'utilisateur
+    // ============================================================
     const userId = wsUser.id;
     console.log(`📡 Connection event received for user: ${userId}`);
     console.log(`   Socket ID: ${socket.id}`);
 
+    // Chercher si l'utilisateur est déjà connecté
     const existingDriverIndex = this.activeUsers.findIndex(
       (user) => user.id === userId,
     );
 
+    // Rejoindre la room personnelle de l'utilisateur
     socket.join(userId);
-    // ✅ AJOUT : tracer la room perso
+
+    // ✅ AJOUT : tracer la room perso dans la Map inversée
     this.addUserRoom(userId, userId);
 
+    // ============================================================
+    // 🔄 CAS A : L'utilisateur est déjà connecté
+    // ============================================================
     if (existingDriverIndex !== -1) {
       const oldSocketId = this.activeUsers[existingDriverIndex].socketId;
+
       if (oldSocketId === socket.id) {
         console.log(`ℹ️ User ${userId} already connected with same socket`);
       } else {
+        // Mettre à jour le socketId
         this.activeUsers[existingDriverIndex].socketId = socket.id;
         console.log(`🔄 User ${userId} reconnected (old: ${oldSocketId}, new: ${socket.id})`);
       }
-    } else {
+
+      // ⚠️ IMPORTANT : re-stocker les infos sur le NOUVEAU socket
+      socket.data.userId = userId;
+      socket.data.role = wsUser.role;
+      socket.data.fullName = wsUser.fullName || undefined;
+    }
+    // ============================================================
+    // 🆕 CAS B : Nouvelle connexion
+    // ============================================================
+    else {
+      // Vérifier que l'utilisateur existe en base
       const user = await this.userRepository.findOne({
         where: { id: userId },
       });
+
       if (user) {
-        // 🔥 STOCKER LES INFOS SUR LE SOCKET (JWT + base)
+        // 🔥 STOCKER LES INFOS SUR LE SOCKET (JWT + base de données)
         socket.data.userId = userId;
         socket.data.role = wsUser.role || user.role;
         socket.data.fullName = wsUser.fullName || user.fullName;
 
+        // Ajouter à la liste des utilisateurs actifs
         this.activeUsers.push({
           id: userId,
           socketId: socket.id,
         });
+
         console.log(`🔌 User ${userId} connected (${socket.data.fullName}, role: ${socket.data.role})`);
       } else {
+        // ❌ Utilisateur trouvé dans le JWT mais PAS en base
         console.warn(`⚠️ User ${userId} introuvable en base`);
         socket.emit('connection-error', { message: 'Utilisateur introuvable' });
         return;
       }
     }
 
+    // ============================================================
+    // 📢 BROADCAST + CONFIRMATION
+    // ============================================================
     this.broadcastUsers();
     socket.emit('confirmation');
     console.log(`✅ Confirmation sent to ${userId}`);
