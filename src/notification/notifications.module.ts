@@ -14,6 +14,7 @@ import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/com
 
 // 🔥 AJOUT IMPORTANT
 import { OrderModule } from 'src/order/order.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
@@ -27,6 +28,10 @@ import { OrderModule } from 'src/order/order.module';
       CompanyHasUserResource,
     ]),
     DriverLocationModule,
+    JwtModule.register({                                          // 🔥 AJOUT
+      secret: process.env.ACCESS_TOKEN_SECRET_KEY,
+      signOptions: { expiresIn: '7d' },
+    }),
   ],
   controllers: [NotificationsController],
   providers: [
