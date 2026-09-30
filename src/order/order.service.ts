@@ -2724,18 +2724,7 @@ export class OrderService {
     pageNumber?: number,
     limitNumber?: number,
   ) {
-    // 🔥 Récupérer le user pour connaître son rôle
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException(`Utilisateur ${userId} introuvable`);
-    }
-
-    // ============================================================
-    // 🎯 REQUÊTE AVEC createQueryBuilder (comme findByType)
-    // ============================================================
+    // 🔍 Construire la requête (MÊME pattern que findByType)
     const query = this.orderRepo
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.user', 'user')
@@ -2764,28 +2753,9 @@ export class OrderService {
       .leftJoinAndSelect('order.completedBy', 'completedBy')
       .leftJoinAndSelect('order.deliveredBy', 'deliveredBy')
       .leftJoinAndSelect('order.rejectedBy', 'rejectedBy')
-      .leftJoinAndSelect('order.delivery', 'delivery');
-
-    // 🔐 Filtre dynamique selon le rôle
-    if (user.role === UserRole.CUSTOMER) {
-      query.andWhere('order.userId = :userId', { userId });
-    } else if (user.role === UserRole.DELIVER) {
-      query.andWhere('assignment.deliverId = :userId', { userId });
-      query.andWhere('assignment.isActive = :isActive', { isActive: true });
-    } else if (
-      user.role === UserRole.SUPER_ADMIN ||
-      user.role === UserRole.ADMIN
-    ) {
-      // Admin → accès total
-    } else {
-      return {
-        message: 'Aucune commande disponible pour ce rôle',
-        data: [],
-      };
-    }
-
-    // 🔽 Tri
-    query.orderBy('order.createdAt', 'DESC');
+      .leftJoinAndSelect('order.delivery', 'delivery')
+      .where('order.userId = :userId', { userId })
+      .orderBy('order.createdAt', 'DESC');
 
     // 🔥 Pagination
     if (pageNumber && limitNumber) {
@@ -2796,9 +2766,7 @@ export class OrderService {
 
     const orders = await query.getMany();
 
-    // ============================================================
-    // 🎯 CONSTRUIRE LA RÉPONSE
-    // ============================================================
+    // 🔥 RETOURNER LA RÉPONSE
     return {
       message: 'Commandes récupérées avec succès',
       data: orders.map((o) => {
@@ -2806,7 +2774,7 @@ export class OrderService {
           (a) => a.isActive,
         );
 
-        // 🔒 HELPER : nettoyer les infos d'un user
+        // 🔒 Helper : nettoyer les infos d'un user
         const sanitizeUser = (u: any) => {
           if (!u) return null;
           return {
@@ -2818,9 +2786,6 @@ export class OrderService {
         };
 
         return {
-          // ============================================================
-          // 📦 INFOS COMMANDE
-          // ============================================================
           id: o.id,
           invoiceNumber: o.invoiceNumber,
           status: o.status,
@@ -2878,24 +2843,22 @@ export class OrderService {
             }
             : null,
 
-          // 📦 Items & sous-commandes
           orderItems: o.orderItems,
           subOrders: o.subOrders,
 
-          // 🚚 Livreur courant (sécurisé)
+          // 🚚 Livreur courant
           currentDeliveryUser: sanitizeUser(o.currentDeliveryUser),
 
-          // 👤 Validations (sécurisées)
+          // 👤 Validations
           validatedBy: sanitizeUser(o.validatedBy),
           processingBy: sanitizeUser(o.processingBy),
           completedBy: sanitizeUser(o.completedBy),
           deliveredBy: sanitizeUser(o.deliveredBy),
           rejectedBy: sanitizeUser(o.rejectedBy),
 
-          // 🚚 Livreur affecté (sécurisé)
+          // 🚚 Livreur affecté
           deliver: sanitizeUser(activeAssignment?.deliver),
 
-          // 👤 Assigné par
           assignedBy: activeAssignment?.assignedBy
             ? {
               id: activeAssignment.assignedBy.id,
@@ -2904,7 +2867,6 @@ export class OrderService {
             }
             : null,
 
-          // 📋 Affectation
           assignment: activeAssignment
             ? {
               assignmentId: activeAssignment.id,
@@ -2916,7 +2878,6 @@ export class OrderService {
             }
             : null,
 
-          // 📍 Tracking
           tracking: {
             currentLatitude: activeAssignment?.currentLatitude ?? null,
             currentLongitude: activeAssignment?.currentLongitude ?? null,
