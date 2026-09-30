@@ -37,6 +37,20 @@ export class AddressUserController {
     return { message: 'Adresse mise à jour avec succès', data: updatedAddress };
   }
 
+  @Patch('updatebydeliver/:addressId')
+  @UseGuards(AuthentificationGuard)
+  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
+  async updateByadmin(
+    @Param('addressId') addressId: string,
+    @Body() updateDto: UpdateAddressUserDto,
+  ) {
+    const updatedAddress = await this.addressUserService.updateByAdmin(
+      addressId,
+      updateDto,
+    );
+    return { message: 'Adresse mise à jour avec succès', data: updatedAddress };
+  }
+
 
   @Delete(':addressId')
   @UseGuards(AuthentificationGuard)

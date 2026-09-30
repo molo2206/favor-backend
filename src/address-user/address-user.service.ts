@@ -140,6 +140,80 @@ export class AddressUserService {
     return addressWithRelations || savedAddress;
   }
 
+  async updateByAdmin(
+    id: string,
+    updateDto: UpdateAddressUserDto,
+  ): Promise<AddressUser> {
+    // ============================================================
+    // 🔍 RÉCUPÉRATION DE L'ADRESSE
+    // ============================================================
+    const address = await this.addressUserRepo.findOne({
+      where: { id },
+      relations: ['country', 'city'],
+    });
+
+    if (!address) {
+      throw new NotFoundException(`Adresse avec l'ID ${id} non trouvée`);
+    }
+
+    // ============================================================
+    // 🔄 GESTION DU CHAMP isDefault
+    // ============================================================
+    if (updateDto.isDefault === true) {
+      await this.addressUserRepo.update(
+        { user: { id: address.user.id }, isDefault: true },
+        { isDefault: false },
+      );
+    }
+
+    // ============================================================
+    // 🔍 VALIDATION DU PAYS
+    // ============================================================
+    if (updateDto.countryId) {
+      const country = await this.countryRepo.findOne({
+        where: { id: updateDto.countryId },
+      });
+      if (!country) {
+        throw new NotFoundException(`Pays avec l'ID ${updateDto.countryId} non trouvé`);
+      }
+    }
+
+    // ============================================================
+    // 🔍 VALIDATION DE LA VILLE
+    // ============================================================
+    if (updateDto.cityId) {
+      const city = await this.cityRepo.findOne({
+        where: { id: updateDto.cityId },
+      });
+      if (!city) {
+        throw new NotFoundException(`Ville avec l'ID ${updateDto.cityId} non trouvée`);
+      }
+    }
+
+    // ============================================================
+    // 📝 APPLICATION DES MODIFICATIONS
+    // ============================================================
+    Object.assign(address, updateDto);
+
+    // ============================================================
+    // 💾 SAUVEGARDE
+    // ============================================================
+    const savedAddress = await this.addressUserRepo.save(address);
+
+    if (Array.isArray(savedAddress)) {
+      throw new Error('Erreur lors de la sauvegarde de l\'adresse');
+    }
+
+    // ============================================================
+    // 🔄 RECHARGEMENT AVEC RELATIONS
+    // ============================================================
+    const addressWithRelations = await this.addressUserRepo.findOne({
+      where: { id: savedAddress.id },
+      relations: ['country', 'city'],
+    });
+
+    return addressWithRelations || savedAddress;
+  }
 
   async updateDefaultAddress(user: UserEntity, addressId: string): Promise<AddressUser> {
     const address = await this.addressUserRepo.findOne({

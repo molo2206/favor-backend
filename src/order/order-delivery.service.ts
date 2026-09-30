@@ -671,6 +671,10 @@ export class OrderDeliveryService {
             estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
             status: updated.status as string,
             direction: {
+                origin: {                              // ⬅️ AJOUT
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                },
                 polyline,
                 steps,
                 destination: {
@@ -1032,6 +1036,10 @@ export class OrderDeliveryService {
             estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
             status: updated.status as string,
             direction: {
+                origin: {                              // ⬅️ AJOUT
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                },
                 polyline,
                 steps,
                 destination: {
@@ -1062,18 +1070,57 @@ export class OrderDeliveryService {
     // ============================================================
     // 🚚 LISTE DES AFFECTATIONS ACTIVES DU LIVREUR
     // ============================================================
-    async getDeliverAssignments(deliverId: string) {
+    async getDeliverAssignments(userId: string) {
         this.logger.log(
-            `📋 GET DELIVER ASSIGNMENTS - deliverId = ${deliverId}`,
+            `📋 GET DELIVER ASSIGNMENTS - userId = ${userId}`,
         );
 
-        const assignments = await this.buildAssignmentQuery('assignment')
-            .where('assignment.deliverId = :deliverId', { deliverId })
+        // 🔍 Récupérer le user pour connaître son rôle
+        const user = await this.userRepo.findOne({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException(
+                await this.i18n.translate('user_not_found', 'fr'),
+            );
+        }
+
+        this.logger.log(`👤 User role = ${user.role}`);
+
+        const query = this.buildAssignmentQuery('assignment');
+
+        // 🔐 Filtre dynamique selon le rôle
+        if (user.role === UserRole.CLIENT) {
+            // ✅ Client → ses commandes
+            query.andWhere('order.userId = :userId', { userId });
+            this.logger.log(`👤 Client → order.userId = ${userId}`);
+        } else if (user.role === UserRole.DELIVER) {
+            // ✅ Livreur → ses affectations
+            query.andWhere('assignment.deliverId = :userId', { userId });
+            this.logger.log(`🚚 Livreur → deliverId = ${userId}`);
+        } else if (
+            user.role === UserRole.SUPER_ADMIN ||
+            user.role === UserRole.ADMIN
+        ) {
+            this.logger.log(`🔓 Admin → accès total`);
+        } else {
+            this.logger.warn(`⚠️ Rôle non supporté : ${user.role}`);
+            return {
+                message: 'Aucune affectation disponible pour ce rôle',
+                data: [],
+            };
+        }
+
+        const assignments = await query
             .andWhere('assignment.isActive = :isActive', { isActive: true })
             .orderBy('assignment.createdAt', 'DESC')
             .getMany();
 
-        this.logger.log(`✅ ${assignments.length} affectation(s) active(s)`);
+        this.logger.log(`✅ ${assignments.length} affectation(s) trouvée(s)`);
+
+        // 🔥 Trackings actifs en mémoire
+        const activeOrderIds = this.notificationsGateway.getActiveTrackings(userId);
 
         return {
             message: 'Affectations récupérées avec succès',
@@ -1104,10 +1151,19 @@ export class OrderDeliveryService {
                 currentLatitude: a.currentLatitude,
                 currentLongitude: a.currentLongitude,
                 lastLocationUpdate: a.lastLocationUpdate,
+
+                // 🔥 Tracking
+                tracking: {
+                    isActive: activeOrderIds.includes(a.orderId),
+                    currentLatitude: a.currentLatitude,
+                    currentLongitude: a.currentLongitude,
+                    distanceRemainingKm: a.distanceRemainingKm,
+                    estimatedArrivalMinutes: a.estimatedArrivalMinutes,
+                    lastLocationUpdate: a.lastLocationUpdate,
+                },
             })),
         };
     }
-
     // ============================================================
     // 📍 DERNIÈRE POSITION
     // ============================================================

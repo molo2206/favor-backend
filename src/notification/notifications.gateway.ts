@@ -571,6 +571,7 @@ export class NotificationsGateway
       estimatedArrivalMinutes?: number;
       status: string;
       direction?: {
+        origin: { latitude: number; longitude: number };      // ⬅️ AJOUT
         polyline: string | null;
         steps: any[];
         destination: { latitude: number; longitude: number };
@@ -579,7 +580,6 @@ export class NotificationsGateway
   ) {
     const roomName = `order-${orderId}`;
 
-    // 🔍 DEBUG : combien de sockets dans la room ?
     const sockets = await this.server.in(roomName).fetchSockets();
     console.log(`📍 [sendDeliveryLocation] Room ${roomName} → ${sockets.length} socket(s)`);
 
@@ -1154,6 +1154,11 @@ export class NotificationsGateway
     client.emit('ride-accepted', { rideId: ride.data.id });
   }
 
+  getActiveTrackings(deliverId: string): string[] {
+    const trackings = this.activeTrackings.get(deliverId);
+    if (!trackings) return [];
+    return Array.from(trackings);
+  }
   // ============================================================
   // 📋 RÉCUPÉRATION DES UTILISATEURS DANS LES ROOMS
   // ============================================================
