@@ -491,54 +491,59 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
-    // console.log(client)
     const payload = this.parseBody<{ orderId: string }>(data);
     if (!payload?.orderId) {
       return { success: false, message: 'orderId est requis' };
     }
 
+    // 🚫 VÉRIFICATION : le client doit être identifié
+    const userId = client.data?.userId;
+    if (!userId) {
+      console.warn(`🚫 [join-order] Socket ${client.id} NON identifié → envoie "connection" d'abord`);
+      console.warn(`   socket.data = ${JSON.stringify(client.data)}`);
+
+      client.emit('join-order-error', {
+        success: false,
+        message: "Vous devez d'abord envoyer l'event 'connection' avec un JWT valide",
+        code: 'NOT_AUTHENTICATED',
+      });
+
+      return {
+        success: false,
+        message: "Vous devez d'abord envoyer l'event 'connection' avec un JWT valide",
+        code: 'NOT_AUTHENTICATED',
+      };
+    }
+
     const roomName = `order-${payload.orderId}`;
     client.join(roomName);
-    // ✅ AJOUT : tracer la room
-    const userId = client.data?.userId;
-    if (userId) this.addUserRoom(userId, roomName);
-    console.log(`🔌 Client ${client.id} joined order room: ${roomName}`);
+    this.addUserRoom(userId, roomName);
+    console.log(`🔌 Client ${client.id} (user: ${userId}) joined order room: ${roomName}`);
 
-    // ✅ AJOUT : récupérer les utilisateurs actuellement dans la room
     const usersInRoom = await this.getUsersInOrderRoom(payload.orderId);
 
-    // ============================================================
-    // 🔒 PRIVÉ : le client qui rejoint reçoit la liste complète
-    // ============================================================
     client.emit('order-joined', {
       success: true,
       room: roomName,
       orderId: payload.orderId,
-      users: usersInRoom,   // ⬅️ liste des users dans la room (privé)
+      users: usersInRoom,
       userCount: usersInRoom.length,
     });
 
-    // ============================================================
-    // 📢 BROADCAST : à tous les autres membres de la room
-    // (sans la liste des users, juste une notification)
-    // ============================================================
     client.to(roomName).emit('order-user-joined', {
       success: true,
       room: roomName,
       orderId: payload.orderId,
-      userId: userId || null,
+      userId: userId,
       socketId: client.id,
       userCount: usersInRoom.length,
       timestamp: new Date().toISOString(),
     });
 
-    // ============================================================
-    // 🔙 RETOUR ACK (REST)
-    // ============================================================
     return {
       success: true,
       room: roomName,
-      users: usersInRoom,        // ⬅️ retour REST (seul le demandeur le voit)
+      users: usersInRoom,
       userCount: usersInRoom.length,
     };
   }
