@@ -16,12 +16,12 @@ export class WsAuthHelper {
     constructor(private readonly jwtService: JwtService) { }
 
     /**
-     * Valide un JWT token et retourne l'utilisateur
+     * ✅ Valide un JWT token et retourne l'utilisateur
      */
     async validateToken(token: string): Promise<WsUser | null> {
         try {
             const payload = this.jwtService.verify(token, {
-                secret: process.env.ACCESS_TOKEN_SECRET_KEY,   // ✅ Utiliser votre vraie variable
+                secret: process.env.ACCESS_TOKEN_SECRET_KEY,
             });
 
             return {
@@ -37,27 +37,32 @@ export class WsAuthHelper {
     }
 
     /**
-     * Extrait le token depuis les différents endroits possibles
+     * ✅ Extrait le token UNIQUEMENT depuis le header Authorization
+     * Format attendu : "Authorization: Bearer <token>"
      */
     extractToken(socket: any): string | null {
-        // 1. Depuis auth (socket.handshake.auth.token)
-        if (socket.handshake?.auth?.token) {
-            return socket.handshake.auth.token;
-        }
-
-        // 2. Depuis les headers Authorization
         const authHeader = socket.handshake?.headers?.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            return authHeader.substring(7);
+
+        // ⚠️ Doit commencer par "Bearer " (insensible à la casse)
+        if (!authHeader || typeof authHeader !== 'string') {
+            this.logger.warn('Aucun header Authorization trouvé');
+            return null;
         }
 
-        // 3. Depuis query param
-        if (socket.handshake?.query?.token) {
-            return socket.handshake.query.token as string;
+        if (!authHeader.toLowerCase().startsWith('bearer ')) {
+            this.logger.warn(`Header Authorization ne commence pas par "Bearer "`);
+            return null;
         }
 
-        return null;
+        // Retirer "Bearer " et trim
+        const token = authHeader.substring(7).trim();
+
+        // Vérifier que c'est un JWT valide (3 parties)
+        if (token.split('.').length !== 3) {
+            this.logger.warn(`Token malformé (pas 3 parties)`);
+            return null;
+        }
+
+        return token;
     }
-
-
 }

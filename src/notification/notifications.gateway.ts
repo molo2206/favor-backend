@@ -77,60 +77,18 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     @MessageBody() data: any,
     @ConnectedSocket() socket: Socket,
   ) {
-    // ============================================================
-    // 🔥 DEBUG
-    // ============================================================
-    const queryToken = socket.handshake?.query?.token;
-    const queryTokenPreview = Array.isArray(queryToken)
-      ? queryToken[0]?.substring(0, 40)
-      : queryToken?.substring(0, 40);
-
     console.log('═══════════════════════════════════════════');
     console.log('📥 [connection] DEBUG');
-    console.log('   body.data       :', JSON.stringify(data));
-    console.log('   handshake.auth  :', JSON.stringify(socket.handshake?.auth));
-    console.log('   handshake.query :', JSON.stringify(queryTokenPreview));
-    console.log('   headers.authorization :', socket.handshake?.headers?.authorization?.substring(0, 50));
+    console.log('   headers.authorization :', JSON.stringify(socket.handshake?.headers?.authorization));
     console.log('═══════════════════════════════════════════');
 
     // ============================================================
-    // 🔑 EXTRACTION INTELLIGENTE DU JWT
+    // 🔑 EXTRACTION DU TOKEN (uniquement depuis Authorization: Bearer <token>)
     // ============================================================
-    let token: string | null = null;
+    const token = this.wsAuthHelper.extractToken(socket);
 
-    // 🎯 PRIORITÉ 1 : Header Authorization (source la plus fiable)
-    const authHeader = socket.handshake?.headers?.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-      console.log('🔑 Token trouvé dans header Authorization');
-    }
-
-    // 🎯 PRIORITÉ 2 : Body SI c'est un JWT (pas un userId)
-    if (!token && typeof data === 'string') {
-      // Un JWT contient 2 points : xxx.yyy.zzz
-      if (data.split('.').length === 3) {
-        token = data;
-        console.log('🔑 Token trouvé dans body (string JWT)');
-      } else {
-        console.log('ℹ️ body.data est un userId, ignoré');
-      }
-    } else if (!token && data && typeof data === 'object' && data.token) {
-      if (typeof data.token === 'string' && data.token.split('.').length === 3) {
-        token = data.token;
-        console.log('🔑 Token trouvé dans body (objet.token)');
-      } else {
-        console.log('ℹ️ data.token n\'est pas un JWT, ignoré');
-      }
-    }
-
-    // 🎯 PRIORITÉ 3 : Fallback via WsAuthHelper (auth + query)
-    if (!token) {
-      token = this.wsAuthHelper.extractToken(socket);
-      if (token) console.log('🔑 Token trouvé via extractToken (fallback)');
-    }
-
-    console.log('🔑 Token final :', token ? token.substring(0, 40) + '...' : '❌ AUCUN');
-    console.log('🔑 Longueur   :', token?.length);
+    console.log('🔑 Token extrait :', token ? token.substring(0, 40) + '...' : '❌ AUCUN');
+    console.log('🔑 Longueur     :', token?.length);
 
     // ============================================================
     // ❌ CAS 1 : Aucun token
@@ -158,46 +116,34 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     }
 
     // ============================================================
-    // ✅ CAS 3 : Token valide
+    // ✅ CAS 3 : Token valide → identification
     // ============================================================
     const userId = wsUser.id;
     console.log(`📡 Connection event received for user: ${userId}`);
     console.log(`   Socket ID: ${socket.id}`);
 
-    // Vérifier si l'utilisateur est déjà connecté
     const existingDriverIndex = this.activeUsers.findIndex(
       (user) => user.id === userId,
     );
 
-    // Rejoindre la room personnelle
     socket.join(userId);
     this.addUserRoom(userId, userId);
 
-    // ============================================================
-    // 🔄 CAS A : Utilisateur déjà connecté
-    // ============================================================
     if (existingDriverIndex !== -1) {
       const oldSocketId = this.activeUsers[existingDriverIndex].socketId;
-
       if (oldSocketId === socket.id) {
         console.log(`ℹ️ User ${userId} already connected with same socket`);
       } else {
         this.activeUsers[existingDriverIndex].socketId = socket.id;
         console.log(`🔄 User ${userId} reconnected (old: ${oldSocketId}, new: ${socket.id})`);
       }
-
       socket.data.userId = userId;
       socket.data.role = wsUser.role;
       socket.data.fullName = wsUser.fullName || undefined;
-    }
-    // ============================================================
-    // 🆕 CAS B : Nouvelle connexion
-    // ============================================================
-    else {
+    } else {
       const user = await this.userRepository.findOne({
         where: { id: userId },
       });
-
       if (user) {
         socket.data.userId = userId;
         socket.data.role = wsUser.role || user.role;
@@ -207,7 +153,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
           id: userId,
           socketId: socket.id,
         });
-
         console.log(`🔌 User ${userId} connected (${socket.data.fullName}, role: ${socket.data.role})`);
       } else {
         console.warn(`⚠️ User ${userId} introuvable en base`);
@@ -224,14 +169,12 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     // ============================================================
     this.broadcastUsers();
 
-    // ✅ Construire l'objet user à retourner
     const userData = {
       id: socket.data.userId,
       role: socket.data.role,
       fullName: socket.data.fullName,
     };
 
-    // 🔥 Émettre `confirmation` avec les infos du user
     socket.emit('confirmation', {
       success: true,
       message: 'Connexion réussie',
@@ -240,7 +183,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       timestamp: new Date().toISOString(),
     });
 
-    // 🔥 Retourner aussi l'ACK (au cas où le client utilise un callback)
     console.log(`✅ Confirmation sent to ${userId} :`, JSON.stringify(userData));
 
     return {
