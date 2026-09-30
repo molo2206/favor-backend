@@ -15,9 +15,6 @@ export class WsAuthHelper {
 
     constructor(private readonly jwtService: JwtService) { }
 
-    /**
-     * ✅ Valide un JWT token et retourne l'utilisateur
-     */
     async validateToken(token: string): Promise<WsUser | null> {
         try {
             const payload = this.jwtService.verify(token, {
@@ -37,25 +34,45 @@ export class WsAuthHelper {
     }
 
     /**
-     * ✅ Extrait le token UNIQUEMENT depuis le header Authorization
-     * Format attendu : "Authorization: Bearer <token>"
+     * ✅ Extrait le token depuis :
+     *   1. socket.handshake.auth.token       ← Mobile app (Socket.IO natif)
+     *   2. socket.handshake.headers.authorization (Bearer) ← Hoppscotch/curl
      */
     extractToken(socket: any): string | null {
+        // 1️⃣ PRIORITÉ : auth.token (Socket.IO natif — utilisé par mobile app)
+        const authToken = socket.handshake?.auth?.token;
+        if (authToken && typeof authToken === 'string') {
+            const cleaned = this.cleanToken(authToken);
+            if (cleaned) {
+                this.logger.log('✅ Token trouvé dans handshake.auth.token');
+                return cleaned;
+            }
+        }
+
+        // 2️⃣ PRIORITÉ : header Authorization Bearer (Hoppscotch, curl)
         const authHeader = socket.handshake?.headers?.authorization;
-
-        // ⚠️ Doit commencer par "Bearer " (insensible à la casse)
-        if (!authHeader || typeof authHeader !== 'string') {
-            this.logger.warn('Aucun header Authorization trouvé');
-            return null;
+        if (authHeader && typeof authHeader === 'string') {
+            const cleaned = this.cleanToken(authHeader);
+            if (cleaned) {
+                this.logger.log('✅ Token trouvé dans headers.authorization');
+                return cleaned;
+            }
         }
 
-        if (!authHeader.toLowerCase().startsWith('bearer ')) {
-            this.logger.warn(`Header Authorization ne commence pas par "Bearer "`);
-            return null;
-        }
+        this.logger.warn('❌ Aucun token trouvé (ni auth.token, ni headers.authorization)');
+        return null;
+    }
 
-        // Retirer "Bearer " et trim
-        const token = authHeader.substring(7).trim();
+    /**
+     * 🧹 Nettoie le token : retire "Bearer " et vérifie le format JWT
+     */
+    private cleanToken(raw: string): string | null {
+        let token = raw.trim();
+
+        // Retirer "Bearer " si présent (insensible à la casse)
+        if (token.toLowerCase().startsWith('bearer ')) {
+            token = token.substring(7).trim();
+        }
 
         // Vérifier que c'est un JWT valide (3 parties)
         if (token.split('.').length !== 3) {
