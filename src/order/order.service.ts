@@ -2727,7 +2727,6 @@ export class OrderService {
     // 🔥 Récupérer le user pour connaître son rôle
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      select: ['id', 'role'],
     });
 
     if (!user) {
@@ -2735,23 +2734,44 @@ export class OrderService {
     }
 
     // ============================================================
-    // 🎯 ÉTAPE 1 : RÉCUPÉRER LES IDs PAGINÉS (rapide)
+    // 🎯 REQUÊTE AVEC createQueryBuilder (comme findByType)
     // ============================================================
-    const idsQuery = this.orderRepo
+    const query = this.orderRepo
       .createQueryBuilder('order')
-      .select('order.id', 'id')
-      .orderBy('order.createdAt', 'DESC');
+      .leftJoinAndSelect('order.user', 'user')
+      .leftJoinAndSelect('order.addressUser', 'addressUser')
+      .leftJoinAndSelect('addressUser.country', 'addressCountry')
+      .leftJoinAndSelect('addressUser.city', 'addressCity')
+      .leftJoinAndSelect('order.orderItems', 'orderItem')
+      .leftJoinAndSelect('orderItem.product', 'product')
+      .leftJoinAndSelect('product.company', 'productCompany')
+      .leftJoinAndSelect('product.category', 'productCategory')
+      .leftJoinAndSelect('product.measure', 'productMeasure')
+      .leftJoinAndSelect('order.subOrders', 'subOrder')
+      .leftJoinAndSelect('subOrder.items', 'subOrderItem')
+      .leftJoinAndSelect('subOrderItem.product', 'subOrderProduct')
+      .leftJoinAndSelect('subOrderProduct.company', 'subOrderProductCompany')
+      .leftJoinAndSelect('subOrderProduct.category', 'subOrderProductCategory')
+      .leftJoinAndSelect('subOrderProduct.measure', 'subOrderProductMeasure')
+      .leftJoinAndSelect('subOrder.company', 'subOrderCompany')
+      .leftJoinAndSelect('subOrderCompany.city', 'subOrderCompanyCity')
+      .leftJoinAndSelect('order.deliveryAssignments', 'assignment')
+      .leftJoinAndSelect('assignment.deliver', 'deliver')
+      .leftJoinAndSelect('assignment.assignedBy', 'assignedBy')
+      .leftJoinAndSelect('order.currentDeliveryUser', 'currentDeliveryUser')
+      .leftJoinAndSelect('order.validatedBy', 'validatedBy')
+      .leftJoinAndSelect('order.processingBy', 'processingBy')
+      .leftJoinAndSelect('order.completedBy', 'completedBy')
+      .leftJoinAndSelect('order.deliveredBy', 'deliveredBy')
+      .leftJoinAndSelect('order.rejectedBy', 'rejectedBy')
+      .leftJoinAndSelect('order.delivery', 'delivery');
 
     // 🔐 Filtre dynamique selon le rôle
     if (user.role === UserRole.CUSTOMER) {
-      idsQuery.andWhere('order.userId = :userId', { userId });
+      query.andWhere('order.userId = :userId', { userId });
     } else if (user.role === UserRole.DELIVER) {
-      idsQuery.innerJoin(
-        'order.deliveryAssignments',
-        'assignment',
-        'assignment.deliverId = :userId AND assignment.isActive = true',
-        { userId },
-      );
+      query.andWhere('assignment.deliverId = :userId', { userId });
+      query.andWhere('assignment.isActive = :isActive', { isActive: true });
     } else if (
       user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.ADMIN
@@ -2764,71 +2784,20 @@ export class OrderService {
       };
     }
 
-    // 🔥 Pagination sur les IDs
+    // 🔽 Tri
+    query.orderBy('order.createdAt', 'DESC');
+
+    // 🔥 Pagination
     if (pageNumber && limitNumber) {
-      idsQuery.skip((pageNumber - 1) * limitNumber).take(limitNumber);
+      query.skip((pageNumber - 1) * limitNumber).take(limitNumber);
     } else if (limitNumber) {
-      idsQuery.take(limitNumber);
+      query.take(limitNumber);
     }
 
-    const rawIds = await idsQuery.getRawMany();
-    const orderIds = rawIds.map((r) => r.id);
-
-    if (orderIds.length === 0) {
-      return {
-        message: 'Commandes récupérées avec succès',
-        data: [],
-      };
-    }
+    const orders = await query.getMany();
 
     // ============================================================
-    // 🎯 ÉTAPE 2 : CHARGER LES COMMANDES AVEC TOUTES LES RELATIONS
-    // ============================================================
-    const orders = await this.orderRepo.find({
-      where: { id: In(orderIds) },
-      relations: [
-        // 📦 Items principaux
-        'orderItems.product.company',
-        'orderItems.product.category',
-        'orderItems.product.measure',
-
-        // 🏢 Sous-commandes
-        'subOrders',
-        'subOrders.items.product.company',
-        'subOrders.items.product.category',
-        'subOrders.items.product.measure',
-        'subOrders.company',
-        'subOrders.company.city',        // ✅ Ajouté
-
-        // 👤 Client
-        'user',
-
-        // 📍 Adresse
-        'addressUser',
-        'addressUser.city',              // ✅ Ajouté
-        'addressUser.country',           // ✅ Ajouté
-
-        // 🚚 Affectations
-        'deliveryAssignments',
-        'deliveryAssignments.deliver',
-        'deliveryAssignments.assignedBy',
-
-        // 👤 Validations
-        'currentDeliveryUser',
-        'validatedBy',
-        'processingBy',
-        'completedBy',
-        'deliveredBy',
-        'rejectedBy',
-
-        // 📦 Livraison
-        'delivery',
-      ],
-      order: { createdAt: 'DESC' },
-    });
-
-    // ============================================================
-    // 🎯 ÉTAPE 3 : CONSTRUIRE LA RÉPONSE (SÉCURISÉE)
+    // 🎯 CONSTRUIRE LA RÉPONSE
     // ============================================================
     return {
       message: 'Commandes récupérées avec succès',
@@ -2837,7 +2806,7 @@ export class OrderService {
           (a) => a.isActive,
         );
 
-        // 🔒 HELPER : nettoyer les infos d'un user (enlever password, etc.)
+        // 🔒 HELPER : nettoyer les infos d'un user
         const sanitizeUser = (u: any) => {
           if (!u) return null;
           return {
@@ -2883,9 +2852,7 @@ export class OrderService {
           cancelledAt: o.cancelledAt,
           cancellationReason: o.cancellationReason,
 
-          // ============================================================
-          // 👤 CLIENT
-          // ============================================================
+          // 👤 Client
           user: o.user
             ? {
               id: o.user.id,
@@ -2896,9 +2863,7 @@ export class OrderService {
             }
             : null,
 
-          // ============================================================
-          // 📍 ADRESSE (avec city + country)
-          // ============================================================
+          // 📍 Adresse (avec city + country)
           addressUser: o.addressUser
             ? {
               id: o.addressUser.id,
@@ -2908,39 +2873,29 @@ export class OrderService {
               phone: o.addressUser.phone ?? null,
               latitude: o.addressUser.latitude ?? null,
               longitude: o.addressUser.longitude ?? null,
-              city: o.addressUser.city ?? null,         // ✅ Chargé
-              country: o.addressUser.country ?? null,   // ✅ Chargé
+              city: o.addressUser.city ?? null,
+              country: o.addressUser.country ?? null,
             }
             : null,
 
-          // ============================================================
-          // 📦 ITEMS & SOUS-COMMANDES (avec city)
-          // ============================================================
+          // 📦 Items & sous-commandes
           orderItems: o.orderItems,
-          subOrders: o.subOrders,   // ✅ Contient maintenant company.city
+          subOrders: o.subOrders,
 
-          // ============================================================
-          // 🚚 LIVREUR COURANT (SÉCURISÉ)
-          // ============================================================
+          // 🚚 Livreur courant (sécurisé)
           currentDeliveryUser: sanitizeUser(o.currentDeliveryUser),
 
-          // ============================================================
-          // 👤 VALIDATIONS (SÉCURISÉES)
-          // ============================================================
+          // 👤 Validations (sécurisées)
           validatedBy: sanitizeUser(o.validatedBy),
           processingBy: sanitizeUser(o.processingBy),
           completedBy: sanitizeUser(o.completedBy),
           deliveredBy: sanitizeUser(o.deliveredBy),
           rejectedBy: sanitizeUser(o.rejectedBy),
 
-          // ============================================================
-          // 🚚 LIVREUR AFFECTÉ (SÉCURISÉ)
-          // ============================================================
+          // 🚚 Livreur affecté (sécurisé)
           deliver: sanitizeUser(activeAssignment?.deliver),
 
-          // ============================================================
-          // 👤 ASSIGNÉ PAR (SÉCURISÉ)
-          // ============================================================
+          // 👤 Assigné par
           assignedBy: activeAssignment?.assignedBy
             ? {
               id: activeAssignment.assignedBy.id,
@@ -2949,9 +2904,7 @@ export class OrderService {
             }
             : null,
 
-          // ============================================================
-          // 📋 AFFECTATION
-          // ============================================================
+          // 📋 Affectation
           assignment: activeAssignment
             ? {
               assignmentId: activeAssignment.id,
@@ -2963,9 +2916,7 @@ export class OrderService {
             }
             : null,
 
-          // ============================================================
-          // 📍 TRACKING
-          // ============================================================
+          // 📍 Tracking
           tracking: {
             currentLatitude: activeAssignment?.currentLatitude ?? null,
             currentLongitude: activeAssignment?.currentLongitude ?? null,
