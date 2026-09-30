@@ -15,6 +15,9 @@ export class WsAuthHelper {
 
     constructor(private readonly jwtService: JwtService) { }
 
+    /**
+     * ✅ Valide un JWT token et retourne l'utilisateur
+     */
     async validateToken(token: string): Promise<WsUser | null> {
         try {
             const payload = this.jwtService.verify(token, {
@@ -35,21 +38,12 @@ export class WsAuthHelper {
 
     /**
      * ✅ Extrait le token depuis :
-     *   1. socket.handshake.auth.token       ← Mobile app (Socket.IO natif)
-     *   2. socket.handshake.headers.authorization (Bearer) ← Hoppscotch/curl
+     *   1. headers.authorization  (Bearer) → Priorité (mobile envoie ici)
+     *   2. query.token            → Fallback (mobile envoie ici aussi)
+     *   3. auth.token             → Fallback (Socket.IO natif)
      */
     extractToken(socket: any): string | null {
-        // 1️⃣ PRIORITÉ : auth.token (Socket.IO natif — utilisé par mobile app)
-        const authToken = socket.handshake?.auth?.token;
-        if (authToken && typeof authToken === 'string') {
-            const cleaned = this.cleanToken(authToken);
-            if (cleaned) {
-                this.logger.log('✅ Token trouvé dans handshake.auth.token');
-                return cleaned;
-            }
-        }
-
-        // 2️⃣ PRIORITÉ : header Authorization Bearer (Hoppscotch, curl)
+        // 1️⃣ Priorité : header Authorization Bearer
         const authHeader = socket.handshake?.headers?.authorization;
         if (authHeader && typeof authHeader === 'string') {
             const cleaned = this.cleanToken(authHeader);
@@ -59,7 +53,30 @@ export class WsAuthHelper {
             }
         }
 
-        this.logger.warn('❌ Aucun token trouvé (ni auth.token, ni headers.authorization)');
+        // 2️⃣ Fallback : query.token
+        const queryToken = socket.handshake?.query?.token;
+        if (queryToken) {
+            const raw = Array.isArray(queryToken) ? queryToken[0] : queryToken;
+            if (typeof raw === 'string') {
+                const cleaned = this.cleanToken(raw);
+                if (cleaned) {
+                    this.logger.log('✅ Token trouvé dans query.token');
+                    return cleaned;
+                }
+            }
+        }
+
+        // 3️⃣ Fallback : auth.token (Socket.IO natif)
+        const authToken = socket.handshake?.auth?.token;
+        if (authToken && typeof authToken === 'string') {
+            const cleaned = this.cleanToken(authToken);
+            if (cleaned) {
+                this.logger.log('✅ Token trouvé dans auth.token');
+                return cleaned;
+            }
+        }
+
+        this.logger.warn('❌ Aucun token trouvé');
         return null;
     }
 
@@ -69,7 +86,7 @@ export class WsAuthHelper {
     private cleanToken(raw: string): string | null {
         let token = raw.trim();
 
-        // Retirer "Bearer " si présent (insensible à la casse)
+        // Retirer "Bearer " (insensible à la casse)
         if (token.toLowerCase().startsWith('bearer ')) {
             token = token.substring(7).trim();
         }

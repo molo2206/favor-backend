@@ -6,6 +6,7 @@ import {
   ConnectedSocket,
   MessageBody,
   OnGatewayDisconnect,
+  OnGatewayConnection,
 } from '@nestjs/websockets';
 import { Injectable, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
@@ -37,7 +38,8 @@ interface ActiveUser {
   allowEIO3: true,
 })
 @Injectable()
-export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
+export class NotificationsGateway
+  implements OnModuleInit, OnGatewayDisconnect, OnGatewayConnection {
   @WebSocketServer()
   server!: Server;
 
@@ -77,29 +79,84 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     @MessageBody() data: any,
     @ConnectedSocket() socket: Socket,
   ) {
+    // ============================================================
+    // 🔍 COURT-CIRCUIT : déjà identifié par handleConnection (mobile)
+    // ============================================================
+    if (socket.data?.userId) {
+      console.log(`ℹ️ Socket ${socket.id} déjà identifié (user: ${socket.data.userId})`);
+
+      const confirmation = {
+        success: true,
+        // ✅ Format mobile (à plat)
+        userId: socket.data.userId,
+        role: socket.data.role,
+        fullName: socket.data.fullName,
+        // ✅ Format riche
+        user: {
+          id: socket.data.userId,
+          role: socket.data.role,
+          fullName: socket.data.fullName,
+        },
+        socketId: socket.id,
+        message: 'Déjà connecté',
+        timestamp: new Date().toISOString(),
+      };
+
+      socket.emit('confirmation', confirmation);
+      return confirmation;
+    }
+
+    // ============================================================
+    // 📥 LOGS DE DEBUG
+    // ============================================================
     console.log('═══════════════════════════════════════════');
     console.log('📥 [connection] DEBUG');
-    console.log('   headers.authorization :', JSON.stringify(socket.handshake?.headers?.authorization));
+    console.log('   body.data            :', JSON.stringify(data));
+    console.log('   handshake.auth       :', JSON.stringify(socket.handshake?.auth));
+    console.log('   handshake.query.token:', JSON.stringify(socket.handshake?.query?.token));
+    console.log('   headers.authorization:', JSON.stringify(socket.handshake?.headers?.authorization));
     console.log('═══════════════════════════════════════════');
 
     // ============================================================
-    // 🔑 EXTRACTION DU TOKEN (uniquement depuis Authorization: Bearer <token>)
+    // 🔑 EXTRACTION DU TOKEN (multi-sources via WsAuthHelper)
     // ============================================================
-    const token = this.wsAuthHelper.extractToken(socket);
+    let token: string | null = null;
 
-    console.log('🔑 Token extrait :', token ? token.substring(0, 40) + '...' : '❌ AUCUN');
-    console.log('🔑 Longueur     :', token?.length);
+    // 1. Body SI c'est un JWT (pas un userId)
+    if (typeof data === 'string' && data.split('.').length === 3) {
+      token = data;
+      console.log('🔑 Token trouvé dans body (string JWT)');
+    } else if (
+      data &&
+      typeof data === 'object' &&
+      data.token &&
+      typeof data.token === 'string' &&
+      data.token.split('.').length === 3
+    ) {
+      token = data.token;
+      console.log('🔑 Token trouvé dans body (objet.token)');
+    }
+
+    // 2. Fallback : WsAuthHelper (auth.token, header Bearer, query.token)
+    if (!token) {
+      token = this.wsAuthHelper.extractToken(socket);
+      if (token) console.log('🔑 Token trouvé via WsAuthHelper');
+    }
+
+    console.log('🔑 Token final :', token ? token.substring(0, 40) + '...' : '❌ AUCUN');
+    console.log('🔑 Longueur   :', token?.length);
 
     // ============================================================
     // ❌ CAS 1 : Aucun token
     // ============================================================
     if (!token) {
       console.warn(`⚠️ Connection sans token - Socket ${socket.id}`);
-      socket.emit('connection-error', { message: 'Token requis' });
-      return {
+      const errorResp = {
         success: false,
         message: 'Token requis',
       };
+      socket.emit('connection-error', errorResp);
+      return errorResp;
     }
 
     // ============================================================
@@ -108,11 +165,12 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     const wsUser = await this.wsAuthHelper.validateToken(token);
     if (!wsUser) {
       console.warn(`⚠️ Token invalide - Socket ${socket.id}`);
-      socket.emit('connection-error', { message: 'Token invalide' });
-      return {
+      const errorResp = {
         success: false,
         message: 'Token invalide',
       };
+      socket.emit('connection-error', errorResp);
+      return errorResp;
     }
 
     // ============================================================
@@ -126,6 +184,7 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       (user) => user.id === userId,
     );
 
+    // Rejoindre la room perso
     socket.join(userId);
     this.addUserRoom(userId, userId);
 
@@ -156,44 +215,42 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
         console.log(`🔌 User ${userId} connected (${socket.data.fullName}, role: ${socket.data.role})`);
       } else {
         console.warn(`⚠️ User ${userId} introuvable en base`);
-        socket.emit('connection-error', { message: 'Utilisateur introuvable' });
-        return {
+        const errorResp = {
           success: false,
           message: 'Utilisateur introuvable',
         };
+        socket.emit('connection-error', errorResp);
+        return errorResp;
       }
     }
 
     // ============================================================
-    // 📢 BROADCAST + CONFIRMATION AVEC USER
+    // 📢 BROADCAST + CONFIRMATION
     // ============================================================
     this.broadcastUsers();
 
-    const userData = {
-      id: socket.data.userId,
+    const confirmation = {
+      success: true,
+      // ✅ Format mobile (à plat)
+      userId: socket.data.userId,
       role: socket.data.role,
       fullName: socket.data.fullName,
-    };
-
-    socket.emit('confirmation', {
-      success: true,
-      message: 'Connexion réussie',
-      user: userData,
+      // ✅ Format riche
+      user: {
+        id: socket.data.userId,
+        role: socket.data.role,
+        fullName: socket.data.fullName,
+      },
       socketId: socket.id,
-      timestamp: new Date().toISOString(),
-    });
-
-    console.log(`✅ Confirmation sent to ${userId} :`, JSON.stringify(userData));
-
-    return {
-      success: true,
       message: 'Connexion réussie',
-      user: userData,
-      socketId: socket.id,
       timestamp: new Date().toISOString(),
     };
+
+    socket.emit('confirmation', confirmation);
+    console.log(`✅ Confirmation sent to ${userId} :`, JSON.stringify(confirmation));
+
+    return confirmation;
   }
-
   handleDisconnect(client: Socket) {
     const userIndex = this.activeUsers.findIndex(
       (user) => user.socketId === client.id,
@@ -411,6 +468,95 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       console.log(`⚠️ Deliver ${deliverId} is not connected`);
     }
   }
+  async handleConnection(client: Socket) {
+    console.log('═══════════════════════════════════════════');
+    console.log(`🔌 Nouveau socket : ${client.id}`);
+    console.log('   auth            :', JSON.stringify(client.handshake?.auth));
+    console.log('   query.token     :', JSON.stringify(client.handshake?.query?.token));
+    console.log('   headers.auth    :', JSON.stringify(client.handshake?.headers?.authorization));
+    console.log('═══════════════════════════════════════════');
+
+    // 🎯 Extraire le token (header Bearer, query, auth)
+    const token = this.wsAuthHelper.extractToken(client);
+
+    if (!token) {
+      console.warn(`⚠️ Socket ${client.id} sans token → non identifié`);
+      // ⚠️ On ne déconnecte PAS ici → on attend que le client envoie 'connection' si besoin
+      // Ou on déconnecte :
+      // client.emit('connection-error', { message: 'Token requis' });
+      // client.disconnect(true);
+      return;
+    }
+
+    // 🔐 Valider le JWT
+    const wsUser = await this.wsAuthHelper.validateToken(token);
+    if (!wsUser) {
+      console.warn(`⚠️ Socket ${client.id} token invalide`);
+      client.emit('connection-error', { message: 'Token invalide' });
+      // client.disconnect(true);
+      return;
+    }
+
+    // ✅ Token valide → identifier le socket
+    const userId = wsUser.id;
+
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      console.warn(`⚠️ User ${userId} introuvable en base`);
+      client.emit('connection-error', { message: 'Utilisateur introuvable' });
+      return;
+    }
+
+    // 🔥 Stocker les infos sur le socket
+    client.data.userId = userId;
+    client.data.role = wsUser.role || user.role;
+    client.data.fullName = wsUser.fullName || user.fullName;
+
+    // Rejoindre la room perso
+    client.join(userId);
+    this.addUserRoom(userId, userId);
+
+    // Gérer la reconnexion
+    const existingIndex = this.activeUsers.findIndex((u) => u.id === userId);
+    if (existingIndex !== -1) {
+      const oldSocketId = this.activeUsers[existingIndex].socketId;
+      if (oldSocketId !== client.id) {
+        this.activeUsers[existingIndex].socketId = client.id;
+        console.log(`🔄 User ${userId} reconnected (old: ${oldSocketId}, new: ${client.id})`);
+      }
+    } else {
+      this.activeUsers.push({ id: userId, socketId: client.id });
+      console.log(`🔌 User ${userId} connected (${client.data.fullName}, role: ${client.data.role})`);
+    }
+
+    this.broadcastUsers();
+
+    // 📢 Émettre la confirmation (format mobile : à plat + format riche)
+    const confirmation = {
+      success: true,
+      // ✅ Format mobile app (à plat)
+      userId,
+      role: client.data.role,
+      fullName: client.data.fullName,
+      // ✅ Format riche (pour ton front web)
+      user: {
+        id: userId,
+        role: client.data.role,
+        fullName: client.data.fullName,
+      },
+      socketId: client.id,
+      message: 'Connexion réussie',
+      timestamp: new Date().toISOString(),
+    };
+
+    client.emit('confirmation', confirmation);
+    console.log(`✅ Confirmation sent to ${userId} :`, JSON.stringify(confirmation));
+    console.log('═══════════════════════════════════════════');
+  }
+
 
   async sendDeliveryLocation(
     orderId: string,
