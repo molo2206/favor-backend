@@ -17,6 +17,7 @@ import { NotificationsService } from './notifications.service';
 import { NotificationType } from './type/notification.type';
 import { DriverLocationService } from 'src/Course et Taxi/DriverLocation/driver-location.service';
 import { OrderDeliveryService } from 'src/order/order-delivery.service';
+import { WsAuthHelper } from './utils/ws-auth.helper';
 
 interface ActiveUser {
   id: string;
@@ -61,6 +62,9 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
     @Inject(forwardRef(() => OrderDeliveryService))
     private readonly deliveryService: OrderDeliveryService,
+
+    // ✅ AJOUT : helper JWT
+    private readonly wsAuthHelper: WsAuthHelper,
   ) { }
 
   onModuleInit() {
@@ -70,17 +74,41 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
   @SubscribeMessage('connection')
   async sendConfirm(
-    @MessageBody() userId: string,
+    @MessageBody() data: any,
     @ConnectedSocket() socket: Socket,
   ) {
-    console.log(`📡 Connection event received for user: ${userId}`);
-    console.log(`   Socket ID: ${socket.id}`);
+    // 🎯 Extraire le token depuis plusieurs sources
+    let token: string | null = null;
 
-    if (!userId || typeof userId !== 'string') {
-      console.warn(`⚠️ Connection sans userId valide - Socket ${socket.id}`);
-      socket.emit('connection-error', { message: 'userId requis' });
+    // 1. Depuis le body (si l'event 'connection' envoie le token)
+    if (typeof data === 'string') {
+      token = data;
+    } else if (data && typeof data === 'object' && data.token) {
+      token = data.token;
+    }
+
+    // 2. Fallback : depuis le handshake (auth / headers / query)
+    if (!token) {
+      token = this.wsAuthHelper.extractToken(socket);
+    }
+
+    if (!token) {
+      console.warn(`⚠️ Connection sans token - Socket ${socket.id}`);
+      socket.emit('connection-error', { message: 'Token requis' });
       return;
     }
+
+    // 🔐 Valider le JWT
+    const wsUser = await this.wsAuthHelper.validateToken(token);
+    if (!wsUser) {
+      console.warn(`⚠️ Token invalide - Socket ${socket.id}`);
+      socket.emit('connection-error', { message: 'Token invalide' });
+      return;
+    }
+
+    const userId = wsUser.id;
+    console.log(`📡 Connection event received for user: ${userId}`);
+    console.log(`   Socket ID: ${socket.id}`);
 
     const existingDriverIndex = this.activeUsers.findIndex(
       (user) => user.id === userId,
@@ -98,21 +126,21 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
         this.activeUsers[existingDriverIndex].socketId = socket.id;
         console.log(`🔄 User ${userId} reconnected (old: ${oldSocketId}, new: ${socket.id})`);
       }
-    } else if (userId) {
+    } else {
       const user = await this.userRepository.findOne({
         where: { id: userId },
       });
       if (user) {
-        // 🔥 STOCKER LES INFOS SUR LE SOCKET
+        // 🔥 STOCKER LES INFOS SUR LE SOCKET (JWT + base)
         socket.data.userId = userId;
-        socket.data.role = user.role;
-        socket.data.fullName = user.fullName;
+        socket.data.role = wsUser.role || user.role;
+        socket.data.fullName = wsUser.fullName || user.fullName;
 
         this.activeUsers.push({
           id: userId,
           socketId: socket.id,
         });
-        console.log(`🔌 User ${userId} connected (${user.fullName}, role: ${user.role})`);
+        console.log(`🔌 User ${userId} connected (${socket.data.fullName}, role: ${socket.data.role})`);
       } else {
         console.warn(`⚠️ User ${userId} introuvable en base`);
         socket.emit('connection-error', { message: 'Utilisateur introuvable' });
@@ -583,12 +611,19 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
-    const payload = this.parseBody<{ orderId: string; deliverId: string }>(data);
-    if (!payload?.orderId || !payload?.deliverId) {
-      return { status: 'error', message: 'orderId et deliverId requis' };
+    const payload = this.parseBody<{ orderId: string }>(data);
+
+    // 🔐 Récupérer deliverId depuis le socket (JWT déjà validé)
+    const deliverId = client.data?.userId;
+    if (!deliverId) {
+      return { status: 'error', message: 'Non authentifié' };
     }
 
-    const { orderId, deliverId } = payload;
+    if (!payload?.orderId) {
+      return { status: 'error', message: 'orderId requis' };
+    }
+
+    const { orderId } = payload;
     console.log(`🔌 [Gateway] livreur:connect - ${deliverId} → order ${orderId}`);
 
     try {
@@ -618,13 +653,20 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
-    const payload = this.parseBody<{ orderId: string; deliverId: string; action: 'start' | 'stop' }>(data);
-    if (!payload?.orderId || !payload?.deliverId || !payload?.action) {
-      return { status: 'error', message: 'orderId, deliverId et action requis' };
+    const payload = this.parseBody<{ orderId: string; action: 'start' | 'stop' }>(data);
+
+    // 🔐 Récupérer deliverId depuis le socket
+    const deliverId = client.data?.userId;
+    if (!deliverId) {
+      return { status: 'error', message: 'Non authentifié' };
     }
 
-    const { orderId, deliverId, action } = payload;
-    console.log(`🚚 [Gateway] livreur:tracking - ${action} → order ${orderId}`);
+    if (!payload?.orderId || !payload?.action) {
+      return { status: 'error', message: 'orderId et action requis' };
+    }
+
+    const { orderId, action } = payload;
+    console.log(`🚚 [Gateway] livreur:tracking - ${action} → order ${orderId} | deliver=${deliverId}`);
 
     try {
       // Gestion du tracking actif en mémoire
@@ -688,19 +730,25 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
   @SubscribeMessage('livreur:position')
   async handleLivreurPosition(
     @MessageBody() data: any,
+    @ConnectedSocket() client: Socket,
   ) {
     const payload = this.parseBody<{
       orderId: string;
-      deliverId: string;
       latitude: number;
       longitude: number;
     }>(data);
 
-    if (!payload?.orderId || !payload?.deliverId || payload.latitude == null || payload.longitude == null) {
-      return { status: 'error', message: 'orderId, deliverId, latitude, longitude requis' };
+    // 🔐 Récupérer deliverId depuis le socket
+    const deliverId = client.data?.userId;
+    if (!deliverId) {
+      return { status: 'error', message: 'Non authentifié' };
     }
 
-    const { orderId, deliverId, latitude, longitude } = payload;
+    if (!payload?.orderId || payload.latitude == null || payload.longitude == null) {
+      return { status: 'error', message: 'orderId, latitude, longitude requis' };
+    }
+
+    const { orderId, latitude, longitude } = payload;
     console.log(`📍 [Gateway] livreur:position - ${deliverId} → order ${orderId}`);
 
     // Vérifier que le tracking est actif
