@@ -255,6 +255,28 @@ export class OrderDeliveryService {
             console.error('❌ Erreur dans processOrderNotifications:', error);
         }
     }
+
+    // ============================================================
+    // 🔍 VÉRIFIER SI UNE AFFECTATION ACTIVE EXISTE POUR UN ORDER
+    // ============================================================
+    async findAssignmentByOrderId(orderId: string): Promise<OrderDeliveryAssignment | null> {
+        this.logger.log(`🔍 [findAssignmentByOrderId] Recherche pour orderId = ${orderId}`);
+
+        const assignment = await this.assignmentRepo.findOne({
+            where: {
+                orderId,
+                isActive: true,
+            },
+        });
+
+        if (assignment) {
+            this.logger.log(`✅ Affectation trouvée : ${assignment.id} (status: ${assignment.status})`);
+        } else {
+            this.logger.warn(`❌ Aucune affectation active pour ${orderId}`);
+        }
+
+        return assignment;
+    }
     // ============================================================
     // 📦 AFFECTER UN LIVREUR À UNE COMMANDE
     // ============================================================
