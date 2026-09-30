@@ -211,12 +211,7 @@ export class OrderController {
     @CurrentUser() user: UserEntity,
     @Req() req: Request,
   ) {
-    const orders = await this.orderService.getOrdersByUser(user.id);
-    const lang = this.getUserLanguage(user, req);
-    return {
-      message: "succes",
-      data: orders,
-    };
+    return await this.orderService.getOrdersByUser(user.id);
   }
 
   //   @Get('my-order')
