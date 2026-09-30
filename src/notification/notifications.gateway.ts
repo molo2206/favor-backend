@@ -343,7 +343,7 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     }
   }
 
-  sendDeliveryLocation(
+  async sendDeliveryLocation(
     orderId: string,
     payload: {
       orderId: string;
@@ -363,6 +363,18 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     },
   ) {
     const roomName = `order-${orderId}`;
+
+    // 🔍 DEBUG : combien de sockets dans la room ?
+    const sockets = await this.server.in(roomName).fetchSockets();
+    console.log(`📍 [sendDeliveryLocation] Room ${roomName} → ${sockets.length} socket(s)`);
+
+    if (sockets.length === 0) {
+      console.warn(`⚠️ PERSONNE dans la room ${roomName} → emit dans le vide`);
+    } else {
+      sockets.forEach((s: any) => {
+        console.log(`   → socket ${s.id} | userId=${s.data?.userId} | role=${s.data?.role}`);
+      });
+    }
 
     this.server.to(roomName).emit('deliveryLocation', {
       ...payload,
@@ -406,7 +418,7 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('join-order')
-  handleJoinOrderTracking(
+  async handleJoinOrderTracking(
     @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
@@ -422,13 +434,23 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     if (userId) this.addUserRoom(userId, roomName);
     console.log(`🔌 Client ${client.id} joined order room: ${roomName}`);
 
+    // ✅ AJOUT : récupérer les utilisateurs actuellement dans la room
+    const usersInRoom = await this.getUsersInOrderRoom(payload.orderId);
+
     client.emit('order-joined', {
       success: true,
       room: roomName,
       orderId: payload.orderId,
+      users: usersInRoom,   // ⬅️ liste des users dans la room
+      userCount: usersInRoom.length,
     });
 
-    return { success: true, room: roomName };
+    return {
+      success: true,
+      room: roomName,
+      users: usersInRoom,        // ⬅️ retour REST aussi
+      userCount: usersInRoom.length,
+    };
   }
 
   @SubscribeMessage('leave-order')
@@ -505,40 +527,50 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
   @SubscribeMessage('updateDeliveryLocation')
   async handleUpdateDeliveryLocation(
-    @MessageBody()
-    data: {
+    @MessageBody() data: any,
+  ) {
+    const payload = this.parseBody<{
       orderId: string;
       deliverId: string;
       latitude: number;
       longitude: number;
       speed?: number;
       heading?: number;
-    },
-  ) {
+    }>(data);
+
+    if (!payload?.orderId || !payload?.deliverId || payload.latitude == null || payload.longitude == null) {
+      return { success: false, message: 'orderId, deliverId, latitude, longitude requis' };
+    }
+
     console.log(
-      `📍 [Gateway] Location update from deliver ${data.deliverId} for order ${data.orderId}`,
+      `📍 [Gateway] Location update from deliver ${payload.deliverId} for order ${payload.orderId}`,
     );
 
-    this.server.emit('internal:updateDeliveryLocation', data);
+    this.server.emit('internal:updateDeliveryLocation', payload);
 
     return { success: true };
   }
 
   @SubscribeMessage('updateDeliveryStatus')
   async handleUpdateDeliveryStatus(
-    @MessageBody()
-    data: {
+    @MessageBody() data: any,
+  ) {
+    const payload = this.parseBody<{
       orderId: string;
       deliverId: string;
       status: string;
       note?: string;
-    },
-  ) {
+    }>(data);
+
+    if (!payload?.orderId || !payload?.deliverId || !payload?.status) {
+      return { success: false, message: 'orderId, deliverId, status requis' };
+    }
+
     console.log(
-      `✅ [Gateway] Status update from deliver ${data.deliverId} for order ${data.orderId}: ${data.status}`,
+      `✅ [Gateway] Status update from deliver ${payload.deliverId} for order ${payload.orderId}: ${payload.status}`,
     );
 
-    this.server.emit('internal:updateDeliveryStatus', data);
+    this.server.emit('internal:updateDeliveryStatus', payload);
 
     return { success: true };
   }
@@ -548,15 +580,16 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
   // ============================================================
   @SubscribeMessage('livreur:connect')
   async handleLivreurConnect(
-    @MessageBody() data: { orderId: string; deliverId: string },
+    @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
-    const { orderId, deliverId } = data;
-    console.log(`🔌 [Gateway] livreur:connect - ${deliverId} → order ${orderId}`);
-
-    if (!orderId || !deliverId) {
+    const payload = this.parseBody<{ orderId: string; deliverId: string }>(data);
+    if (!payload?.orderId || !payload?.deliverId) {
       return { status: 'error', message: 'orderId et deliverId requis' };
     }
+
+    const { orderId, deliverId } = payload;
+    console.log(`🔌 [Gateway] livreur:connect - ${deliverId} → order ${orderId}`);
 
     try {
       const roomName = `order-${orderId}`;
@@ -582,16 +615,16 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
   // ============================================================
   @SubscribeMessage('livreur:tracking')
   async handleLivreurTracking(
-    @MessageBody()
-    data: { orderId: string; deliverId: string; action: 'start' | 'stop' },
+    @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
-    const { orderId, deliverId, action } = data;
-    console.log(`🚚 [Gateway] livreur:tracking - ${action} → order ${orderId}`);
-
-    if (!orderId || !deliverId || !action) {
+    const payload = this.parseBody<{ orderId: string; deliverId: string; action: 'start' | 'stop' }>(data);
+    if (!payload?.orderId || !payload?.deliverId || !payload?.action) {
       return { status: 'error', message: 'orderId, deliverId et action requis' };
     }
+
+    const { orderId, deliverId, action } = payload;
+    console.log(`🚚 [Gateway] livreur:tracking - ${action} → order ${orderId}`);
 
     try {
       // Gestion du tracking actif en mémoire
@@ -654,20 +687,21 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
   // ============================================================
   @SubscribeMessage('livreur:position')
   async handleLivreurPosition(
-    @MessageBody()
-    data: {
+    @MessageBody() data: any,
+  ) {
+    const payload = this.parseBody<{
       orderId: string;
       deliverId: string;
       latitude: number;
       longitude: number;
-    },
-  ) {
-    const { orderId, deliverId, latitude, longitude } = data;
-    console.log(`📍 [Gateway] livreur:position - ${deliverId} → order ${orderId}`);
+    }>(data);
 
-    if (!orderId || !deliverId || latitude == null || longitude == null) {
+    if (!payload?.orderId || !payload?.deliverId || payload.latitude == null || payload.longitude == null) {
       return { status: 'error', message: 'orderId, deliverId, latitude, longitude requis' };
     }
+
+    const { orderId, deliverId, latitude, longitude } = payload;
+    console.log(`📍 [Gateway] livreur:position - ${deliverId} → order ${orderId}`);
 
     // Vérifier que le tracking est actif
     const isTracking = this.activeTrackings.get(deliverId)?.has(orderId);
@@ -698,27 +732,31 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
   @SubscribeMessage('accept-ride')
   async handleAcceptRide(
-    @MessageBody()
-    data: { rideId: string; driverId: string; driverName: string },
+    @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
-    const ride = await this.rideService.findOne(data.rideId);
+    const payload = this.parseBody<{ rideId: string; driverId: string; driverName: string }>(data);
+    if (!payload?.rideId || !payload?.driverId || !payload?.driverName) {
+      return client.emit('error', 'rideId, driverId et driverName requis');
+    }
+
+    const ride = await this.rideService.findOne(payload.rideId);
     if (!ride) return client.emit('error', 'Course introuvable');
     if (ride.data.driverId) return client.emit('error', 'Course déjà acceptée');
 
-    await this.rideService.updateDriver(ride.data.id, data.driverId);
+    await this.rideService.updateDriver(ride.data.id, payload.driverId);
 
     await this.notificationsService.sendNotificationToUser(
       ride.data.riderId,
       'Course acceptée',
-      `Votre course a été acceptée par ${data.driverName}`,
+      `Votre course a été acceptée par ${payload.driverName}`,
       NotificationType.RIDE_ACCEPTED,
-      { driverId: data.driverId },
+      { driverId: payload.driverId },
     );
 
     try {
-      await this.driverLocationService.setDriverBusy(data.driverId);
-      console.log(`Chauffeur ${data.driverId} marqué comme occupé`);
+      await this.driverLocationService.setDriverBusy(payload.driverId);
+      console.log(`Chauffeur ${payload.driverId} marqué comme occupé`);
     } catch (error) {
       console.error(
         'Erreur lors du marquage du chauffeur comme occupé:',
@@ -758,7 +796,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       return [];
     }
   }
-
   /**
    * Récupérer tous les utilisateurs d'une room company
    */
