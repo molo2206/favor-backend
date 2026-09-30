@@ -332,6 +332,7 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     @MessageBody() data: { orderId: string },
     @ConnectedSocket() client: Socket,
   ) {
+    console.log(data)
     const roomName = `order-${data.orderId}`;
     client.join(roomName);
     console.log(`🔌 Client ${client.id} joined order room: ${roomName}`);
