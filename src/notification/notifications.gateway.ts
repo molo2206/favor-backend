@@ -955,40 +955,114 @@ export class NotificationsGateway
     // 🔐 Récupérer deliverId depuis le socket
     const deliverId = client.data?.userId;
     if (!deliverId) {
-      return { status: 'error', message: 'Non authentifié' };
+      const errResp = {
+        status: 'error',
+        code: 'NOT_AUTHENTICATED',
+        message: 'Non authentifié. Envoyez "connection" avec un JWT valide.',
+      };
+      client.emit('position-error', errResp);
+      return errResp;
     }
 
+    // 🔍 Valider le payload
     if (!payload?.orderId || payload.latitude == null || payload.longitude == null) {
-      return { status: 'error', message: 'orderId, latitude, longitude requis' };
+      const errResp = {
+        status: 'error',
+        code: 'INVALID_PAYLOAD',
+        message: 'orderId, latitude, longitude requis',
+      };
+      client.emit('position-error', errResp);
+      return errResp;
     }
 
     const { orderId, latitude, longitude } = payload;
-    console.log(`📍 [Gateway] livreur:position - ${deliverId} → order ${orderId}`);
+    console.log('═══════════════════════════════════════════');
+    console.log(`📍 [livreur:position]`);
+    console.log(`   deliverId = ${deliverId}`);
+    console.log(`   orderId   = ${orderId}`);
+    console.log(`   lat/lng   = ${latitude}, ${longitude}`);
+    console.log('═══════════════════════════════════════════');
 
-    // Vérifier que le tracking est actif
+    // ✅ Vérifier que le tracking est actif
     const isTracking = this.activeTrackings.get(deliverId)?.has(orderId);
     if (!isTracking) {
-      console.log(`⚠️ Tracking inactif pour ${deliverId} → order-${orderId}`);
-      return {
+      console.warn(`⚠️ Tracking inactif pour ${deliverId} → order-${orderId}`);
+      const errResp = {
         status: 'error',
+        code: 'TRACKING_INACTIVE',
         message: "Tracking inactif. Envoyez livreur:tracking (action='start') d'abord.",
       };
+      client.emit('position-error', errResp);
+      return errResp;
     }
 
     try {
+      // ============================================================
+      // 🎯 APPEL DU SERVICE
+      // ⚠️ Le service THROW si l'affectation n'existe pas
+      // ============================================================
       await this.deliveryService.updateLocation(orderId, {
         latitude,
         longitude,
       });
 
-      return {
+      // ✅ SUCCÈS
+      console.log(`✅ Position traitée avec succès pour order-${orderId}`);
+      const successResp = {
         status: 'position_received',
         message: 'Position enregistrée et diffusée',
         data: { orderId, deliverId, latitude, longitude },
       };
+      client.emit('position-success', successResp);
+      return successResp;
+
     } catch (err: any) {
-      console.error(`❌ Erreur position: ${err.message}`);
-      return { status: 'error', message: err.message };
+      // ============================================================
+      // ❌ ERREUR → distinguer les cas
+      // ============================================================
+      console.error(`❌ Erreur position pour order-${orderId}: ${err.message}`);
+
+      // Détecter le type d'erreur
+      let code = 'UNKNOWN_ERROR';
+      let message = err.message || 'Erreur inconnue';
+
+      // NestJS NotFoundException
+      if (err.status === 404 || err.message?.includes('Aucune affectation active')) {
+        code = 'ASSIGNMENT_NOT_FOUND';
+        message = `Aucune affectation active pour la commande ${orderId}. Contactez le support.`;
+      }
+      // NestJS BadRequestException
+      else if (err.status === 400) {
+        code = 'BAD_REQUEST';
+      }
+      // Erreur Google Maps
+      else if (err.message?.includes('Google')) {
+        code = 'GOOGLE_DIRECTIONS_ERROR';
+      }
+
+      const errResp = {
+        status: 'error',
+        code,
+        message,
+        orderId,
+        timestamp: new Date().toISOString(),
+      };
+
+      // 📢 Émettre l'erreur AU CLIENT qui a envoyé la position
+      client.emit('position-error', errResp);
+
+      // 📢 Émettre AUSSI un event à la room (pour prévenir les autres)
+      if (code === 'ASSIGNMENT_NOT_FOUND') {
+        this.server.to(`order-${orderId}`).emit('deliveryPositionFailed', {
+          orderId,
+          deliverId,
+          reason: 'ASSIGNMENT_NOT_FOUND',
+          message,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      return errResp;
     }
   }
 
