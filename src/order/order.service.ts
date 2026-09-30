@@ -2724,41 +2724,260 @@ export class OrderService {
     pageNumber?: number,
     limitNumber?: number,
   ) {
-    // Test SANS filtre par rôle (juste pour voir si ça bloque)
+    // 🔥 Récupérer le user pour connaître son rôle
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'role'],
+    });
+
+    if (!user) {
+      throw new NotFoundException(`Utilisateur ${userId} introuvable`);
+    }
+
+    // ============================================================
+    // 🎯 ÉTAPE 1 : RÉCUPÉRER LES IDs PAGINÉS (rapide)
+    // ============================================================
+    const idsQuery = this.orderRepo
+      .createQueryBuilder('order')
+      .select('order.id', 'id')
+      .orderBy('order.createdAt', 'DESC');
+
+    // 🔐 Filtre dynamique selon le rôle
+    if (user.role === UserRole.CUSTOMER) {
+      idsQuery.andWhere('order.userId = :userId', { userId });
+    } else if (user.role === UserRole.DELIVER) {
+      idsQuery.innerJoin(
+        'order.deliveryAssignments',
+        'assignment',
+        'assignment.deliverId = :userId AND assignment.isActive = true',
+        { userId },
+      );
+    } else if (
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.ADMIN
+    ) {
+      // Admin → accès total
+    } else {
+      return {
+        message: 'Aucune commande disponible pour ce rôle',
+        data: [],
+      };
+    }
+
+    // 🔥 Pagination sur les IDs
+    if (pageNumber && limitNumber) {
+      idsQuery.skip((pageNumber - 1) * limitNumber).take(limitNumber);
+    } else if (limitNumber) {
+      idsQuery.take(limitNumber);
+    }
+
+    const rawIds = await idsQuery.getRawMany();
+    const orderIds = rawIds.map((r) => r.id);
+
+    if (orderIds.length === 0) {
+      return {
+        message: 'Commandes récupérées avec succès',
+        data: [],
+      };
+    }
+
+    // ============================================================
+    // 🎯 ÉTAPE 2 : CHARGER LES COMMANDES AVEC TOUTES LES RELATIONS
+    // ============================================================
     const orders = await this.orderRepo.find({
-      where: { user: { id: userId } },
+      where: { id: In(orderIds) },
       relations: [
+        // 📦 Items principaux
         'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
+
+        // 🏢 Sous-commandes
         'subOrders',
         'subOrders.items.product.company',
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',
+        'subOrders.company.city',        // ✅ Ajouté
+
+        // 👤 Client
         'user',
+
+        // 📍 Adresse
         'addressUser',
+        'addressUser.city',              // ✅ Ajouté
+        'addressUser.country',           // ✅ Ajouté
+
+        // 🚚 Affectations
         'deliveryAssignments',
         'deliveryAssignments.deliver',
         'deliveryAssignments.assignedBy',
+
+        // 👤 Validations
+        'currentDeliveryUser',
+        'validatedBy',
+        'processingBy',
+        'completedBy',
+        'deliveredBy',
+        'rejectedBy',
+
+        // 📦 Livraison
+        'delivery',
       ],
       order: { createdAt: 'DESC' },
-      skip: pageNumber && limitNumber ? (pageNumber - 1) * limitNumber : undefined,
-      take: limitNumber || undefined,
     });
 
+    // ============================================================
+    // 🎯 ÉTAPE 3 : CONSTRUIRE LA RÉPONSE (SÉCURISÉE)
+    // ============================================================
     return {
       message: 'Commandes récupérées avec succès',
-      data: orders.map((o) => ({
-        id: o.id,
-        invoiceNumber: o.invoiceNumber,
-        status: o.status,
-        user: o.user ? { id: o.user.id, fullName: o.user.fullName } : null,
-        addressUser: o.addressUser ? { id: o.addressUser.id, address: o.addressUser.address } : null,
-        orderItems: o.orderItems,
-        subOrders: o.subOrders,
-        deliver: o.deliveryAssignments?.[0]?.deliver || null,
-      })),
+      data: orders.map((o) => {
+        const activeAssignment = o.deliveryAssignments?.find(
+          (a) => a.isActive,
+        );
+
+        // 🔒 HELPER : nettoyer les infos d'un user (enlever password, etc.)
+        const sanitizeUser = (u: any) => {
+          if (!u) return null;
+          return {
+            id: u.id,
+            fullName: u.fullName,
+            phone: u.phone ?? null,
+            image: u.image ?? null,
+          };
+        };
+
+        return {
+          // ============================================================
+          // 📦 INFOS COMMANDE
+          // ============================================================
+          id: o.id,
+          invoiceNumber: o.invoiceNumber,
+          status: o.status,
+          paymentStatus: o.paymentStatus,
+          paid: o.paid,
+          pin: o.pin,
+          readyToPay: o.readyToPay,
+
+          totalAmount: o.totalAmount,
+          grandTotal: o.grandTotal,
+          shippingCost: o.shippingCost,
+          currency: o.currency,
+
+          paymentMethod: o.paymentMethod,
+          appliedFeeRate: o.appliedFeeRate,
+          transactionFee: o.transactionFee,
+
+          type: o.type,
+          shopType: o.shopType,
+          whatsapp_number: o.whatsapp_number,
+
+          createdAt: o.createdAt,
+          updatedAt: o.updatedAt,
+          validatedAt: o.validatedAt,
+          processingAt: o.processingAt,
+          completedAt: o.completedAt,
+          deliveredAt: o.deliveredAt,
+          rejectedAt: o.rejectedAt,
+          cancelledAt: o.cancelledAt,
+          cancellationReason: o.cancellationReason,
+
+          // ============================================================
+          // 👤 CLIENT
+          // ============================================================
+          user: o.user
+            ? {
+              id: o.user.id,
+              fullName: o.user.fullName,
+              phone: o.user.phone ?? null,
+              email: o.user.email ?? null,
+              image: o.user.image ?? null,
+            }
+            : null,
+
+          // ============================================================
+          // 📍 ADRESSE (avec city + country)
+          // ============================================================
+          addressUser: o.addressUser
+            ? {
+              id: o.addressUser.id,
+              address: o.addressUser.address,
+              firstName: o.addressUser.firstName ?? null,
+              lastName: o.addressUser.lastName ?? null,
+              phone: o.addressUser.phone ?? null,
+              latitude: o.addressUser.latitude ?? null,
+              longitude: o.addressUser.longitude ?? null,
+              city: o.addressUser.city ?? null,         // ✅ Chargé
+              country: o.addressUser.country ?? null,   // ✅ Chargé
+            }
+            : null,
+
+          // ============================================================
+          // 📦 ITEMS & SOUS-COMMANDES (avec city)
+          // ============================================================
+          orderItems: o.orderItems,
+          subOrders: o.subOrders,   // ✅ Contient maintenant company.city
+
+          // ============================================================
+          // 🚚 LIVREUR COURANT (SÉCURISÉ)
+          // ============================================================
+          currentDeliveryUser: sanitizeUser(o.currentDeliveryUser),
+
+          // ============================================================
+          // 👤 VALIDATIONS (SÉCURISÉES)
+          // ============================================================
+          validatedBy: sanitizeUser(o.validatedBy),
+          processingBy: sanitizeUser(o.processingBy),
+          completedBy: sanitizeUser(o.completedBy),
+          deliveredBy: sanitizeUser(o.deliveredBy),
+          rejectedBy: sanitizeUser(o.rejectedBy),
+
+          // ============================================================
+          // 🚚 LIVREUR AFFECTÉ (SÉCURISÉ)
+          // ============================================================
+          deliver: sanitizeUser(activeAssignment?.deliver),
+
+          // ============================================================
+          // 👤 ASSIGNÉ PAR (SÉCURISÉ)
+          // ============================================================
+          assignedBy: activeAssignment?.assignedBy
+            ? {
+              id: activeAssignment.assignedBy.id,
+              fullName: activeAssignment.assignedBy.fullName,
+              role: activeAssignment.assignedBy.role,
+            }
+            : null,
+
+          // ============================================================
+          // 📋 AFFECTATION
+          // ============================================================
+          assignment: activeAssignment
+            ? {
+              assignmentId: activeAssignment.id,
+              status: activeAssignment.status,
+              assignedAt: activeAssignment.assignedAt,
+              pickedUpAt: activeAssignment.pickedUpAt,
+              deliveredAt: activeAssignment.deliveredAt,
+              isActive: activeAssignment.isActive,
+            }
+            : null,
+
+          // ============================================================
+          // 📍 TRACKING
+          // ============================================================
+          tracking: {
+            currentLatitude: activeAssignment?.currentLatitude ?? null,
+            currentLongitude: activeAssignment?.currentLongitude ?? null,
+            distanceRemainingKm:
+              activeAssignment?.distanceRemainingKm ?? null,
+            estimatedArrivalMinutes:
+              activeAssignment?.estimatedArrivalMinutes ?? null,
+            lastLocationUpdate:
+              activeAssignment?.lastLocationUpdate ?? null,
+          },
+        };
+      }),
     };
   }
 
