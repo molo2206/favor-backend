@@ -327,21 +327,39 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     console.log(`✅ deliveryStatusUpdate emitted to room ${roomName}`);
   }
 
+  private parseBody<T = any>(data: any): T | null {
+    if (typeof data === 'string') {
+      try {
+        return JSON.parse(data) as T;
+      } catch (err) {
+        console.log('❌ Impossible de parser data:', err);
+        return null;
+      }
+    }
+    if (typeof data === 'object' && data !== null) {
+      return data as T;
+    }
+    return null;
+  }
+
   @SubscribeMessage('join-order')
   handleJoinOrderTracking(
-    @MessageBody() data: { orderId: string },
+    @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
-    console.log(data)
-    const roomName = `order-${data.orderId}`;
+    const payload = this.parseBody<{ orderId: string }>(data);
+    if (!payload?.orderId) {
+      return { success: false, message: 'orderId est requis' };
+    }
+
+    const roomName = `order-${payload.orderId}`;
     client.join(roomName);
     console.log(`🔌 Client ${client.id} joined order room: ${roomName}`);
 
-    // ✅ Émettre un événement de confirmation
     client.emit('order-joined', {
       success: true,
       room: roomName,
-      orderId: data.orderId,
+      orderId: payload.orderId,
     });
 
     return { success: true, room: roomName };
