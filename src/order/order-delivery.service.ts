@@ -1124,14 +1124,45 @@ export class OrderDeliveryService {
         return {
             message: 'Commandes récupérées avec succès',
             data: assignments.map((a) => ({
-                // ─── Identifiants de la commande ───
+                // ============================================================
+                // 📦 INFOS COMPLÈTES DE LA COMMANDE
+                // ============================================================
                 id: a.order?.id,
                 invoiceNumber: a.order?.invoiceNumber,
                 status: a.order?.status,
+                paymentStatus: a.order?.paymentStatus,
+                paid: a.order?.paid,
+                pin: a.order?.pin,
+                readyToPay: a.order?.readyToPay,
+
+                // 💰 Montants
                 totalAmount: a.order?.totalAmount,
+                grandTotal: a.order?.grandTotal,
+                shippingCost: a.order?.shippingCost,
                 currency: a.order?.currency,
 
-                // ─── Client ───
+                // 💳 Paiement
+                paymentMethod: a.order?.paymentMethod,
+                appliedFeeRate: a.order?.appliedFeeRate,
+                transactionFee: a.order?.transactionFee,
+
+                // 🏢 Type de commande
+                type: a.order?.type,
+                shopType: a.order?.shopType,
+                whatsapp_number: a.order?.whatsapp_number,
+
+                // 🕐 Dates
+                createdAt: a.order?.createdAt,
+                updatedAt: a.order?.updatedAt,
+                validatedAt: a.order?.validatedAt,
+                processingAt: a.order?.processingAt,
+                completedAt: a.order?.completedAt,
+                deliveredAt: a.order?.deliveredAt,
+                rejectedAt: a.order?.rejectedAt,
+                cancelledAt: a.order?.cancelledAt,
+                cancellationReason: a.order?.cancellationReason,
+
+                // 👤 Client
                 user: a.order?.user
                     ? {
                         id: a.order.user.id,
@@ -1142,7 +1173,7 @@ export class OrderDeliveryService {
                     }
                     : null,
 
-                // ─── Adresse de livraison ───
+                // 📍 Adresse
                 addressUser: a.order?.addressUser
                     ? {
                         id: a.order.addressUser.id,
@@ -1157,11 +1188,63 @@ export class OrderDeliveryService {
                     }
                     : null,
 
-                // ─── Items & sous-commandes ───
+                // 📦 Items & sous-commandes
                 orderItems: a.order?.orderItems,
                 subOrders: a.order?.subOrders,
 
-                // ─── Livreur affecté ───
+                // 🚚 Livreur affecté (courant)
+                currentDeliveryUser: a.order?.currentDeliveryUser
+                    ? {
+                        id: a.order.currentDeliveryUser.id,
+                        fullName: a.order.currentDeliveryUser.fullName,
+                        phone: a.order.currentDeliveryUser.phone,
+                        image: a.order.currentDeliveryUser.image,
+                    }
+                    : null,
+
+                // 👤 Validé par
+                validatedBy: a.order?.validatedBy
+                    ? {
+                        id: a.order.validatedBy.id,
+                        fullName: a.order.validatedBy.fullName,
+                    }
+                    : null,
+
+                // 👤 Traité par
+                processingBy: a.order?.processingBy
+                    ? {
+                        id: a.order.processingBy.id,
+                        fullName: a.order.processingBy.fullName,
+                    }
+                    : null,
+
+                // 👤 Complété par
+                completedBy: a.order?.completedBy
+                    ? {
+                        id: a.order.completedBy.id,
+                        fullName: a.order.completedBy.fullName,
+                    }
+                    : null,
+
+                // 👤 Livré par
+                deliveredBy: a.order?.deliveredBy
+                    ? {
+                        id: a.order.deliveredBy.id,
+                        fullName: a.order.deliveredBy.fullName,
+                    }
+                    : null,
+
+                // 👤 Rejeté par
+                rejectedBy: a.order?.rejectedBy
+                    ? {
+                        id: a.order.rejectedBy.id,
+                        fullName: a.order.rejectedBy.fullName,
+                    }
+                    : null,
+
+                // ============================================================
+                // 🚚 INFOS AFFECTATION
+                // ============================================================
                 deliver: a.deliver
                     ? {
                         id: a.deliver.id,
@@ -1171,7 +1254,6 @@ export class OrderDeliveryService {
                     }
                     : null,
 
-                // ─── Assigné par ───
                 assignedBy: a.assignedBy
                     ? {
                         id: a.assignedBy.id,
@@ -1180,7 +1262,6 @@ export class OrderDeliveryService {
                     }
                     : null,
 
-                // ─── Infos affectation ───
                 assignment: {
                     assignmentId: a.id,
                     status: a.status,
@@ -1190,7 +1271,9 @@ export class OrderDeliveryService {
                     isActive: a.isActive,
                 },
 
-                // ─── Tracking ───
+                // ============================================================
+                // 📍 TRACKING
+                // ============================================================
                 tracking: {
                     isActive: activeOrderIds.includes(a.orderId),
                     currentLatitude: a.currentLatitude,
@@ -1199,10 +1282,6 @@ export class OrderDeliveryService {
                     estimatedArrivalMinutes: a.estimatedArrivalMinutes,
                     lastLocationUpdate: a.lastLocationUpdate,
                 },
-
-                // ─── Timestamps ───
-                createdAt: a.order?.createdAt,
-                updatedAt: a.order?.updatedAt,
             })),
         };
     }
