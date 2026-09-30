@@ -895,6 +895,15 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
       console.log(`📋 Room ${roomName} contient ${sockets.length} socket(s)`);
 
+      // 🔥 DEBUG : afficher socket.data de chaque socket
+      sockets.forEach((s: any) => {
+        console.log(`   → socket ${s.id}`);
+        console.log(`     data.userId   = ${s.data?.userId || 'undefined'}`);
+        console.log(`     data.role     = ${s.data?.role || 'undefined'}`);
+        console.log(`     data.fullName = ${s.data?.fullName || 'undefined'}`);
+        console.log(`     data (complet) = ${JSON.stringify(s.data)}`);
+      });
+
       return sockets.map((s: any) => ({
         socketId: s.id,
         userId: s.data?.userId || null,
