@@ -2724,260 +2724,41 @@ export class OrderService {
     pageNumber?: number,
     limitNumber?: number,
   ) {
-    // 🔥 Récupérer le user pour connaître son rôle
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      select: ['id', 'role'],
-    });
-
-    if (!user) {
-      throw new NotFoundException(`Utilisateur ${userId} introuvable`);
-    }
-
-    // 🔐 Filtre dynamique selon le rôle
-    let where: any = {};
-
-    if (user.role === UserRole.CUSTOMER) {
-      where = { user: { id: userId } };
-    } else if (user.role === UserRole.DELIVER) {
-      where = {
-        deliveryAssignments: {
-          deliverId: userId,
-          isActive: true,
-        },
-      };
-    } else if (
-      user.role === UserRole.SUPER_ADMIN ||
-      user.role === UserRole.ADMIN
-    ) {
-      where = {};
-    } else {
-      return {
-        message: 'Aucune commande disponible pour ce rôle',
-        data: [],
-      };
-    }
-
-    // ✅ UTILISER EXACTEMENT LES 13 RELATIONS QUI MARCHENT
+    // Test SANS filtre par rôle (juste pour voir si ça bloque)
     const orders = await this.orderRepo.find({
-      where,
+      where: { user: { id: userId } },
       relations: [
-        // 📦 Items principaux
         'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
-
-        // 🏢 Sous-commandes
         'subOrders',
         'subOrders.items.product.company',
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',
-
-        // 👤 Client
         'user',
-
-        // 📍 Adresse
         'addressUser',
-
-        // 🚚 Affectations
         'deliveryAssignments',
         'deliveryAssignments.deliver',
         'deliveryAssignments.assignedBy',
       ],
       order: { createdAt: 'DESC' },
-      // 🔥 Pagination
-      skip:
-        pageNumber && limitNumber
-          ? (pageNumber - 1) * limitNumber
-          : undefined,
+      skip: pageNumber && limitNumber ? (pageNumber - 1) * limitNumber : undefined,
       take: limitNumber || undefined,
     });
 
-    // ============================================================
-    // 🎯 ÉTAPE 2 : RÉCUPÉRER LES INFOS SUPPLÉMENTAIRES EN 1 SEULE REQUÊTE
-    // ============================================================
-    const orderIds = orders.map((o) => o.id);
-
-    // Récupérer les villes + pays + users de validation en une seule requête
-    const enrichedData = await this.orderRepo
-      .createQueryBuilder('order')
-      .leftJoinAndSelect('order.addressUser', 'addressUser')
-      .leftJoinAndSelect('addressUser.city', 'addressCity')
-      .leftJoinAndSelect('addressUser.country', 'addressCountry')
-      .leftJoinAndSelect('order.subOrders', 'subOrder')
-      .leftJoinAndSelect('subOrder.company', 'company')
-      .leftJoinAndSelect('company.city', 'companyCity')
-      .leftJoinAndSelect('order.currentDeliveryUser', 'currentDeliveryUser')
-      .leftJoinAndSelect('order.validatedBy', 'validatedBy')
-      .leftJoinAndSelect('order.processingBy', 'processingBy')
-      .leftJoinAndSelect('order.completedBy', 'completedBy')
-      .leftJoinAndSelect('order.deliveredBy', 'deliveredBy')
-      .leftJoinAndSelect('order.rejectedBy', 'rejectedBy')
-      .leftJoinAndSelect('order.delivery', 'delivery')
-      .where('order.id IN (:...orderIds)', { orderIds })
-      .getMany();
-
-    // Map par ID pour lookup rapide
-    const enrichedMap = new Map<string, any>();
-    for (const e of enrichedData) {
-      enrichedMap.set(e.id, e);
-    }
-
-    // ============================================================
-    // 🎯 ÉTAPE 3 : CONSTRUIRE LA RÉPONSE
-    // ============================================================
     return {
       message: 'Commandes récupérées avec succès',
-      data: orders.map((o) => {
-        const enriched = enrichedMap.get(o.id);
-        const activeAssignment = o.deliveryAssignments?.find(
-          (a) => a.isActive,
-        );
-
-        return {
-          id: o.id,
-          invoiceNumber: o.invoiceNumber,
-          status: o.status,
-          paymentStatus: o.paymentStatus,
-          paid: o.paid,
-          pin: o.pin,
-          readyToPay: o.readyToPay,
-
-          totalAmount: o.totalAmount,
-          grandTotal: o.grandTotal,
-          shippingCost: o.shippingCost,
-          currency: o.currency,
-
-          paymentMethod: o.paymentMethod,
-          appliedFeeRate: o.appliedFeeRate,
-          transactionFee: o.transactionFee,
-
-          type: o.type,
-          shopType: o.shopType,
-          whatsapp_number: o.whatsapp_number,
-
-          createdAt: o.createdAt,
-          updatedAt: o.updatedAt,
-          validatedAt: o.validatedAt,
-          processingAt: o.processingAt,
-          completedAt: o.completedAt,
-          deliveredAt: o.deliveredAt,
-          rejectedAt: o.rejectedAt,
-          cancelledAt: o.cancelledAt,
-          cancellationReason: o.cancellationReason,
-
-          // 👤 Client
-          user: o.user
-            ? {
-              id: o.user.id,
-              fullName: o.user.fullName,
-              phone: o.user.phone,
-              email: o.user.email,
-              image: o.user.image,
-            }
-            : null,
-
-          // 📍 Adresse AVEC city + country (depuis enriched)
-          addressUser: enriched?.addressUser
-            ? {
-              id: enriched.addressUser.id,
-              address: enriched.addressUser.address,
-              firstName: enriched.addressUser.firstName,
-              lastName: enriched.addressUser.lastName,
-              phone: enriched.addressUser.phone,
-              latitude: enriched.addressUser.latitude,
-              longitude: enriched.addressUser.longitude,
-              city: enriched.addressUser.city,
-              country: enriched.addressUser.country,
-            }
-            : o.addressUser
-              ? {
-                id: o.addressUser.id,
-                address: o.addressUser.address,
-                firstName: o.addressUser.firstName,
-                lastName: o.addressUser.lastName,
-                phone: o.addressUser.phone,
-                latitude: o.addressUser.latitude,
-                longitude: o.addressUser.longitude,
-                city: null,
-                country: null,
-              }
-              : null,
-
-          // 📦 Items & sous-commandes AVEC city (depuis enriched)
-          orderItems: o.orderItems,
-          subOrders: enriched?.subOrders || o.subOrders,
-
-          // 🚚 Livreur courant (depuis enriched)
-          currentDeliveryUser: enriched?.currentDeliveryUser
-            ? {
-              id: enriched.currentDeliveryUser.id,
-              fullName: enriched.currentDeliveryUser.fullName,
-              phone: enriched.currentDeliveryUser.phone,
-              image: enriched.currentDeliveryUser.image,
-            }
-            : null,
-
-          // 👤 Validations (depuis enriched)
-          validatedBy: enriched?.validatedBy
-            ? { id: enriched.validatedBy.id, fullName: enriched.validatedBy.fullName }
-            : null,
-          processingBy: enriched?.processingBy
-            ? { id: enriched.processingBy.id, fullName: enriched.processingBy.fullName }
-            : null,
-          completedBy: enriched?.completedBy
-            ? { id: enriched.completedBy.id, fullName: enriched.completedBy.fullName }
-            : null,
-          deliveredBy: enriched?.deliveredBy
-            ? { id: enriched.deliveredBy.id, fullName: enriched.deliveredBy.fullName }
-            : null,
-          rejectedBy: enriched?.rejectedBy
-            ? { id: enriched.rejectedBy.id, fullName: enriched.rejectedBy.fullName }
-            : null,
-
-          // 🚚 Affectation
-          deliver: activeAssignment?.deliver
-            ? {
-              id: activeAssignment.deliver.id,
-              fullName: activeAssignment.deliver.fullName,
-              phone: activeAssignment.deliver.phone,
-              image: activeAssignment.deliver.image,
-            }
-            : null,
-
-          assignedBy: activeAssignment?.assignedBy
-            ? {
-              id: activeAssignment.assignedBy.id,
-              fullName: activeAssignment.assignedBy.fullName,
-              role: activeAssignment.assignedBy.role,
-            }
-            : null,
-
-          assignment: activeAssignment
-            ? {
-              assignmentId: activeAssignment.id,
-              status: activeAssignment.status,
-              assignedAt: activeAssignment.assignedAt,
-              pickedUpAt: activeAssignment.pickedUpAt,
-              deliveredAt: activeAssignment.deliveredAt,
-              isActive: activeAssignment.isActive,
-            }
-            : null,
-
-          // 📍 Tracking
-          tracking: {
-            currentLatitude: activeAssignment?.currentLatitude ?? null,
-            currentLongitude: activeAssignment?.currentLongitude ?? null,
-            distanceRemainingKm:
-              activeAssignment?.distanceRemainingKm ?? null,
-            estimatedArrivalMinutes:
-              activeAssignment?.estimatedArrivalMinutes ?? null,
-            lastLocationUpdate:
-              activeAssignment?.lastLocationUpdate ?? null,
-          },
-        };
-      }),
+      data: orders.map((o) => ({
+        id: o.id,
+        invoiceNumber: o.invoiceNumber,
+        status: o.status,
+        user: o.user ? { id: o.user.id, fullName: o.user.fullName } : null,
+        addressUser: o.addressUser ? { id: o.addressUser.id, address: o.addressUser.address } : null,
+        orderItems: o.orderItems,
+        subOrders: o.subOrders,
+        deliver: o.deliveryAssignments?.[0]?.deliver || null,
+      })),
     };
   }
 
