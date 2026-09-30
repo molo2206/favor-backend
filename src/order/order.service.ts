@@ -94,8 +94,9 @@ export class OrderService {
     private readonly notificationsService: NotificationsService,
     private readonly notificationHelper: OrderNotificationHelper,
     private readonly notificationHelpers: NotificationHelper,
-    @InjectRepository(OperationEntity) private readonly operationRepo: Repository<OperationEntity>,
     private readonly pushNotificationHelper: PushNotificationHelper,
+    @InjectRepository(OperationEntity) private readonly operationRepo: Repository<OperationEntity>,
+
     private readonly permissionHelper: PermissionHelper,
     private readonly i18nService: I18nService,
     private readonly fpayService: FpayService,
@@ -2718,25 +2719,50 @@ export class OrderService {
     };
   }
 
-  async getOrdersByUser(userId: string, pageNumber?: number, limitNumber?: number): Promise<OrderEntity[]> {
+  async getOrdersByUser(
+    userId: string,
+    pageNumber?: number,
+    limitNumber?: number,
+  ): Promise<OrderEntity[]> {
     return this.orderRepo.find({
       where: { user: { id: userId } },
       relations: [
+        
         'orderItems.product.company',
         'orderItems.product.category',
         'orderItems.product.measure',
+
+        
         'subOrders',
         'subOrders.items.product.company',
         'subOrders.items.product.category',
         'subOrders.items.product.measure',
         'subOrders.company',
+        'subOrders.company.city',
+
         'user',
+
         'addressUser',
+        'addressUser.city',
+        'addressUser.country',
+
         'deliveryAssignments',
         'deliveryAssignments.deliver',
         'deliveryAssignments.assignedBy',
+
+        'currentDeliveryUser',
+        'validatedBy',
+        'processingBy',
+        'completedBy',
+        'deliveredBy',
+        'rejectedBy',
+
+        'delivery',
       ],
       order: { createdAt: 'DESC' },
+      // 🔥 Pagination
+      skip: pageNumber && limitNumber ? (pageNumber - 1) * limitNumber : undefined,
+      take: limitNumber || undefined,
     });
   }
 
