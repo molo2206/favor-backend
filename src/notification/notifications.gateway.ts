@@ -80,11 +80,16 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     // ============================================================
     // 🔥 DEBUG : voir ce que le client envoie vraiment
     // ============================================================
+    const queryToken = socket.handshake?.query?.token;
+    const queryTokenPreview = Array.isArray(queryToken)
+      ? queryToken[0]?.substring(0, 40)
+      : queryToken?.substring(0, 40);
+
     console.log('═══════════════════════════════════════════');
     console.log('📥 [connection] DEBUG');
     console.log('   body.data       :', JSON.stringify(data));
     console.log('   handshake.auth  :', JSON.stringify(socket.handshake?.auth));
-    console.log('   handshake.query :', JSON.stringify(socket.handshake?.query?.token?.substring(0, 40)));
+    console.log('   handshake.query :', JSON.stringify(queryTokenPreview));
     console.log('   headers.authorization :', socket.handshake?.headers?.authorization?.substring(0, 50));
     console.log('═══════════════════════════════════════════');
 
@@ -118,7 +123,7 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     }
 
     // ============================================================
-    // ❌ CAS 2 : Token invalide (signature, exp, malformed)
+    // ❌ CAS 2 : Token invalide
     // ============================================================
     const wsUser = await this.wsAuthHelper.validateToken(token);
     if (!wsUser) {
@@ -128,25 +133,21 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     }
 
     // ============================================================
-    // ✅ CAS 3 : Token valide → identification de l'utilisateur
+    // ✅ CAS 3 : Token valide → identification
     // ============================================================
     const userId = wsUser.id;
     console.log(`📡 Connection event received for user: ${userId}`);
     console.log(`   Socket ID: ${socket.id}`);
 
-    // Chercher si l'utilisateur est déjà connecté
     const existingDriverIndex = this.activeUsers.findIndex(
       (user) => user.id === userId,
     );
 
-    // Rejoindre la room personnelle de l'utilisateur
     socket.join(userId);
-
-    // ✅ AJOUT : tracer la room perso dans la Map inversée
     this.addUserRoom(userId, userId);
 
     // ============================================================
-    // 🔄 CAS A : L'utilisateur est déjà connecté
+    // 🔄 CAS A : Utilisateur déjà connecté
     // ============================================================
     if (existingDriverIndex !== -1) {
       const oldSocketId = this.activeUsers[existingDriverIndex].socketId;
@@ -154,12 +155,10 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
       if (oldSocketId === socket.id) {
         console.log(`ℹ️ User ${userId} already connected with same socket`);
       } else {
-        // Mettre à jour le socketId
         this.activeUsers[existingDriverIndex].socketId = socket.id;
         console.log(`🔄 User ${userId} reconnected (old: ${oldSocketId}, new: ${socket.id})`);
       }
 
-      // ⚠️ IMPORTANT : re-stocker les infos sur le NOUVEAU socket
       socket.data.userId = userId;
       socket.data.role = wsUser.role;
       socket.data.fullName = wsUser.fullName || undefined;
@@ -168,18 +167,15 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     // 🆕 CAS B : Nouvelle connexion
     // ============================================================
     else {
-      // Vérifier que l'utilisateur existe en base
       const user = await this.userRepository.findOne({
         where: { id: userId },
       });
 
       if (user) {
-        // 🔥 STOCKER LES INFOS SUR LE SOCKET (JWT + base de données)
         socket.data.userId = userId;
         socket.data.role = wsUser.role || user.role;
         socket.data.fullName = wsUser.fullName || user.fullName;
 
-        // Ajouter à la liste des utilisateurs actifs
         this.activeUsers.push({
           id: userId,
           socketId: socket.id,
@@ -187,7 +183,6 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
 
         console.log(`🔌 User ${userId} connected (${socket.data.fullName}, role: ${socket.data.role})`);
       } else {
-        // ❌ Utilisateur trouvé dans le JWT mais PAS en base
         console.warn(`⚠️ User ${userId} introuvable en base`);
         socket.emit('connection-error', { message: 'Utilisateur introuvable' });
         return;
@@ -499,7 +494,7 @@ export class NotificationsGateway implements OnModuleInit, OnGatewayDisconnect {
     @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
   ) {
-    console.log(client)
+    // console.log(client)
     const payload = this.parseBody<{ orderId: string }>(data);
     if (!payload?.orderId) {
       return { success: false, message: 'orderId est requis' };
