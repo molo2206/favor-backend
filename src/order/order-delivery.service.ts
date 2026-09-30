@@ -1092,11 +1092,9 @@ export class OrderDeliveryService {
 
         // 🔐 Filtre dynamique selon le rôle
         if (user.role === UserRole.CUSTOMER) {
-            // ✅ Client → ses commandes
             query.andWhere('order.userId = :userId', { userId });
             this.logger.log(`👤 Client → order.userId = ${userId}`);
         } else if (user.role === UserRole.DELIVER) {
-            // ✅ Livreur → ses affectations
             query.andWhere('assignment.deliverId = :userId', { userId });
             this.logger.log(`🚚 Livreur → deliverId = ${userId}`);
         } else if (
@@ -1107,7 +1105,7 @@ export class OrderDeliveryService {
         } else {
             this.logger.warn(`⚠️ Rôle non supporté : ${user.role}`);
             return {
-                message: 'Aucune affectation disponible pour ce rôle',
+                message: 'Aucune commande disponible pour ce rôle',
                 data: [],
             };
         }
@@ -1117,23 +1115,37 @@ export class OrderDeliveryService {
             .orderBy('assignment.createdAt', 'DESC')
             .getMany();
 
-        this.logger.log(`✅ ${assignments.length} affectation(s) trouvée(s)`);
+        this.logger.log(`✅ ${assignments.length} commande(s) trouvée(s)`);
 
         // 🔥 Trackings actifs en mémoire
         const activeOrderIds = this.notificationsGateway.getActiveTrackings(userId);
 
+        // 🔥 RETOURNER UN TABLEAU DE COMMANDES
         return {
-            message: 'Affectations récupérées avec succès',
+            message: 'Commandes récupérées avec succès',
             data: assignments.map((a) => ({
-                assignmentId: a.id,
-                orderId: a.orderId,
-                status: a.status,
+                // ─── Identifiants de la commande ───
+                id: a.order?.id,
                 invoiceNumber: a.order?.invoiceNumber,
-                order: a.order,
-                deliver: a.deliver,
-                assignedBy: a.assignedBy,
-                deliveryAddress: a.order?.addressUser
+                status: a.order?.status,
+                totalAmount: a.order?.totalAmount,
+                currency: a.order?.currency,
+
+                // ─── Client ───
+                user: a.order?.user
                     ? {
+                        id: a.order.user.id,
+                        fullName: a.order.user.fullName,
+                        phone: a.order.user.phone,
+                        email: a.order.user.email,
+                        image: a.order.user.image,
+                    }
+                    : null,
+
+                // ─── Adresse de livraison ───
+                addressUser: a.order?.addressUser
+                    ? {
+                        id: a.order.addressUser.id,
                         address: a.order.addressUser.address,
                         firstName: a.order.addressUser.firstName,
                         lastName: a.order.addressUser.lastName,
@@ -1144,15 +1156,41 @@ export class OrderDeliveryService {
                         country: a.order.addressUser.country,
                     }
                     : null,
-                distanceRemainingKm: a.distanceRemainingKm,
-                estimatedArrivalMinutes: a.estimatedArrivalMinutes,
-                assignedAt: a.assignedAt,
-                pickedUpAt: a.pickedUpAt,
-                currentLatitude: a.currentLatitude,
-                currentLongitude: a.currentLongitude,
-                lastLocationUpdate: a.lastLocationUpdate,
 
-                // 🔥 Tracking
+                // ─── Items & sous-commandes ───
+                orderItems: a.order?.orderItems,
+                subOrders: a.order?.subOrders,
+
+                // ─── Livreur affecté ───
+                deliver: a.deliver
+                    ? {
+                        id: a.deliver.id,
+                        fullName: a.deliver.fullName,
+                        phone: a.deliver.phone,
+                        image: a.deliver.image,
+                    }
+                    : null,
+
+                // ─── Assigné par ───
+                assignedBy: a.assignedBy
+                    ? {
+                        id: a.assignedBy.id,
+                        fullName: a.assignedBy.fullName,
+                        role: a.assignedBy.role,
+                    }
+                    : null,
+
+                // ─── Infos affectation ───
+                assignment: {
+                    assignmentId: a.id,
+                    status: a.status,
+                    assignedAt: a.assignedAt,
+                    pickedUpAt: a.pickedUpAt,
+                    deliveredAt: a.deliveredAt,
+                    isActive: a.isActive,
+                },
+
+                // ─── Tracking ───
                 tracking: {
                     isActive: activeOrderIds.includes(a.orderId),
                     currentLatitude: a.currentLatitude,
@@ -1161,6 +1199,10 @@ export class OrderDeliveryService {
                     estimatedArrivalMinutes: a.estimatedArrivalMinutes,
                     lastLocationUpdate: a.lastLocationUpdate,
                 },
+
+                // ─── Timestamps ───
+                createdAt: a.order?.createdAt,
+                updatedAt: a.order?.updatedAt,
             })),
         };
     }
