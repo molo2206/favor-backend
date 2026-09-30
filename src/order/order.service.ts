@@ -2719,26 +2719,253 @@ export class OrderService {
     };
   }
 
-  async getOrdersByUser(userId: string, pageNumber?: number, limitNumber?: number): Promise<OrderEntity[]> {
-    return this.orderRepo.find({
-      where: { user: { id: userId } },
-      relations: [
-        'orderItems.product.company',
-        'orderItems.product.category',
-        'orderItems.product.measure',
-        'subOrders',
-        'subOrders.items.product.company',
-        'subOrders.items.product.category',
-        'subOrders.items.product.measure',
-        'subOrders.company',
-        'user',
-        'addressUser',
-        'deliveryAssignments',
-        'deliveryAssignments.deliver',
-        'deliveryAssignments.assignedBy',
-      ],
-      order: { createdAt: 'DESC' },
+  async getOrdersByUser(
+    userId: string,
+    pageNumber?: number,
+    limitNumber?: number,
+  ) {
+    // 🔥 Récupérer le user pour connaître son rôle
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
     });
+
+    if (!user) {
+      throw new NotFoundException(`Utilisateur ${userId} introuvable`);
+    }
+
+    // 🔍 Construire la requête avec les mêmes relations
+    const query = this.orderRepo
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.user', 'user')
+      .leftJoinAndSelect('order.addressUser', 'addressUser')
+      .leftJoinAndSelect('addressUser.country', 'addressCountry')
+      .leftJoinAndSelect('addressUser.city', 'addressCity')
+      .leftJoinAndSelect('order.orderItems', 'orderItem')
+      .leftJoinAndSelect('orderItem.product', 'product')
+      .leftJoinAndSelect('product.company', 'productCompany')
+      .leftJoinAndSelect('product.category', 'productCategory')
+      .leftJoinAndSelect('product.measure', 'productMeasure')
+      .leftJoinAndSelect('order.subOrders', 'subOrder')
+      .leftJoinAndSelect('subOrder.items', 'subOrderItem')
+      .leftJoinAndSelect('subOrderItem.product', 'subOrderProduct')
+      .leftJoinAndSelect('subOrderProduct.company', 'subOrderProductCompany')
+      .leftJoinAndSelect('subOrderProduct.category', 'subOrderProductCategory')
+      .leftJoinAndSelect('subOrderProduct.measure', 'subOrderProductMeasure')
+      .leftJoinAndSelect('subOrder.company', 'subOrderCompany')
+      .leftJoinAndSelect('subOrderCompany.city', 'subOrderCompanyCity')
+      .leftJoinAndSelect('order.deliveryAssignments', 'assignment')
+      .leftJoinAndSelect('assignment.deliver', 'deliver')
+      .leftJoinAndSelect('assignment.assignedBy', 'assignedBy')
+      .leftJoinAndSelect('order.currentDeliveryUser', 'currentDeliveryUser')
+      .leftJoinAndSelect('order.validatedBy', 'validatedBy')
+      .leftJoinAndSelect('order.processingBy', 'processingBy')
+      .leftJoinAndSelect('order.completedBy', 'completedBy')
+      .leftJoinAndSelect('order.deliveredBy', 'deliveredBy')
+      .leftJoinAndSelect('order.rejectedBy', 'rejectedBy')
+      .leftJoinAndSelect('order.delivery', 'delivery');
+
+    // 🔐 Filtre dynamique selon le rôle
+    if (user.role === UserRole.CUSTOMER) {
+      query.andWhere('order.userId = :userId', { userId });
+    } else if (user.role === UserRole.DELIVER) {
+      query.andWhere('assignment.deliverId = :userId', { userId });
+    } else if (
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.ADMIN
+    ) {
+      // Admin → accès total
+    } else {
+      return {
+        message: 'Aucune commande disponible pour ce rôle',
+        data: [],
+      };
+    }
+
+    // 🔽 Tri
+    query.orderBy('order.createdAt', 'DESC');
+
+    // 🔥 Pagination
+    if (pageNumber && limitNumber) {
+      query.skip((pageNumber - 1) * limitNumber).take(limitNumber);
+    } else if (limitNumber) {
+      query.take(limitNumber);
+    }
+
+    const orders = await query.getMany();
+
+    // 🔥 Trackings actifs en mémoire
+
+    // 🔥 RETOURNER UN TABLEAU DE COMMANDES
+    return {
+      message: 'Commandes récupérées avec succès',
+      data: orders.map((o) => {
+        const activeAssignment = o.deliveryAssignments?.find((a) => a.isActive);
+
+        return {
+          // ============================================================
+          // 📦 INFOS COMPLÈTES DE LA COMMANDE
+          // ============================================================
+          id: o.id,
+          invoiceNumber: o.invoiceNumber,
+          status: o.status,
+          paymentStatus: o.paymentStatus,
+          paid: o.paid,
+          pin: o.pin,
+          readyToPay: o.readyToPay,
+
+          // 💰 Montants
+          totalAmount: o.totalAmount,
+          grandTotal: o.grandTotal,
+          shippingCost: o.shippingCost,
+          currency: o.currency,
+
+          // 💳 Paiement
+          paymentMethod: o.paymentMethod,
+          appliedFeeRate: o.appliedFeeRate,
+          transactionFee: o.transactionFee,
+
+          // 🏢 Type de commande
+          type: o.type,
+          shopType: o.shopType,
+          whatsapp_number: o.whatsapp_number,
+
+          // 🕐 Dates
+          createdAt: o.createdAt,
+          updatedAt: o.updatedAt,
+          validatedAt: o.validatedAt,
+          processingAt: o.processingAt,
+          completedAt: o.completedAt,
+          deliveredAt: o.deliveredAt,
+          rejectedAt: o.rejectedAt,
+          cancelledAt: o.cancelledAt,
+          cancellationReason: o.cancellationReason,
+
+          // 👤 Client
+          user: o.user
+            ? {
+              id: o.user.id,
+              fullName: o.user.fullName,
+              phone: o.user.phone,
+              email: o.user.email,
+              image: o.user.image,
+            }
+            : null,
+
+          // 📍 Adresse
+          addressUser: o.addressUser
+            ? {
+              id: o.addressUser.id,
+              address: o.addressUser.address,
+              firstName: o.addressUser.firstName,
+              lastName: o.addressUser.lastName,
+              phone: o.addressUser.phone,
+              latitude: o.addressUser.latitude,
+              longitude: o.addressUser.longitude,
+              city: o.addressUser.city,
+              country: o.addressUser.country,
+            }
+            : null,
+
+          // 📦 Items & sous-commandes
+          orderItems: o.orderItems,
+          subOrders: o.subOrders,
+
+          // 🚚 Livreur affecté (courant)
+          currentDeliveryUser: o.currentDeliveryUser
+            ? {
+              id: o.currentDeliveryUser.id,
+              fullName: o.currentDeliveryUser.fullName,
+              phone: o.currentDeliveryUser.phone,
+              image: o.currentDeliveryUser.image,
+            }
+            : null,
+
+          // 👤 Validé par
+          validatedBy: o.validatedBy
+            ? {
+              id: o.validatedBy.id,
+              fullName: o.validatedBy.fullName,
+            }
+            : null,
+
+          // 👤 Traité par
+          processingBy: o.processingBy
+            ? {
+              id: o.processingBy.id,
+              fullName: o.processingBy.fullName,
+            }
+            : null,
+
+          // 👤 Complété par
+          completedBy: o.completedBy
+            ? {
+              id: o.completedBy.id,
+              fullName: o.completedBy.fullName,
+            }
+            : null,
+
+          // 👤 Livré par
+          deliveredBy: o.deliveredBy
+            ? {
+              id: o.deliveredBy.id,
+              fullName: o.deliveredBy.fullName,
+            }
+            : null,
+
+          // 👤 Rejeté par
+          rejectedBy: o.rejectedBy
+            ? {
+              id: o.rejectedBy.id,
+              fullName: o.rejectedBy.fullName,
+            }
+            : null,
+
+          // ============================================================
+          // 🚚 INFOS AFFECTATION
+          // ============================================================
+          deliver: activeAssignment?.deliver
+            ? {
+              id: activeAssignment.deliver.id,
+              fullName: activeAssignment.deliver.fullName,
+              phone: activeAssignment.deliver.phone,
+              image: activeAssignment.deliver.image,
+            }
+            : null,
+
+          assignedBy: activeAssignment?.assignedBy
+            ? {
+              id: activeAssignment.assignedBy.id,
+              fullName: activeAssignment.assignedBy.fullName,
+              role: activeAssignment.assignedBy.role,
+            }
+            : null,
+
+          assignment: activeAssignment
+            ? {
+              assignmentId: activeAssignment.id,
+              status: activeAssignment.status,
+              assignedAt: activeAssignment.assignedAt,
+              pickedUpAt: activeAssignment.pickedUpAt,
+              deliveredAt: activeAssignment.deliveredAt,
+              isActive: activeAssignment.isActive,
+            }
+            : null,
+
+          // ============================================================
+          // 📍 TRACKING
+          // ============================================================
+          tracking: {
+            // isActive: activeOrderIds.includes(o.id),
+            currentLatitude: activeAssignment?.currentLatitude ?? null,
+            currentLongitude: activeAssignment?.currentLongitude ?? null,
+            distanceRemainingKm: activeAssignment?.distanceRemainingKm ?? null,
+            estimatedArrivalMinutes:
+              activeAssignment?.estimatedArrivalMinutes ?? null,
+            lastLocationUpdate: activeAssignment?.lastLocationUpdate ?? null,
+          },
+        };
+      }),
+    };
   }
 
   //   async getOrdersByUser(

@@ -203,6 +203,7 @@ export class OrderController {
       data: result.data,
     };
   }
+
   @Get('my-order')
   @UseGuards(AuthentificationGuard)
   @AuditAction(ActionType.VIEW, 'Order')
@@ -210,8 +211,12 @@ export class OrderController {
     @CurrentUser() user: UserEntity,
     @Req() req: Request,
   ) {
-    // ✅ getOrdersByUser retourne déjà { message, data }
-    return await this.orderService.getOrdersByUser(user.id);
+    const orders = await this.orderService.getOrdersByUser(user.id);
+    const lang = this.getUserLanguage(user, req);
+    return {
+      message: "succes",
+      data: orders,
+    };
   }
 
   //   @Get('my-order')
