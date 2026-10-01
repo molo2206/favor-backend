@@ -44,6 +44,8 @@ import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { Request } from 'express';
 import { Permissions } from './utility/guards/permissions.guard';
 import { ChangeUserRoleDto } from './dto/change-role.dto';
+import { UpdateUserByAdminDto } from './dto/update-user-by-admin.dto';
+import { CreateUserByAdminDto } from './dto/create-user-by-admin.dto';
 
 
 
@@ -297,10 +299,16 @@ export class UsersController {
   async getAllUsers(
     @Req() req: Request,
     @Query('role') role?: UserRole,
+    @Query('hasOrder') hasOrder?: string,
+    @Query('hasShipment') hasShipment?: string,
   ) {
     const lang = this.extractLanguage(req);
 
-    const users = await this.usersService.findAllWithDetails(role);
+    const users = await this.usersService.findAllWithDetails(
+      role,
+      hasOrder === 'true',
+      hasShipment === 'true',
+    );
 
     const message = await this.usersService['i18n'].translate(
       'user.users_list_retrieved',
@@ -316,29 +324,53 @@ export class UsersController {
   @Get('/get/all-users-paginate')
   async getAllUsersPaginate(
     @Req() req: Request,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
-    @Query('role') role?: UserRole,
+
+    @Query('page')
+    page: number = 1,
+
+    @Query('limit')
+    limit: number = 10,
+
+    @Query('role')
+    role?: UserRole,
+
+    @Query('hasOrder')
+    hasOrder?: string,
+
+    @Query('hasShipment')
+    hasShipment?: string,
   ) {
     const lang = this.extractLanguage(req);
 
-    const { data } = await this.usersService.findAllWithDetailsPaginate(
-      Number(page),
-      Number(limit),
-      role,
-    );
+    // ============================================================
+    // 🔥 Conversion des query params string -> boolean
+    // ============================================================
+    const hasOrderFilter =
+      hasOrder === 'true';
 
-    const message = await this.usersService['i18n'].translate(
-      'user.users_list_retrieved',
-      lang,
-    );
+    const hasShipmentFilter =
+      hasShipment === 'true';
+
+    const { data } =
+      await this.usersService.findAllWithDetailsPaginate(
+        Number(page),
+        Number(limit),
+        role,
+        hasOrderFilter,
+        hasShipmentFilter,
+      );
+
+    const message =
+      await this.usersService['i18n'].translate(
+        'user.users_list_retrieved',
+        lang,
+      );
 
     return {
       message,
       data,
     };
   }
-
   @Patch(':id/role')
   @UseGuards(AuthentificationGuard)
   @HttpCode(HttpStatus.OK)
@@ -435,5 +467,41 @@ export class UsersController {
   ) {
     const lang = this.extractLanguage(req);
     return this.usersService.updateUserSettings(user.id, dto, lang);
+  }
+
+  // ============================================================
+  // 🔧 CRÉER UN UTILISATEUR PAR UN ADMIN
+  // ============================================================
+  @Post('admin/create')
+  @UseGuards(AuthentificationGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async createUserByAdmin(
+    @Req() req: Request,
+    @Body() dto: CreateUserByAdminDto,
+    @CurrentUser() currentUser: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+    return this.usersService.createUserByAdmin(dto, currentUser, lang);
+  }
+
+  // ============================================================
+  // 🔧 MODIFIER UN UTILISATEUR PAR UN ADMIN
+  // ============================================================
+  @Patch(':id/admin-update')
+  @UseGuards(AuthentificationGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateUserByAdmin(
+    @Req() req: Request,
+    @Param('id') targetUserId: string,
+    @Body() dto: UpdateUserByAdminDto,
+    @CurrentUser() currentUser: UserEntity,
+  ) {
+    const lang = this.extractLanguage(req);
+    return this.usersService.updateUserByAdmin(
+      targetUserId,
+      dto,
+      currentUser,
+      lang,
+    );
   }
 }
