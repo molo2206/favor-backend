@@ -69,6 +69,83 @@ export class NotificationsGateway
     private readonly wsAuthHelper: WsAuthHelper,
   ) { }
 
+  // ============================================================
+  // 🔑 HELPER : identifier un socket depuis un token JWT
+  // ============================================================
+  private async resolveUserFromToken(token: string): Promise<{
+    userId: string;
+    role?: string;
+    fullName?: string;
+  } | null> {
+    const wsUser = await this.wsAuthHelper.validateToken(token);
+    if (!wsUser) return null;
+
+    const user = await this.userRepository.findOne({
+      where: { id: wsUser.id },
+    });
+    if (!user) return null;
+
+    return {
+      userId: wsUser.id,
+      role: wsUser.role || user.role,
+      fullName: wsUser.fullName || user.fullName,
+    };
+  }
+
+  // ============================================================
+  // 🔑 HELPER : identifier un socket depuis un userId direct (ancien)
+  // ============================================================
+  private async resolveUserFromId(userId: string): Promise<{
+    userId: string;
+    role?: string;
+    fullName?: string;
+  } | null> {
+    if (!userId) return null;
+
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+    if (!user) return null;
+
+    return {
+      userId,
+      role: user.role,
+      fullName: user.fullName,
+    };
+  }
+
+  // ============================================================
+  // 🔑 HELPER : finaliser l'identification (commun JWT + userId)
+  // ============================================================
+  private finalizeIdentification(
+    socket: Socket,
+    info: { userId: string; role?: string; fullName?: string },
+  ): void {
+    const { userId, role, fullName } = info;
+
+    socket.data.userId = userId;
+    socket.data.role = role;
+    socket.data.fullName = fullName;
+
+    socket.join(userId);
+    this.addUserRoom(userId, userId);
+    console.log(`🔌 Socket ${socket.id} joined room ${userId}`);
+
+    const existingIndex = this.activeUsers.findIndex((u) => u.id === userId);
+    if (existingIndex !== -1) {
+      const oldSocketId = this.activeUsers[existingIndex].socketId;
+      if (oldSocketId !== socket.id) {
+        this.activeUsers[existingIndex].socketId = socket.id;
+        console.log(`🔄 User ${userId} reconnected (old: ${oldSocketId}, new: ${socket.id})`);
+      }
+    } else {
+      this.activeUsers.push({ id: userId, socketId: socket.id });
+      console.log(`🔌 User ${userId} connected (${fullName}, role: ${role})`);
+    }
+
+    this.broadcastUsers();
+  }
+
   onModuleInit() {
     console.log('✅ WebSocket Gateway initialized');
     this.server.emit('confirmation');
@@ -80,18 +157,16 @@ export class NotificationsGateway
     @ConnectedSocket() socket: Socket,
   ) {
     // ============================================================
-    // 🔍 COURT-CIRCUIT : déjà identifié par handleConnection (mobile)
+    // 🔍 COURT-CIRCUIT : déjà identifié par handleConnection
     // ============================================================
     if (socket.data?.userId) {
       console.log(`ℹ️ Socket ${socket.id} déjà identifié (user: ${socket.data.userId})`);
 
       const confirmation = {
         success: true,
-        // ✅ Format mobile (à plat)
         userId: socket.data.userId,
         role: socket.data.role,
         fullName: socket.data.fullName,
-        // ✅ Format riche
         user: {
           id: socket.data.userId,
           role: socket.data.role,
@@ -106,9 +181,6 @@ export class NotificationsGateway
       return confirmation;
     }
 
-    // ============================================================
-    // 📥 LOGS DE DEBUG
-    // ============================================================
     console.log('═══════════════════════════════════════════');
     console.log('📥 [connection] DEBUG');
     console.log('   body.data            :', JSON.stringify(data));
@@ -118,11 +190,10 @@ export class NotificationsGateway
     console.log('═══════════════════════════════════════════');
 
     // ============================================================
-    // 🔑 EXTRACTION DU TOKEN (multi-sources via WsAuthHelper)
+    // 1️⃣ TENTATIVE JWT (nouveau système — prioritaire)
     // ============================================================
     let token: string | null = null;
 
-    // 1. Body SI c'est un JWT (pas un userId)
     if (typeof data === 'string' && data.split('.').length === 3) {
       token = data;
       console.log('🔑 Token trouvé dans body (string JWT)');
@@ -137,120 +208,92 @@ export class NotificationsGateway
       console.log('🔑 Token trouvé dans body (objet.token)');
     }
 
-    // 2. Fallback : WsAuthHelper (auth.token, header Bearer, query.token)
     if (!token) {
       token = this.wsAuthHelper.extractToken(socket);
       if (token) console.log('🔑 Token trouvé via WsAuthHelper');
     }
 
-    console.log('🔑 Token final :', token ? token.substring(0, 40) + '...' : '❌ AUCUN');
-    console.log('🔑 Longueur   :', token?.length);
+    if (token) {
+      const info = await this.resolveUserFromToken(token);
+      if (info) {
+        console.log(`✅ [connection] JWT valide → user ${info.userId}`);
+        this.finalizeIdentification(socket, info);
 
-    // ============================================================
-    // ❌ CAS 1 : Aucun token
-    // ============================================================
-    if (!token) {
-      console.warn(`⚠️ Connection sans token - Socket ${socket.id}`);
-      const errorResp = {
-        success: false,
-        message: 'Token requis',
-      };
-      socket.emit('connection-error', errorResp);
-      return errorResp;
-    }
-
-    // ============================================================
-    // ❌ CAS 2 : Token invalide
-    // ============================================================
-    const wsUser = await this.wsAuthHelper.validateToken(token);
-    if (!wsUser) {
-      console.warn(`⚠️ Token invalide - Socket ${socket.id}`);
-      const errorResp = {
-        success: false,
-        message: 'Token invalide',
-      };
-      socket.emit('connection-error', errorResp);
-      return errorResp;
-    }
-
-    // ============================================================
-    // ✅ CAS 3 : Token valide → identification
-    // ============================================================
-    const userId = wsUser.id;
-    console.log(`📡 Connection event received for user: ${userId}`);
-    console.log(`   Socket ID: ${socket.id}`);
-
-    const existingDriverIndex = this.activeUsers.findIndex(
-      (user) => user.id === userId,
-    );
-
-    // Rejoindre la room perso
-    socket.join(userId);
-    this.addUserRoom(userId, userId);
-
-    if (existingDriverIndex !== -1) {
-      const oldSocketId = this.activeUsers[existingDriverIndex].socketId;
-      if (oldSocketId === socket.id) {
-        console.log(`ℹ️ User ${userId} already connected with same socket`);
-      } else {
-        this.activeUsers[existingDriverIndex].socketId = socket.id;
-        console.log(`🔄 User ${userId} reconnected (old: ${oldSocketId}, new: ${socket.id})`);
-      }
-      socket.data.userId = userId;
-      socket.data.role = wsUser.role;
-      socket.data.fullName = wsUser.fullName || undefined;
-    } else {
-      const user = await this.userRepository.findOne({
-        where: { id: userId },
-      });
-      if (user) {
-        socket.data.userId = userId;
-        socket.data.role = wsUser.role || user.role;
-        socket.data.fullName = wsUser.fullName || user.fullName;
-
-        this.activeUsers.push({
-          id: userId,
+        const confirmation = {
+          success: true,
+          userId: info.userId,
+          role: info.role,
+          fullName: info.fullName,
+          user: {
+            id: info.userId,
+            role: info.role,
+            fullName: info.fullName,
+          },
           socketId: socket.id,
-        });
-        console.log(`🔌 User ${userId} connected (${socket.data.fullName}, role: ${socket.data.role})`);
-      } else {
-        console.warn(`⚠️ User ${userId} introuvable en base`);
-        const errorResp = {
-          success: false,
-          message: 'Utilisateur introuvable',
+          message: 'Connexion réussie',
+          timestamp: new Date().toISOString(),
         };
-        socket.emit('connection-error', errorResp);
-        return errorResp;
+
+        socket.emit('confirmation', confirmation);
+        console.log(`✅ Confirmation sent to ${info.userId}`);
+        return confirmation;
       }
+      console.warn(`⚠️ [connection] JWT invalide → fallback userId`);
     }
 
     // ============================================================
-    // 📢 BROADCAST + CONFIRMATION
+    // 2️⃣ FALLBACK : userId direct (ancien système)
     // ============================================================
-    this.broadcastUsers();
+    let directUserId: string | null = null;
 
-    const confirmation = {
-      success: true,
-      // ✅ Format mobile (à plat)
-      userId: socket.data.userId,
-      role: socket.data.role,
-      fullName: socket.data.fullName,
-      // ✅ Format riche
-      user: {
-        id: socket.data.userId,
-        role: socket.data.role,
-        fullName: socket.data.fullName,
-      },
-      socketId: socket.id,
-      message: 'Connexion réussie',
-      timestamp: new Date().toISOString(),
+    if (typeof data === 'string' && data.split('.').length !== 3) {
+      directUserId = data.trim();
+    } else if (data && typeof data === 'object') {
+      directUserId = data.userId || data.id || data.user?.id || null;
+    }
+
+    if (directUserId) {
+      console.log(`🔑 [connection] userId direct fourni: ${directUserId}`);
+
+      const info = await this.resolveUserFromId(directUserId);
+      if (info) {
+        console.log(`✅ [connection] userId valide → user ${info.userId}`);
+        this.finalizeIdentification(socket, info);
+
+        const confirmation = {
+          success: true,
+          userId: info.userId,
+          role: info.role,
+          fullName: info.fullName,
+          user: {
+            id: info.userId,
+            role: info.role,
+            fullName: info.fullName,
+          },
+          socketId: socket.id,
+          message: 'Connexion réussie',
+          timestamp: new Date().toISOString(),
+        };
+
+        socket.emit('confirmation', confirmation);
+        console.log(`✅ Confirmation sent to ${info.userId}`);
+        return confirmation;
+      }
+      console.warn(`⚠️ [connection] userId ${directUserId} introuvable en base`);
+    }
+
+    // ============================================================
+    // ❌ AUCUN MODE D'IDENTIFICATION N'A FONCTIONNÉ
+    // ============================================================
+    console.warn(`⚠️ [connection] Impossible d'identifier le socket ${socket.id}`);
+    const errorResp = {
+      success: false,
+      message: 'Token ou userId requis',
     };
-
-    socket.emit('confirmation', confirmation);
-    console.log(`✅ Confirmation sent to ${userId} :`, JSON.stringify(confirmation));
-
-    return confirmation;
+    socket.emit('connection-error', errorResp);
+    return errorResp;
   }
+
   handleDisconnect(client: Socket) {
     const userIndex = this.activeUsers.findIndex(
       (user) => user.socketId === client.id,
@@ -262,24 +305,27 @@ export class NotificationsGateway
       console.log(`❌ User ${userId} disconnected (socket: ${client.id})`);
       console.log(`   Reason: ${(client as any).disconnected ? 'unknown' : 'transport close'}`);
 
-      // ✅ AJOUT : nettoyer la Map inversée
-      this.userRooms.delete(userId);
+      // ✅ Vérifier s'il reste un autre socket actif pour cet user
+      const stillConnected = this.activeUsers.some((u) => u.id === userId);
 
-      if (this.activeTrackings.has(userId)) {
-        const orders = Array.from(this.activeTrackings.get(userId)!);
-        for (const orderId of orders) {
-          const roomName = `order-${orderId}`;
-          this.server.to(roomName).emit('trackingStopped', {
-            orderId,
-            deliverId: userId,
-            reason: 'livreur_disconnected',
-            timestamp: new Date().toISOString(),
-          });
-        }
+      if (!stillConnected) {
+        console.log(`🧹 Dernier socket de ${userId} déconnecté → nettoyage`);
+
+        // ✅ Nettoyer la Map inversée (rooms)
+        this.userRooms.delete(userId);
+
+        // ✅ Nettoyer les trackings actifs EN MÉMOIRE uniquement
+        //    SANS émettre trackingStopped à la room
+        //    → le livreur ne s'arrête PAS si un client se déconnecte
         this.activeTrackings.delete(userId);
-        console.log(`🧹 Trackings nettoyés pour ${userId}`);
+      } else {
+        const remainingSockets = this.activeUsers.filter((u) => u.id === userId);
+        console.log(
+          `ℹ️ User ${userId} a encore ${remainingSockets.length} socket(s) actif(s) → pas de nettoyage`,
+        );
       }
     }
+
     this.broadcastUsers();
   }
 
@@ -468,6 +514,7 @@ export class NotificationsGateway
       console.log(`⚠️ Deliver ${deliverId} is not connected`);
     }
   }
+
   async handleConnection(client: Socket) {
     console.log('═══════════════════════════════════════════');
     console.log(`🔌 Nouveau socket : ${client.id}`);
@@ -476,76 +523,33 @@ export class NotificationsGateway
     console.log('   headers.auth    :', JSON.stringify(client.handshake?.headers?.authorization));
     console.log('═══════════════════════════════════════════');
 
-    // 🎯 Extraire le token (header Bearer, query, auth)
     const token = this.wsAuthHelper.extractToken(client);
 
     if (!token) {
-      console.warn(`⚠️ Socket ${client.id} sans token → non identifié`);
-      // ⚠️ On ne déconnecte PAS ici → on attend que le client envoie 'connection' si besoin
-      // Ou on déconnecte :
-      // client.emit('connection-error', { message: 'Token requis' });
-      // client.disconnect(true);
+      console.warn(`⚠️ Socket ${client.id} sans token → en attente de 'connection'`);
+      // ⚠️ Ancien client : il enverra 'connection' avec userId
       return;
     }
 
-    // 🔐 Valider le JWT
-    const wsUser = await this.wsAuthHelper.validateToken(token);
-    if (!wsUser) {
+    const info = await this.resolveUserFromToken(token);
+    if (!info) {
       console.warn(`⚠️ Socket ${client.id} token invalide`);
       client.emit('connection-error', { message: 'Token invalide' });
-      // client.disconnect(true);
       return;
     }
 
-    // ✅ Token valide → identifier le socket
-    const userId = wsUser.id;
+    // ✅ Identifié via handshake → on finalise TOUT DE SUITE
+    this.finalizeIdentification(client, info);
 
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      console.warn(`⚠️ User ${userId} introuvable en base`);
-      client.emit('connection-error', { message: 'Utilisateur introuvable' });
-      return;
-    }
-
-    // 🔥 Stocker les infos sur le socket
-    client.data.userId = userId;
-    client.data.role = wsUser.role || user.role;
-    client.data.fullName = wsUser.fullName || user.fullName;
-
-    // Rejoindre la room perso
-    client.join(userId);
-    this.addUserRoom(userId, userId);
-
-    // Gérer la reconnexion
-    const existingIndex = this.activeUsers.findIndex((u) => u.id === userId);
-    if (existingIndex !== -1) {
-      const oldSocketId = this.activeUsers[existingIndex].socketId;
-      if (oldSocketId !== client.id) {
-        this.activeUsers[existingIndex].socketId = client.id;
-        console.log(`🔄 User ${userId} reconnected (old: ${oldSocketId}, new: ${client.id})`);
-      }
-    } else {
-      this.activeUsers.push({ id: userId, socketId: client.id });
-      console.log(`🔌 User ${userId} connected (${client.data.fullName}, role: ${client.data.role})`);
-    }
-
-    this.broadcastUsers();
-
-    // 📢 Émettre la confirmation (format mobile : à plat + format riche)
     const confirmation = {
       success: true,
-      // ✅ Format mobile app (à plat)
-      userId,
-      role: client.data.role,
-      fullName: client.data.fullName,
-      // ✅ Format riche (pour ton front web)
+      userId: info.userId,
+      role: info.role,
+      fullName: info.fullName,
       user: {
-        id: userId,
-        role: client.data.role,
-        fullName: client.data.fullName,
+        id: info.userId,
+        role: info.role,
+        fullName: info.fullName,
       },
       socketId: client.id,
       message: 'Connexion réussie',
@@ -553,7 +557,7 @@ export class NotificationsGateway
     };
 
     client.emit('confirmation', confirmation);
-    console.log(`✅ Confirmation sent to ${userId} :`, JSON.stringify(confirmation));
+    console.log(`✅ Confirmation sent to ${info.userId} (via handshake)`);
     console.log('═══════════════════════════════════════════');
   }
 
@@ -741,7 +745,6 @@ export class NotificationsGateway
       }
 
       console.log(`✅ [join-order] Affectation trouvée pour ${orderId}`);
-
     } catch (err: any) {
       console.warn(`🚫 [join-order] Erreur: ${err.message}`);
 
@@ -843,15 +846,52 @@ export class NotificationsGateway
     }
 
     // ============================================================
+    // ✅ NOUVEAU : VÉRIFIER SI LE TRACKING EST DÉJÀ ACTIF EN MÉMOIRE
+    // ============================================================
+    // On regarde si N'IMPORTE QUEL livreur a un tracking actif sur cet orderId.
+    // → Utile pour :
+    //    • Le LIVREUR qui revient sur l'écran → il retrouve son tracking allumé
+    //    • Le CLIENT qui rejoint après → il voit le tracking actif sans clic
+    let trackingIsActive = false;
+    let activeDeliverIdForOrder: string | null = null;
+
+    for (const [deliverId, orderSet] of this.activeTrackings.entries()) {
+      if (orderSet.has(orderId)) {
+        trackingIsActive = true;
+        activeDeliverIdForOrder = deliverId;
+        break;
+      }
+    }
+
+    console.log(
+      `🔍 [join-order] Tracking actif pour ${orderId} ? ${trackingIsActive}` +
+      (activeDeliverIdForOrder ? ` (par ${activeDeliverIdForOrder})` : ''),
+    );
+
+    // ✅ Injecter le tracking dans orderData pour que le front
+    //    puisse lire `freshOrder.tracking.isActive` (déjà géré côté front)
+    if (orderData) {
+      orderData.tracking = {
+        ...(orderData.tracking || {}),
+        isActive: trackingIsActive,
+        deliverId: activeDeliverIdForOrder,
+      };
+    }
+
+    // ============================================================
     // 📤 RÉPONSE PRIVÉE AU CLIENT
     // ============================================================
-    client.to(roomName).emit('order-joined', {
+    client.emit('order-joined', {
       success: true,
       room: roomName,
       orderId,
       users: [],
       userCount: 0,
       order: orderData,
+      tracking: {
+        isActive: trackingIsActive,
+        deliverId: activeDeliverIdForOrder,
+      },
     });
 
     // ============================================================
@@ -892,9 +932,11 @@ export class NotificationsGateway
 
     const roomName = `order-${payload.orderId}`;
     client.leave(roomName);
-    // ✅ AJOUT : retirer de la Map inversée
+
+    // ✅ Retirer de la Map inversée
     const userId = client.data?.userId;
     if (userId) this.removeUserRoom(userId, roomName);
+
     console.log(`🔌 Client ${client.id} left order room: ${roomName}`);
 
     client.emit('order-left', {
@@ -905,7 +947,6 @@ export class NotificationsGateway
 
     return { success: true, room: roomName };
   }
-
   // ============================================================
   // 🔌 CONNECTER UN LIVREUR À UNE ROOM ORDER (par userId)
   // ============================================================
