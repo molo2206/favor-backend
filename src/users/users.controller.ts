@@ -301,6 +301,7 @@ export class UsersController {
     @Query('role') role?: UserRole,
     @Query('hasOrder') hasOrder?: string,
     @Query('hasShipment') hasShipment?: string,
+    @Query('search') search?: string,
   ) {
     const lang = this.extractLanguage(req);
 
@@ -308,6 +309,7 @@ export class UsersController {
       role,
       hasOrder === 'true',
       hasShipment === 'true',
+      search,
     );
 
     const message = await this.usersService['i18n'].translate(
@@ -324,53 +326,36 @@ export class UsersController {
   @Get('/get/all-users-paginate')
   async getAllUsersPaginate(
     @Req() req: Request,
-
-    @Query('page')
-    page: number = 1,
-
-    @Query('limit')
-    limit: number = 10,
-
-    @Query('role')
-    role?: UserRole,
-
-    @Query('hasOrder')
-    hasOrder?: string,
-
-    @Query('hasShipment')
-    hasShipment?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('role') role?: UserRole,
+    @Query('hasOrder') hasOrder?: string,
+    @Query('hasShipment') hasShipment?: string,
+    @Query('search') search?: string,
   ) {
     const lang = this.extractLanguage(req);
-
-    // ============================================================
-    // 🔥 Conversion des query params string -> boolean
-    // ============================================================
-    const hasOrderFilter =
-      hasOrder === 'true';
-
-    const hasShipmentFilter =
-      hasShipment === 'true';
 
     const { data } =
       await this.usersService.findAllWithDetailsPaginate(
         Number(page),
         Number(limit),
         role,
-        hasOrderFilter,
-        hasShipmentFilter,
+        hasOrder === 'true',
+        hasShipment === 'true',
+        search,
       );
 
-    const message =
-      await this.usersService['i18n'].translate(
-        'user.users_list_retrieved',
-        lang,
-      );
+    const message = await this.usersService['i18n'].translate(
+      'user.users_list_retrieved',
+      lang,
+    );
 
     return {
       message,
       data,
     };
   }
+
   @Patch(':id/role')
   @UseGuards(AuthentificationGuard)
   @HttpCode(HttpStatus.OK)
