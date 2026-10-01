@@ -627,7 +627,7 @@ export class NotificationsGateway
     }
   }
 
-  sendDeliveryStatusUpdate(
+  async sendDeliveryStatusUpdate(
     orderId: string,
     payload: {
       orderId: string;
@@ -637,26 +637,42 @@ export class NotificationsGateway
   ) {
     const roomName = `order-${orderId}`;
 
-    // ============================================================
-    // 🔍 VÉRIFICATION : la room existe et contient des sockets ?
-    // ============================================================
-    const room = this.server.sockets.adapter.rooms.get(roomName);
+    try {
+      // ============================================================
+      // 🛡️ GARDE-FOU : server initialisé ?
+      // ============================================================
+      if (!this.server) {
+        console.warn(`⚠️ [sendDeliveryStatusUpdate] this.server undefined - skip`);
+        return;
+      }
 
-    if (!room || room.size === 0) {
-      console.warn(`⚠️ [sendDeliveryStatusUpdate] Room ${roomName} vide ou inexistante`);
-      console.warn(`   → Aucun envoi car personne n'a fait join-order avec cet orderId`);
-      return;
+      // ============================================================
+      // 🔍 VÉRIFICATION : la room existe et contient des sockets ?
+      //    ✅ API officielle Socket.IO (safe, async)
+      // ============================================================
+      const sockets = await this.server.in(roomName).fetchSockets();
+
+      if (!sockets || sockets.length === 0) {
+        console.warn(`⚠️ [sendDeliveryStatusUpdate] Room ${roomName} vide ou inexistante`);
+        console.warn(`   → Aucun envoi car personne n'a fait join-order avec cet orderId`);
+        return;
+      }
+
+      // ============================================================
+      // 📤 ENVOI STRICTEMENT À CETTE ROOM
+      // ============================================================
+      this.server.to(roomName).emit('deliveryStatusUpdate', {
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(`✅ deliveryStatusUpdate envoyé UNIQUEMENT à la room ${roomName}`);
+    } catch (err: any) {
+      // ============================================================
+      // 🛡️ NE JAMAIS laisser crasher le process
+      // ============================================================
+      console.error(`❌ [sendDeliveryStatusUpdate] Erreur:`, err?.message);
     }
-
-    // ============================================================
-    // 📤 ENVOI STRICTEMENT À CETTE ROOM
-    // ============================================================
-    this.server.to(roomName).emit('deliveryStatusUpdate', {
-      ...payload,
-      timestamp: new Date().toISOString(),
-    });
-
-    console.log(`✅ deliveryStatusUpdate envoyé UNIQUEMENT à la room ${roomName}`);
   }
 
   private parseBody<T = any>(data: any): T | null {
