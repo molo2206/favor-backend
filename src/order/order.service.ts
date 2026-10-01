@@ -2168,10 +2168,9 @@ export class OrderService {
     // ============================================================
     // ✅ AJOUT : émettre le changement de statut à la room order-XXX
     // ============================================================
-    this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
+    await this.notificationsGateway.sendOrderJoinedToRoom(orderId, {
       orderId,
-      status: order.status as string,
-      note: noteOrStatusMessage(dto.status),  // ← helper (voir plus bas)
+      order: order,
     });
 
     return {

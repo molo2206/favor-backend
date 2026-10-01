@@ -947,9 +947,62 @@ export class NotificationsGateway
 
     return { success: true, room: roomName };
   }
-  // ============================================================
-  // 🔌 CONNECTER UN LIVREUR À UNE ROOM ORDER (par userId)
-  // ============================================================
+
+  async sendOrderJoinedToRoom(
+    orderId: string,
+    payload: {
+      orderId: string;
+      order: any;
+    },
+  ): Promise<void> {
+    const roomName = `order-${orderId}`;
+
+    try {
+      if (!this.server) {
+        console.warn(`⚠️ [sendOrderJoinedToRoom] this.server undefined - skip`);
+        return;
+      }
+
+      const sockets = await this.server.in(roomName).fetchSockets();
+
+      if (!sockets || sockets.length === 0) {
+        console.warn(`⚠️ [sendOrderJoinedToRoom] Room ${roomName} vide`);
+        return;
+      }
+
+      console.log(`📢 [sendOrderJoinedToRoom] Room ${roomName} → ${sockets.length} socket(s)`);
+
+      // ✅ Vérifier si tracking actif en mémoire
+      let trackingIsActive = false;
+      let activeDeliverIdForOrder: string | null = null;
+      for (const [deliverId, orderSet] of this.activeTrackings.entries()) {
+        if (orderSet.has(orderId)) {
+          trackingIsActive = true;
+          activeDeliverIdForOrder = deliverId;
+          break;
+        }
+      }
+
+      // ✅ Émettre EXACTEMENT le même format que handleJoinOrderTracking
+      this.server.to(roomName).emit('order-joined', {
+        success: true,
+        room: roomName,
+        orderId,
+        users: [],
+        userCount: 0,
+        order: payload.order,
+        tracking: {
+          isActive: trackingIsActive,
+          deliverId: activeDeliverIdForOrder,
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(`✅ order-joined (update) envoyé à la room ${roomName}`);
+    } catch (err: any) {
+      console.error(`❌ [sendOrderJoinedToRoom] Erreur:`, err?.message);
+    }
+  }
   // ============================================================
   // 🔌 CONNECTER UN LIVREUR À UNE ROOM ORDER (par userId)
   // ============================================================
