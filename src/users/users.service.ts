@@ -3666,7 +3666,6 @@ export class UsersService {
   ) {
     const query = this.usersRepository
       .createQueryBuilder('users')
-      .addSelect('users.password')
       .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
       .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
       .leftJoinAndSelect('userHasCompany.company', 'company')
@@ -3687,17 +3686,12 @@ export class UsersService {
         'userCompanyResourceDetail',
       );
 
-    // ============================================================
     // FILTRE PAR RÔLE
-    // ============================================================
     if (role) {
       query.andWhere('users.role = :role', { role });
     }
 
-    // ============================================================
-    // RECHERCHE PAR MOTS-CLÉS
-    // fullName / email / phone
-    // ============================================================
+    // RECHERCHE
     if (search && search.trim()) {
       const keyword = `%${search.trim()}%`;
 
@@ -3711,9 +3705,7 @@ export class UsersService {
       );
     }
 
-    // ============================================================
-    // UTILISATEURS AYANT DÉJÀ PASSÉ AU MOINS UNE COMMANDE
-    // ============================================================
+    // UTILISATEURS AYANT AU MOINS UNE COMMANDE
     if (hasOrder === true) {
       query.andWhere(`
       EXISTS (
@@ -3724,13 +3716,8 @@ export class UsersService {
     `);
     }
 
-    // ============================================================
-    // UTILISATEURS AYANT DÉJÀ CRÉÉ AU MOINS UN SHIPMENT
-    //
-    // IMPORTANT :
-    // On ne filtre PAS sur LTA.
-    // Le lien Shipment -> LTA reste exactement comme il est.
-    // ============================================================
+    // UTILISATEURS AYANT AU MOINS UN SHIPMENT
+    // Aucun filtre sur LTA
     if (hasShipment === true) {
       query.andWhere(`
       EXISTS (
@@ -3748,336 +3735,71 @@ export class UsersService {
     const sanitizedUsers = users.map((user) => {
       const { password, ...userWithoutPassword } = user;
 
-      const userHasCompany = (userWithoutPassword.userHasCompany || []).map(
-        (uhc) => ({
-          id: uhc.id,
-          isOwner: uhc.isOwner,
-          company: uhc.company
-            ? {
-              ...uhc.company,
-              tauxCompanies: uhc.company.tauxCompanies ?? [],
-              country: uhc.company.country ?? null,
-              city: uhc.company.city ?? null,
-              category: uhc.company.category ?? null,
-              branches: (uhc.company.branches || []).map((b) => ({
-                id: b.id,
-                name: b.name,
-                address: b.address,
-                phone: b.phone,
-                email: b.email,
-                status: b.status,
-                deleted: b.deleted,
-                country: b.country
-                  ? { id: b.country.id, name: b.country.name }
-                  : null,
-                city: b.city
-                  ? { id: b.city.id, name: b.city.name }
-                  : null,
-              })),
-            }
-            : null,
-          branch: uhc.branch
-            ? { id: uhc.branch.id, name: uhc.branch.name }
-            : null,
-          userResources: (uhc.resources || []).map((r) => ({
-            id: r.id,
-            canCreate: r.canCreate,
-            canRead: r.canRead,
-            canUpdate: r.canUpdate,
-            canDelete: r.canDelete,
-            canManage: r.canManage,
-            status: r.status,
-            resource: r.resource
-              ? {
-                id: r.resource.id,
-                name: r.resource.name,
-                label: r.resource.label,
-              }
-              : null,
-          })),
-        }),
-      );
+      const userHasCompany = (
+        userWithoutPassword.userHasCompany || []
+      ).map((uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
 
-      // Reconstruire activeCompany avec sa branche
-      const activeUserHasCompany = userWithoutPassword.userHasCompany?.find(
-        (uhc) => uhc.company?.id === userWithoutPassword.activeCompanyId,
-      );
+        company: uhc.company
+          ? {
+            ...uhc.company,
+            tauxCompanies: uhc.company.tauxCompanies ?? [],
+            country: uhc.company.country ?? null,
+            city: uhc.company.city ?? null,
+            category: uhc.company.category ?? null,
 
-      const activeCompanyEntity = activeUserHasCompany?.company ?? null;
+            branches: (uhc.company.branches || []).map((b) => ({
+              id: b.id,
+              name: b.name,
+              address: b.address,
+              phone: b.phone,
+              email: b.email,
+              status: b.status,
+              deleted: b.deleted,
 
-      const activeCompanyBranch = activeUserHasCompany?.branch
-        ? {
-          id: activeUserHasCompany.branch.id,
-          name: activeUserHasCompany.branch.name,
-        }
-        : null;
-
-      const activeCompany = activeCompanyEntity
-        ? {
-          ...activeCompanyEntity,
-          tauxCompanies: activeCompanyEntity.tauxCompanies ?? [],
-          country: activeCompanyEntity.country ?? null,
-          city: activeCompanyEntity.city ?? null,
-          category: activeCompanyEntity.category ?? null,
-          branch: activeCompanyBranch,
-
-          companyResources: (
-            activeCompanyEntity.companyResources || []
-          ).map((cr) => ({
-            id: cr.id,
-            canCreate: cr.can_create,
-            canRead: cr.can_read,
-            canUpdate: cr.can_update,
-            canDelete: cr.can_delete,
-            canManage: cr.can_manage,
-            status: cr.status,
-            resource: cr.resource
-              ? {
-                id: cr.resource.id,
-                name: cr.resource.name,
-                label: cr.resource.label,
-              }
-              : null,
-          })),
-
-          userResources: (activeUserHasCompany?.resources || []).map(
-            (r) => ({
-              id: r.id,
-              canCreate: r.canCreate,
-              canRead: r.canRead,
-              canUpdate: r.canUpdate,
-              canDelete: r.canDelete,
-              canManage: r.canManage,
-              status: r.status,
-              resource: r.resource
+              country: b.country
                 ? {
-                  id: r.resource.id,
-                  name: r.resource.name,
-                  label: r.resource.label,
+                  id: b.country.id,
+                  name: b.country.name,
                 }
                 : null,
-            }),
-          ),
 
-          branches: (activeCompanyEntity.branches || []).map((b) => ({
-            id: b.id,
-            name: b.name,
-            address: b.address,
-            phone: b.phone,
-            email: b.email,
-            status: b.status,
-            deleted: b.deleted,
-            country: b.country
-              ? { id: b.country.id, name: b.country.name }
-              : null,
-            city: b.city ? { id: b.city.id, name: b.city.name } : null,
-          })),
-        }
-        : null;
+              city: b.city
+                ? {
+                  id: b.city.id,
+                  name: b.city.name,
+                }
+                : null,
+            })),
+          }
+          : null,
 
-      const userPlatformRoles = (
-        userWithoutPassword.userPlatformRoles || []
-      ).map((upr: any) => ({
-        id: upr.id,
-        platform: upr.platform,
-        role: upr.role,
+        branch: uhc.branch
+          ? {
+            id: uhc.branch.id,
+            name: uhc.branch.name,
+          }
+          : null,
+
+        userResources: (uhc.resources || []).map((r) => ({
+          id: r.id,
+          canCreate: r.canCreate,
+          canRead: r.canRead,
+          canUpdate: r.canUpdate,
+          canDelete: r.canDelete,
+          canManage: r.canManage,
+          status: r.status,
+
+          resource: r.resource
+            ? {
+              id: r.resource.id,
+              name: r.resource.name,
+              label: r.resource.label,
+            }
+            : null,
+        })),
       }));
-
-      const defaultAddress = userWithoutPassword.defaultAddress
-        ? {
-          id: userWithoutPassword.defaultAddress.id,
-          firstName: userWithoutPassword.defaultAddress.firstName,
-          lastName: userWithoutPassword.defaultAddress.lastName,
-          address: userWithoutPassword.defaultAddress.address,
-          phone: userWithoutPassword.defaultAddress.phone,
-          type: userWithoutPassword.defaultAddress.type,
-          isDefault: userWithoutPassword.defaultAddress.isDefault,
-          latitude: userWithoutPassword.defaultAddress.latitude,
-          longitude: userWithoutPassword.defaultAddress.longitude,
-          createdAt: userWithoutPassword.defaultAddress.createdAt,
-          updatedAt: userWithoutPassword.defaultAddress.updatedAt,
-        }
-        : null;
-
-      return instanceToPlain({
-        ...userWithoutPassword,
-        userHasCompany,
-        activeCompany,
-        userPlatformRoles,
-        defaultAddress,
-      });
-    });
-
-    return sanitizedUsers;
-  }
-
-  async findAllWithDetailsPaginate(
-    page: number = 1,
-    limit: number = 10,
-    role?: UserRole,
-    hasOrder?: boolean,
-    hasShipment?: boolean,
-    search?: string,
-  ): Promise<{ data: PaginatedResponseDto<any> }> {
-    const query = this.usersRepository
-      .createQueryBuilder('users')
-      .addSelect('users.password')
-      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
-      .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
-      .leftJoinAndSelect('userHasCompany.company', 'company')
-      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
-      .leftJoinAndSelect('company.country', 'country')
-      .leftJoinAndSelect('company.city', 'city')
-      .leftJoinAndSelect('company.category', 'category')
-      .leftJoinAndSelect('company.companyResources', 'companyResources')
-      .leftJoinAndSelect('companyResources.resource', 'resource')
-      .leftJoinAndSelect('company.branches', 'branches')
-      .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
-      .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
-      .leftJoinAndSelect('userPlatformRoles.role', 'role')
-      .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
-      .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
-      .leftJoinAndSelect(
-        'userCompanyResources.resource',
-        'userCompanyResourceDetail',
-      );
-
-    // ============================================================
-    // FILTRE PAR RÔLE
-    // ============================================================
-    if (role) {
-      query.andWhere('users.role = :role', { role });
-    }
-
-    // ============================================================
-    // RECHERCHE
-    // fullName / email / phone
-    // ============================================================
-    if (search && search.trim()) {
-      const keyword = `%${search.trim()}%`;
-
-      query.andWhere(
-        `(
-        users.fullName LIKE :keyword
-        OR users.email LIKE :keyword
-        OR users.phone LIKE :keyword
-      )`,
-        { keyword },
-      );
-    }
-
-    // ============================================================
-    // UTILISATEUR AYANT AU MOINS UNE COMMANDE
-    // ============================================================
-    if (hasOrder === true) {
-      query.andWhere(`
-      EXISTS (
-        SELECT 1
-        FROM orders order_filter
-        WHERE order_filter.userId = users.id
-      )
-    `);
-    }
-
-    // ============================================================
-    // UTILISATEUR AYANT AU MOINS UN SHIPMENT
-    //
-    // Aucun filtre LTA ici.
-    // ============================================================
-    if (hasShipment === true) {
-      query.andWhere(`
-      EXISTS (
-        SELECT 1
-        FROM shipments shipment_filter
-        WHERE shipment_filter.userId = users.id
-      )
-    `);
-    }
-
-    // ============================================================
-    // PAGINATION
-    // ============================================================
-    const skip = (page - 1) * limit;
-
-    query
-      .orderBy('users.createdAt', 'DESC')
-      .skip(skip)
-      .take(limit);
-
-    const [users, total] = await query.getManyAndCount();
-
-    const sanitizedUsers = users.map((user) => {
-      const { password, ...userWithoutPassword } = user;
-
-      const userHasCompany = (userWithoutPassword.userHasCompany || []).map(
-        (uhc) => ({
-          id: uhc.id,
-          isOwner: uhc.isOwner,
-
-          company: uhc.company
-            ? {
-              ...uhc.company,
-              tauxCompanies: uhc.company.tauxCompanies ?? [],
-              country: uhc.company.country ?? null,
-              city: uhc.company.city ?? null,
-              category: uhc.company.category ?? null,
-
-              branches: (uhc.company.branches || []).map((b) => ({
-                id: b.id,
-                name: b.name,
-                address: b.address,
-                phone: b.phone,
-                email: b.email,
-                status: b.status,
-                deleted: b.deleted,
-
-                country: b.country
-                  ? {
-                    id: b.country.id,
-                    name: b.country.name,
-                  }
-                  : null,
-
-                city: b.city
-                  ? {
-                    id: b.city.id,
-                    name: b.city.name,
-                  }
-                  : null,
-              })),
-            }
-            : null,
-
-          branch: uhc.branch
-            ? {
-              id: uhc.branch.id,
-              name: uhc.branch.name,
-            }
-            : null,
-
-          userResources: (uhc.resources || []).map((r) => ({
-            id: r.id,
-            canCreate: r.canCreate,
-            canRead: r.canRead,
-            canUpdate: r.canUpdate,
-            canDelete: r.canDelete,
-            canManage: r.canManage,
-            status: r.status,
-
-            resource: r.resource
-              ? {
-                id: r.resource.id,
-                name: r.resource.name,
-                label: r.resource.label,
-              }
-              : null,
-          })),
-        }),
-      );
-
-      // ============================================================
-      // ACTIVE COMPANY
-      // ============================================================
 
       const activeUserHasCompany =
         userWithoutPassword.userHasCompany?.find(
@@ -4099,17 +3821,10 @@ export class UsersService {
         ? {
           ...activeCompanyEntity,
 
-          tauxCompanies:
-            activeCompanyEntity.tauxCompanies ?? [],
-
-          country:
-            activeCompanyEntity.country ?? null,
-
-          city:
-            activeCompanyEntity.city ?? null,
-
-          category:
-            activeCompanyEntity.category ?? null,
+          tauxCompanies: activeCompanyEntity.tauxCompanies ?? [],
+          country: activeCompanyEntity.country ?? null,
+          city: activeCompanyEntity.city ?? null,
+          category: activeCompanyEntity.category ?? null,
 
           branch: activeCompanyBranch,
 
@@ -4181,9 +3896,286 @@ export class UsersService {
         }
         : null;
 
-      // ============================================================
-      // PLATFORM ROLES
-      // ============================================================
+      const userPlatformRoles = (
+        userWithoutPassword.userPlatformRoles || []
+      ).map((upr: any) => ({
+        id: upr.id,
+        platform: upr.platform,
+        role: upr.role,
+      }));
+
+      const defaultAddress = userWithoutPassword.defaultAddress
+        ? {
+          id: userWithoutPassword.defaultAddress.id,
+          firstName: userWithoutPassword.defaultAddress.firstName,
+          lastName: userWithoutPassword.defaultAddress.lastName,
+          address: userWithoutPassword.defaultAddress.address,
+          phone: userWithoutPassword.defaultAddress.phone,
+          type: userWithoutPassword.defaultAddress.type,
+          isDefault: userWithoutPassword.defaultAddress.isDefault,
+          latitude: userWithoutPassword.defaultAddress.latitude,
+          longitude: userWithoutPassword.defaultAddress.longitude,
+          createdAt: userWithoutPassword.defaultAddress.createdAt,
+          updatedAt: userWithoutPassword.defaultAddress.updatedAt,
+        }
+        : null;
+
+      return instanceToPlain({
+        ...userWithoutPassword,
+        userHasCompany,
+        activeCompany,
+        userPlatformRoles,
+        defaultAddress,
+      });
+    });
+
+    return sanitizedUsers;
+  }
+
+  async findAllWithDetailsPaginate(
+    page: number = 1,
+    limit: number = 10,
+    role?: UserRole,
+    hasOrder?: boolean,
+    hasShipment?: boolean,
+    search?: string,
+  ): Promise<{ data: PaginatedResponseDto<any> }> {
+    const query = this.usersRepository
+      .createQueryBuilder('users')
+      .leftJoinAndSelect('users.userHasCompany', 'userHasCompany')
+      .leftJoinAndSelect('userHasCompany.branch', 'userHasCompanyBranch')
+      .leftJoinAndSelect('userHasCompany.company', 'company')
+      .leftJoinAndSelect('company.tauxCompanies', 'tauxCompanies')
+      .leftJoinAndSelect('company.country', 'country')
+      .leftJoinAndSelect('company.city', 'city')
+      .leftJoinAndSelect('company.category', 'category')
+      .leftJoinAndSelect('company.companyResources', 'companyResources')
+      .leftJoinAndSelect('companyResources.resource', 'resource')
+      .leftJoinAndSelect('company.branches', 'branches')
+      .leftJoinAndSelect('users.userPlatformRoles', 'userPlatformRoles')
+      .leftJoinAndSelect('userPlatformRoles.platform', 'platform')
+      .leftJoinAndSelect('userPlatformRoles.role', 'role')
+      .leftJoinAndSelect('users.defaultAddress', 'defaultAddress')
+      .leftJoinAndSelect('userHasCompany.resources', 'userCompanyResources')
+      .leftJoinAndSelect(
+        'userCompanyResources.resource',
+        'userCompanyResourceDetail',
+      );
+
+    // FILTRE PAR RÔLE
+    if (role) {
+      query.andWhere('users.role = :role', { role });
+    }
+
+    // RECHERCHE
+    if (search && search.trim()) {
+      const keyword = `%${search.trim()}%`;
+
+      query.andWhere(
+        `(
+        users.fullName LIKE :keyword
+        OR users.email LIKE :keyword
+        OR users.phone LIKE :keyword
+      )`,
+        { keyword },
+      );
+    }
+
+    // UTILISATEURS AYANT AU MOINS UNE COMMANDE
+    if (hasOrder === true) {
+      query.andWhere(`
+      EXISTS (
+        SELECT 1
+        FROM orders order_filter
+        WHERE order_filter.userId = users.id
+      )
+    `);
+    }
+
+    // UTILISATEURS AYANT AU MOINS UN SHIPMENT
+    // Aucun filtre sur LTA
+    if (hasShipment === true) {
+      query.andWhere(`
+      EXISTS (
+        SELECT 1
+        FROM shipments shipment_filter
+        WHERE shipment_filter.userId = users.id
+      )
+    `);
+    }
+
+    const skip = (page - 1) * limit;
+
+    query
+      .orderBy('users.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [users, total] = await query.getManyAndCount();
+
+    const sanitizedUsers = users.map((user) => {
+      const { password, ...userWithoutPassword } = user;
+
+      const userHasCompany = (
+        userWithoutPassword.userHasCompany || []
+      ).map((uhc) => ({
+        id: uhc.id,
+        isOwner: uhc.isOwner,
+
+        company: uhc.company
+          ? {
+            ...uhc.company,
+            tauxCompanies: uhc.company.tauxCompanies ?? [],
+            country: uhc.company.country ?? null,
+            city: uhc.company.city ?? null,
+            category: uhc.company.category ?? null,
+
+            branches: (uhc.company.branches || []).map((b) => ({
+              id: b.id,
+              name: b.name,
+              address: b.address,
+              phone: b.phone,
+              email: b.email,
+              status: b.status,
+              deleted: b.deleted,
+
+              country: b.country
+                ? {
+                  id: b.country.id,
+                  name: b.country.name,
+                }
+                : null,
+
+              city: b.city
+                ? {
+                  id: b.city.id,
+                  name: b.city.name,
+                }
+                : null,
+            })),
+          }
+          : null,
+
+        branch: uhc.branch
+          ? {
+            id: uhc.branch.id,
+            name: uhc.branch.name,
+          }
+          : null,
+
+        userResources: (uhc.resources || []).map((r) => ({
+          id: r.id,
+          canCreate: r.canCreate,
+          canRead: r.canRead,
+          canUpdate: r.canUpdate,
+          canDelete: r.canDelete,
+          canManage: r.canManage,
+          status: r.status,
+
+          resource: r.resource
+            ? {
+              id: r.resource.id,
+              name: r.resource.name,
+              label: r.resource.label,
+            }
+            : null,
+        })),
+      }));
+
+      const activeUserHasCompany =
+        userWithoutPassword.userHasCompany?.find(
+          (uhc) =>
+            uhc.company?.id === userWithoutPassword.activeCompanyId,
+        );
+
+      const activeCompanyEntity =
+        activeUserHasCompany?.company ?? null;
+
+      const activeCompanyBranch = activeUserHasCompany?.branch
+        ? {
+          id: activeUserHasCompany.branch.id,
+          name: activeUserHasCompany.branch.name,
+        }
+        : null;
+
+      const activeCompany = activeCompanyEntity
+        ? {
+          ...activeCompanyEntity,
+
+          tauxCompanies: activeCompanyEntity.tauxCompanies ?? [],
+          country: activeCompanyEntity.country ?? null,
+          city: activeCompanyEntity.city ?? null,
+          category: activeCompanyEntity.category ?? null,
+
+          branch: activeCompanyBranch,
+
+          companyResources: (
+            activeCompanyEntity.companyResources || []
+          ).map((cr) => ({
+            id: cr.id,
+            canCreate: cr.can_create,
+            canRead: cr.can_read,
+            canUpdate: cr.can_update,
+            canDelete: cr.can_delete,
+            canManage: cr.can_manage,
+            status: cr.status,
+
+            resource: cr.resource
+              ? {
+                id: cr.resource.id,
+                name: cr.resource.name,
+                label: cr.resource.label,
+              }
+              : null,
+          })),
+
+          userResources: (
+            activeUserHasCompany?.resources || []
+          ).map((r) => ({
+            id: r.id,
+            canCreate: r.canCreate,
+            canRead: r.canRead,
+            canUpdate: r.canUpdate,
+            canDelete: r.canDelete,
+            canManage: r.canManage,
+            status: r.status,
+
+            resource: r.resource
+              ? {
+                id: r.resource.id,
+                name: r.resource.name,
+                label: r.resource.label,
+              }
+              : null,
+          })),
+
+          branches: (
+            activeCompanyEntity.branches || []
+          ).map((b) => ({
+            id: b.id,
+            name: b.name,
+            address: b.address,
+            phone: b.phone,
+            email: b.email,
+            status: b.status,
+            deleted: b.deleted,
+
+            country: b.country
+              ? {
+                id: b.country.id,
+                name: b.country.name,
+              }
+              : null,
+
+            city: b.city
+              ? {
+                id: b.city.id,
+                name: b.city.name,
+              }
+              : null,
+          })),
+        }
+        : null;
 
       const userPlatformRoles = (
         userWithoutPassword.userPlatformRoles || []
@@ -4193,36 +4185,21 @@ export class UsersService {
         role: upr.role,
       }));
 
-      // ============================================================
-      // DEFAULT ADDRESS
-      // ============================================================
-
-      const defaultAddress =
-        userWithoutPassword.defaultAddress
-          ? {
-            id: userWithoutPassword.defaultAddress.id,
-            firstName:
-              userWithoutPassword.defaultAddress.firstName,
-            lastName:
-              userWithoutPassword.defaultAddress.lastName,
-            address:
-              userWithoutPassword.defaultAddress.address,
-            phone:
-              userWithoutPassword.defaultAddress.phone,
-            type:
-              userWithoutPassword.defaultAddress.type,
-            isDefault:
-              userWithoutPassword.defaultAddress.isDefault,
-            latitude:
-              userWithoutPassword.defaultAddress.latitude,
-            longitude:
-              userWithoutPassword.defaultAddress.longitude,
-            createdAt:
-              userWithoutPassword.defaultAddress.createdAt,
-            updatedAt:
-              userWithoutPassword.defaultAddress.updatedAt,
-          }
-          : null;
+      const defaultAddress = userWithoutPassword.defaultAddress
+        ? {
+          id: userWithoutPassword.defaultAddress.id,
+          firstName: userWithoutPassword.defaultAddress.firstName,
+          lastName: userWithoutPassword.defaultAddress.lastName,
+          address: userWithoutPassword.defaultAddress.address,
+          phone: userWithoutPassword.defaultAddress.phone,
+          type: userWithoutPassword.defaultAddress.type,
+          isDefault: userWithoutPassword.defaultAddress.isDefault,
+          latitude: userWithoutPassword.defaultAddress.latitude,
+          longitude: userWithoutPassword.defaultAddress.longitude,
+          createdAt: userWithoutPassword.defaultAddress.createdAt,
+          updatedAt: userWithoutPassword.defaultAddress.updatedAt,
+        }
+        : null;
 
       return instanceToPlain({
         ...userWithoutPassword,
