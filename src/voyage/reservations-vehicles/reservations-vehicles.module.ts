@@ -35,9 +35,12 @@ import { MailOrderService } from 'src/email/emailorder.service';
 import { TransactionModule } from 'src/transaction/transaction.module';
 import { Meal } from '../meal/entity/meal.entity';
 import { ReservationMeal } from '../meal/entity/reservation-meal.entity';
-import { FpayModule } from 'src/fpay/fpay.module'; // ✅ Importer FpayModule
+import { FpayModule } from 'src/fpay/fpay.module';
 import { Product } from 'src/products/entities/product.entity';
 import { ReferralEntity } from 'src/users/entities/referral.entity';
+
+// ✅ AJOUT : OrderModule (pour OrderDeliveryService)
+import { OrderModule } from 'src/order/order.module';
 
 @Module({
   imports: [
@@ -60,10 +63,9 @@ import { ReferralEntity } from 'src/users/entities/referral.entity';
       CompanyHasUserResource,
       Meal,
       ReservationMeal,
-      FpayModule,
       Product,
-      ReferralEntity
-      // ✅ SUPPRIMER FpayModule d'ici - ce n'est pas une entité !
+      ReferralEntity,
+      // ✅ FpayModule retiré de forFeature (n'est pas une entité)
     ]),
     forwardRef(() => NotificationsModule),
     forwardRef(() => MailModule),
@@ -71,7 +73,8 @@ import { ReferralEntity } from 'src/users/entities/referral.entity';
     forwardRef(() => TransactionModule),
     forwardRef(() => RideModule),
     forwardRef(() => DriverLocationModule),
-    FpayModule, // ✅ AJOUTER FpayModule ici (dans imports, pas dans TypeOrmModule)
+    forwardRef(() => OrderModule),   // ✅ AJOUT — résout OrderDeliveryService
+    FpayModule,
   ],
   providers: [
     ReservationsVehiclesService,
