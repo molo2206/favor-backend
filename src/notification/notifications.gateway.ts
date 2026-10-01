@@ -845,7 +845,7 @@ export class NotificationsGateway
     // ============================================================
     // 📤 RÉPONSE PRIVÉE AU CLIENT
     // ============================================================
-    client.emit('order-joined', {
+    client.to(roomName).emit('order-joined', {
       success: true,
       room: roomName,
       orderId,
@@ -857,16 +857,16 @@ export class NotificationsGateway
     // ============================================================
     // 📢 BROADCAST AUX AUTRES MEMBRES DE LA ROOM (SAUF l'émetteur)
     // ============================================================
-    client.to(roomName).emit('order-user-joined', {
-      success: true,
-      room: roomName,
-      orderId,
-      userId,
-      role: userRole,
-      socketId: client.id,
-      userCount: 0,
-      timestamp: new Date().toISOString(),
-    });
+    // client.to(roomName).emit('order-user-joined', {
+    //   success: true,
+    //   room: roomName,
+    //   orderId,
+    //   userId,
+    //   role: userRole,
+    //   socketId: client.id,
+    //   userCount: 0,
+    //   timestamp: new Date().toISOString(),
+    // });
 
     // ============================================================
     // 🔙 RETOUR
