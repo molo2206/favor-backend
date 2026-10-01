@@ -1556,6 +1556,7 @@ export class ShipmentService {
       fournisseurId: shipment.fournisseurId,
       fournisseurPhone: shipment.fournisseurPhone || null,
       isPaid: shipment.isPaid,
+      paid: shipment.isPaid,
     };
 
     console.log(`🔍 [Shipment] État AVANT modification:`, previousState);
