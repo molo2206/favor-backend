@@ -89,58 +89,58 @@ export class AddressUserService {
     };
   }
 
+  // async update(
+  //   id: string,
+  //   updateDto: UpdateAddressUserDto,
+  //   user: UserEntity,
+  // ): Promise<AddressUser> {
+  //   const address = await this.findOne(id, user);
+
+  //   if (updateDto.isDefault) {
+  //     await this.addressUserRepo.update(
+  //       { user, isDefault: true },
+  //       { isDefault: false },
+  //     );
+  //   }
+
+  //   if (updateDto.countryId) {
+  //     const country = await this.countryRepo.findOne({
+  //       where: { id: updateDto.countryId },
+  //     });
+  //     if (!country) {
+  //       throw new NotFoundException(`Pays avec l'ID ${updateDto.countryId} non trouvé`);
+  //     }
+  //   }
+
+  //   if (updateDto.cityId) {
+  //     const city = await this.cityRepo.findOne({
+  //       where: { id: updateDto.cityId },
+  //     });
+  //     if (!city) {
+  //       throw new NotFoundException(`Ville avec l'ID ${updateDto.cityId} non trouvée`);
+  //     }
+  //   }
+
+  //   Object.assign(address, updateDto);
+
+  //   // ✅ Sauvegarder et s'assurer d'avoir un objet unique
+  //   const savedAddress = await this.addressUserRepo.save(address);
+
+  //   // ✅ Vérifier que savedAddress est un objet et non un tableau
+  //   if (Array.isArray(savedAddress)) {
+  //     throw new Error('Erreur lors de la sauvegarde de l\'adresse');
+  //   }
+
+  //   // ✅ Utiliser savedAddress.id pour recharger
+  //   const addressWithRelations = await this.addressUserRepo.findOne({
+  //     where: { id: savedAddress.id },
+  //     relations: ['country', 'city'],
+  //   });
+
+  //   return addressWithRelations || savedAddress;
+  // }
+
   async update(
-    id: string,
-    updateDto: UpdateAddressUserDto,
-    user: UserEntity,
-  ): Promise<AddressUser> {
-    const address = await this.findOne(id, user);
-
-    if (updateDto.isDefault) {
-      await this.addressUserRepo.update(
-        { user, isDefault: true },
-        { isDefault: false },
-      );
-    }
-
-    if (updateDto.countryId) {
-      const country = await this.countryRepo.findOne({
-        where: { id: updateDto.countryId },
-      });
-      if (!country) {
-        throw new NotFoundException(`Pays avec l'ID ${updateDto.countryId} non trouvé`);
-      }
-    }
-
-    if (updateDto.cityId) {
-      const city = await this.cityRepo.findOne({
-        where: { id: updateDto.cityId },
-      });
-      if (!city) {
-        throw new NotFoundException(`Ville avec l'ID ${updateDto.cityId} non trouvée`);
-      }
-    }
-
-    Object.assign(address, updateDto);
-
-    // ✅ Sauvegarder et s'assurer d'avoir un objet unique
-    const savedAddress = await this.addressUserRepo.save(address);
-
-    // ✅ Vérifier que savedAddress est un objet et non un tableau
-    if (Array.isArray(savedAddress)) {
-      throw new Error('Erreur lors de la sauvegarde de l\'adresse');
-    }
-
-    // ✅ Utiliser savedAddress.id pour recharger
-    const addressWithRelations = await this.addressUserRepo.findOne({
-      where: { id: savedAddress.id },
-      relations: ['country', 'city'],
-    });
-
-    return addressWithRelations || savedAddress;
-  }
-
-  async updateByAdmin(
     id: string,
     updateDto: UpdateAddressUserDto,
   ): Promise<AddressUser> {
@@ -266,53 +266,54 @@ export class AddressUserService {
   }
 
   async updateDefaultAddressWithData(
-    user: UserEntity,
     addressId: string,
     updateDto: UpdateAddressUserDto,
   ): Promise<AddressUser> {
     const address = await this.addressUserRepo.findOne({
-      where: { id: addressId, user: { id: user.id } },
+      where: { id: addressId },
+      relations: ['user'],
     });
 
     if (!address) {
-      throw new NotFoundException('Adresse non trouvée pour cet utilisateur');
+      throw new NotFoundException('Adresse non trouvée');
     }
 
     const isDefault = updateDto.isDefault;
 
     if (typeof isDefault === 'boolean') {
       if (isDefault) {
-        // Définir cette adresse comme par défaut → désactiver les autres
+        // ✅ Désactiver les autres adresses par défaut DU MÊME user
         await this.addressUserRepo.update(
-          { user: { id: user.id }, isDefault: true },
+          { user: { id: address.user.id }, isDefault: true },
           { isDefault: false },
         );
+
         address.isDefault = true;
 
-        // Mettre à jour le user
-        await this.userRepo.update(user.id, {
+        // ✅ Mettre à jour le user propriétaire de l'adresse
+        await this.userRepo.update(address.user.id, {
           defaultAddressId: address.id,
         });
-
-        // Facultatif : mettre aussi la relation
-        await this.userRepo.save({ ...user, defaultAddress: address });
       } else {
         // Supprimer le statut par défaut
         address.isDefault = false;
 
-        // Si cette adresse était celle du user, on nettoie
-        if (user.defaultAddressId === address.id) {
-          await this.userRepo.update(user.id, {
+        // ⚠️ Récupérer le user propriétaire pour vérifier son defaultAddressId
+        const owner = await this.userRepo.findOne({
+          where: { id: address.user.id },
+        });
+
+        if (owner?.defaultAddressId === address.id) {
+          await this.userRepo.update(address.user.id, {
             defaultAddressId: undefined,
           });
-
-          await this.userRepo.save({ ...user, defaultAddress: undefined });
         }
       }
     }
 
-    // Mise à jour des autres champs (firstName, phone, etc.)
+    // Mise à jour des autres champs
     Object.assign(address, updateDto);
+
     return this.addressUserRepo.save(address);
   }
 

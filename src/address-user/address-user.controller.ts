@@ -44,7 +44,7 @@ export class AddressUserController {
     @Param('addressId') addressId: string,
     @Body() updateDto: UpdateAddressUserDto,
   ) {
-    const updatedAddress = await this.addressUserService.updateByAdmin(
+    const updatedAddress = await this.addressUserService.update(
       addressId,
       updateDto,
     );
@@ -72,10 +72,8 @@ export class AddressUserController {
   async updateDefaultAddressWithData(
     @Param('addressId') addressId: string,
     @Body() updateDto: UpdateAddressUserDto,
-    @CurrentUser() user: UserEntity,
   ) {
     const updatedAddress = await this.addressUserService.updateDefaultAddressWithData(
-      user,
       addressId,
       updateDto,
     );
