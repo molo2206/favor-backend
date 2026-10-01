@@ -664,9 +664,9 @@ export class NotificationsGateway
     // ============================================================
     // 🚫 VÉRIFICATION 2 : l'orderId doit exister dans la base
     // ============================================================
+    let assignment: any = null;
     try {
-      // Vérifier via l'affectation en base
-      const assignment = await this.deliveryService.findAssignmentByOrderId(orderId);
+      assignment = await this.deliveryService.findAssignmentByOrderId(orderId);
 
       if (!assignment) {
         console.warn(`🚫 [join-order] Aucune affectation pour orderId = ${orderId}`);
@@ -684,7 +684,6 @@ export class NotificationsGateway
       console.log(`✅ [join-order] Affectation trouvée pour ${orderId}`);
 
     } catch (err: any) {
-      // Si le service throw aussi
       console.warn(`🚫 [join-order] Erreur: ${err.message}`);
 
       const errResp = {
@@ -698,38 +697,65 @@ export class NotificationsGateway
     }
 
     // ============================================================
-    // ✅ Rejoindre la room
+    // 🔌 REJOINDRE LA ROOM
     // ============================================================
     const roomName = `order-${orderId}`;
     client.join(roomName);
     this.addUserRoom(userId, roomName);
-    console.log(`🔌 Client ${client.id} (user: ${userId}) joined order room: ${roomName}`);
+    console.log(`🔌 Client ${client.id} (user: ${userId}) joined room ${roomName}`);
 
-    const usersInRoom = await this.getUsersInOrderRoom(orderId);
+    // ============================================================
+    // ✨ AJOUT : CHARGER LA COMMANDE COMPLÈTE
+    // ============================================================
+    let orderData: any = null;
+    try {
+      const result = await this.deliveryService.getDeliverAssignments(userId);
 
+      if (result?.data && Array.isArray(result.data)) {
+        orderData = result.data.find((cmd: any) => cmd.id === orderId) || null;
+      }
+
+      if (orderData) {
+        console.log(`✅ [join-order] Commande chargée avec succès`);
+      }
+    } catch (err: any) {
+      console.warn(`⚠️ [join-order] Impossible de charger la commande: ${err.message}`);
+    }
+
+    // ============================================================
+    // 📤 RÉPONSE AU CLIENT QUI REJOINT
+    // ============================================================
     client.emit('order-joined', {
       success: true,
       room: roomName,
       orderId,
-      users: usersInRoom,
-      userCount: usersInRoom.length,
+      users: [],                    // 🔥 ta structure actuelle
+      userCount: 0,                 // 🔥 ta structure actuelle
+      order: orderData,             // ✨ AJOUT
     });
 
+    // ============================================================
+    // 📢 BROADCAST AUX AUTRES MEMBRES
+    // ============================================================
     client.to(roomName).emit('order-user-joined', {
       success: true,
       room: roomName,
       orderId,
       userId,
       socketId: client.id,
-      userCount: usersInRoom.length,
+      userCount: 0,
       timestamp: new Date().toISOString(),
     });
 
+    // ============================================================
+    // 🔙 RETOUR
+    // ============================================================
     return {
       success: true,
       room: roomName,
-      users: usersInRoom,
-      userCount: usersInRoom.length,
+      users: [],                    // 🔥 ta structure actuelle
+      userCount: 0,                 // 🔥 ta structure actuelle
+      order: orderData,             // ✨ AJOUT
     };
   }
 
