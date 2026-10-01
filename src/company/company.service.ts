@@ -66,6 +66,7 @@ import {
   CreateInvoiceConfigurationDto,
   UpdateInvoiceConfigurationDto,
 } from './dto/invoice-configuration.dto';
+import { PaginatedResponseDto } from 'src/products/dto/paginated-response.dto';
 
 @Injectable()
 export class CompanyService {
@@ -1173,8 +1174,14 @@ export class CompanyService {
   // ======================== FIND BY TYPE ========================
   async findByType(
     type?: string,
+    search?: string,
+    page: number = 1,
+    limit: number = 10,
     lang: string = 'fr',
-  ): Promise<{ message: string; data: CompanyEntity[] }> {
+  ): Promise<{
+    message: string;
+    data: PaginatedResponseDto<CompanyEntity>;
+  }> {
     const query = this.companyRepository
       .createQueryBuilder('company')
       .leftJoinAndSelect('company.userHasCompany', 'userHasCompany')
@@ -1187,19 +1194,64 @@ export class CompanyService {
       .leftJoinAndSelect('company.category', 'category')
       .leftJoinAndSelect('company.branches', 'branches')
       .leftJoinAndSelect('company.settings', 'settings')
-      .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
+      .leftJoinAndSelect(
+        'company.invoiceConfiguration',
+        'invoiceConfiguration',
+      )
       .orderBy('company.createdAt', 'DESC');
 
-    if (type) query.where('company.typeCompany = :type', { type });
-    const companies = await query.getMany();
+    // Filtre par type
+    if (type && type.trim()) {
+      query.andWhere('company.typeCompany = :type', {
+        type: type.trim(),
+      });
+    }
+
+    // Filtre par recherche
+    if (search && search.trim()) {
+      const keyword = `%${search.trim()}%`;
+
+      query.andWhere(
+        `(
+        company.companyName LIKE :keyword
+        OR company.email LIKE :keyword
+        OR company.phone LIKE :keyword
+        OR company.companyAddress LIKE :keyword
+        OR company.address LIKE :keyword
+        OR company.website LIKE :keyword
+      )`,
+        {
+          keyword,
+        },
+      );
+    }
+
+    // Pagination
+    const currentPage = Math.max(1, Number(page) || 1);
+    const currentLimit = Math.max(1, Number(limit) || 10);
+
+    const skip = (currentPage - 1) * currentLimit;
+
+    query
+      .skip(skip)
+      .take(currentLimit);
+
+    const [companies, total] = await query.getManyAndCount();
+
     if (!companies.length) {
       throw new NotFoundException(
         await this.i18n.translate('company_not_found', lang),
       );
     }
+
     return {
       message: await this.i18n.translate('company_created', lang),
-      data: companies,
+      data: new PaginatedResponseDto(
+        companies,
+        total,
+        currentPage,
+        currentLimit,
+      ),
     };
   }
   // ======================== GET COMPANY BY ID ========================
