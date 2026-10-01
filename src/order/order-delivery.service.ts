@@ -827,8 +827,8 @@ export class OrderDeliveryService {
         // ============================================================
         // ✅ EXISTANT : retirer le livreur de la room après livraison
         // ============================================================
-        this.notificationsGateway.leaveOrderRoom(updated.deliverId, orderId);
-        this.logger.log(`🚪 Livreur ${updated.deliverId} retiré de la room order-${orderId}`);
+        // this.notificationsGateway.leaveOrderRoom(updated.deliverId, orderId);
+        // this.logger.log(`🚪 Livreur ${updated.deliverId} retiré de la room order-${orderId}`);
 
         this.logger.log('========================================');
         this.logger.log(`✅ UPDATE STATUS - SUCCÈS`);
