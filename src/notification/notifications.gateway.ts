@@ -571,7 +571,7 @@ export class NotificationsGateway
       estimatedArrivalMinutes?: number;
       status: string;
       direction?: {
-        origin: { latitude: number; longitude: number };      // ⬅️ AJOUT
+        origin: { latitude: number; longitude: number };
         polyline: string | null;
         steps: any[];
         destination: { latitude: number; longitude: number };
@@ -580,23 +580,36 @@ export class NotificationsGateway
   ) {
     const roomName = `order-${orderId}`;
 
+    // ============================================================
+    // 🔍 VÉRIFICATION : la room existe et contient des sockets ?
+    // ============================================================
+    const room = this.server.sockets.adapter.rooms.get(roomName);
+
+    if (!room || room.size === 0) {
+      console.warn(`⚠️ [sendDeliveryLocation] Room ${roomName} vide ou inexistante`);
+      console.warn(`   → Aucun envoi car personne n'a fait join-order avec cet orderId`);
+      return;
+    }
+
+    // ============================================================
+    // 📋 LOGS : lister les sockets présents dans la room
+    // ============================================================
     const sockets = await this.server.in(roomName).fetchSockets();
     console.log(`📍 [sendDeliveryLocation] Room ${roomName} → ${sockets.length} socket(s)`);
 
-    if (sockets.length === 0) {
-      console.warn(`⚠️ PERSONNE dans la room ${roomName} → emit dans le vide`);
-    } else {
-      sockets.forEach((s: any) => {
-        console.log(`   → socket ${s.id} | userId=${s.data?.userId} | role=${s.data?.role}`);
-      });
-    }
+    sockets.forEach((s: any) => {
+      console.log(`   → socket ${s.id} | userId=${s.data?.userId} | role=${s.data?.role}`);
+    });
 
+    // ============================================================
+    // 📤 ENVOI STRICTEMENT À CETTE ROOM (order-${orderId})
+    // ============================================================
     this.server.to(roomName).emit('deliveryLocation', {
       ...payload,
       timestamp: new Date().toISOString(),
     });
 
-    console.log(`📍 deliveryLocation emitted to room ${roomName}`);
+    console.log(`📍 deliveryLocation envoyé UNIQUEMENT à la room ${roomName}`);
   }
 
   sendDeliveryStatusUpdate(
@@ -609,12 +622,26 @@ export class NotificationsGateway
   ) {
     const roomName = `order-${orderId}`;
 
+    // ============================================================
+    // 🔍 VÉRIFICATION : la room existe et contient des sockets ?
+    // ============================================================
+    const room = this.server.sockets.adapter.rooms.get(roomName);
+
+    if (!room || room.size === 0) {
+      console.warn(`⚠️ [sendDeliveryStatusUpdate] Room ${roomName} vide ou inexistante`);
+      console.warn(`   → Aucun envoi car personne n'a fait join-order avec cet orderId`);
+      return;
+    }
+
+    // ============================================================
+    // 📤 ENVOI STRICTEMENT À CETTE ROOM
+    // ============================================================
     this.server.to(roomName).emit('deliveryStatusUpdate', {
       ...payload,
       timestamp: new Date().toISOString(),
     });
 
-    console.log(`✅ deliveryStatusUpdate emitted to room ${roomName}`);
+    console.log(`✅ deliveryStatusUpdate envoyé UNIQUEMENT à la room ${roomName}`);
   }
 
   private parseBody<T = any>(data: any): T | null {
@@ -646,9 +673,10 @@ export class NotificationsGateway
     // 🚫 VÉRIFICATION 1 : le client doit être identifié
     // ============================================================
     const userId = client.data?.userId;
+    const userRole = client.data?.role;
+
     if (!userId) {
       console.warn(`🚫 [join-order] Socket ${client.id} NON identifié`);
-      console.warn(`   socket.data = ${JSON.stringify(client.data)}`);
 
       const errResp = {
         success: false,
@@ -662,7 +690,7 @@ export class NotificationsGateway
     const { orderId } = payload;
 
     // ============================================================
-    // 🚫 VÉRIFICATION 2 : l'orderId doit exister dans la base
+    // 🚫 VÉRIFICATION 2 : l'orderId doit exister en base
     // ============================================================
     let assignment: any = null;
     try {
@@ -697,51 +725,113 @@ export class NotificationsGateway
     }
 
     // ============================================================
+    // 🔐 VÉRIFICATION 3 : contrôle d'accès STRICT
+    // ============================================================
+    const orderInfo = await this.deliveryService.getOrderAccessInfo(orderId);
+
+    if (!orderInfo) {
+      const errResp = {
+        success: false,
+        code: 'ORDER_NOT_FOUND',
+        message: `Commande introuvable`,
+        orderId,
+      };
+      client.emit('join-order-error', errResp);
+      return errResp;
+    }
+
+    const roleUpper = String(userRole).toUpperCase();
+
+    // 🔓 ADMIN : accès total
+    if (roleUpper === 'SUPER ADMIN' || roleUpper === 'SUPER_ADMIN' || roleUpper === 'ADMIN') {
+      console.log(`🔓 [join-order] ADMIN ${userId} → accès total`);
+    }
+    // 👤 CLIENT : doit être LE client de la commande
+    else if (roleUpper === 'CUSTOMER' || roleUpper === 'CLIENT') {
+      if (orderInfo.clientId !== userId) {
+        console.warn(`🚫 [join-order] CLIENT ${userId} n'est PAS le client de ${orderId}`);
+
+        const errResp = {
+          success: false,
+          code: 'ACCESS_DENIED',
+          message: "Vous n'êtes pas le client de cette commande",
+          orderId,
+        };
+        client.emit('join-order-error', errResp);
+        return errResp;
+      }
+      console.log(`✅ [join-order] CLIENT ${userId} autorisé`);
+    }
+    // 🚚 LIVREUR : doit être LE livreur affecté
+    else if (roleUpper === 'DELIVER' || roleUpper === 'DELIVERY' || roleUpper === 'LIVREUR') {
+      if (orderInfo.deliverId !== userId) {
+        console.warn(`🚫 [join-order] LIVREUR ${userId} n'est PAS affecté à ${orderId}`);
+
+        const errResp = {
+          success: false,
+          code: 'ACCESS_DENIED',
+          message: "Vous n'êtes pas affecté à cette commande",
+          orderId,
+        };
+        client.emit('join-order-error', errResp);
+        return errResp;
+      }
+      console.log(`✅ [join-order] LIVREUR ${userId} autorisé`);
+    }
+    // ❌ Autre rôle : refus
+    else {
+      const errResp = {
+        success: false,
+        code: 'ACCESS_DENIED',
+        message: "Votre rôle ne permet pas d'accéder à cette commande",
+        orderId,
+      };
+      client.emit('join-order-error', errResp);
+      return errResp;
+    }
+
+    // ============================================================
     // 🔌 REJOINDRE LA ROOM
     // ============================================================
     const roomName = `order-${orderId}`;
     client.join(roomName);
     this.addUserRoom(userId, roomName);
-    console.log(`🔌 Client ${client.id} (user: ${userId}) joined room ${roomName}`);
+    console.log(`🔌 Client ${client.id} (user: ${userId}, role: ${userRole}) joined room ${roomName}`);
 
     // ============================================================
-    // ✨ AJOUT : CHARGER LA COMMANDE COMPLÈTE
+    // ✨ CHARGER LA COMMANDE COMPLÈTE (cette commande uniquement)
     // ============================================================
     let orderData: any = null;
     try {
-      const result = await this.deliveryService.getDeliverAssignments(userId);
-
+      const result = await this.deliveryService.getDeliverAssignments(userId, orderId);
       if (result?.data && Array.isArray(result.data)) {
-        orderData = result.data.find((cmd: any) => cmd.id === orderId) || null;
-      }
-
-      if (orderData) {
-        console.log(`✅ [join-order] Commande chargée avec succès`);
+        orderData = result.data[0] || null;
       }
     } catch (err: any) {
       console.warn(`⚠️ [join-order] Impossible de charger la commande: ${err.message}`);
     }
 
     // ============================================================
-    // 📤 RÉPONSE AU CLIENT QUI REJOINT
+    // 📤 RÉPONSE PRIVÉE AU CLIENT
     // ============================================================
     client.emit('order-joined', {
       success: true,
       room: roomName,
       orderId,
-      users: [],                    // 🔥 ta structure actuelle
-      userCount: 0,                 // 🔥 ta structure actuelle
-      order: orderData,             // ✨ AJOUT
+      users: [],
+      userCount: 0,
+      order: orderData,
     });
 
     // ============================================================
-    // 📢 BROADCAST AUX AUTRES MEMBRES
+    // 📢 BROADCAST AUX AUTRES MEMBRES DE LA ROOM (SAUF l'émetteur)
     // ============================================================
     client.to(roomName).emit('order-user-joined', {
       success: true,
       room: roomName,
       orderId,
       userId,
+      role: userRole,
       socketId: client.id,
       userCount: 0,
       timestamp: new Date().toISOString(),
@@ -753,9 +843,9 @@ export class NotificationsGateway
     return {
       success: true,
       room: roomName,
-      users: [],                    // 🔥 ta structure actuelle
-      userCount: 0,                 // 🔥 ta structure actuelle
-      order: orderData,             // ✨ AJOUT
+      users: [],
+      userCount: 0,
+      order: orderData,
     };
   }
 

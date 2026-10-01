@@ -3,7 +3,9 @@ import { OrderNotificationHelper } from 'src/notification/utils/order-notificati
 import {
   BadRequestException,
   ForbiddenException,
+  forwardRef,
   HttpStatus,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -56,6 +58,7 @@ import { randomBytes } from 'crypto';
 import { PayOrderDto } from './dto/pay-order.dto';
 import { FpaySendDto } from 'src/fpay/dto/send.dto';
 import { ReferralEntity, ReferralStatus } from 'src/users/entities/referral.entity';
+import { NotificationsGateway } from 'src/notification/notifications.gateway';
 
 function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean {
   const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -67,6 +70,18 @@ function isValidStatusTransition(current: OrderStatus, next: OrderStatus): boole
     [OrderStatus.REJECTED]: [],
   };
   return transitions[current]?.includes(next) ?? false;
+}
+
+function noteOrStatusMessage(status: OrderStatus): string {
+  const messages: Record<OrderStatus, string> = {
+    [OrderStatus.PENDING]: 'Commande en attente',
+    [OrderStatus.VALIDATED]: 'Commande validée',
+    [OrderStatus.PROCESSING]: 'Commande en cours de traitement',
+    [OrderStatus.COMPLETED]: 'Commande complétée',
+    [OrderStatus.DELIVERED]: 'Commande livrée',
+    [OrderStatus.REJECTED]: 'Commande rejetée',
+  };
+  return messages[status] ?? `Statut changé vers ${status}`;
 }
 
 @Injectable()
@@ -103,6 +118,9 @@ export class OrderService {
     @InjectRepository(CompanyHasUserResource) private readonly companyHasUserResourceRepo: Repository<CompanyHasUserResource>,
     @InjectRepository(ReferralEntity)
     private readonly referralRepo: Repository<ReferralEntity>,
+
+    @Inject(forwardRef(() => NotificationsGateway))
+    private readonly notificationsGateway: NotificationsGateway,
   ) { }
 
   private getUserLanguage(user: UserEntity): string {
@@ -1939,9 +1957,9 @@ export class OrderService {
         'subOrders.company',
         'user',
         'addressUser',
-        'deliveryAssignments',              // 🔥 AJOUT
-        'deliveryAssignments.deliver',      // 🔥 AJOUT
-        'deliveryAssignments.assignedBy',   // 🔥 AJOUT
+        'deliveryAssignments',
+        'deliveryAssignments.deliver',
+        'deliveryAssignments.assignedBy',
       ],
     });
     if (!order) {
@@ -2146,6 +2164,15 @@ export class OrderService {
 
     const updatedOrder = await this.orderRepo.save(order);
     this.processOrderStatusUpdate(order, dto.status, isNewlyValidated, lang).catch((err) => console.error('Erreur notifications statut commande:', err));
+
+    // ============================================================
+    // ✅ AJOUT : émettre le changement de statut à la room order-XXX
+    // ============================================================
+    this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
+      orderId,
+      status: order.status as string,
+      note: noteOrStatusMessage(dto.status),  // ← helper (voir plus bas)
+    });
 
     return {
       message: this.i18nService.translate('order.order_status_updated_message', lang, { orderId }),

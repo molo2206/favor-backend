@@ -825,6 +825,41 @@ export class OrderDeliveryService {
         };
     }
 
+    /**
+ * 🔐 Récupérer uniquement les IDs nécessaires pour vérifier l'accès à une commande
+ */
+    async getOrderAccessInfo(orderId: string): Promise<{
+        clientId: string;
+        deliverId: string | null;
+        assignedById: string | null;
+    } | null> {
+        this.logger.log(`🔐 [getOrderAccessInfo] orderId = ${orderId}`);
+
+        const order = await this.orderRepo.findOne({
+            where: { id: orderId },
+            select: ['id', 'userId'],
+        });
+
+        if (!order) {
+            this.logger.warn(`❌ Commande introuvable: ${orderId}`);
+            return null;
+        }
+
+        const assignment = await this.assignmentRepo.findOne({
+            where: {
+                orderId,
+                isActive: true,
+            },
+            select: ['id', 'deliverId', 'assignedById'],
+        });
+
+        return {
+            clientId: order.userId,
+            deliverId: assignment?.deliverId || null,
+            assignedById: assignment?.assignedById || null,
+        };
+    }
+
     // ============================================================
     // 2️⃣ DÉMARRER / ARRÊTER LE TRACKING
     // ============================================================
