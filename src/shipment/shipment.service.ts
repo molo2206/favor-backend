@@ -1869,6 +1869,7 @@ export class ShipmentService {
     // ============================================================
     if (dto.isPaid !== undefined) {
       shipment.isPaid = dto.isPaid;
+      shipment.paid = dto.isPaid;
     }
 
     // ============================================================
