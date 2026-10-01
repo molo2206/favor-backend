@@ -6,6 +6,7 @@ import {
     ConflictException,
     Inject,
     forwardRef,
+    ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -540,6 +541,7 @@ export class OrderDeliveryService {
         location: {
             latitude: number;
             longitude: number;
+            deliverId?: string;   // ✅ AJOUT (optionnel pour ne rien casser)
         },
     ) {
         this.logger.log('========================================');
@@ -547,6 +549,7 @@ export class OrderDeliveryService {
         this.logger.log(`   orderId   = ${orderId}`);
         this.logger.log(`   latitude  = ${location.latitude}`);
         this.logger.log(`   longitude = ${location.longitude}`);
+        this.logger.log(`   deliverId = ${location.deliverId}`);   // ✅ AJOUT log
         this.logger.log('========================================');
 
         // 1. Récupérer l'affectation active
@@ -567,6 +570,19 @@ export class OrderDeliveryService {
         this.logger.log(`   id        = ${assignment.id}`);
         this.logger.log(`   status    = ${assignment.status}`);
         this.logger.log(`   deliverId = ${assignment.deliverId}`);
+
+        // ============================================================
+        // ✅ AJOUT : VÉRIFICATION QUE LE LIVREUR EST BIEN CELUI AFFECTÉ
+        // ============================================================
+        if (location.deliverId && assignment.deliverId !== location.deliverId) {
+            this.logger.warn(
+                `🚫 [updateLocation] LIVREUR ${location.deliverId} N'EST PAS affecté à ${orderId} ` +
+                `(affecté à: ${assignment.deliverId})`,
+            );
+            throw new ForbiddenException(
+                `Le livreur ${location.deliverId} n'est pas affecté à la commande ${orderId}`,
+            );
+        }
 
         // 2. Coordonnées cibles
         const targetLatitude = assignment.order.addressUser?.latitude;
@@ -671,7 +687,7 @@ export class OrderDeliveryService {
             estimatedArrivalMinutes: updated.estimatedArrivalMinutes,
             status: updated.status as string,
             direction: {
-                origin: {                              // ⬅️ AJOUT
+                origin: {
                     latitude: location.latitude,
                     longitude: location.longitude,
                 },

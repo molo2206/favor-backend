@@ -38,9 +38,9 @@ export class WsAuthHelper {
 
     /**
      * ✅ Extrait le token depuis :
-     *   1. headers.authorization  (Bearer) → Priorité (mobile envoie ici)
-     *   2. query.token            → Fallback (mobile envoie ici aussi)
-     *   3. auth.token             → Fallback (Socket.IO natif)
+     *   1. headers.authorization  (Bearer)
+     *   2. query.token
+     *   3. auth.token (Socket.IO natif)
      */
     extractToken(socket: any): string | null {
         // 1️⃣ Priorité : header Authorization Bearer
@@ -86,17 +86,48 @@ export class WsAuthHelper {
     private cleanToken(raw: string): string | null {
         let token = raw.trim();
 
-        // Retirer "Bearer " (insensible à la casse)
         if (token.toLowerCase().startsWith('bearer ')) {
             token = token.substring(7).trim();
         }
 
-        // Vérifier que c'est un JWT valide (3 parties)
         if (token.split('.').length !== 3) {
             this.logger.warn(`Token malformé (pas 3 parties)`);
             return null;
         }
 
         return token;
+    }
+
+    // ============================================================
+    // ✅ NOUVEAU : helpers "livreur"
+    // ============================================================
+
+    /**
+     * Vérifie si un rôle correspond à un livreur
+     */
+    isDeliverRole(role?: string | null): boolean {
+        if (!role) return false;
+        const r = String(role).toUpperCase().replace(/\s+/g, '_');
+        return r === 'DELIVER' || r === 'DELIVERY' || r === 'LIVREUR';
+    }
+
+    /**
+     * Extrait le deliverId depuis un socket identifié.
+     * Retourne null si :
+     *   - socket non identifié (pas de client.data.userId)
+     *   - rôle ≠ livreur
+     */
+    extractDeliverId(socket: any): string | null {
+        const userId = socket?.data?.userId;
+        const role = socket?.data?.role;
+        if (!userId) return null;
+        return this.isDeliverRole(role) ? userId : null;
+    }
+
+    /**
+     * Extrait l'userId depuis un socket identifié (peu importe le rôle)
+     */
+    extractUserId(socket: any): string | null {
+        return socket?.data?.userId || null;
     }
 }

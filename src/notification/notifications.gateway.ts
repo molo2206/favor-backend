@@ -1022,35 +1022,82 @@ export class NotificationsGateway
   ) {
     const payload = this.parseBody<{ orderId: string }>(data);
 
-    // 🔐 Récupérer deliverId depuis le socket (JWT déjà validé)
-    const deliverId = client.data?.userId;
+    // ✅ Récupérer deliverId depuis le token (vérifie aussi le rôle)
+    const deliverId = this.wsAuthHelper.extractDeliverId(client);
     if (!deliverId) {
-      return { status: 'error', message: 'Non authentifié' };
+      const errResp = {
+        status: 'error',
+        code: 'NOT_A_DELIVER',
+        message: 'Seul un livreur authentifié peut se connecter à une room',
+      };
+      client.emit('livreur:connect-error', errResp);
+      return errResp;
     }
 
     if (!payload?.orderId) {
-      return { status: 'error', message: 'orderId requis' };
+      const errResp = {
+        status: 'error',
+        code: 'INVALID_PAYLOAD',
+        message: 'orderId requis',
+      };
+      client.emit('livreur:connect-error', errResp);
+      return errResp;
     }
 
     const { orderId } = payload;
     console.log(`🔌 [Gateway] livreur:connect - ${deliverId} → order ${orderId}`);
 
     try {
+      // ============================================================
+      // 🔐 CONTRÔLE D'ACCÈS : le livreur est-il bien affecté à CETTE commande ?
+      // ============================================================
+      const orderInfo = await this.deliveryService.getOrderAccessInfo(orderId);
+
+      if (!orderInfo) {
+        const errResp = {
+          status: 'error',
+          code: 'ORDER_NOT_FOUND',
+          message: `Commande ${orderId} introuvable`,
+        };
+        client.emit('livreur:connect-error', errResp);
+        return errResp;
+      }
+
+      if (orderInfo.deliverId !== deliverId) {
+        console.warn(
+          `🚫 [livreur:connect] LIVREUR ${deliverId} N'EST PAS affecté à ${orderId} ` +
+          `(affecté à: ${orderInfo.deliverId})`,
+        );
+        const errResp = {
+          status: 'error',
+          code: 'ACCESS_DENIED',
+          message: "Vous n'êtes pas affecté à cette commande",
+        };
+        client.emit('livreur:connect-error', errResp);
+        return errResp;
+      }
+
+      // ============================================================
+      // 🔌 REJOINDRE LA ROOM
+      // ============================================================
       const roomName = `order-${orderId}`;
       client.join(roomName);
-      // ✅ AJOUT : tracer la room
       this.addUserRoom(deliverId, roomName);
 
       console.log(`✅ Livreur ${deliverId} joined room ${roomName}`);
 
-      return {
+      const successResp = {
         status: 'connected',
         message: 'Connecté à la room',
         data: { orderId, deliverId, roomName },
       };
+      client.emit('livreur:connect-success', successResp);
+      return successResp;
     } catch (err: any) {
       console.error(`❌ Erreur connect: ${err.message}`);
-      return { status: 'error', message: err.message };
+      const errResp = { status: 'error', message: err.message };
+      client.emit('livreur:connect-error', errResp);
+      return errResp;
     }
   }
 
@@ -1064,28 +1111,77 @@ export class NotificationsGateway
   ) {
     const payload = this.parseBody<{ orderId: string; action: 'start' | 'stop' }>(data);
 
-    // 🔐 Récupérer deliverId depuis le socket
-    const deliverId = client.data?.userId;
+    // ✅ Récupérer deliverId depuis le token
+    const deliverId = this.wsAuthHelper.extractDeliverId(client);
     if (!deliverId) {
-      return { status: 'error', message: 'Non authentifié' };
+      const errResp = {
+        status: 'error',
+        code: 'NOT_A_DELIVER',
+        message: 'Seul un livreur authentifié peut gérer le tracking',
+      };
+      client.emit('tracking-error', errResp);
+      return errResp;
     }
 
     if (!payload?.orderId || !payload?.action) {
-      return { status: 'error', message: 'orderId et action requis' };
+      const errResp = {
+        status: 'error',
+        code: 'INVALID_PAYLOAD',
+        message: 'orderId et action requis',
+      };
+      client.emit('tracking-error', errResp);
+      return errResp;
     }
 
     const { orderId, action } = payload;
     console.log(`🚚 [Gateway] livreur:tracking - ${action} → order ${orderId} | deliver=${deliverId}`);
 
     try {
-      // Gestion du tracking actif en mémoire
+      // ============================================================
+      // 🔐 CONTRÔLE D'ACCÈS
+      // ============================================================
+      const orderInfo = await this.deliveryService.getOrderAccessInfo(orderId);
+
+      if (!orderInfo) {
+        const errResp = {
+          status: 'error',
+          code: 'ORDER_NOT_FOUND',
+          message: `Commande ${orderId} introuvable`,
+        };
+        client.emit('tracking-error', errResp);
+        return errResp;
+      }
+
+      if (orderInfo.deliverId !== deliverId) {
+        console.warn(
+          `🚫 [livreur:tracking] LIVREUR ${deliverId} N'EST PAS affecté à ${orderId} ` +
+          `(affecté à: ${orderInfo.deliverId})`,
+        );
+        const errResp = {
+          status: 'error',
+          code: 'ACCESS_DENIED',
+          message: "Vous n'êtes pas affecté à cette commande",
+        };
+        client.emit('tracking-error', errResp);
+        return errResp;
+      }
+
+      // ============================================================
+      // 🔌 S'assurer que le livreur est dans la room
+      // ============================================================
+      const roomName = `order-${orderId}`;
+      client.join(roomName);
+      this.addUserRoom(deliverId, roomName);
+
+      // ============================================================
+      // 📡 START / STOP
+      // ============================================================
       if (action === 'start') {
         if (!this.activeTrackings.has(deliverId)) {
           this.activeTrackings.set(deliverId, new Set());
         }
         this.activeTrackings.get(deliverId)!.add(orderId);
 
-        const roomName = `order-${orderId}`;
         this.server.to(roomName).emit('trackingStarted', {
           orderId,
           deliverId,
@@ -1094,23 +1190,23 @@ export class NotificationsGateway
 
         console.log(`✅ Tracking STARTED - ${deliverId} → order-${orderId}`);
 
-        return {
+        const successResp = {
           status: 'started',
           message: 'Tracking démarré',
           data: { orderId, deliverId, action: 'start' },
         };
+        client.emit('tracking-started', successResp);
+        return successResp;
       }
 
       if (action === 'stop') {
         if (this.activeTrackings.has(deliverId)) {
           this.activeTrackings.get(deliverId)!.delete(orderId);
-
           if (this.activeTrackings.get(deliverId)!.size === 0) {
             this.activeTrackings.delete(deliverId);
           }
         }
 
-        const roomName = `order-${orderId}`;
         this.server.to(roomName).emit('trackingStopped', {
           orderId,
           deliverId,
@@ -1119,17 +1215,23 @@ export class NotificationsGateway
 
         console.log(`✅ Tracking STOPPED - ${deliverId} → order-${orderId}`);
 
-        return {
+        const successResp = {
           status: 'stopped',
           message: 'Tracking arrêté',
           data: { orderId, deliverId, action: 'stop' },
         };
+        client.emit('tracking-stopped', successResp);
+        return successResp;
       }
 
-      return { status: 'error', message: `Action inconnue : ${action}` };
+      const errResp = { status: 'error', code: 'INVALID_ACTION', message: `Action inconnue : ${action}` };
+      client.emit('tracking-error', errResp);
+      return errResp;
     } catch (err: any) {
       console.error(`❌ Erreur tracking: ${err.message}`);
-      return { status: 'error', message: err.message };
+      const errResp = { status: 'error', message: err.message };
+      client.emit('tracking-error', errResp);
+      return errResp;
     }
   }
 
@@ -1147,19 +1249,18 @@ export class NotificationsGateway
       longitude: number;
     }>(data);
 
-    // 🔐 Récupérer deliverId depuis le socket
-    const deliverId = client.data?.userId;
+    // ✅ Récupérer deliverId depuis le token
+    const deliverId = this.wsAuthHelper.extractDeliverId(client);
     if (!deliverId) {
       const errResp = {
         status: 'error',
-        code: 'NOT_AUTHENTICATED',
-        message: 'Non authentifié. Envoyez "connection" avec un JWT valide.',
+        code: 'NOT_A_DELIVER',
+        message: 'Seul un livreur authentifié peut envoyer une position',
       };
       client.emit('position-error', errResp);
       return errResp;
     }
 
-    // 🔍 Valider le payload
     if (!payload?.orderId || payload.latitude == null || payload.longitude == null) {
       const errResp = {
         status: 'error',
@@ -1178,7 +1279,7 @@ export class NotificationsGateway
     console.log(`   lat/lng   = ${latitude}, ${longitude}`);
     console.log('═══════════════════════════════════════════');
 
-    // ✅ Vérifier que le tracking est actif
+    // ✅ Vérif 1 : tracking actif en mémoire
     const isTracking = this.activeTrackings.get(deliverId)?.has(orderId);
     if (!isTracking) {
       console.warn(`⚠️ Tracking inactif pour ${deliverId} → order-${orderId}`);
@@ -1191,17 +1292,53 @@ export class NotificationsGateway
       return errResp;
     }
 
+    // ============================================================
+    // ✅ Vérif 2 : le livreur est-il bien affecté à CETTE commande ?
+    // ============================================================
     try {
-      // ============================================================
-      // 🎯 APPEL DU SERVICE
-      // ⚠️ Le service THROW si l'affectation n'existe pas
-      // ============================================================
+      const orderInfo = await this.deliveryService.getOrderAccessInfo(orderId);
+
+      if (!orderInfo || orderInfo.deliverId !== deliverId) {
+        console.warn(
+          `🚫 [livreur:position] LIVREUR ${deliverId} N'EST PAS affecté à ${orderId} ` +
+          `(affecté à: ${orderInfo?.deliverId ?? 'inconnu'})`,
+        );
+
+        // 🔥 Stoppe le tracking fantôme en mémoire
+        this.activeTrackings.get(deliverId)?.delete(orderId);
+
+        const errResp = {
+          status: 'error',
+          code: 'ACCESS_DENIED',
+          message: "Vous n'êtes pas affecté à cette commande",
+          orderId,
+          timestamp: new Date().toISOString(),
+        };
+        client.emit('position-error', errResp);
+        return errResp;
+      }
+    } catch (accessErr: any) {
+      console.error(`❌ [livreur:position] Erreur vérif accès: ${accessErr.message}`);
+      const errResp = {
+        status: 'error',
+        code: 'ACCESS_CHECK_FAILED',
+        message: 'Impossible de vérifier vos droits sur cette commande',
+        orderId,
+      };
+      client.emit('position-error', errResp);
+      return errResp;
+    }
+
+    // ============================================================
+    // 🎯 APPEL DU SERVICE (avec deliverId pour double vérif)
+    // ============================================================
+    try {
       await this.deliveryService.updateLocation(orderId, {
         latitude,
         longitude,
+        deliverId, // ✅ passe deliverId pour double vérif côté service
       });
 
-      // ✅ SUCCÈS
       console.log(`✅ Position traitée avec succès pour order-${orderId}`);
       const successResp = {
         status: 'position_received',
@@ -1210,28 +1347,21 @@ export class NotificationsGateway
       };
       client.emit('position-success', successResp);
       return successResp;
-
     } catch (err: any) {
-      // ============================================================
-      // ❌ ERREUR → distinguer les cas
-      // ============================================================
       console.error(`❌ Erreur position pour order-${orderId}: ${err.message}`);
 
-      // Détecter le type d'erreur
       let code = 'UNKNOWN_ERROR';
       let message = err.message || 'Erreur inconnue';
 
-      // NestJS NotFoundException
       if (err.status === 404 || err.message?.includes('Aucune affectation active')) {
         code = 'ASSIGNMENT_NOT_FOUND';
         message = `Aucune affectation active pour la commande ${orderId}. Contactez le support.`;
-      }
-      // NestJS BadRequestException
-      else if (err.status === 400) {
+      } else if (err.status === 403 || err.message?.includes("n'est pas affecté")) {
+        code = 'ACCESS_DENIED';
+        message = "Vous n'êtes pas affecté à cette commande";
+      } else if (err.status === 400) {
         code = 'BAD_REQUEST';
-      }
-      // Erreur Google Maps
-      else if (err.message?.includes('Google')) {
+      } else if (err.message?.includes('Google')) {
         code = 'GOOGLE_DIRECTIONS_ERROR';
       }
 
@@ -1243,10 +1373,8 @@ export class NotificationsGateway
         timestamp: new Date().toISOString(),
       };
 
-      // 📢 Émettre l'erreur AU CLIENT qui a envoyé la position
       client.emit('position-error', errResp);
 
-      // 📢 Émettre AUSSI un event à la room (pour prévenir les autres)
       if (code === 'ASSIGNMENT_NOT_FOUND') {
         this.server.to(`order-${orderId}`).emit('deliveryPositionFailed', {
           orderId,
