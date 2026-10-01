@@ -2321,6 +2321,9 @@ export class ProductService {
     // ============================================================
     const countBuilder = this.productRepo
       .createQueryBuilder('product')
+      .leftJoin('product.category', 'category')
+      .leftJoin('category.parent', 'categoryParent')
+      .leftJoin('category.children', 'categoryChildren')
       .leftJoin('product.company', 'company')
       .leftJoin('company.country', 'country')
       .leftJoin('company.city', 'city')
