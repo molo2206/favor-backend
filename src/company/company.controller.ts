@@ -55,6 +55,7 @@ import { I18nService } from 'src/libs/common/src';
 import { Request } from 'express';
 import { CreateCompanySettingsDto, UpdateCompanySettingsDto } from './dto/create-company-settings.dto';
 import { CreateInvoiceConfigurationDto, UpdateInvoiceConfigurationDto } from './dto/invoice-configuration.dto';
+import { PaginatedResponseDto } from 'src/products/dto/paginated-response.dto';
 
 @Controller('company')
 export class CompanyController {
@@ -276,9 +277,22 @@ export class CompanyController {
   async getCompaniesByType(
     @Req() req: Request,
     @Query('type') type?: string,
-  ): Promise<{ message: string; data: CompanyEntity[] }> {
+    @Query('search') search?: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+  ): Promise<{
+    message: string;
+    data: PaginatedResponseDto<CompanyEntity>;
+  }> {
     const lang = this.extractLanguage(req);
-    return this.companyService.findByType(type, lang);
+
+    return this.companyService.findByType(
+      type,
+      search,
+      Number(page),
+      Number(limit),
+      lang,
+    );
   }
 
   @Get(':id')
