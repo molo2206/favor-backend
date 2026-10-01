@@ -777,15 +777,56 @@ export class OrderDeliveryService {
             `✅ Affectation sauvegardée (nouveau status: ${updated.status})`,
         );
 
-        this.logger.log(`📡 Diffusion WebSocket...`);
+        // ============================================================
+        // ✅ EXISTANT : diffusion deliveryStatusUpdate
+        // ============================================================
+        this.logger.log(`📡 Diffusion WebSocket (deliveryStatusUpdate)...`);
         this.notificationsGateway.sendDeliveryStatusUpdate(orderId, {
             orderId,
             status: updated.status as string,
             note: note ?? 'Livraison confirmée par PIN',
         });
-        this.logger.log(`✅ Diffusé`);
+        this.logger.log(`✅ deliveryStatusUpdate diffusé`);
 
-        // ✅ CORRECTION : retirer le livreur de la room après livraison
+        // ============================================================
+        // ✅ NOUVEAU : diffusion order-joined (commande complète)
+        //    Pour que le front hydrate l'ordre complet à jour.
+        // ============================================================
+        try {
+            const fullOrder = await this.orderRepo.findOne({
+                where: { id: orderId },
+                relations: [
+                    'orderItems.product.company',
+                    'orderItems.product.category',
+                    'orderItems.product.measure',
+                    'subOrders',
+                    'subOrders.items.product.company',
+                    'subOrders.items.product.category',
+                    'subOrders.items.product.measure',
+                    'subOrders.company',
+                    'user',
+                    'addressUser',
+                    'deliveryAssignments',
+                    'deliveryAssignments.deliver',
+                    'deliveryAssignments.assignedBy',
+                ],
+            });
+
+            await this.notificationsGateway.sendOrderJoinedToRoom(orderId, {
+                orderId,
+                order: fullOrder,
+            });
+            this.logger.log(`✅ order-joined diffusé à la room order-${orderId}`);
+        } catch (err: any) {
+            this.logger.error(
+                `⚠️ [updateStatus] sendOrderJoinedToRoom échoué: ${err.message}`,
+            );
+            // On ne throw pas → ne casse pas le retour de la méthode
+        }
+
+        // ============================================================
+        // ✅ EXISTANT : retirer le livreur de la room après livraison
+        // ============================================================
         this.notificationsGateway.leaveOrderRoom(updated.deliverId, orderId);
         this.logger.log(`🚪 Livreur ${updated.deliverId} retiré de la room order-${orderId}`);
 
@@ -795,7 +836,6 @@ export class OrderDeliveryService {
 
         return updated;
     }
-
     // ============================================================
     // 1️⃣ CONNECTER LE LIVREUR À LA ROOM
     // ============================================================
