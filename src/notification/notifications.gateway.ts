@@ -580,36 +580,51 @@ export class NotificationsGateway
   ) {
     const roomName = `order-${orderId}`;
 
-    // ============================================================
-    // 🔍 VÉRIFICATION : la room existe et contient des sockets ?
-    // ============================================================
-    const room = this.server.sockets.adapter.rooms.get(roomName);
+    try {
+      // ============================================================
+      // 🛡️ GARDE-FOU : server initialisé ?
+      // ============================================================
+      if (!this.server) {
+        console.warn(`⚠️ [sendDeliveryLocation] this.server undefined - skip`);
+        return;
+      }
 
-    if (!room || room.size === 0) {
-      console.warn(`⚠️ [sendDeliveryLocation] Room ${roomName} vide ou inexistante`);
-      console.warn(`   → Aucun envoi car personne n'a fait join-order avec cet orderId`);
-      return;
+      // ============================================================
+      // 🔍 VÉRIFICATION : la room existe et contient des sockets ?
+      //    ✅ API officielle Socket.IO (safe, async)
+      // ============================================================
+      const sockets = await this.server.in(roomName).fetchSockets();
+
+      if (!sockets || sockets.length === 0) {
+        console.warn(`⚠️ [sendDeliveryLocation] Room ${roomName} vide ou inexistante`);
+        console.warn(`   → Aucun envoi car personne n'a fait join-order avec cet orderId`);
+        return;
+      }
+
+      // ============================================================
+      // 📋 LOGS : lister les sockets présents dans la room
+      // ============================================================
+      console.log(`📍 [sendDeliveryLocation] Room ${roomName} → ${sockets.length} socket(s)`);
+
+      sockets.forEach((s: any) => {
+        console.log(`   → socket ${s.id} | userId=${s.data?.userId} | role=${s.data?.role}`);
+      });
+
+      // ============================================================
+      // 📤 ENVOI STRICTEMENT À CETTE ROOM (order-${orderId})
+      // ============================================================
+      this.server.to(roomName).emit('deliveryLocation', {
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(`📍 deliveryLocation envoyé UNIQUEMENT à la room ${roomName}`);
+    } catch (err: any) {
+      // ============================================================
+      // 🛡️ NE JAMAIS laisser crasher le process
+      // ============================================================
+      console.error(`❌ [sendDeliveryLocation] Erreur:`, err?.message);
     }
-
-    // ============================================================
-    // 📋 LOGS : lister les sockets présents dans la room
-    // ============================================================
-    const sockets = await this.server.in(roomName).fetchSockets();
-    console.log(`📍 [sendDeliveryLocation] Room ${roomName} → ${sockets.length} socket(s)`);
-
-    sockets.forEach((s: any) => {
-      console.log(`   → socket ${s.id} | userId=${s.data?.userId} | role=${s.data?.role}`);
-    });
-
-    // ============================================================
-    // 📤 ENVOI STRICTEMENT À CETTE ROOM (order-${orderId})
-    // ============================================================
-    this.server.to(roomName).emit('deliveryLocation', {
-      ...payload,
-      timestamp: new Date().toISOString(),
-    });
-
-    console.log(`📍 deliveryLocation envoyé UNIQUEMENT à la room ${roomName}`);
   }
 
   sendDeliveryStatusUpdate(
