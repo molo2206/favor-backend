@@ -1105,9 +1105,10 @@ export class OrderDeliveryService {
     // ============================================================
     // 🚚 LISTE DES AFFECTATIONS ACTIVES DU LIVREUR
     // ============================================================
-    async getDeliverAssignments(userId: string) {
+    // ============================================================
+    async getDeliverAssignments(userId: string, filterOrderId?: string) {
         this.logger.log(
-            `📋 GET DELIVER ASSIGNMENTS - userId = ${userId}`,
+            `📋 GET DELIVER ASSIGNMENTS - userId = ${userId}, filterOrderId = ${filterOrderId || 'N/A'}`,
         );
 
         // 🔍 Récupérer le user pour connaître son rôle
@@ -1143,6 +1144,14 @@ export class OrderDeliveryService {
                 message: 'Aucune commande disponible pour ce rôle',
                 data: [],
             };
+        }
+
+        // ============================================================
+        // ✅ AJOUT : filtre optionnel sur orderId
+        // ============================================================
+        if (filterOrderId) {
+            query.andWhere('assignment.orderId = :filterOrderId', { filterOrderId });
+            this.logger.log(`🎯 Filtre sur orderId = ${filterOrderId}`);
         }
 
         const assignments = await query
