@@ -68,7 +68,7 @@ export class AddressUserController {
 
   @Patch(':addressId')
   @UseGuards(AuthentificationGuard)
-  @AuthorizeRoles(['ADMIN', 'SUPER ADMIN', 'CUSTOMER'])
+  @AuthorizeRoles(['DELIVER'])
   async updateDefaultAddressWithData(
     @Param('addressId') addressId: string,
     @Body() updateDto: UpdateAddressUserDto,
