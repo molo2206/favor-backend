@@ -2495,27 +2495,63 @@ export class CompanyService {
     }
 
     // ------------------------------------------------------------
-    // ATTRIBUER TOUTES LES PERMISSIONS (TOUS LES DROITS À TRUE)
-    // SUR TOUTES LES RESSOURCES DISPONIBLES
+    // ATTRIBUER LES PERMISSIONS DE L'ENTREPRISE AU NOUVEAU USER
+    // ✅ Copie des permissions du OWNER de la company
+    //    (au lieu de "tous les droits sur toutes les ressources")
     // ------------------------------------------------------------
-    const allResources = await this.resourceRepo.find();
-    // Supprimer les anciennes permissions éventuelles (normalement aucune, mais par sécurité)
+
+    // 1️⃣ Récupérer le owner (créateur) de la company
+    const owner = await this.userHasCompanyRepository.findOne({
+      where: { company: { id: activeCompanyId }, isOwner: true },
+      relations: ['resources'],
+    });
+
+    if (!owner) {
+      console.warn(
+        `⚠️ [assignUserToCompany] Aucun owner trouvé pour la company ${activeCompanyId}`,
+      );
+    }
+
+    // 2️⃣ Récupérer ses permissions
+    const ownerPermissions = owner
+      ? await this.companyUserResourceRepo.find({
+        where: { userCompanyId: owner.id, status: true },
+      })
+      : [];
+
+    console.log(
+      `ℹ️ [assignUserToCompany] Owner ${owner?.id} → ${ownerPermissions.length} permission(s) à copier`,
+    );
+
+    // 3️⃣ Supprimer les anciennes permissions éventuelles (par sécurité)
     await this.companyUserResourceRepo.delete({ userCompanyId: userHasCompany.id });
 
-    for (const resource of allResources) {
-      const newPerm = this.companyUserResourceRepo.create({
-        id: uuidv4(),
-        userCompanyId: userHasCompany.id,
-        resourceId: resource.id,
-        branchId: targetBranch.id,
-        canCreate: true,
-        canRead: true,
-        canUpdate: true,
-        canDelete: true,
-        canManage: true,
-        status: true,
-      });
-      await this.companyUserResourceRepo.save(newPerm);
+    // 4️⃣ Copier chaque permission du owner vers le nouveau user
+    if (ownerPermissions.length === 0) {
+      console.warn(
+        `⚠️ [assignUserToCompany] Aucune permission à copier → user créé sans permissions`,
+      );
+    } else {
+      for (const perm of ownerPermissions) {
+        const newPerm = this.companyUserResourceRepo.create({
+          id: uuidv4(),
+          userCompanyId: userHasCompany.id,
+          resourceId: perm.resourceId,
+          branchId: targetBranch.id,
+          // ✅ Copie EXACTE des droits du owner
+          canCreate: perm.canCreate,
+          canRead: perm.canRead,
+          canUpdate: perm.canUpdate,
+          canDelete: perm.canDelete,
+          canManage: perm.canManage,
+          status: true,
+        });
+        await this.companyUserResourceRepo.save(newPerm);
+      }
+
+      console.log(
+        `✅ [assignUserToCompany] ${ownerPermissions.length} permission(s) copiée(s) pour ${targetUser.id}`,
+      );
     }
 
     const { password, ...userWithoutPassword } = targetUser;
