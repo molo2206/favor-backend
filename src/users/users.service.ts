@@ -2029,7 +2029,6 @@ export class UsersService {
         role,
         password,
         isActive,
-        email,
         deleted,
         ...safeUpdateData
       } = updateUserDto as any;
