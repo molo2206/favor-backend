@@ -2188,95 +2188,683 @@ export class ShipmentService {
     };
   }
 
-  async updateShipmentPrices(
-    shipmentId: string,
-    priceDto: ShipmentPriceDto,
+  async updateByAdmin(
+    id: string,
+    dto: UpdateShipmentAdminDto,
+    file: Express.Multer.File | undefined,
+    currentUser: UserEntity,
     lang: string = 'fr',
   ): Promise<{ message: string; data: Shipment }> {
     const shipment = await this.shipmentRepo.findOne({
-      where: { id: shipmentId },
-      relations: ['user', 'deliveryAddress', 'package', 'ltaShipments'],
+      where: { id },
+      relations: [
+        'package',
+        'pickupTransportType',
+        'user',
+        'fournisseur',
+        'trackings',
+        'ltaShipments',
+        'pickupCompany',
+        'shippingCompany',
+        'deliveryCompany',
+      ],
     });
-    if (!shipment) {
-      throw new NotFoundException(await this.i18n.translate('shipment.error.not_found', lang, { id: shipmentId }));
+    if (!shipment) throw new NotFoundException(await this.i18n.translate('shipment.error.not_found', lang, { id }));
+
+    // ============================================================
+    // ✅ CAPTURER L'ÉTAT AVANT MODIFICATION
+    // ============================================================
+    const previousState = {
+      userId: shipment.userId,
+      clientPhone: shipment.clientPhone || null,
+      fournisseurId: shipment.fournisseurId,
+      fournisseurPhone: shipment.fournisseurPhone || null,
+      isPaid: shipment.isPaid,
+      paid: shipment.isPaid,
+    };
+
+    console.log(`🔍 [Shipment] État AVANT modification:`, previousState);
+
+    // ============================================================
+    // 🔹 USER / CLIENT (via userId direct)
+    // ============================================================
+    // ✅ CORRECTION : appliquer clientName / clientPhone TOUJOURS
+    //    avant la logique userId, pour ne pas les effacer
+    if (dto.clientName !== undefined) {
+      shipment.clientName = dto.clientName;
+    }
+    if (dto.clientPhone !== undefined) {
+      shipment.clientPhone = dto.clientPhone;
     }
 
-    const wantsToUpdatePrice =
-      priceDto.pickupPrice !== undefined ||
-      priceDto.shippingPrice !== undefined ||
-      priceDto.deliveryPrice !== undefined;
-    const enabledCount =
-      Number(shipment.pickupEnabled) +
-      Number(shipment.shippingEnabled) +
-      Number(shipment.deliveryEnabled);
-    const canUpdatePrice = enabledCount > 0;
-    if (wantsToUpdatePrice && !canUpdatePrice) {
-      throw new BadRequestException(
-        await this.i18n.translate('shipment.error.cannot_update_price_no_service', lang),
-      );
+    if (dto.userId) {
+      const user = await this.userRepo.findOneBy({ id: dto.userId });
+      if (!user) throw new NotFoundException(await this.i18n.translate('shipment.error.user_not_found', lang, { id: dto.userId }));
+      shipment.userId = user.id;
+
+      // ⚠️ On n'efface plus automatiquement clientName/clientPhone.
+      //    Si tu veux effacer, il faut le faire explicitement côté DTO.
+      // shipment.clientName = undefined;
+      // shipment.clientPhone = undefined;
     }
 
-    if (priceDto.pickupPrice !== undefined) shipment.pickupPrice = priceDto.pickupPrice;
-    if (priceDto.shippingPrice !== undefined) shipment.shippingPrice = priceDto.shippingPrice;
-    if (priceDto.deliveryPrice !== undefined) shipment.deliveryPrice = priceDto.deliveryPrice;
+    // ============================================================
+    // 🔹 DÉTECTION DU CHANGEMENT CLIENT
+    //    ✅ Payer UNIQUEMENT si : ancien VIDE → nouveau REMPLI
+    //    ❌ Ne PAS payer si : remplacé / retiré / inchangé
+    // ============================================================
+    let clientShouldBePaid = false;
 
-    shipment.totalPrice = (shipment.pickupPrice ?? 0) + (shipment.shippingPrice ?? 0) + (shipment.deliveryPrice ?? 0);
+    const oldClientPhone = (previousState.clientPhone || '').trim();
+    const newClientPhone = (dto.clientPhone || shipment.clientPhone || '').trim();
 
-    if (shipment.shippingEnabled) {
-      shipment.pin = GeneratePin.generate();
-      if (shipment.user?.email) {
-        const shipmentEmailData = {
-          user: shipment.user,
-          order: {
-            ...shipment,
-            currency: 'USD',
-            addressUser: { address: shipment.deliveryAddress?.address || 'Non spécifiée' },
-            invoiceNumber: shipment.trackingNumber,
-            paymentStatus: shipment.paymentMethod || 'paid',
-            pin: shipment.pin,
-          },
-          clientName: shipment.user?.fullName || 'Client',
-          pinCode: shipment.pin,
-          trackingNumber: shipment.trackingNumber,
-          shipmentReference: shipment.trackingNumber,
-          weight: shipment.package?.weight ? `${shipment.package.weight} kg` : 'Non spécifié',
-          dimensions: shipment.package?.dimensions || 'Non spécifiées',
-          packageType: shipment.package?.description || 'Colis standard',
-          totalPrice: shipment.totalPrice ? `${shipment.totalPrice} $` : '0 $',
-          year: new Date().getFullYear(),
-        };
-        await this.mailServic.sendShipmentPinEmail(shipment.user.email, shipmentEmailData);
+    const clientWasEmpty = oldClientPhone === '';
+    const clientIsNowFilled = newClientPhone !== '';
+
+    if (clientWasEmpty && clientIsNowFilled) {
+      clientShouldBePaid = true;
+      console.log(`✅ [Shipment] Client AJOUTÉ (vide → "${newClientPhone}") → PAIEMENT fidélité autorisé`);
+    } else if (!clientWasEmpty && !clientIsNowFilled) {
+      console.log(`⚠️ [Shipment] Client RETIRÉ ("${oldClientPhone}" → vide) → PAS de paiement`);
+    } else if (!clientWasEmpty && clientIsNowFilled && oldClientPhone !== newClientPhone) {
+      console.log(`🔄 [Shipment] Client REMPLACÉ ("${oldClientPhone}" → "${newClientPhone}") → PAS de paiement`);
+    } else if (oldClientPhone === newClientPhone && newClientPhone !== '') {
+      console.log(`⏭️ [Shipment] Client INCHANGÉ ("${newClientPhone}") → PAS de paiement`);
+    }
+
+    // ============================================================
+    // 🔹 TRAITEMENT DU CLIENT (find ou create)
+    //     Création auto si inexistant
+    // ============================================================
+    let clientUser: UserEntity | null = null;
+
+    if (newClientPhone !== '') {
+      try {
+        const isValidPhone = /^\+?[0-9\s\-()]{7,20}$/.test(newClientPhone);
+
+        if (!isValidPhone) {
+          console.log(`⚠️ [Shipment] Format clientPhone invalide: ${newClientPhone} → ignoré`);
+        } else {
+          // ✅ Chercher dans user (peu importe le rôle)
+          clientUser = await this.userRepo.findOne({
+            where: { phone: newClientPhone },
+          });
+
+          if (clientUser) {
+            // ✅ User EXISTE → récupérer ses infos
+            console.log(`ℹ️ [Shipment] Client existant trouvé: ${clientUser.id} (${clientUser.fullName})`);
+            console.log(`   - Email: ${clientUser.email || 'N/A'}`);
+            console.log(`   - Phone: ${clientUser.phone}`);
+          } else {
+            // ✅ User N'EXISTE PAS → créer
+            console.log(`⚠️ [Shipment] Aucun client avec ${newClientPhone} → création user`);
+
+            const defaultClientPassword = await bcrypt.hash(
+              process.env.DEFAULT_CLIENT_PASSWORD || 'FavorHelp2024!',
+              10,
+            );
+
+            const newClient = this.userRepo.create({
+              fullName: dto.clientName || `Client ${newClientPhone.slice(-4)}`,
+              phone: newClientPhone,
+              password: defaultClientPassword,
+              role: UserRole.CUSTOMER,
+              isActive: true,
+              provider: 'auto-created',
+              country: shipment.user?.country || 'CD',
+              city: shipment.user?.city || 'Goma',
+            });
+
+            console.log('🔍 [Shipment] Tentative création client avec:', {
+              fullName: newClient.fullName,
+              phone: newClient.phone,
+              role: newClient.role,
+              provider: newClient.provider,
+              country: newClient.country,
+              city: newClient.city,
+            });
+
+            clientUser = await this.userRepo.save(newClient);
+            console.log(`✅ [Shipment] Nouveau client créé: ${clientUser.id} (${clientUser.fullName})`);
+          }
+
+          // ✅ Récupérer OU créer loyalty
+          let clientLoyalty = await this.userLoyaltyRepo.findOne({
+            where: { userId: clientUser.id, isActive: true },
+          });
+
+          if (!clientLoyalty) {
+            clientLoyalty = await this.getOrCreateLoyaltyAccount(clientUser.id);
+          }
+
+          if (clientLoyalty?.loyaltyCode) {
+            shipment.loyaltyCode = clientLoyalty.loyaltyCode;
+            console.log(`✅ [Shipment] loyaltyCode (client): ${clientLoyalty.loyaltyCode}`);
+          }
+
+          // ✅ Assigner le userId si pas déjà défini
+          if (!shipment.userId) {
+            shipment.userId = clientUser.id;
+          }
+
+          // ✅ Mettre à jour clientName si vide
+          if (!dto.clientName && clientUser.fullName) {
+            shipment.clientName = clientUser.fullName;
+          }
+        }
+      } catch (error: any) {
+        console.error(`❌ [Shipment] Erreur client:`, {
+          message: error.message,
+          code: error.code,
+          detail: error.detail,
+        });
       }
     }
 
-    if (priceDto.status !== undefined) {
-      shipment.status = priceDto.status;
-    } else if (
-      shipment.pickupEnabled &&
-      shipment.shippingEnabled &&
-      shipment.pickupPrice !== undefined &&
-      shipment.shippingPrice === undefined
-    ) {
-      shipment.status = ShipmentStatus.PENDING;
-    } else if (
-      priceDto.pickupPrice !== undefined &&
-      (shipment.status === ShipmentStatus.PICKUP_ASSIGNED ||
-        shipment.status === ShipmentStatus.PICKUP_IN_PROGRESS)
-    ) {
-      // no change
-    } else if (priceDto.pickupPrice !== undefined && shipment.status === ShipmentStatus.PICKUP_COMPLETED) {
-      shipment.status = ShipmentStatus.AT_ORIGIN_AGENCY;
-    } else if (priceDto.shippingPrice !== undefined) {
-      shipment.status = ShipmentStatus.AWAITING_SHIPPING;
+    // ============================================================
+    // 🔹 FALLBACK : si clientPhone vide mais userId existant
+    // ============================================================
+    if (!clientUser && (dto.userId || shipment.userId)) {
+      try {
+        const lookupId = dto.userId || shipment.userId;
+        clientUser = await this.userRepo.findOne({ where: { id: lookupId } });
+
+        if (clientUser) {
+          console.log(`ℹ️ [Shipment] Client trouvé via userId: ${clientUser.id}`);
+
+          let clientLoyalty = await this.userLoyaltyRepo.findOne({
+            where: { userId: clientUser.id, isActive: true },
+          });
+
+          if (!clientLoyalty) {
+            clientLoyalty = await this.getOrCreateLoyaltyAccount(clientUser.id);
+          }
+
+          if (clientLoyalty?.loyaltyCode && dto.loyaltyCode === undefined) {
+            shipment.loyaltyCode = clientLoyalty.loyaltyCode;
+          }
+        }
+      } catch (error: any) {
+        console.error(`❌ [Shipment] Erreur récupération client via userId:`, error.message);
+      }
     }
 
-    const savedShipment = await this.shipmentRepo.save(shipment);
+    // ============================================================
+    // 🔹 DÉTECTION DU CHANGEMENT FOURNISSEUR
+    //    ✅ Payer UNIQUEMENT si : ancien VIDE → nouveau REMPLI
+    //    ❌ Ne PAS payer si : remplacé / retiré / inchangé
+    // ============================================================
+    let fournisseurShouldBePaid = false;
+
+    const oldSupplierPhone = (previousState.fournisseurPhone || '').trim();
+    const newSupplierPhone = (dto.supplierPhone || '').trim();
+
+    const supplierWasEmpty = oldSupplierPhone === '';
+    const supplierIsNowFilled = newSupplierPhone !== '';
+
+    if (supplierWasEmpty && supplierIsNowFilled) {
+      fournisseurShouldBePaid = true;
+      console.log(`✅ [Shipment] Fournisseur AJOUTÉ (vide → "${newSupplierPhone}") → PAIEMENT fidélité autorisé`);
+    } else if (!supplierWasEmpty && !supplierIsNowFilled) {
+      console.log(`⚠️ [Shipment] Fournisseur RETIRÉ ("${oldSupplierPhone}" → vide) → PAS de paiement`);
+    } else if (!supplierWasEmpty && supplierIsNowFilled && oldSupplierPhone !== newSupplierPhone) {
+      console.log(`🔄 [Shipment] Fournisseur REMPLACÉ ("${oldSupplierPhone}" → "${newSupplierPhone}") → PAS de paiement`);
+    } else if (oldSupplierPhone === newSupplierPhone && newSupplierPhone !== '') {
+      console.log(`⏭️ [Shipment] Fournisseur INCHANGÉ ("${newSupplierPhone}") → PAS de paiement`);
+    }
+
+    // ============================================================
+    // 🔹 TRAITEMENT DU FOURNISSEUR (find ou create)
+    //     Création auto si inexistant
+    //     ✅ INDÉPENDANT DU CLIENT
+    // ============================================================
+    let fournisseurUser: UserEntity | null = null;
+
+    if (newSupplierPhone !== '') {
+      try {
+        const isValidPhone = /^\+?[0-9\s\-()]{7,20}$/.test(newSupplierPhone);
+
+        if (!isValidPhone) {
+          console.log(`⚠️ [Shipment] Format supplierPhone invalide: ${newSupplierPhone} → ignoré`);
+          shipment.fournisseurPhone = newSupplierPhone;
+        } else {
+          // ✅ Cas particulier : même personne que le client
+          const isSameAsClient = clientUser?.phone === newSupplierPhone;
+
+          if (isSameAsClient && clientUser) {
+            console.log(`⚠️ [Shipment] supplierPhone === clientPhone → même personne`);
+
+            fournisseurUser = clientUser;
+          } else {
+            // ✅ Chercher dans user (peu importe le rôle)
+            fournisseurUser = await this.userRepo.findOne({
+              where: { phone: newSupplierPhone },
+            });
+
+            if (fournisseurUser) {
+              // ✅ User EXISTE → récupérer ses infos
+              console.log(`ℹ️ [Shipment] Fournisseur existant trouvé: ${fournisseurUser.id} (${fournisseurUser.fullName})`);
+              console.log(`   - Email: ${fournisseurUser.email || 'N/A'}`);
+              console.log(`   - Phone: ${fournisseurUser.phone}`);
+            } else {
+              // ✅ User N'EXISTE PAS → créer
+              console.log(`⚠️ [Shipment] Aucun fournisseur avec ${newSupplierPhone} → création user`);
+
+              const finalFournisseurName =
+                dto.supplierName && dto.supplierName.trim() !== ''
+                  ? dto.supplierName.trim()
+                  : `Fournisseur ${newSupplierPhone.slice(-4)}`;
+
+              const defaultPassword = await bcrypt.hash(
+                process.env.DEFAULT_SUPPLIER_PASSWORD || 'FavorHelp2024!',
+                10,
+              );
+
+              const newFournisseur = this.userRepo.create({
+                fullName: finalFournisseurName,
+                phone: newSupplierPhone,
+                password: defaultPassword,
+                role: UserRole.CUSTOMER,
+                isActive: true,
+                provider: 'auto-created',
+                country: shipment.user?.country || 'CD',
+                city: shipment.user?.city || 'Goma',
+              });
+
+              console.log('🔍 [Shipment] Tentative création fournisseur avec:', {
+                fullName: newFournisseur.fullName,
+                phone: newFournisseur.phone,
+                role: newFournisseur.role,
+                provider: newFournisseur.provider,
+                country: newFournisseur.country,
+                city: newFournisseur.city,
+              });
+
+              fournisseurUser = await this.userRepo.save(newFournisseur);
+              console.log(`✅ [Shipment] Nouveau fournisseur créé: ${fournisseurUser.id} (${fournisseurUser.fullName})`);
+            }
+          }
+
+          // ✅ Assigner les infos du fournisseur
+          shipment.fournisseurId = fournisseurUser.id;
+          shipment.fournisseurName = fournisseurUser.fullName;
+          shipment.fournisseurPhone = newSupplierPhone;
+
+          // ✅ Récupérer OU créer loyalty
+          let fournisseurLoyalty = await this.userLoyaltyRepo.findOne({
+            where: { userId: fournisseurUser.id, isActive: true },
+          });
+
+          if (!fournisseurLoyalty) {
+            fournisseurLoyalty = await this.getOrCreateLoyaltyAccount(fournisseurUser.id);
+          }
+
+          if (fournisseurLoyalty?.loyaltyCode && dto.loyaltyCodeFournisseur === undefined) {
+            shipment.loyaltyCodeFournisseur = fournisseurLoyalty.loyaltyCode;
+            console.log(`✅ [Shipment] loyaltyCodeFournisseur: ${fournisseurLoyalty.loyaltyCode}`);
+          }
+        }
+      } catch (error: any) {
+        console.error(`❌ [Shipment] Erreur fournisseur:`, {
+          message: error.message,
+          code: error.code,
+          detail: error.detail,
+        });
+        shipment.fournisseurPhone = newSupplierPhone;
+      }
+    } else {
+      // 🔹 Fallback : si supplierName/Phone envoyés directement (ancien comportement)
+      if (dto.supplierName !== undefined) {
+        shipment.fournisseurName = dto.supplierName;
+      }
+      if (dto.supplierPhone !== undefined) {
+        shipment.fournisseurPhone = dto.supplierPhone;
+      }
+    }
+
+    // ============================================================
+    // 🔹 COMPANIES
+    // ============================================================
+    if (dto.pickupCompanyId !== undefined) shipment.pickupCompanyId = dto.pickupCompanyId;
+    if (dto.shippingCompanyId !== undefined) shipment.shippingCompanyId = dto.shippingCompanyId;
+    if (dto.deliveryCompanyId !== undefined) shipment.deliveryCompanyId = dto.deliveryCompanyId;
+
+    // ============================================================
+    // 🔹 STATUS & FLAGS
+    // ============================================================
+    if (dto.status !== undefined) shipment.status = dto.status;
+    if (dto.pickupEnabled !== undefined) shipment.pickupEnabled = dto.pickupEnabled;
+    if (dto.shippingEnabled !== undefined) shipment.shippingEnabled = dto.shippingEnabled;
+    if (dto.deliveryEnabled !== undefined) shipment.deliveryEnabled = dto.deliveryEnabled;
+
+    // ============================================================
+    // 🔹 isPaid / paid
+    // ✅ CORRECTION : supporte les 2 champs (isPaid ET paid)
+    // ============================================================
+    const paidValue = dto.isPaid ?? dto.paid;
+
+    if (paidValue !== undefined) {
+      shipment.isPaid = paidValue;
+      shipment.paid = paidValue;
+      console.log(`💰 [Shipment] isPaid/paid mis à jour → ${paidValue}`);
+    }
+
+    // ============================================================
+    // 🔹 LOYALTY CODES (override manuel)
+    // ============================================================
+    if (dto.loyaltyCode !== undefined) {
+      shipment.loyaltyCode = dto.loyaltyCode ?? undefined;
+    }
+    if (dto.loyaltyCodeFournisseur !== undefined) {
+      shipment.loyaltyCodeFournisseur = dto.loyaltyCodeFournisseur ?? undefined;
+    }
+
+    // ============================================================
+    // 🔹 PICKUP
+    // ============================================================
+    if (shipment.pickupEnabled) {
+      if (dto.pickupFrom) shipment.pickupFrom = dto.pickupFrom;
+      if (dto.pickupTo) shipment.pickupTo = dto.pickupTo;
+      if (dto.pickupContactName) shipment.pickupContactName = dto.pickupContactName;
+      if (dto.pickupContactPhone) shipment.pickupContactPhone = dto.pickupContactPhone;
+      if (dto.pickupTransportTypeId) {
+        const transport = await this.transportRepo.findOne({
+          where: { id: dto.pickupTransportTypeId },
+        });
+        if (!transport) {
+          throw new NotFoundException(
+            await this.i18n.translate('shipment.error.transport_not_found', lang, { id: dto.pickupTransportTypeId }),
+          );
+        }
+        shipment.pickupTransportType = transport;
+      }
+    }
+
+    // ============================================================
+    // 🔹 SHIPPING
+    // ============================================================
+    if (shipment.shippingEnabled) {
+      if (dto.shippingFrom) shipment.shippingFrom = dto.shippingFrom;
+      if (dto.shippingTo) shipment.shippingTo = dto.shippingTo;
+    }
+
+    // ============================================================
+    // 🔹 DELIVERY
+    // ============================================================
+    if (shipment.deliveryEnabled && dto.deliveryAddressId) {
+      shipment.deliveryAddressId = dto.deliveryAddressId;
+    }
+
+    // ============================================================
+    // 🔹 PACKAGE
+    // ============================================================
+    if (shipment.package) {
+      Object.assign(shipment.package, {
+        description: dto.description ?? shipment.package.description,
+        external_quantity: dto.external_quantity ?? shipment.package.external_quantity,
+        weight: dto.weight ?? shipment.package.weight,
+        length: dto.length ?? shipment.package.length,
+        dimensions: dto.dimensions ?? shipment.package.dimensions,
+        internal_quantity: dto.internal_quantity ?? shipment.package.internal_quantity,
+        value: dto.value ?? shipment.package.value,
+        fragile: dto.fragile ?? shipment.package.fragile,
+      });
+      await this.packageRepo.save(shipment.package);
+    }
+
+    // ============================================================
+    // 🔹 IMAGE
+    // ============================================================
+    if (file) {
+      if (shipment.image) {
+        try {
+          const oldFilename = shipment.image.split('/').pop()!;
+          await this.filesService.deleteFile('shipment', oldFilename);
+        } catch (err) {
+          console.warn('Impossible de supprimer l’ancienne image:', err);
+        }
+      }
+      const uploadedFile = await this.filesService.uploadFile(file, 'shipment', 'product');
+      shipment.image = uploadedFile.data;
+    }
+
+    // ============================================================
+    // 🔹 PRICES
+    // ============================================================
+    if (dto.pickupPrice !== undefined) shipment.pickupPrice = dto.pickupPrice;
+    if (dto.shippingPrice !== undefined) shipment.shippingPrice = dto.shippingPrice;
+    if (dto.deliveryPrice !== undefined) shipment.deliveryPrice = dto.deliveryPrice;
+    shipment.totalPrice = dto.totalPrice ?? (shipment.pickupPrice ?? 0) + (shipment.shippingPrice ?? 0) + (shipment.deliveryPrice ?? 0);
+
+    // ============================================================
+    // 🔹 WHATSAPP
+    // ============================================================
+    if (dto.whatsapp_number !== undefined) {
+      shipment.whatsapp_number = dto.whatsapp_number;
+    }
+
+    // ============================================================
+    // 🔹 PAYMENT METHOD
+    // ============================================================
+    if (dto.paymentMethod !== undefined) {
+      shipment.paymentMethod = dto.paymentMethod;
+    }
+
+    await this.shipmentRepo.save(shipment);
+
+    // ============================================================
+    // 💰 PAIEMENT FIDÉLITÉ
+    // ✅ RÈGLE STRICTE :
+    //   - Payer UNIQUEMENT si un client/fournisseur a été AJOUTÉ
+    //     (était vide → devient rempli)
+    //   - Ne PAS payer si :
+    //     · Remplacement (A → B)
+    //     · Retrait (A → vide)
+    //     · Inchangé (A → A)
+    // ============================================================
+    const shouldPayClient = clientShouldBePaid;
+    const shouldPayFournisseur = fournisseurShouldBePaid;
+
+    console.log(`💰 [Fidelity] Analyse finale:`, {
+      shouldPayClient,
+      shouldPayFournisseur,
+      shipmentLoyaltyCode: shipment.loyaltyCode,
+      shipmentLoyaltyCodeFournisseur: shipment.loyaltyCodeFournisseur,
+    });
+
+    if (!shouldPayClient && !shouldPayFournisseur) {
+      console.log(`⏭️ [Fidelity] Aucun nouveau client/fournisseur ajouté → AUCUN paiement fidélité`);
+    } else {
+      console.log(`💰 [Fidelity] Paiement déclenché:`, {
+        shouldPayClient,
+        shouldPayFournisseur,
+      });
+
+      try {
+        const amountForLoyalty = shipment.totalPrice || 0;
+
+        if (amountForLoyalty > 0) {
+          // ✅ Générer pin et collectedAt
+          shipment.pin = GeneratePin.generate();
+          shipment.collectedAt = new Date();
+          await this.shipmentRepo.save(shipment);
+
+          // ✅ Récupérer le % de frais fidélité via company settings
+          let loyaltyFeePercentage = 0;
+          let mainCompany: CompanyEntity | null = shipment.shippingCompanyId
+            ? await this.companyRepo.findOne({ where: { id: shipment.shippingCompanyId } })
+            : null;
+
+          if (!mainCompany && shipment.pickupCompanyId) {
+            mainCompany = await this.companyRepo.findOne({ where: { id: shipment.pickupCompanyId } });
+          }
+          if (!mainCompany && shipment.deliveryCompanyId) {
+            mainCompany = await this.companyRepo.findOne({ where: { id: shipment.deliveryCompanyId } });
+          }
+
+          if (mainCompany) {
+            const companySettings = await this.companySettingsRepo.findOne({
+              where: { companyId: mainCompany.id },
+            });
+
+            loyaltyFeePercentage = companySettings?.loyaltyFeeFixed || 5.00;
+            console.log(`[Fidelity] 🔍 Pourcentage: ${loyaltyFeePercentage}%`);
+          } else {
+            loyaltyFeePercentage = 5.00;
+            console.log(`[Fidelity] ⚠️ Aucune company → 5% par défaut`);
+          }
+
+          const totalFees = (amountForLoyalty * loyaltyFeePercentage) / 100;
+          const loyaltyFeeClient = totalFees / 2;
+          const loyaltyFeeFournisseur = totalFees / 2;
+
+          console.log(`[Fidelity] 💰 Répartition:`, {
+            totalFees,
+            loyaltyFeeClient,
+            loyaltyFeeFournisseur,
+          });
+
+          // ============================================================
+          // ✅ Payer le CLIENT UNIQUEMENT si ajouté (vide → rempli)
+          // ============================================================
+          if (shouldPayClient && shipment.loyaltyCode && loyaltyFeeClient > 0) {
+            const userLoyalty = await this.userLoyaltyRepo.findOne({
+              where: { loyaltyCode: shipment.loyaltyCode, isActive: true },
+              relations: ['user'],
+            });
+
+            if (userLoyalty?.user?.userIdFpay) {
+              try {
+                const fpayResponse = await this.fpayService.makeSend(
+                  {
+                    userId: userLoyalty.user.userIdFpay,
+                    amount: loyaltyFeeClient,
+                    description: `Frais de fidélité (50%) pour le colis ${shipment.trackingNumber}`,
+                    currency: 'USD',
+                    countryCode: 'CD',
+                  },
+                  currentUser
+                );
+
+                if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+                  const loyaltyHistory = this.loyaltyHistoryRepo.create({
+                    userId: userLoyalty.user.id,
+                    loyaltyId: userLoyalty.id,
+                    transactionType: LoyaltyTransactionType.EARN,
+                    sourceType: LoyaltySourceType.SHIPMENT,
+                    sourceId: shipment.id,
+                    description: `Frais de fidélité (50%) pour l'expédition ${shipment.trackingNumber}`,
+                  });
+                  await this.loyaltyHistoryRepo.save(loyaltyHistory);
+
+                  userLoyalty.pointsBalance += Math.round(loyaltyFeeClient * 100);
+                  userLoyalty.pointsTotalEarned += Math.round(loyaltyFeeClient * 100);
+                  await this.userLoyaltyRepo.save(userLoyalty);
+
+                  console.log(`[Fidelity] ✅ ${loyaltyFeeClient} USD envoyé au CLIENT`);
+                }
+              } catch (err: any) {
+                console.error(`[Fidelity] ❌ Erreur paiement client:`, err.message);
+              }
+            }
+          }
+
+          // ============================================================
+          // ✅ Payer le FOURNISSEUR UNIQUEMENT si ajouté (vide → rempli)
+          // ============================================================
+          if (shouldPayFournisseur && shipment.loyaltyCodeFournisseur && loyaltyFeeFournisseur > 0) {
+            const fournisseurLoyalty = await this.userLoyaltyRepo.findOne({
+              where: { loyaltyCode: shipment.loyaltyCodeFournisseur, isActive: true },
+              relations: ['user'],
+            });
+
+            if (fournisseurLoyalty?.user?.userIdFpay) {
+              try {
+                const fpayResponse = await this.fpayService.makeSend(
+                  {
+                    userId: fournisseurLoyalty.user.userIdFpay,
+                    amount: loyaltyFeeFournisseur,
+                    description: `Frais de fidélité (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
+                    currency: 'USD',
+                    countryCode: 'CD',
+                  },
+                  currentUser,
+                );
+
+                if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
+                  const loyaltyHistory = this.loyaltyHistoryRepo.create({
+                    userId: fournisseurLoyalty.user.id,
+                    loyaltyId: fournisseurLoyalty.id,
+                    transactionType: LoyaltyTransactionType.EARN,
+                    sourceType: LoyaltySourceType.SHIPMENT,
+                    sourceId: shipment.id,
+                    description: `Frais de fidélité (50%) fournisseur pour l'expédition ${shipment.trackingNumber}`,
+                  });
+                  await this.loyaltyHistoryRepo.save(loyaltyHistory);
+
+                  fournisseurLoyalty.pointsBalance += Math.round(loyaltyFeeFournisseur * 100);
+                  fournisseurLoyalty.pointsTotalEarned += Math.round(loyaltyFeeFournisseur * 100);
+                  await this.userLoyaltyRepo.save(fournisseurLoyalty);
+
+                  console.log(`[Fidelity] ✅ ${loyaltyFeeFournisseur} USD envoyé au FOURNISSEUR`);
+                }
+              } catch (err: any) {
+                console.error(`[Fidelity] ❌ Erreur paiement fournisseur:`, err.message);
+              }
+            }
+          }
+
+          // ✅ Enregistrer l'opération
+          await this.operation.save({
+            debit: amountForLoyalty,
+            credit: 0,
+            shipmentId: shipment.id,
+            designation: await this.i18n.translate('shipment.operation.admin_payment_designation', lang, {
+              trackingNumber: shipment.trackingNumber,
+            }),
+            status: OperationStatus.ACCEPTED,
+            userId: currentUser.id,
+            paymentMethod: PaymentMethod.CASH,
+            provider: 'ADMIN_AUTO_PAID',
+            reference: this.generateOperationReference(),
+          });
+
+          console.log(`[Fidelity] ✅ Paiement fidélité complet pour ${shipment.trackingNumber}`);
+        } else {
+          console.log(`⚠️ [Fidelity] Montant total = 0 → pas de paiement`);
+        }
+      } catch (err: any) {
+        console.error(`❌ [Fidelity] Erreur globale paiement fidélité:`, err.message);
+      }
+    }
+
+    // ============================================================
+    // 🔹 RECHARGER LE SHIPMENT
+    // ============================================================
+    const updatedShipment = await this.shipmentRepo.findOne({
+      where: { id },
+      relations: [
+        'package',
+        'pickupTransportType',
+        'user',
+        'fournisseur',
+        'trackings',
+        'ltaShipments',
+        'pickupCompany',
+        'shippingCompany',
+        'deliveryCompany',
+      ],
+    });
+    if (!updatedShipment) {
+      throw new NotFoundException(await this.i18n.translate('shipment.error.update_reload_failed', lang));
+    }
+
     return {
-      message: await this.i18n.translate('shipment.price_update_success', lang),
-      data: savedShipment,
+      message: await this.i18n.translate('shipment.update_admin_success', lang),
+      data: updatedShipment,
     };
   }
-
+  
   async findAll(
     currentUser: UserEntity,
     page: number = 1,

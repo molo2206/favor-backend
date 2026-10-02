@@ -7,14 +7,11 @@ import {
   IsNumber,
   IsInt,
   Min,
+  IsBoolean,
 } from 'class-validator';
 import { ShipmentStatus } from '../enum/shipment.dto';
 import { Transform, Type } from 'class-transformer';
 
-/**
- * Boolean permissif (FormData safe)
- * Ne bloque JAMAIS l'update
- */
 const softBoolean = () =>
   Transform(({ value }) => {
     if (value === true || value === 'true' || value === '1' || value === 1)
@@ -35,12 +32,11 @@ export class UpdateShipmentAdminDto {
   @IsUUID()
   userId?: string;
 
-  @ValidateIf((o) => !o.userId)
   @IsOptional()
   @IsString()
   clientName?: string;
 
-  @ValidateIf((o) => !o.userId)
+  // ✅ SUPPRESSION du @ValidateIf((o) => !o.userId)
   @IsOptional()
   @IsString()
   clientPhone?: string;
@@ -56,6 +52,7 @@ export class UpdateShipmentAdminDto {
   @IsOptional()
   @IsString()
   supplierPhone?: string;
+
   // -----------------------
   // Status
   // -----------------------
@@ -65,7 +62,7 @@ export class UpdateShipmentAdminDto {
   status?: ShipmentStatus;
 
   // -----------------------
-  // Flags (NE BLOQUENT PAS)
+  // Flags
   // -----------------------
 
   @IsOptional()
@@ -183,55 +180,74 @@ export class UpdateShipmentAdminDto {
   @softBoolean()
   fragile?: boolean;
 
-  // Prix pour le pickup (facultatif)
+  // -----------------------
+  // Prices
+  // -----------------------
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   pickupPrice?: number;
 
-  // Prix pour le shipping (facultatif)
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   shippingPrice?: number;
 
-  // Prix pour la livraison finale (facultatif)
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   deliveryPrice?: number;
 
-  // Total (facultatif, peut être calculé automatiquement côté backend)
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   totalPrice?: number;
 
-  // 🔹 WHATSAPP (pour le fournisseur)
+  // -----------------------
+  // WhatsApp
+  // -----------------------
+
   @IsOptional()
   @IsString()
   whatsapp_number?: string;
 
-  // 🔹 PAYMENT METHOD
+  // -----------------------
+  // Payment
+  // -----------------------
+
   @IsOptional()
   @IsString()
   paymentMethod?: string;
 
-  // 🔹 LOYALTY CODE - CLIENT (expéditeur)
+  // -----------------------
+  // Loyalty
+  // -----------------------
+
   @IsOptional()
   @IsString()
   loyaltyCode?: string;
 
-  // 🔹 LOYALTY CODE - FOURNISSEUR
   @IsOptional()
   @IsString()
   loyaltyCodeFournisseur?: string;
 
-
+  // ============================================================
+  // ✅ CORRECTION : Ajouter @softBoolean() à isPaid
+  //    Sinon, "true"/"false" en string ne sont pas convertis
+  // ============================================================
   @IsOptional()
+  @softBoolean()
   isPaid?: boolean;
+
+  // ============================================================
+  // ✅ AJOUT : paid (alias de isPaid)
+  // ============================================================
+  @IsOptional()
+  @softBoolean()
+  paid?: boolean;
 }
