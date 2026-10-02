@@ -2440,13 +2440,129 @@ export class CompanyService {
       where: { user: { id: targetUser.id }, company: { id: activeCompanyId } },
     });
 
+    // ============================================================
+    // ✅ CAS 1 : L'UTILISATEUR EST DÉJÀ ASSOCIÉ À LA COMPANY
+    //    → On supprime ses anciennes permissions
+    //    → On les recrée selon : owner + dto.resources
+    // ============================================================
     if (userHasCompany) {
-      // Déjà associé → on ne fait rien (pas de réassignation)
+      console.log(
+        `ℹ️ [assignUserToCompany] User ${targetUser.id} déjà associé → réattribution des permissions`,
+      );
+
+      // Déterminer la branche cible pour la réattribution
+      let targetBranch: BranchEntity;
+      if (dto.branchId) {
+        const branch = await this.branchRepo.findOne({
+          where: { id: dto.branchId, company_id: activeCompanyId },
+        });
+        if (!branch) {
+          throw new BadRequestException(
+            await this.i18n.translate('company_invalid_branch', lang),
+          );
+        }
+        targetBranch = branch;
+      } else {
+        const branch = await this.branchRepo.findOne({
+          where: { company_id: activeCompanyId },
+          order: { createdAt: 'ASC' },
+        });
+        if (!branch) {
+          throw new NotFoundException(
+            await this.i18n.translate('company_not_found', lang),
+          );
+        }
+        targetBranch = branch;
+      }
+
+      // 1️⃣ Récupérer le owner
+      const owner = await this.userHasCompanyRepository.findOne({
+        where: { company: { id: activeCompanyId }, isOwner: true },
+      });
+
+      if (!owner) {
+        throw new NotFoundException(
+          await this.i18n.translate('company_owner_not_found', lang),
+        );
+      }
+
+      // 2️⃣ Récupérer les permissions du owner
+      const ownerPermissions = await this.companyUserResourceRepo.find({
+        where: { userCompanyId: owner.id, status: true },
+      });
+
+      // 3️⃣ Map { resourceId → permissions owner }
+      const ownerPermMap = new Map<string, any>();
+      for (const perm of ownerPermissions) {
+        ownerPermMap.set(perm.resourceId, perm);
+      }
+
+      // 4️⃣ Supprimer les anciennes permissions du user
+      await this.companyUserResourceRepo.delete({ userCompanyId: userHasCompany.id });
+      console.log(
+        `🧹 [assignUserToCompany] Anciennes permissions supprimées pour userCompanyId=${userHasCompany.id}`,
+      );
+
+      // 5️⃣ Recréer les permissions du user depuis dto.resources
+      //    en LIMITANT aux droits du owner
+      const requestedResources = dto.resources ?? [];
+
+      if (requestedResources.length === 0) {
+        console.warn(
+          `⚠️ [assignUserToCompany] Aucune ressource envoyée dans dto.resources → user sans permissions`,
+        );
+      } else {
+        let created = 0;
+        for (const requested of requestedResources) {
+          const ownerPerm = ownerPermMap.get(requested.resourceId);
+
+          // ❌ Le owner n'a PAS cette ressource → on ignore
+          if (!ownerPerm) {
+            console.warn(
+              `⚠️ [assignUserToCompany] Ressource ${requested.resourceId} non autorisée par le owner → ignorée`,
+            );
+            continue;
+          }
+
+          // ✅ AND logique : user ne peut avoir QUE ce que le owner a
+          const newPerm = this.companyUserResourceRepo.create({
+            id: uuidv4(),
+            userCompanyId: userHasCompany.id,
+            resourceId: requested.resourceId,
+            branchId: targetBranch.id,
+            canCreate: ownerPerm.canCreate && (requested.canCreate ?? false),
+            canRead: ownerPerm.canRead && (requested.canRead ?? false),
+            canUpdate: ownerPerm.canUpdate && (requested.canUpdate ?? false),
+            canDelete: ownerPerm.canDelete && (requested.canDelete ?? false),
+            canManage: ownerPerm.canManage && (requested.canManage ?? false),
+            status: requested.status ?? true,
+          });
+
+          await this.companyUserResourceRepo.save(newPerm);
+          created++;
+        }
+
+        console.log(
+          `✅ [assignUserToCompany] ${created}/${requestedResources.length} permission(s) créée(s) pour ${targetUser.id}`,
+        );
+      }
+
+      // Mettre à jour le rôle si nécessaire
+      if (targetUser.role !== UserRole.SUPER_ADMIN && targetUser.role !== UserRole.ADMIN) {
+        targetUser.role = UserRole.ADMIN;
+        await this.userRepository.save(targetUser);
+      }
+
+      const { password, ...userWithoutPassword } = targetUser;
       return {
         message: await this.i18n.translate('company_updated', lang),
-        data: null,
+        data: userWithoutPassword,
       };
     }
+
+    // ============================================================
+    // ✅ CAS 2 : NOUVELLE ASSOCIATION
+    // ============================================================
 
     // Création de la relation user ↔ company
     userHasCompany = this.userHasCompanyRepository.create({
@@ -2464,7 +2580,9 @@ export class CompanyService {
         where: { id: dto.branchId, company_id: activeCompanyId },
       });
       if (!branch) {
-        throw new BadRequestException(await this.i18n.translate('company_invalid_branch', lang));
+        throw new BadRequestException(
+          await this.i18n.translate('company_invalid_branch', lang),
+        );
       }
       targetBranch = branch;
     } else {
@@ -2495,15 +2613,12 @@ export class CompanyService {
     }
 
     // ------------------------------------------------------------
-    // ATTRIBUER LES PERMISSIONS DE L'ENTREPRISE AU NOUVEAU USER
-    // ✅ Copie des permissions du OWNER de la company
-    //    (au lieu de "tous les droits sur toutes les ressources")
+    // ATTRIBUER LES PERMISSIONS : owner + dto.resources
     // ------------------------------------------------------------
 
-    // 1️⃣ Récupérer le owner (créateur) de la company
+    // 1️⃣ Récupérer le owner
     const owner = await this.userHasCompanyRepository.findOne({
       where: { company: { id: activeCompanyId }, isOwner: true },
-      relations: ['resources'],
     });
 
     if (!owner) {
@@ -2512,7 +2627,7 @@ export class CompanyService {
       );
     }
 
-    // 2️⃣ Récupérer ses permissions
+    // 2️⃣ Récupérer les permissions du owner
     const ownerPermissions = owner
       ? await this.companyUserResourceRepo.find({
         where: { userCompanyId: owner.id, status: true },
@@ -2520,37 +2635,58 @@ export class CompanyService {
       : [];
 
     console.log(
-      `ℹ️ [assignUserToCompany] Owner ${owner?.id} → ${ownerPermissions.length} permission(s) à copier`,
+      `ℹ️ [assignUserToCompany] Owner ${owner?.id} → ${ownerPermissions.length} permission(s) de référence`,
     );
 
-    // 3️⃣ Supprimer les anciennes permissions éventuelles (par sécurité)
+    // 3️⃣ Map { resourceId → owner permission }
+    const ownerPermMap = new Map<string, any>();
+    for (const perm of ownerPermissions) {
+      ownerPermMap.set(perm.resourceId, perm);
+    }
+
+    // 4️⃣ Supprimer les anciennes permissions éventuelles
     await this.companyUserResourceRepo.delete({ userCompanyId: userHasCompany.id });
 
-    // 4️⃣ Copier chaque permission du owner vers le nouveau user
-    if (ownerPermissions.length === 0) {
+    // 5️⃣ Créer les permissions depuis dto.resources (limitées au owner)
+    const requestedResources = dto.resources ?? [];
+
+    if (requestedResources.length === 0) {
       console.warn(
-        `⚠️ [assignUserToCompany] Aucune permission à copier → user créé sans permissions`,
+        `⚠️ [assignUserToCompany] Aucune ressource envoyée dans dto.resources → user créé sans permissions`,
       );
     } else {
-      for (const perm of ownerPermissions) {
+      let created = 0;
+      for (const requested of requestedResources) {
+        const ownerPerm = ownerPermMap.get(requested.resourceId);
+
+        // ❌ Le owner n'a PAS cette ressource → on ignore
+        if (!ownerPerm) {
+          console.warn(
+            `⚠️ [assignUserToCompany] Ressource ${requested.resourceId} non autorisée par le owner → ignorée`,
+          );
+          continue;
+        }
+
+        // ✅ AND logique : user ne peut avoir QUE ce que le owner a
         const newPerm = this.companyUserResourceRepo.create({
           id: uuidv4(),
           userCompanyId: userHasCompany.id,
-          resourceId: perm.resourceId,
+          resourceId: requested.resourceId,
           branchId: targetBranch.id,
-          // ✅ Copie EXACTE des droits du owner
-          canCreate: perm.canCreate,
-          canRead: perm.canRead,
-          canUpdate: perm.canUpdate,
-          canDelete: perm.canDelete,
-          canManage: perm.canManage,
-          status: true,
+          canCreate: ownerPerm.canCreate && (requested.canCreate ?? false),
+          canRead: ownerPerm.canRead && (requested.canRead ?? false),
+          canUpdate: ownerPerm.canUpdate && (requested.canUpdate ?? false),
+          canDelete: ownerPerm.canDelete && (requested.canDelete ?? false),
+          canManage: ownerPerm.canManage && (requested.canManage ?? false),
+          status: requested.status ?? true,
         });
+
         await this.companyUserResourceRepo.save(newPerm);
+        created++;
       }
 
       console.log(
-        `✅ [assignUserToCompany] ${ownerPermissions.length} permission(s) copiée(s) pour ${targetUser.id}`,
+        `✅ [assignUserToCompany] ${created}/${requestedResources.length} permission(s) créée(s) pour ${targetUser.id}`,
       );
     }
 
