@@ -1524,6 +1524,7 @@ export class ShipmentService {
     };
   }
 
+
   async updateByAdmin(
     id: string,
     dto: UpdateShipmentAdminDto,
@@ -2198,6 +2199,95 @@ export class ShipmentService {
     return {
       message: await this.i18n.translate('shipment.update_admin_success', lang),
       data: updatedShipment,
+    };
+  }
+
+  async updateShipmentPrices(
+    shipmentId: string,
+    priceDto: ShipmentPriceDto,
+    lang: string = 'fr',
+  ): Promise<{ message: string; data: Shipment }> {
+    const shipment = await this.shipmentRepo.findOne({
+      where: { id: shipmentId },
+      relations: ['user', 'deliveryAddress', 'package', 'ltaShipments'],
+    });
+    if (!shipment) {
+      throw new NotFoundException(await this.i18n.translate('shipment.error.not_found', lang, { id: shipmentId }));
+    }
+
+    const wantsToUpdatePrice =
+      priceDto.pickupPrice !== undefined ||
+      priceDto.shippingPrice !== undefined ||
+      priceDto.deliveryPrice !== undefined;
+    const enabledCount =
+      Number(shipment.pickupEnabled) +
+      Number(shipment.shippingEnabled) +
+      Number(shipment.deliveryEnabled);
+    const canUpdatePrice = enabledCount > 0;
+    if (wantsToUpdatePrice && !canUpdatePrice) {
+      throw new BadRequestException(
+        await this.i18n.translate('shipment.error.cannot_update_price_no_service', lang),
+      );
+    }
+
+    if (priceDto.pickupPrice !== undefined) shipment.pickupPrice = priceDto.pickupPrice;
+    if (priceDto.shippingPrice !== undefined) shipment.shippingPrice = priceDto.shippingPrice;
+    if (priceDto.deliveryPrice !== undefined) shipment.deliveryPrice = priceDto.deliveryPrice;
+
+    shipment.totalPrice = (shipment.pickupPrice ?? 0) + (shipment.shippingPrice ?? 0) + (shipment.deliveryPrice ?? 0);
+
+    if (shipment.shippingEnabled) {
+      shipment.pin = GeneratePin.generate();
+      if (shipment.user?.email) {
+        const shipmentEmailData = {
+          user: shipment.user,
+          order: {
+            ...shipment,
+            currency: 'USD',
+            addressUser: { address: shipment.deliveryAddress?.address || 'Non spécifiée' },
+            invoiceNumber: shipment.trackingNumber,
+            paymentStatus: shipment.paymentMethod || 'paid',
+            pin: shipment.pin,
+          },
+          clientName: shipment.user?.fullName || 'Client',
+          pinCode: shipment.pin,
+          trackingNumber: shipment.trackingNumber,
+          shipmentReference: shipment.trackingNumber,
+          weight: shipment.package?.weight ? `${shipment.package.weight} kg` : 'Non spécifié',
+          dimensions: shipment.package?.dimensions || 'Non spécifiées',
+          packageType: shipment.package?.description || 'Colis standard',
+          totalPrice: shipment.totalPrice ? `${shipment.totalPrice} $` : '0 $',
+          year: new Date().getFullYear(),
+        };
+        await this.mailServic.sendShipmentPinEmail(shipment.user.email, shipmentEmailData);
+      }
+    }
+
+    if (priceDto.status !== undefined) {
+      shipment.status = priceDto.status;
+    } else if (
+      shipment.pickupEnabled &&
+      shipment.shippingEnabled &&
+      shipment.pickupPrice !== undefined &&
+      shipment.shippingPrice === undefined
+    ) {
+      shipment.status = ShipmentStatus.PENDING;
+    } else if (
+      priceDto.pickupPrice !== undefined &&
+      (shipment.status === ShipmentStatus.PICKUP_ASSIGNED ||
+        shipment.status === ShipmentStatus.PICKUP_IN_PROGRESS)
+    ) {
+      // no change
+    } else if (priceDto.pickupPrice !== undefined && shipment.status === ShipmentStatus.PICKUP_COMPLETED) {
+      shipment.status = ShipmentStatus.AT_ORIGIN_AGENCY;
+    } else if (priceDto.shippingPrice !== undefined) {
+      shipment.status = ShipmentStatus.AWAITING_SHIPPING;
+    }
+
+    const savedShipment = await this.shipmentRepo.save(shipment);
+    return {
+      message: await this.i18n.translate('shipment.price_update_success', lang),
+      data: savedShipment,
     };
   }
 
