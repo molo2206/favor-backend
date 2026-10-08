@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="<%= lang || 'fr' %>">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FavorHelp Billet de Voyage</title>
+  <style>
+    /* Votre CSS inchangé */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --blue: #0014D2; --light: #dcdcdc; --green: #15803d; --orange: #b45309; }
+    body { background: transparent; font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; display: flex; justify-content: flex-start; align-items: center; min-height: 100vh; flex-direction: column; gap: 6px; width: 100%; padding-top: 2px; }
+    .ticket-container { display: flex; flex-direction: column; align-items: center; width: 100%; gap: 6px; margin-top: 0; padding-top: 0; padding: 0 2px; }
+    .ticket { width: 99%; max-width: 210mm; min-height: 54mm; background: var(--light); overflow: hidden; display: flex; position: relative; }
+    .ticket::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.22) 0, rgba(255,255,255,0.22) 12%, transparent 12%), radial-gradient(circle at 60% 40%, rgba(255,255,255,0.18) 0, rgba(255,255,255,0.18) 15%, transparent 15%); opacity: 0.5; pointer-events: none; }
+    .left-side { flex: 1; padding: 1.8mm; position: relative; }
+    .header { background: var(--blue); border-radius: 2.5mm; padding: 1.5mm 2.5mm; display: flex; justify-content: space-between; align-items: center; }
+    .company { display: flex; align-items: center; gap: 1.5mm; color: white; }
+    .logo { width: 8mm; height: 8mm; background: white; border-radius: 1.5mm; padding: 0.6mm; object-fit: contain; }
+    .company h1 { font-size: 3mm; line-height: 1; }
+    .company span { font-size: 1.5mm; }
+    .boarding { background: white; color: #222; padding: 0.8mm 2.5mm; border-radius: 1.2mm; font-size: 2.2mm; font-weight: bold; letter-spacing: 0.5mm; }
+    .info-row { margin-top: 1.5mm; display: grid; grid-template-columns: 5mm repeat(5, 1fr); gap: 1.5mm; }
+    .barcode { width: 4mm; height: 16mm; background: repeating-linear-gradient(to bottom, #000, #000 0.5mm, #fff 0.5mm, #fff 1mm); }
+    .info small { display: block; color: #444; font-size: 1.9mm; font-weight: 700; margin-bottom: 0.5mm; letter-spacing: 0.2mm; }
+    .info h2 { font-size: 2.8mm; color: #111; font-weight: bold; }
+    .status-confirmed { color: var(--green) !important; font-weight: bold; }
+    .status-pending { color: var(--orange) !important; font-weight: bold; }
+    .travel-box { width: 68mm; margin-top: 1.5mm; margin-left: 7mm; background: var(--blue); border-radius: 2.5mm; padding: 1.5mm 2.5mm; display: flex; justify-content: space-between; align-items: center; color: white; position: relative; }
+    .city { width: 20mm; }
+    .city small { font-size: 1.4mm; }
+    .city h2 { font-size: 2.5mm; margin-top: 0.2mm; }
+    .line { height: 0.2mm; background: rgba(255,255,255,0.7); margin: 0.8mm 0; }
+    .vehicle-icon { font-size: 3.5mm; }
+    .date-info { position: absolute; right: 2mm; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.95); border-radius: 2mm; padding: 1mm 2mm; text-align: center; box-shadow: 0 0.5mm 1mm rgba(0,0,0,0.1); min-width: 25mm; }
+    .date-info .date-day { font-size: 2mm; font-weight: bold; color: var(--blue); letter-spacing: 0.3mm; }
+    .date-info .date-label { font-size: 1mm; color: #555; margin-top: 0.3mm; text-transform: uppercase; }
+    .date-info .time { font-size: 1.8mm; font-weight: bold; color: #222; margin-top: 0.3mm; }
+    .right-side { width: 52mm; border-left: 0.5mm dashed rgba(255,255,255,0.9); display: flex; flex-direction: column; }
+    .right-top { padding: 1.8mm; }
+    .class-box { background: var(--blue); border-radius: 2.5mm; padding: 1.5mm; display: flex; justify-content: space-between; align-items: center; color: white; }
+    .class-box h2 { font-size: 2.5mm; }
+    .mini-logo { width: 7mm; height: 7mm; background: white; border-radius: 1.5mm; padding: 0.5mm; object-fit: contain; }
+    .mini-content { display: flex; gap: 1.5mm; margin-top: 2.5mm; align-items: center; }
+    .mini-barcode { width: 4mm; height: 14mm; background: repeating-linear-gradient(to bottom, #000, #000 0.5mm, #fff 0.5mm, #fff 1mm); }
+    .qr-code { width: 18mm; height: 18mm; background: white; border-radius: 2mm; display: flex; align-items: center; justify-content: center; padding: 1.5mm; box-shadow: 0 0.5mm 1mm rgba(0,0,0,0.1); }
+    .qr-code img { width: 100%; height: 100%; object-fit: contain; }
+    .mini-details small { display: block; color: #444; font-size: 1.7mm; font-weight: bold; margin-bottom: 0.3mm; }
+    .mini-details h3 { font-size: 2.2mm; color: #111; font-weight: bold; }
+    .mini-row { display: flex; gap: 1.5mm; margin-top: 1mm; }
+    .meals-section-right { margin-top: 1.5mm; background: white; border-radius: 1.5mm; padding: 0.8mm 1.2mm; border: 0.2mm solid rgba(0,20,210,0.15); }
+    .meals-title-right { font-size: 1.6mm; font-weight: 800; color: var(--blue); margin-bottom: 0.8mm; text-transform: uppercase; letter-spacing: 0.2mm; }
+    .meal-item-right { display: flex; justify-content: space-between; align-items: center; padding: 0.5mm 0; border-bottom: 0.15mm dashed rgba(0,0,0,0.08); gap: 1.5mm; }
+    .meal-item-right:last-child { border-bottom: none; }
+    .meal-name-right { font-size: 1.5mm; font-weight: bold; color: #111; }
+    .meal-details-right { font-size: 1.3mm; color: #444; }
+    .meal-price-right { background: rgba(0,20,210,0.12); color: var(--blue); font-size: 1.3mm; font-weight: bold; padding: 0.4mm 1.2mm; border-radius: 4mm; white-space: nowrap; }
+    .total-meals-fee-right { margin-top: 0.6mm; padding-top: 0.5mm; border-top: 0.2mm solid rgba(0,20,210,0.15); text-align: right; font-size: 1.2mm; font-weight: bold; color: var(--blue); }
+    .bottom-travel { margin-top: auto; background: var(--blue); color: white; padding: 1mm 1.5mm; display: flex; justify-content: space-between; align-items: center; }
+    .bottom-travel small { font-size: 1.8mm; font-weight: bold; letter-spacing: 0.2mm; }
+    .bottom-travel h3 { font-size: 2.5mm; font-weight: bold; }
+    @page { size: auto; margin: 0; }
+    @media print { body { background: transparent; margin: 0; padding: 0; } .ticket { box-shadow: none; page-break-inside: avoid; break-inside: avoid; } }
+  </style>
+</head>
+<body>
+<div class="ticket-container">
+  <% for (let idx = 0; idx < tickets.length; idx++) { 
+       const t = tickets[idx];
+       const segment = t.segment;
+       const vehicle = segment?.vehicle;
+  %>
+  <div class="ticket">
+    <div class="left-side">
+      <div class="header">
+        <div class="company">
+          <img src="https://api-prod.favorhelp.com/uploads/1%20Favor.webp" alt="FavorHelp Logo" class="logo" />
+          <div>
+            <h1>FAVOR HELP</h1>
+            <span>Agence de Voyage</span>
+          </div>
+        </div>
+        <div class="boarding"><%= translations.boarding %></div>
+      </div>
+
+      <div class="info-row">
+        <div class="barcode"></div>
+        <div class="info">
+          <small><%= translations.passenger %></small>
+          <h2><%= (t.passenger_name || '').toUpperCase() %> <%= (t.passenger_prename || '').toUpperCase() %></h2>
+        </div>
+        <div class="info">
+          <small><%= translations.trip_number %></small>
+          <h2>ET-<%= idx+1 %></h2>
+        </div>
+        <div class="info">
+          <small><%= translations.gate %></small>
+          <h2><%= Math.floor(Math.random() * 20) + 1 %></h2>
+        </div>
+        <div class="info">
+          <small><%= translations.seat %></small>
+          <h2><%= t.seatNumber || 'N/A' %></h2>
+        </div>
+        <div class="info">
+          <small><%= translations.status %></small>
+          <h2 class="<%= reservation && reservation.status === 'CONFIRMED' ? 'status-confirmed' : 'status-pending' %>">
+            <%= reservation && reservation.status === 'CONFIRMED' ? translations.status_confirmed : translations.status_pending %>
+          </h2>
+        </div>
+      </div>
+
+      <div class="travel-box">
+        <div class="city">
+          <div class="line"></div>
+          <small><%= translations.departure %></small>
+          <h2><%= segment ? segment.departure_city.substring(0,20).toUpperCase() : 'DEP' %></h2>
+          <div class="line"></div>
+        </div>
+        <div class="vehicle-icon">➜</div>
+        <div class="city">
+          <div class="line"></div>
+          <small><%= translations.arrival %></small>
+          <h2><%= segment ? segment.arrival_city.substring(0,20).toUpperCase() : 'ARR' %></h2>
+          <div class="line"></div>
+        </div>
+      </div>
+
+      <div class="date-info">
+        <div class="date-day"><%= segment && segment.departure_datetime ? new Date(segment.departure_datetime).toLocaleDateString(lang, { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() : '25 MAI 2026' %></div>
+        <div class="date-label"><%= translations.date_departure %></div>
+        <div class="time"><%= segment && segment.departure_datetime ? new Date(segment.departure_datetime).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' }) : '13:00' %></div>
+      </div>
+    </div>
+
+    <div class="right-side">
+      <div class="right-top">
+        <div class="class-box">
+          <h2><%= translations.segment %> <%= segment ? segment.segment_order : '' %></h2>
+          <img src="https://api-prod.favorhelp.com/uploads/1%20Favor.webp" alt="FavorHelp Logo" class="mini-logo" />
+        </div>
+
+        <div class="mini-content">
+          <div class="mini-barcode"></div>
+          <div class="qr-code">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=<%= reservation ? reservation.id : 'N/A' %>" alt="QR Code" />
+          </div>
+          <div class="mini-details">
+            <small><%= translations.passenger %></small>
+            <h3><%= (t.passenger_name || '').toUpperCase() %> <%= (t.passenger_prename || '').toUpperCase() %></h3>
+            <div class="mini-row">
+              <div>
+                <small><%= translations.departure %></small>
+                <h3><%= segment ? segment.departure_city.substring(0,20).toUpperCase() : 'DEP' %></h3>
+              </div>
+              <div>
+                <small><%= translations.arrival %></small>
+                <h3><%= segment ? segment.arrival_city.substring(0,20).toUpperCase() : 'ARR' %></h3>
+              </div>
+              <div>
+                <small><%= translations.seat %></small>
+                <h3><%= t.seatNumber || 'N/A' %></h3>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <% if (t.meals && t.meals.length > 0) { %>
+        <div class="meals-section-right">
+          <div class="meals-title-right"><%= translations.meals_title %></div>
+          <% let totalMealsFee = 0;
+             for (let i = 0; i < t.meals.length; i++) {
+               const meal = t.meals[i];
+               totalMealsFee += meal.total_price;
+          %>
+          <div class="meal-item-right">
+            <div>
+              <span class="meal-name-right"><%= meal.name %></span>
+              <span class="meal-details-right"> × <%= meal.quantity %></span>
+            </div>
+            <div class="meal-price-right"><%= meal.total_price %> USD</div>
+          </div>
+          <% } %>
+          <% if (totalMealsFee > 0) { %>
+          <div class="total-meals-fee-right">
+            <%= translations.meals_total_prefix %><%= totalMealsFee %><%= translations.meals_total_suffix %>
+          </div>
+          <% } %>
+        </div>
+        <% } %>
+      </div>
+
+      <div class="bottom-travel">
+        <div><small><%= translations.vehicle %></small><h3><%= vehicle ? (vehicle.license_plate || vehicle.brand).substring(0,8) : 'BUS' %></h3></div>
+        <div><small><%= translations.gate %></small><h3><%= Math.floor(Math.random() * 20) + 1 %></h3></div>
+      </div>
+    </div>
+  </div>
+  <% } %>
+</div>
+</body>
+</html>

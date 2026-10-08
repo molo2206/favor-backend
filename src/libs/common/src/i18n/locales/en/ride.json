@@ -1,0 +1,14 @@
+{
+  "ride.rider_not_found": "Rider not found.",
+  "ride.driver_not_found": "Driver not found.",
+  "ride.city_not_found_or_inactive": "City not found or inactive.",
+  "ride.category_not_found_or_inactive": "Category not found or inactive.",
+  "ride.ride_created_searching_drivers": "Your ride has been created. Searching for drivers...",
+  "ride.ride_created_success": "Ride created successfully",
+  "ride.rides_list_retrieved": "Rides list retrieved",
+  "ride.ride_not_found": "Ride not found.",
+  "ride.ride_retrieved": "Ride retrieved",
+  "ride.ride_updated": "Ride updated",
+  "ride.ride_deleted": "Ride deleted",
+  "ride.ride_already_accepted": "Ride already accepted"
+}
