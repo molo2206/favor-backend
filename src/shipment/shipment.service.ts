@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+﻿/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   BadRequestException,
   ForbiddenException,
@@ -32,7 +32,7 @@ import { UserRole } from 'src/users/enum/user-role-enum';
 import { CollectShipmentBodyAdminDto } from './dto/collect-shipment-bodyAdmin.dto';
 import { PaymentMethod } from 'src/operation/enum/payment-method.enum';
 import { OtpEntity } from 'src/otp/entities/otp.entity';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { UserPlatformRoleEntity } from 'src/users/entities/user_plateform_roles.entity';
 import { NotificationsService } from 'src/notification/notifications.service';
 import { NotificationType } from 'src/notification/type/notification.type';
@@ -107,9 +107,9 @@ export class ShipmentService {
   ) { }
 
   // ----------------------------------------------------------------------
-  // MÉTHODES PRIVÉES
+  // MÃ‰THODES PRIVÃ‰ES
   // ----------------------------------------------------------------------
-  // Remplacer la méthode privée par :
+  // Remplacer la mÃ©thode privÃ©e par :
   private async validateShipmentSections(dto: CreateShipmentDto, lang: string): Promise<string[]> {
     const errors: string[] = [];
     const isAnySectionEnabled =
@@ -171,8 +171,8 @@ export class ShipmentService {
       }
 
       // ============================================================
-      // ✅ CHARGER LA CONFIG DE FACTURE
-      // Priorité : shippingCompany > pickupCompany > deliveryCompany
+      // âœ… CHARGER LA CONFIG DE FACTURE
+      // PrioritÃ© : shippingCompany > pickupCompany > deliveryCompany
       // ============================================================
       let mainCompanyId: string | null = null;
       if (shipment.shippingCompanyId) {
@@ -183,15 +183,15 @@ export class ShipmentService {
         mainCompanyId = shipment.deliveryCompanyId;
       }
 
-      // 🔍 LOG 1 : IDs des companies
-      console.log('🔍 ============================================');
-      console.log('🔍 [Invoice] ÉTAPE 1 — IDs des companies');
-      console.log('🔍 ============================================');
+      // ðŸ” LOG 1 : IDs des companies
+      console.log('ðŸ” ============================================');
+      console.log('ðŸ” [Invoice] Ã‰TAPE 1 â€” IDs des companies');
+      console.log('ðŸ” ============================================');
       console.log('   shipment.pickupCompanyId   :', shipment.pickupCompanyId);
       console.log('   shipment.shippingCompanyId :', shipment.shippingCompanyId);
       console.log('   shipment.deliveryCompanyId :', shipment.deliveryCompanyId);
-      console.log('   → mainCompanyId retenu     :', mainCompanyId);
-      console.log('🔍 ============================================');
+      console.log('   â†’ mainCompanyId retenu     :', mainCompanyId);
+      console.log('ðŸ” ============================================');
 
       let invoiceConfig: InvoiceConfigurationEntity | null = null;
       if (mainCompanyId) {
@@ -199,11 +199,11 @@ export class ShipmentService {
           where: { companyId: mainCompanyId },
         });
 
-        // 🔍 LOG 2 : Config brute depuis la BDD
-        console.log('🔍 ============================================');
-        console.log('🔍 [Invoice] ÉTAPE 2 — Config chargée depuis la BDD');
-        console.log('🔍 ============================================');
-        console.log('   trouvée ?  :', !!invoiceConfig);
+        // ðŸ” LOG 2 : Config brute depuis la BDD
+        console.log('ðŸ” ============================================');
+        console.log('ðŸ” [Invoice] Ã‰TAPE 2 â€” Config chargÃ©e depuis la BDD');
+        console.log('ðŸ” ============================================');
+        console.log('   trouvÃ©e ?  :', !!invoiceConfig);
         if (invoiceConfig) {
           console.log('   id         :', invoiceConfig.id);
           console.log('   companyId  :', invoiceConfig.companyId);
@@ -214,9 +214,9 @@ export class ShipmentService {
           console.log('   rccm       :', invoiceConfig.rccm);
           console.log('   website    :', invoiceConfig.website);
         }
-        console.log('🔍 ============================================');
+        console.log('ðŸ” ============================================');
       } else {
-        console.log('⚠️ [Invoice] Aucun mainCompanyId → pas de config à charger');
+        console.log('âš ï¸ [Invoice] Aucun mainCompanyId â†’ pas de config Ã  charger');
       }
 
       const notificationOptions: any = {
@@ -236,7 +236,7 @@ export class ShipmentService {
       };
 
       // ============================================================
-      // 📧 EMAIL — Envoi de la facture PDF
+      // ðŸ“§ EMAIL â€” Envoi de la facture PDF
       // ============================================================
       if (hasEmail) {
         notificationOptions.emailTo = currentUser.email;
@@ -247,13 +247,13 @@ export class ShipmentService {
         notificationOptions.emailTemplate = 'shipment.ejs';
         notificationOptions.sendShipmentPdf = true;
 
-        // ✅ Context COMPLET
+        // âœ… Context COMPLET
         notificationOptions.emailContext = {
           shipment: shipment,
           package: packageEntity,
           lang: lang,
           user: currentUser,
-          invoiceConfig: invoiceConfig,  // ✅ brut (peut être null)
+          invoiceConfig: invoiceConfig,  // âœ… brut (peut Ãªtre null)
 
           translations: {
             shipment_title: await this.i18n.translate(
@@ -350,7 +350,7 @@ export class ShipmentService {
               lang,
             ),
             legal_line_2:
-              'RCCM: CD/BN/RCCM/26-B-223 — N°Tel : +243 991 225 122 — Email: contact@favorhelp.cd',
+              'RCCM: CD/BN/RCCM/26-B-223 â€” NÂ°Tel : +243 991 225 122 â€” Email: contact@favorhelp.cd',
             legal_line_3: await this.i18n.translate(
               'shipment.email.official_document',
               lang,
@@ -408,7 +408,7 @@ export class ShipmentService {
               lang,
             ),
 
-            // ✅ Nouvelles clés pour les notes de conditions
+            // âœ… Nouvelles clÃ©s pour les notes de conditions
             invoice_notes_title: await this.i18n.translate(
               'shipment.invoice_notes_title',
               lang,
@@ -428,12 +428,12 @@ export class ShipmentService {
           },
         };
 
-        // 🔍 LOG 4 : Ce qu'on envoie au helper
-        console.log('🔍 ============================================');
-        console.log('🔍 [Invoice] ÉTAPE 4 — emailContext prêt');
-        console.log('🔍 ============================================');
+        // ðŸ” LOG 4 : Ce qu'on envoie au helper
+        console.log('ðŸ” ============================================');
+        console.log('ðŸ” [Invoice] Ã‰TAPE 4 â€” emailContext prÃªt');
+        console.log('ðŸ” ============================================');
         console.log(
-          '   invoiceConfig présent ? :',
+          '   invoiceConfig prÃ©sent ? :',
           !!notificationOptions.emailContext.invoiceConfig,
         );
         console.log(
@@ -460,11 +460,11 @@ export class ShipmentService {
           '   invoiceConfig.website   :',
           notificationOptions.emailContext.invoiceConfig?.website,
         );
-        console.log('🔍 ============================================');
+        console.log('ðŸ” ============================================');
       }
 
       // ============================================================
-      // 📱 SMS
+      // ðŸ“± SMS
       // ============================================================
       if (hasPhone) {
         notificationOptions.phoneNumber = currentUser.phone;
@@ -477,13 +477,13 @@ export class ShipmentService {
         );
       }
 
-      // ✅ Envoi (push + SMS + email)
-      console.log('📤 [Invoice] Envoi via pushNotificationHelper.sendAll...');
+      // âœ… Envoi (push + SMS + email)
+      console.log('ðŸ“¤ [Invoice] Envoi via pushNotificationHelper.sendAll...');
       await this.pushNotificationHelper.sendAll(notificationOptions);
-      console.log('✅ [Invoice] sendAll terminé');
+      console.log('âœ… [Invoice] sendAll terminÃ©');
 
       // ============================================================
-      // 🏢 Notifier les companies
+      // ðŸ¢ Notifier les companies
       // ============================================================
       for (const companyInfo of companiesToNotify) {
         if (companyInfo.company) {
@@ -499,7 +499,7 @@ export class ShipmentService {
       }
 
       // ============================================================
-      // 🔔 Notification in-app
+      // ðŸ”” Notification in-app
       // ============================================================
       await this.notificationHelper.sendNotification(
         this.notificationsService,
@@ -531,17 +531,17 @@ export class ShipmentService {
     return `OP-${now}-${random}`;
   }
   private async getOrCreateLoyaltyAccount(userId: string): Promise<UserLoyaltyEntity> {
-    // ✅ 1. VÉRIFIER SI ÇA EXISTE
+    // âœ… 1. VÃ‰RIFIER SI Ã‡A EXISTE
     const existingLoyalty = await this.userLoyaltyRepo.findOne({
       where: { userId },
     });
 
-    // ✅ 2. SI EXISTE → NE PAS CRÉER, RETOURNER
+    // âœ… 2. SI EXISTE â†’ NE PAS CRÃ‰ER, RETOURNER
     if (existingLoyalty) {
       return existingLoyalty;
     }
 
-    // ✅ 3. SINON → GÉNÉRER UN CODE UNIQUE ET CRÉER
+    // âœ… 3. SINON â†’ GÃ‰NÃ‰RER UN CODE UNIQUE ET CRÃ‰ER
     let code: string;
     let exists: UserLoyaltyEntity | null = null;
     let attempts = 0;
@@ -572,7 +572,7 @@ export class ShipmentService {
     try {
       return await this.userLoyaltyRepo.save(loyalty);
     } catch (error: any) {
-      // ✅ 4. Si erreur de doublon (concurrence) → retourner l'existant
+      // âœ… 4. Si erreur de doublon (concurrence) â†’ retourner l'existant
       if (error.code === 'ER_DUP_ENTRY' || error.message?.includes('Duplicate')) {
         const existing = await this.userLoyaltyRepo.findOne({
           where: { userId },
@@ -584,13 +584,13 @@ export class ShipmentService {
   }
 
   // ----------------------------------------------------------------------
-  // MÉTHODES PUBLIQUES
+  // MÃ‰THODES PUBLIQUES
   // ----------------------------------------------------------------------
   async generateShipmentInvoiceByTrackingNumber(
     trackingNumber: string,
     lang: string = 'fr',
   ): Promise<{ pdfBuffer: Buffer; message: string }> {
-    // 1. Récupérer le shipment avec toutes ses relations
+    // 1. RÃ©cupÃ©rer le shipment avec toutes ses relations
     const shipment = await this.shipmentRepo.findOne({
       where: { trackingNumber },
       relations: [
@@ -616,8 +616,8 @@ export class ShipmentService {
     }
 
     // ============================================================
-    // ✅ CHARGER LA CONFIG DE FACTURE
-    // Priorité : shippingCompany > pickupCompany > deliveryCompany
+    // âœ… CHARGER LA CONFIG DE FACTURE
+    // PrioritÃ© : shippingCompany > pickupCompany > deliveryCompany
     // ============================================================
     let mainCompanyId: string | null = null;
     if (shipment.shippingCompanyId) {
@@ -628,14 +628,14 @@ export class ShipmentService {
       mainCompanyId = shipment.deliveryCompanyId;
     }
 
-    console.log('🔍 ============================================');
-    console.log('🔍 [Invoice] ÉTAPE 1 — IDs des companies');
-    console.log('🔍 ============================================');
+    console.log('ðŸ” ============================================');
+    console.log('ðŸ” [Invoice] Ã‰TAPE 1 â€” IDs des companies');
+    console.log('ðŸ” ============================================');
     console.log('   shipment.pickupCompanyId   :', shipment.pickupCompanyId);
     console.log('   shipment.shippingCompanyId :', shipment.shippingCompanyId);
     console.log('   shipment.deliveryCompanyId :', shipment.deliveryCompanyId);
-    console.log('   → mainCompanyId retenu     :', mainCompanyId);
-    console.log('🔍 ============================================');
+    console.log('   â†’ mainCompanyId retenu     :', mainCompanyId);
+    console.log('ðŸ” ============================================');
 
     let invoiceConfig: InvoiceConfigurationEntity | null = null;
     if (mainCompanyId) {
@@ -643,10 +643,10 @@ export class ShipmentService {
         where: { companyId: mainCompanyId },
       });
 
-      console.log('🔍 ============================================');
-      console.log('🔍 [Invoice] ÉTAPE 2 — Config chargée depuis la BDD');
-      console.log('🔍 ============================================');
-      console.log('   trouvée ?  :', !!invoiceConfig);
+      console.log('ðŸ” ============================================');
+      console.log('ðŸ” [Invoice] Ã‰TAPE 2 â€” Config chargÃ©e depuis la BDD');
+      console.log('ðŸ” ============================================');
+      console.log('   trouvÃ©e ?  :', !!invoiceConfig);
       if (invoiceConfig) {
         console.log('   id         :', invoiceConfig.id);
         console.log('   companyId  :', invoiceConfig.companyId);
@@ -657,12 +657,12 @@ export class ShipmentService {
         console.log('   rccm       :', invoiceConfig.rccm);
         console.log('   website    :', invoiceConfig.website);
       }
-      console.log('🔍 ============================================');
+      console.log('ðŸ” ============================================');
     } else {
-      console.log('⚠️ [Invoice] Aucun mainCompanyId → pas de config à charger');
+      console.log('âš ï¸ [Invoice] Aucun mainCompanyId â†’ pas de config Ã  charger');
     }
 
-    // 2. Préparer les traductions pour le template
+    // 2. PrÃ©parer les traductions pour le template
     const emailTranslations = {
       shipment_title: await this.i18n.translate('shipment.email.confirmation_title', lang),
       shipment_invoice: await this.i18n.translate('shipment.shipment_invoice', lang),
@@ -711,20 +711,20 @@ export class ShipmentService {
       shipment_note_2: await this.i18n.translate('shipment.email.present_on_pickup', lang),
       thank_you_footer: await this.i18n.translate('shipment.email.thank_you', lang),
       legal_line_1: await this.i18n.translate('shipment.email.footer_contact', lang),
-      legal_line_2: 'RCCM: CD/BN/RCCM/26-B-223 — N°Tel : +243 991 225 122 — Email: contact@favorhelp.cd',
+      legal_line_2: 'RCCM: CD/BN/RCCM/26-B-223 â€” NÂ°Tel : +243 991 225 122 â€” Email: contact@favorhelp.cd',
       legal_line_3: await this.i18n.translate('shipment.email.official_document', lang),
 
       status_paid: await this.i18n.translate('shipment.status_paid', lang),
       status_unpaid: await this.i18n.translate('shipment.status_unpaid', lang),
 
-      // ✅ Nouvelles clés pour les notes de conditions
+      // âœ… Nouvelles clÃ©s pour les notes de conditions
       invoice_notes_title: await this.i18n.translate('shipment.invoice_notes_title', lang),
       invoice_note_1: await this.i18n.translate('shipment.invoice_note_1', lang),
       invoice_note_2: await this.i18n.translate('shipment.invoice_note_2', lang),
       invoice_note_3: await this.i18n.translate('shipment.invoice_note_3', lang),
     };
 
-    // ✅ Fallback user
+    // âœ… Fallback user
     const templateUser = shipment.user
       ? shipment.user
       : {
@@ -733,14 +733,14 @@ export class ShipmentService {
         phone: shipment.clientPhone || '',
       };
 
-    console.log('🔍 [Invoice] ÉTAPE 3 — User du template :', {
+    console.log('ðŸ” [Invoice] Ã‰TAPE 3 â€” User du template :', {
       hasShipmentUser: !!shipment.user,
       fullName: templateUser.fullName,
       email: templateUser.email,
       phone: templateUser.phone,
     });
 
-    // 3. Générer le PDF
+    // 3. GÃ©nÃ©rer le PDF
     const pdfBuffer = await this.mailService.generatePdfFromTemplate('shipment.ejs', {
       shipment,
       package: shipment.package,
@@ -814,7 +814,7 @@ export class ShipmentService {
     shipment.whatsapp_number = whatsapp_number;
     shipment.paymentMethod = paymentMethod;
 
-    // 🔹 RÉCUPÉRER ET ASSIGNER LE CODE DE FIDÉLITÉ DE L'UTILISATEUR CONNECTÉ
+    // ðŸ”¹ RÃ‰CUPÃ‰RER ET ASSIGNER LE CODE DE FIDÃ‰LITÃ‰ DE L'UTILISATEUR CONNECTÃ‰
     if (currentUser.id) {
       const userLoyalty = await this.userLoyaltyRepo.findOne({
         where: { userId: currentUser.id, isActive: true },
@@ -984,10 +984,10 @@ export class ShipmentService {
     shipment.paid = isPaid ?? false;
 
     // ============================================================
-    // 🔹 1. CLIENT via clientPhone
-    //     → Chercher par phone dans `user`
-    //     → Si trouvé : récupérer ses infos (nom, email...)
-    //     → Si non trouvé : créer
+    // ðŸ”¹ 1. CLIENT via clientPhone
+    //     â†’ Chercher par phone dans `user`
+    //     â†’ Si trouvÃ© : rÃ©cupÃ©rer ses infos (nom, email...)
+    //     â†’ Si non trouvÃ© : crÃ©er
     // ============================================================
     let clientUser: UserEntity | null = null;
 
@@ -997,29 +997,29 @@ export class ShipmentService {
         const isValidPhone = /^\+?[0-9\s\-()]{7,20}$/.test(normalizedClientPhone);
 
         if (!isValidPhone) {
-          console.log(`⚠️ [Shipment] Format clientPhone invalide: ${normalizedClientPhone} → ignoré`);
+          console.log(`âš ï¸ [Shipment] Format clientPhone invalide: ${normalizedClientPhone} â†’ ignorÃ©`);
         } else {
-          // ✅ 1a. Chercher par phone (peu importe le rôle)
+          // âœ… 1a. Chercher par phone (peu importe le rÃ´le)
           clientUser = await this.userRepo.findOne({
             where: { phone: normalizedClientPhone },
           });
 
           if (clientUser) {
-            // ✅ 1b. Client trouvé → récupérer ses infos
-            console.log(`ℹ️ [Shipment] Client existant trouvé: ${clientUser.id} (${clientUser.fullName})`);
+            // âœ… 1b. Client trouvÃ© â†’ rÃ©cupÃ©rer ses infos
+            console.log(`â„¹ï¸ [Shipment] Client existant trouvÃ©: ${clientUser.id} (${clientUser.fullName})`);
             console.log(`   - Email: ${clientUser.email || 'N/A'}`);
             console.log(`   - Phone: ${clientUser.phone}`);
 
-            // ✅ Mettre à jour le nom du client avec celui de la commande
-            //    (le formulaire peut avoir fourni un nom plus récent)
+            // âœ… Mettre Ã  jour le nom du client avec celui de la commande
+            //    (le formulaire peut avoir fourni un nom plus rÃ©cent)
             if (clientName && clientName.trim() !== '') {
               shipment.clientName = clientName.trim();
             } else {
               shipment.clientName = clientUser.fullName;
             }
           } else {
-            // ✅ 1c. Client non trouvé → créer
-            console.log(`⚠️ [Shipment] Aucun client avec ${normalizedClientPhone} → création`);
+            // âœ… 1c. Client non trouvÃ© â†’ crÃ©er
+            console.log(`âš ï¸ [Shipment] Aucun client avec ${normalizedClientPhone} â†’ crÃ©ation`);
 
             const defaultClientPassword = await bcrypt.hash(
               process.env.DEFAULT_CLIENT_PASSWORD || 'FavorHelp2024!',
@@ -1038,7 +1038,7 @@ export class ShipmentService {
             });
 
             clientUser = await this.userRepo.save(newClient);
-            console.log(`✅ [Shipment] Nouveau client créé: ${clientUser.id} (${clientUser.fullName})`);
+            console.log(`âœ… [Shipment] Nouveau client crÃ©Ã©: ${clientUser.id} (${clientUser.fullName})`);
 
             shipment.clientName = clientUser.fullName;
             try {
@@ -1049,14 +1049,14 @@ export class ShipmentService {
 
               await this.smsHelper.sendSms(normalizedClientPhone, smsMessage);
 
-              console.log(`📱 [Shipment] SMS identifiants CLIENT envoyé à ${normalizedClientPhone}`);
+              console.log(`ðŸ“± [Shipment] SMS identifiants CLIENT envoyÃ© Ã  ${normalizedClientPhone}`);
             } catch (smsError: any) {
-              console.error(`❌ [Shipment] Erreur envoi SMS identifiants CLIENT:`, smsError.message);
+              console.error(`âŒ [Shipment] Erreur envoi SMS identifiants CLIENT:`, smsError.message);
               // Ne pas bloquer le flux
             }
           }
 
-          // ✅ 1d. Récupérer ou créer le loyalty code
+          // âœ… 1d. RÃ©cupÃ©rer ou crÃ©er le loyalty code
           let clientLoyalty = await this.userLoyaltyRepo.findOne({
             where: { userId: clientUser.id, isActive: true },
           });
@@ -1067,13 +1067,13 @@ export class ShipmentService {
 
           if (clientLoyalty?.loyaltyCode) {
             shipment.loyaltyCode = clientLoyalty.loyaltyCode;
-            console.log(`✅ [Shipment] loyaltyCode (client): ${clientLoyalty.loyaltyCode}`);
+            console.log(`âœ… [Shipment] loyaltyCode (client): ${clientLoyalty.loyaltyCode}`);
           }
 
           shipment.userId = clientUser.id;
         }
       } catch (error: any) {
-        console.error(`❌ [Shipment] Erreur client:`, {
+        console.error(`âŒ [Shipment] Erreur client:`, {
           message: error.message,
           code: error.code,
           detail: error.detail,
@@ -1081,13 +1081,13 @@ export class ShipmentService {
       }
     }
 
-    // ✅ Fallback : si clientPhone non fourni mais userId oui
+    // âœ… Fallback : si clientPhone non fourni mais userId oui
     if (!clientUser && userId) {
       try {
         clientUser = await this.userRepo.findOne({ where: { id: userId } });
 
         if (clientUser) {
-          console.log(`ℹ️ [Shipment] Client trouvé via userId: ${clientUser.id} (${clientUser.fullName})`);
+          console.log(`â„¹ï¸ [Shipment] Client trouvÃ© via userId: ${clientUser.id} (${clientUser.fullName})`);
 
           let clientLoyalty = await this.userLoyaltyRepo.findOne({
             where: { userId: clientUser.id, isActive: true },
@@ -1105,34 +1105,34 @@ export class ShipmentService {
           shipment.clientName = clientUser.fullName;
         }
       } catch (error: any) {
-        console.error(`❌ [Shipment] Erreur loyalty via userId:`, error.message);
+        console.error(`âŒ [Shipment] Erreur loyalty via userId:`, error.message);
       }
     }
 
     // ============================================================
-    // 🔹 2. FOURNISSEUR via supplierPhone
-    //     → Chercher par phone dans `user`
-    //     → Si trouvé : récupérer ses infos
-    //     → Si non trouvé : créer
-    //     ✅ INDÉPENDANT DU CLIENT
+    // ðŸ”¹ 2. FOURNISSEUR via supplierPhone
+    //     â†’ Chercher par phone dans `user`
+    //     â†’ Si trouvÃ© : rÃ©cupÃ©rer ses infos
+    //     â†’ Si non trouvÃ© : crÃ©er
+    //     âœ… INDÃ‰PENDANT DU CLIENT
     // ============================================================
     if (supplierPhone && supplierPhone.trim() !== '') {
       try {
         const normalizedPhone = supplierPhone.trim();
 
-        // ✅ 2a. Chercher par phone dans user (peu importe le rôle)
+        // âœ… 2a. Chercher par phone dans user (peu importe le rÃ´le)
         let fournisseurUser = await this.userRepo.findOne({
           where: { phone: normalizedPhone },
         });
 
         if (fournisseurUser) {
-          // ✅ 2b. Fournisseur trouvé → récupérer ses infos
-          console.log(`ℹ️ [Shipment] Fournisseur existant trouvé: ${fournisseurUser.id} (${fournisseurUser.fullName})`);
+          // âœ… 2b. Fournisseur trouvÃ© â†’ rÃ©cupÃ©rer ses infos
+          console.log(`â„¹ï¸ [Shipment] Fournisseur existant trouvÃ©: ${fournisseurUser.id} (${fournisseurUser.fullName})`);
           console.log(`   - Email: ${fournisseurUser.email || 'N/A'}`);
           console.log(`   - Phone: ${fournisseurUser.phone}`);
         } else {
-          // ✅ 2c. Fournisseur non trouvé → créer
-          console.log(`⚠️ [Shipment] Aucun fournisseur avec ${normalizedPhone} → création`);
+          // âœ… 2c. Fournisseur non trouvÃ© â†’ crÃ©er
+          console.log(`âš ï¸ [Shipment] Aucun fournisseur avec ${normalizedPhone} â†’ crÃ©ation`);
 
           const finalFournisseurName =
             supplierName && supplierName.trim() !== ''
@@ -1156,7 +1156,7 @@ export class ShipmentService {
           });
 
           fournisseurUser = await this.userRepo.save(newFournisseur);
-          console.log(`✅ [Shipment] Nouveau fournisseur créé: ${fournisseurUser.id} (${fournisseurUser.fullName})`);
+          console.log(`âœ… [Shipment] Nouveau fournisseur crÃ©Ã©: ${fournisseurUser.id} (${fournisseurUser.fullName})`);
           try {
             const smsMessage = await this.i18n.translate('shipment.sms.account_created', lang, {
               phone: normalizedPhone,
@@ -1165,19 +1165,19 @@ export class ShipmentService {
 
             await this.smsHelper.sendSms(normalizedPhone, smsMessage);
 
-            console.log(`📱 [Shipment] SMS identifiants FOURNISSEUR envoyé à ${normalizedPhone}`);
+            console.log(`ðŸ“± [Shipment] SMS identifiants FOURNISSEUR envoyÃ© Ã  ${normalizedPhone}`);
           } catch (smsError: any) {
-            console.error(`❌ [Shipment] Erreur envoi SMS identifiants FOURNISSEUR:`, smsError.message);
+            console.error(`âŒ [Shipment] Erreur envoi SMS identifiants FOURNISSEUR:`, smsError.message);
             // Ne pas bloquer le flux
           }
         }
 
-        // ✅ 2d. Assigner les infos récupérées ou créées
+        // âœ… 2d. Assigner les infos rÃ©cupÃ©rÃ©es ou crÃ©Ã©es
         shipment.fournisseurId = fournisseurUser.id;
         shipment.fournisseurName = fournisseurUser.fullName;
         shipment.fournisseurPhone = normalizedPhone;
 
-        // ✅ 2e. Récupérer ou créer le loyalty code
+        // âœ… 2e. RÃ©cupÃ©rer ou crÃ©er le loyalty code
         let fournisseurLoyalty = await this.userLoyaltyRepo.findOne({
           where: { userId: fournisseurUser.id, isActive: true },
         });
@@ -1188,10 +1188,10 @@ export class ShipmentService {
 
         if (fournisseurLoyalty?.loyaltyCode) {
           shipment.loyaltyCodeFournisseur = fournisseurLoyalty.loyaltyCode;
-          console.log(`✅ [Shipment] loyaltyCodeFournisseur: ${fournisseurLoyalty.loyaltyCode}`);
+          console.log(`âœ… [Shipment] loyaltyCodeFournisseur: ${fournisseurLoyalty.loyaltyCode}`);
         }
       } catch (error: any) {
-        console.error(`❌ [Shipment] Erreur fournisseur:`, {
+        console.error(`âŒ [Shipment] Erreur fournisseur:`, {
           message: error.message,
           code: error.code,
           detail: error.detail,
@@ -1235,7 +1235,7 @@ export class ShipmentService {
       shipment.userId = targetUser.id;
     }
 
-    // ✅ Remplir clientName / clientPhone
+    // âœ… Remplir clientName / clientPhone
     if (!shipment.clientName) {
       shipment.clientName = clientName || clientUser?.fullName;
     }
@@ -1295,13 +1295,13 @@ export class ShipmentService {
     await this.packageRepo.save(packageEntity);
 
     // ============================================================
-    // 💰 PAIEMENT FIDÉLITÉ AUTOMATIQUE SI isPaid = true
+    // ðŸ’° PAIEMENT FIDÃ‰LITÃ‰ AUTOMATIQUE SI isPaid = true
     // ============================================================
     const amountForLoyalty = shipment.totalPrice || 0;
 
     if (amountForLoyalty > 0) {
       try {
-        console.log(`💰 [Shipment] Paiement fidélité déclenché (montant: ${amountForLoyalty}, isPaid: ${isPaid})`);
+        console.log(`ðŸ’° [Shipment] Paiement fidÃ©litÃ© dÃ©clenchÃ© (montant: ${amountForLoyalty}, isPaid: ${isPaid})`);
 
         shipment.pin = GeneratePin.generate();
         shipment.collectedAt = new Date();
@@ -1325,24 +1325,24 @@ export class ShipmentService {
           });
 
           loyaltyFeePercentage = companySettings?.loyaltyFeeFixed || 5.00;
-          console.log(`[Fidelity] 🔍 Pourcentage: ${loyaltyFeePercentage}%`);
+          console.log(`[Fidelity] ðŸ” Pourcentage: ${loyaltyFeePercentage}%`);
         } else {
           loyaltyFeePercentage = 5.00;
-          console.log(`[Fidelity] ⚠️ Aucune company → 5% par défaut`);
+          console.log(`[Fidelity] âš ï¸ Aucune company â†’ 5% par dÃ©faut`);
         }
 
         const totalFees = (amountForLoyalty * loyaltyFeePercentage) / 100;
         const loyaltyFeeClient = totalFees / 2;
         const loyaltyFeeFournisseur = totalFees / 2;
 
-        console.log(`[Fidelity] 💰 Répartition:`, {
+        console.log(`[Fidelity] ðŸ’° RÃ©partition:`, {
           totalFees,
           loyaltyFeeClient,
           loyaltyFeeFournisseur,
         });
 
         // ============================================================
-        // ✅ Paiement au CLIENT — UNIQUEMENT si isPaid === true
+        // âœ… Paiement au CLIENT â€” UNIQUEMENT si isPaid === true
         // ============================================================
         if (isPaid === true && shipment.loyaltyCode && loyaltyFeeClient > 0) {
           const userLoyalty = await this.userLoyaltyRepo.findOne({
@@ -1356,7 +1356,7 @@ export class ShipmentService {
                 {
                   userId: userLoyalty.user.userIdFpay,
                   amount: loyaltyFeeClient,
-                  description: `Frais de fidélité (50%) pour le colis ${shipment.trackingNumber}`,
+                  description: `Frais de fidÃ©litÃ© (50%) pour le colis ${shipment.trackingNumber}`,
                   currency: 'USD',
                   countryCode: 'CD',
                 },
@@ -1370,7 +1370,7 @@ export class ShipmentService {
                   transactionType: LoyaltyTransactionType.EARN,
                   sourceType: LoyaltySourceType.SHIPMENT,
                   sourceId: shipment.id,
-                  description: `Frais de fidélité (50%) pour l'expédition ${shipment.trackingNumber}`,
+                  description: `Frais de fidÃ©litÃ© (50%) pour l'expÃ©dition ${shipment.trackingNumber}`,
                 });
                 await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
@@ -1378,18 +1378,18 @@ export class ShipmentService {
                 userLoyalty.pointsTotalEarned += Math.round(loyaltyFeeClient * 100);
                 await this.userLoyaltyRepo.save(userLoyalty);
 
-                console.log(`[Fidelity] ✅ ${loyaltyFeeClient} USD envoyé au CLIENT`);
+                console.log(`[Fidelity] âœ… ${loyaltyFeeClient} USD envoyÃ© au CLIENT`);
               }
             } catch (err: any) {
-              console.error(`[Fidelity] ❌ Erreur paiement client:`, err.message);
+              console.error(`[Fidelity] âŒ Erreur paiement client:`, err.message);
             }
           }
         } else if (isPaid !== true) {
-          console.log(`[Fidelity] ⏭️ isPaid = false → client non payé automatiquement`);
+          console.log(`[Fidelity] â­ï¸ isPaid = false â†’ client non payÃ© automatiquement`);
         }
 
         // ============================================================
-        // ✅ Paiement au FOURNISSEUR — dès qu'il est présent (peu importe isPaid)
+        // âœ… Paiement au FOURNISSEUR â€” dÃ¨s qu'il est prÃ©sent (peu importe isPaid)
         // ============================================================
         if (shipment.loyaltyCodeFournisseur && loyaltyFeeFournisseur > 0) {
           const fournisseurLoyalty = await this.userLoyaltyRepo.findOne({
@@ -1403,7 +1403,7 @@ export class ShipmentService {
                 {
                   userId: fournisseurLoyalty.user.userIdFpay,
                   amount: loyaltyFeeFournisseur,
-                  description: `Frais de fidélité (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
+                  description: `Frais de fidÃ©litÃ© (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
                   currency: 'USD',
                   countryCode: 'CD',
                 },
@@ -1417,7 +1417,7 @@ export class ShipmentService {
                   transactionType: LoyaltyTransactionType.EARN,
                   sourceType: LoyaltySourceType.SHIPMENT,
                   sourceId: shipment.id,
-                  description: `Frais de fidélité (50%) fournisseur pour l'expédition ${shipment.trackingNumber}`,
+                  description: `Frais de fidÃ©litÃ© (50%) fournisseur pour l'expÃ©dition ${shipment.trackingNumber}`,
                 });
                 await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
@@ -1425,14 +1425,14 @@ export class ShipmentService {
                 fournisseurLoyalty.pointsTotalEarned += Math.round(loyaltyFeeFournisseur * 100);
                 await this.userLoyaltyRepo.save(fournisseurLoyalty);
 
-                console.log(`[Fidelity] ✅ ${loyaltyFeeFournisseur} USD envoyé au FOURNISSEUR`);
+                console.log(`[Fidelity] âœ… ${loyaltyFeeFournisseur} USD envoyÃ© au FOURNISSEUR`);
               }
             } catch (err: any) {
-              console.error(`[Fidelity] ❌ Erreur paiement fournisseur:`, err.message);
+              console.error(`[Fidelity] âŒ Erreur paiement fournisseur:`, err.message);
             }
           }
         } else {
-          console.log(`[Fidelity] ⏭️ Pas de fournisseur → pas de paiement fournisseur`);
+          console.log(`[Fidelity] â­ï¸ Pas de fournisseur â†’ pas de paiement fournisseur`);
         }
 
         await this.operation.save({
@@ -1449,12 +1449,12 @@ export class ShipmentService {
           reference: this.generateOperationReference(),
         });
 
-        console.log(`[Fidelity] ✅ Paiement fidélité complet pour ${shipment.trackingNumber}`);
+        console.log(`[Fidelity] âœ… Paiement fidÃ©litÃ© complet pour ${shipment.trackingNumber}`);
       } catch (err: any) {
-        console.error(`❌ [Fidelity] Erreur globale paiement fidélité:`, err.message);
+        console.error(`âŒ [Fidelity] Erreur globale paiement fidÃ©litÃ©:`, err.message);
       }
     } else {
-      console.log(`[Fidelity] ⏭️ Montant = 0 → aucun frais de fidélité pour ${shipment.trackingNumber}`);
+      console.log(`[Fidelity] â­ï¸ Montant = 0 â†’ aucun frais de fidÃ©litÃ© pour ${shipment.trackingNumber}`);
     }
 
     const relations = [
@@ -1475,32 +1475,32 @@ export class ShipmentService {
     });
 
     // ============================================================
-    // 📧 NOTIFICATIONS - Basé sur le client RÉEL (récupéré ou créé)
+    // ðŸ“§ NOTIFICATIONS - BasÃ© sur le client RÃ‰EL (rÃ©cupÃ©rÃ© ou crÃ©Ã©)
     // ============================================================
 
-    // ✅ AJOUT : LOGS DE DEBUG POUR L'EMAIL
-    console.log(`\n🔍 ============================================`);
-    console.log(`🔍 [DEBUG] ÉTAT AVANT NOTIFICATIONS`);
-    console.log(`🔍 ============================================`);
-    console.log(`🔍 clientUser:`, {
+    // âœ… AJOUT : LOGS DE DEBUG POUR L'EMAIL
+    console.log(`\nðŸ” ============================================`);
+    console.log(`ðŸ” [DEBUG] Ã‰TAT AVANT NOTIFICATIONS`);
+    console.log(`ðŸ” ============================================`);
+    console.log(`ðŸ” clientUser:`, {
       id: clientUser?.id,
       fullName: clientUser?.fullName,
       email: clientUser?.email,
       phone: clientUser?.phone,
       hasEmail: !!(clientUser?.email && clientUser.email.trim() !== ''),
     });
-    console.log(`🔍 targetUser:`, {
+    console.log(`ðŸ” targetUser:`, {
       id: targetUser?.id,
       fullName: targetUser?.fullName,
       email: targetUser?.email,
       phone: targetUser?.phone,
       hasEmail: !!(targetUser?.email && targetUser.email.trim() !== ''),
     });
-    console.log(`🔍 ============================================\n`);
+    console.log(`ðŸ” ============================================\n`);
 
     if (clientUser) {
-      // ✅ Passer clientUser (qui contient email à jour)
-      console.log(`📧 [DEBUG] Appel processShipmentNotifications avec clientUser:`);
+      // âœ… Passer clientUser (qui contient email Ã  jour)
+      console.log(`ðŸ“§ [DEBUG] Appel processShipmentNotifications avec clientUser:`);
       console.log(`   - ID: ${clientUser.id}`);
       console.log(`   - Nom: ${clientUser.fullName}`);
       console.log(`   - Email: ${clientUser.email || 'N/A'}`);
@@ -1510,7 +1510,7 @@ export class ShipmentService {
         console.error('Erreur notifications colis:', err),
       );
     } else if (clientPhone) {
-      console.log(`⚠️ [DEBUG] Pas de clientUser → envoi SMS anonyme à ${clientPhone}`);
+      console.log(`âš ï¸ [DEBUG] Pas de clientUser â†’ envoi SMS anonyme Ã  ${clientPhone}`);
       const finalTrackingNumber = shipmentWithRelations.trackingNumber || trackingNumber;
       const smsMessage = await this.i18n.translate('shipment.sms.created_anonymous', lang, {
         trackingNumber: finalTrackingNumber,
@@ -1549,7 +1549,7 @@ export class ShipmentService {
     if (!shipment) throw new NotFoundException(await this.i18n.translate('shipment.error.not_found', lang, { id }));
 
     // ============================================================
-    // ✅ CAPTURER L'ÉTAT AVANT MODIFICATION
+    // âœ… CAPTURER L'Ã‰TAT AVANT MODIFICATION
     // ============================================================
     const previousState = {
       userId: shipment.userId,
@@ -1560,12 +1560,12 @@ export class ShipmentService {
       paid: shipment.isPaid,
     };
 
-    console.log(`🔍 [Shipment] État AVANT modification:`, previousState);
+    console.log(`ðŸ” [Shipment] Ã‰tat AVANT modification:`, previousState);
 
     // ============================================================
-    // 🔹 USER / CLIENT (via userId direct)
+    // ðŸ”¹ USER / CLIENT (via userId direct)
     // ============================================================
-    // ✅ CORRECTION : appliquer clientName / clientPhone TOUJOURS
+    // âœ… CORRECTION : appliquer clientName / clientPhone TOUJOURS
     //    avant la logique userId, pour ne pas les effacer
     if (dto.clientName !== undefined) {
       shipment.clientName = dto.clientName;
@@ -1579,16 +1579,16 @@ export class ShipmentService {
       if (!user) throw new NotFoundException(await this.i18n.translate('shipment.error.user_not_found', lang, { id: dto.userId }));
       shipment.userId = user.id;
 
-      // ⚠️ On n'efface plus automatiquement clientName/clientPhone.
-      //    Si tu veux effacer, il faut le faire explicitement côté DTO.
+      // âš ï¸ On n'efface plus automatiquement clientName/clientPhone.
+      //    Si tu veux effacer, il faut le faire explicitement cÃ´tÃ© DTO.
       // shipment.clientName = undefined;
       // shipment.clientPhone = undefined;
     }
 
     // ============================================================
-    // 🔹 DÉTECTION DU CHANGEMENT CLIENT
-    //    ✅ Payer UNIQUEMENT si : ancien VIDE → nouveau REMPLI
-    //    ❌ Ne PAS payer si : remplacé / retiré / inchangé
+    // ðŸ”¹ DÃ‰TECTION DU CHANGEMENT CLIENT
+    //    âœ… Payer UNIQUEMENT si : ancien VIDE â†’ nouveau REMPLI
+    //    âŒ Ne PAS payer si : remplacÃ© / retirÃ© / inchangÃ©
     // ============================================================
     let clientShouldBePaid = false;
 
@@ -1600,18 +1600,18 @@ export class ShipmentService {
 
     if (clientWasEmpty && clientIsNowFilled) {
       clientShouldBePaid = true;
-      console.log(`✅ [Shipment] Client AJOUTÉ (vide → "${newClientPhone}") → PAIEMENT fidélité autorisé`);
+      console.log(`âœ… [Shipment] Client AJOUTÃ‰ (vide â†’ "${newClientPhone}") â†’ PAIEMENT fidÃ©litÃ© autorisÃ©`);
     } else if (!clientWasEmpty && !clientIsNowFilled) {
-      console.log(`⚠️ [Shipment] Client RETIRÉ ("${oldClientPhone}" → vide) → PAS de paiement`);
+      console.log(`âš ï¸ [Shipment] Client RETIRÃ‰ ("${oldClientPhone}" â†’ vide) â†’ PAS de paiement`);
     } else if (!clientWasEmpty && clientIsNowFilled && oldClientPhone !== newClientPhone) {
-      console.log(`🔄 [Shipment] Client REMPLACÉ ("${oldClientPhone}" → "${newClientPhone}") → PAS de paiement`);
+      console.log(`ðŸ”„ [Shipment] Client REMPLACÃ‰ ("${oldClientPhone}" â†’ "${newClientPhone}") â†’ PAS de paiement`);
     } else if (oldClientPhone === newClientPhone && newClientPhone !== '') {
-      console.log(`⏭️ [Shipment] Client INCHANGÉ ("${newClientPhone}") → PAS de paiement`);
+      console.log(`â­ï¸ [Shipment] Client INCHANGÃ‰ ("${newClientPhone}") â†’ PAS de paiement`);
     }
 
     // ============================================================
-    // 🔹 TRAITEMENT DU CLIENT (find ou create)
-    //     Création auto si inexistant
+    // ðŸ”¹ TRAITEMENT DU CLIENT (find ou create)
+    //     CrÃ©ation auto si inexistant
     // ============================================================
     let clientUser: UserEntity | null = null;
 
@@ -1620,21 +1620,21 @@ export class ShipmentService {
         const isValidPhone = /^\+?[0-9\s\-()]{7,20}$/.test(newClientPhone);
 
         if (!isValidPhone) {
-          console.log(`⚠️ [Shipment] Format clientPhone invalide: ${newClientPhone} → ignoré`);
+          console.log(`âš ï¸ [Shipment] Format clientPhone invalide: ${newClientPhone} â†’ ignorÃ©`);
         } else {
-          // ✅ Chercher dans user (peu importe le rôle)
+          // âœ… Chercher dans user (peu importe le rÃ´le)
           clientUser = await this.userRepo.findOne({
             where: { phone: newClientPhone },
           });
 
           if (clientUser) {
-            // ✅ User EXISTE → récupérer ses infos
-            console.log(`ℹ️ [Shipment] Client existant trouvé: ${clientUser.id} (${clientUser.fullName})`);
+            // âœ… User EXISTE â†’ rÃ©cupÃ©rer ses infos
+            console.log(`â„¹ï¸ [Shipment] Client existant trouvÃ©: ${clientUser.id} (${clientUser.fullName})`);
             console.log(`   - Email: ${clientUser.email || 'N/A'}`);
             console.log(`   - Phone: ${clientUser.phone}`);
           } else {
-            // ✅ User N'EXISTE PAS → créer
-            console.log(`⚠️ [Shipment] Aucun client avec ${newClientPhone} → création user`);
+            // âœ… User N'EXISTE PAS â†’ crÃ©er
+            console.log(`âš ï¸ [Shipment] Aucun client avec ${newClientPhone} â†’ crÃ©ation user`);
 
             const defaultClientPassword = await bcrypt.hash(
               process.env.DEFAULT_CLIENT_PASSWORD || 'FavorHelp2024!',
@@ -1652,7 +1652,7 @@ export class ShipmentService {
               city: shipment.user?.city || 'Goma',
             });
 
-            console.log('🔍 [Shipment] Tentative création client avec:', {
+            console.log('ðŸ” [Shipment] Tentative crÃ©ation client avec:', {
               fullName: newClient.fullName,
               phone: newClient.phone,
               role: newClient.role,
@@ -1662,10 +1662,10 @@ export class ShipmentService {
             });
 
             clientUser = await this.userRepo.save(newClient);
-            console.log(`✅ [Shipment] Nouveau client créé: ${clientUser.id} (${clientUser.fullName})`);
+            console.log(`âœ… [Shipment] Nouveau client crÃ©Ã©: ${clientUser.id} (${clientUser.fullName})`);
           }
 
-          // ✅ Récupérer OU créer loyalty
+          // âœ… RÃ©cupÃ©rer OU crÃ©er loyalty
           let clientLoyalty = await this.userLoyaltyRepo.findOne({
             where: { userId: clientUser.id, isActive: true },
           });
@@ -1676,21 +1676,21 @@ export class ShipmentService {
 
           if (clientLoyalty?.loyaltyCode) {
             shipment.loyaltyCode = clientLoyalty.loyaltyCode;
-            console.log(`✅ [Shipment] loyaltyCode (client): ${clientLoyalty.loyaltyCode}`);
+            console.log(`âœ… [Shipment] loyaltyCode (client): ${clientLoyalty.loyaltyCode}`);
           }
 
-          // ✅ Assigner le userId si pas déjà défini
+          // âœ… Assigner le userId si pas dÃ©jÃ  dÃ©fini
           if (!shipment.userId) {
             shipment.userId = clientUser.id;
           }
 
-          // ✅ Mettre à jour clientName si vide
+          // âœ… Mettre Ã  jour clientName si vide
           if (!dto.clientName && clientUser.fullName) {
             shipment.clientName = clientUser.fullName;
           }
         }
       } catch (error: any) {
-        console.error(`❌ [Shipment] Erreur client:`, {
+        console.error(`âŒ [Shipment] Erreur client:`, {
           message: error.message,
           code: error.code,
           detail: error.detail,
@@ -1699,7 +1699,7 @@ export class ShipmentService {
     }
 
     // ============================================================
-    // 🔹 FALLBACK : si clientPhone vide mais userId existant
+    // ðŸ”¹ FALLBACK : si clientPhone vide mais userId existant
     // ============================================================
     if (!clientUser && (dto.userId || shipment.userId)) {
       try {
@@ -1707,7 +1707,7 @@ export class ShipmentService {
         clientUser = await this.userRepo.findOne({ where: { id: lookupId } });
 
         if (clientUser) {
-          console.log(`ℹ️ [Shipment] Client trouvé via userId: ${clientUser.id}`);
+          console.log(`â„¹ï¸ [Shipment] Client trouvÃ© via userId: ${clientUser.id}`);
 
           let clientLoyalty = await this.userLoyaltyRepo.findOne({
             where: { userId: clientUser.id, isActive: true },
@@ -1722,14 +1722,14 @@ export class ShipmentService {
           }
         }
       } catch (error: any) {
-        console.error(`❌ [Shipment] Erreur récupération client via userId:`, error.message);
+        console.error(`âŒ [Shipment] Erreur rÃ©cupÃ©ration client via userId:`, error.message);
       }
     }
 
     // ============================================================
-    // 🔹 DÉTECTION DU CHANGEMENT FOURNISSEUR
-    //    ✅ Payer UNIQUEMENT si : ancien VIDE → nouveau REMPLI
-    //    ❌ Ne PAS payer si : remplacé / retiré / inchangé
+    // ðŸ”¹ DÃ‰TECTION DU CHANGEMENT FOURNISSEUR
+    //    âœ… Payer UNIQUEMENT si : ancien VIDE â†’ nouveau REMPLI
+    //    âŒ Ne PAS payer si : remplacÃ© / retirÃ© / inchangÃ©
     // ============================================================
     let fournisseurShouldBePaid = false;
 
@@ -1741,19 +1741,19 @@ export class ShipmentService {
 
     if (supplierWasEmpty && supplierIsNowFilled) {
       fournisseurShouldBePaid = true;
-      console.log(`✅ [Shipment] Fournisseur AJOUTÉ (vide → "${newSupplierPhone}") → PAIEMENT fidélité autorisé`);
+      console.log(`âœ… [Shipment] Fournisseur AJOUTÃ‰ (vide â†’ "${newSupplierPhone}") â†’ PAIEMENT fidÃ©litÃ© autorisÃ©`);
     } else if (!supplierWasEmpty && !supplierIsNowFilled) {
-      console.log(`⚠️ [Shipment] Fournisseur RETIRÉ ("${oldSupplierPhone}" → vide) → PAS de paiement`);
+      console.log(`âš ï¸ [Shipment] Fournisseur RETIRÃ‰ ("${oldSupplierPhone}" â†’ vide) â†’ PAS de paiement`);
     } else if (!supplierWasEmpty && supplierIsNowFilled && oldSupplierPhone !== newSupplierPhone) {
-      console.log(`🔄 [Shipment] Fournisseur REMPLACÉ ("${oldSupplierPhone}" → "${newSupplierPhone}") → PAS de paiement`);
+      console.log(`ðŸ”„ [Shipment] Fournisseur REMPLACÃ‰ ("${oldSupplierPhone}" â†’ "${newSupplierPhone}") â†’ PAS de paiement`);
     } else if (oldSupplierPhone === newSupplierPhone && newSupplierPhone !== '') {
-      console.log(`⏭️ [Shipment] Fournisseur INCHANGÉ ("${newSupplierPhone}") → PAS de paiement`);
+      console.log(`â­ï¸ [Shipment] Fournisseur INCHANGÃ‰ ("${newSupplierPhone}") â†’ PAS de paiement`);
     }
 
     // ============================================================
-    // 🔹 TRAITEMENT DU FOURNISSEUR (find ou create)
-    //     Création auto si inexistant
-    //     ✅ INDÉPENDANT DU CLIENT
+    // ðŸ”¹ TRAITEMENT DU FOURNISSEUR (find ou create)
+    //     CrÃ©ation auto si inexistant
+    //     âœ… INDÃ‰PENDANT DU CLIENT
     // ============================================================
     let fournisseurUser: UserEntity | null = null;
 
@@ -1762,30 +1762,30 @@ export class ShipmentService {
         const isValidPhone = /^\+?[0-9\s\-()]{7,20}$/.test(newSupplierPhone);
 
         if (!isValidPhone) {
-          console.log(`⚠️ [Shipment] Format supplierPhone invalide: ${newSupplierPhone} → ignoré`);
+          console.log(`âš ï¸ [Shipment] Format supplierPhone invalide: ${newSupplierPhone} â†’ ignorÃ©`);
           shipment.fournisseurPhone = newSupplierPhone;
         } else {
-          // ✅ Cas particulier : même personne que le client
+          // âœ… Cas particulier : mÃªme personne que le client
           const isSameAsClient = clientUser?.phone === newSupplierPhone;
 
           if (isSameAsClient && clientUser) {
-            console.log(`⚠️ [Shipment] supplierPhone === clientPhone → même personne`);
+            console.log(`âš ï¸ [Shipment] supplierPhone === clientPhone â†’ mÃªme personne`);
 
             fournisseurUser = clientUser;
           } else {
-            // ✅ Chercher dans user (peu importe le rôle)
+            // âœ… Chercher dans user (peu importe le rÃ´le)
             fournisseurUser = await this.userRepo.findOne({
               where: { phone: newSupplierPhone },
             });
 
             if (fournisseurUser) {
-              // ✅ User EXISTE → récupérer ses infos
-              console.log(`ℹ️ [Shipment] Fournisseur existant trouvé: ${fournisseurUser.id} (${fournisseurUser.fullName})`);
+              // âœ… User EXISTE â†’ rÃ©cupÃ©rer ses infos
+              console.log(`â„¹ï¸ [Shipment] Fournisseur existant trouvÃ©: ${fournisseurUser.id} (${fournisseurUser.fullName})`);
               console.log(`   - Email: ${fournisseurUser.email || 'N/A'}`);
               console.log(`   - Phone: ${fournisseurUser.phone}`);
             } else {
-              // ✅ User N'EXISTE PAS → créer
-              console.log(`⚠️ [Shipment] Aucun fournisseur avec ${newSupplierPhone} → création user`);
+              // âœ… User N'EXISTE PAS â†’ crÃ©er
+              console.log(`âš ï¸ [Shipment] Aucun fournisseur avec ${newSupplierPhone} â†’ crÃ©ation user`);
 
               const finalFournisseurName =
                 dto.supplierName && dto.supplierName.trim() !== ''
@@ -1808,7 +1808,7 @@ export class ShipmentService {
                 city: shipment.user?.city || 'Goma',
               });
 
-              console.log('🔍 [Shipment] Tentative création fournisseur avec:', {
+              console.log('ðŸ” [Shipment] Tentative crÃ©ation fournisseur avec:', {
                 fullName: newFournisseur.fullName,
                 phone: newFournisseur.phone,
                 role: newFournisseur.role,
@@ -1818,16 +1818,16 @@ export class ShipmentService {
               });
 
               fournisseurUser = await this.userRepo.save(newFournisseur);
-              console.log(`✅ [Shipment] Nouveau fournisseur créé: ${fournisseurUser.id} (${fournisseurUser.fullName})`);
+              console.log(`âœ… [Shipment] Nouveau fournisseur crÃ©Ã©: ${fournisseurUser.id} (${fournisseurUser.fullName})`);
             }
           }
 
-          // ✅ Assigner les infos du fournisseur
+          // âœ… Assigner les infos du fournisseur
           shipment.fournisseurId = fournisseurUser.id;
           shipment.fournisseurName = fournisseurUser.fullName;
           shipment.fournisseurPhone = newSupplierPhone;
 
-          // ✅ Récupérer OU créer loyalty
+          // âœ… RÃ©cupÃ©rer OU crÃ©er loyalty
           let fournisseurLoyalty = await this.userLoyaltyRepo.findOne({
             where: { userId: fournisseurUser.id, isActive: true },
           });
@@ -1838,11 +1838,11 @@ export class ShipmentService {
 
           if (fournisseurLoyalty?.loyaltyCode && dto.loyaltyCodeFournisseur === undefined) {
             shipment.loyaltyCodeFournisseur = fournisseurLoyalty.loyaltyCode;
-            console.log(`✅ [Shipment] loyaltyCodeFournisseur: ${fournisseurLoyalty.loyaltyCode}`);
+            console.log(`âœ… [Shipment] loyaltyCodeFournisseur: ${fournisseurLoyalty.loyaltyCode}`);
           }
         }
       } catch (error: any) {
-        console.error(`❌ [Shipment] Erreur fournisseur:`, {
+        console.error(`âŒ [Shipment] Erreur fournisseur:`, {
           message: error.message,
           code: error.code,
           detail: error.detail,
@@ -1850,7 +1850,7 @@ export class ShipmentService {
         shipment.fournisseurPhone = newSupplierPhone;
       }
     } else {
-      // 🔹 Fallback : si supplierName/Phone envoyés directement (ancien comportement)
+      // ðŸ”¹ Fallback : si supplierName/Phone envoyÃ©s directement (ancien comportement)
       if (dto.supplierName !== undefined) {
         shipment.fournisseurName = dto.supplierName;
       }
@@ -1860,14 +1860,14 @@ export class ShipmentService {
     }
 
     // ============================================================
-    // 🔹 COMPANIES
+    // ðŸ”¹ COMPANIES
     // ============================================================
     if (dto.pickupCompanyId !== undefined) shipment.pickupCompanyId = dto.pickupCompanyId;
     if (dto.shippingCompanyId !== undefined) shipment.shippingCompanyId = dto.shippingCompanyId;
     if (dto.deliveryCompanyId !== undefined) shipment.deliveryCompanyId = dto.deliveryCompanyId;
 
     // ============================================================
-    // 🔹 STATUS & FLAGS
+    // ðŸ”¹ STATUS & FLAGS
     // ============================================================
     if (dto.status !== undefined) shipment.status = dto.status;
     if (dto.pickupEnabled !== undefined) shipment.pickupEnabled = dto.pickupEnabled;
@@ -1875,9 +1875,9 @@ export class ShipmentService {
     if (dto.deliveryEnabled !== undefined) shipment.deliveryEnabled = dto.deliveryEnabled;
 
     // ============================================================
-    // 🔹 isPaid / paid
-    // ✅ CORRECTION ROBUSTE : normalisation explicite en booléen
-    //    (ne dépend pas de la config du ValidationPipe)
+    // ðŸ”¹ isPaid / paid
+    // âœ… CORRECTION ROBUSTE : normalisation explicite en boolÃ©en
+    //    (ne dÃ©pend pas de la config du ValidationPipe)
     //    Accepte : true/false, 'true'/'false', 1/0, '1'/'0'
     // ============================================================
     const rawPaidValue = dto.isPaid ?? dto.paid;
@@ -1895,11 +1895,11 @@ export class ShipmentService {
 
       shipment.isPaid = paidValue;
       shipment.paid = paidValue;
-      console.log(`💰 [Shipment] isPaid/paid mis à jour → ${paidValue} (booléen ${typeof paidValue})`);
+      console.log(`ðŸ’° [Shipment] isPaid/paid mis Ã  jour â†’ ${paidValue} (boolÃ©en ${typeof paidValue})`);
     }
 
     // ============================================================
-    // 🔹 LOYALTY CODES (override manuel)
+    // ðŸ”¹ LOYALTY CODES (override manuel)
     // ============================================================
     if (dto.loyaltyCode !== undefined) {
       shipment.loyaltyCode = dto.loyaltyCode ?? undefined;
@@ -1909,7 +1909,7 @@ export class ShipmentService {
     }
 
     // ============================================================
-    // 🔹 PICKUP
+    // ðŸ”¹ PICKUP
     // ============================================================
     if (shipment.pickupEnabled) {
       if (dto.pickupFrom) shipment.pickupFrom = dto.pickupFrom;
@@ -1930,7 +1930,7 @@ export class ShipmentService {
     }
 
     // ============================================================
-    // 🔹 SHIPPING
+    // ðŸ”¹ SHIPPING
     // ============================================================
     if (shipment.shippingEnabled) {
       if (dto.shippingFrom) shipment.shippingFrom = dto.shippingFrom;
@@ -1938,14 +1938,14 @@ export class ShipmentService {
     }
 
     // ============================================================
-    // 🔹 DELIVERY
+    // ðŸ”¹ DELIVERY
     // ============================================================
     if (shipment.deliveryEnabled && dto.deliveryAddressId) {
       shipment.deliveryAddressId = dto.deliveryAddressId;
     }
 
     // ============================================================
-    // 🔹 PACKAGE
+    // ðŸ”¹ PACKAGE
     // ============================================================
     if (shipment.package) {
       Object.assign(shipment.package, {
@@ -1962,7 +1962,7 @@ export class ShipmentService {
     }
 
     // ============================================================
-    // 🔹 IMAGE
+    // ðŸ”¹ IMAGE
     // ============================================================
     if (file) {
       if (shipment.image) {
@@ -1970,7 +1970,7 @@ export class ShipmentService {
           const oldFilename = shipment.image.split('/').pop()!;
           await this.filesService.deleteFile('shipment', oldFilename);
         } catch (err) {
-          console.warn('Impossible de supprimer l’ancienne image:', err);
+          console.warn('Impossible de supprimer lâ€™ancienne image:', err);
         }
       }
       const uploadedFile = await this.filesService.uploadFile(file, 'shipment', 'product');
@@ -1978,7 +1978,7 @@ export class ShipmentService {
     }
 
     // ============================================================
-    // 🔹 PRICES
+    // ðŸ”¹ PRICES
     // ============================================================
     if (dto.pickupPrice !== undefined) shipment.pickupPrice = dto.pickupPrice;
     if (dto.shippingPrice !== undefined) shipment.shippingPrice = dto.shippingPrice;
@@ -1986,14 +1986,14 @@ export class ShipmentService {
     shipment.totalPrice = dto.totalPrice ?? (shipment.pickupPrice ?? 0) + (shipment.shippingPrice ?? 0) + (shipment.deliveryPrice ?? 0);
 
     // ============================================================
-    // 🔹 WHATSAPP
+    // ðŸ”¹ WHATSAPP
     // ============================================================
     if (dto.whatsapp_number !== undefined) {
       shipment.whatsapp_number = dto.whatsapp_number;
     }
 
     // ============================================================
-    // 🔹 PAYMENT METHOD
+    // ðŸ”¹ PAYMENT METHOD
     // ============================================================
     if (dto.paymentMethod !== undefined) {
       shipment.paymentMethod = dto.paymentMethod;
@@ -2002,19 +2002,19 @@ export class ShipmentService {
     await this.shipmentRepo.save(shipment);
 
     // ============================================================
-    // 💰 PAIEMENT FIDÉLITÉ
-    // ✅ RÈGLE STRICTE :
-    //   - Payer UNIQUEMENT si un client/fournisseur a été AJOUTÉ
-    //     (était vide → devient rempli)
+    // ðŸ’° PAIEMENT FIDÃ‰LITÃ‰
+    // âœ… RÃˆGLE STRICTE :
+    //   - Payer UNIQUEMENT si un client/fournisseur a Ã©tÃ© AJOUTÃ‰
+    //     (Ã©tait vide â†’ devient rempli)
     //   - Ne PAS payer si :
-    //     · Remplacement (A → B)
-    //     · Retrait (A → vide)
-    //     · Inchangé (A → A)
+    //     Â· Remplacement (A â†’ B)
+    //     Â· Retrait (A â†’ vide)
+    //     Â· InchangÃ© (A â†’ A)
     // ============================================================
     const shouldPayClient = clientShouldBePaid;
     const shouldPayFournisseur = fournisseurShouldBePaid;
 
-    console.log(`💰 [Fidelity] Analyse finale:`, {
+    console.log(`ðŸ’° [Fidelity] Analyse finale:`, {
       shouldPayClient,
       shouldPayFournisseur,
       shipmentLoyaltyCode: shipment.loyaltyCode,
@@ -2022,9 +2022,9 @@ export class ShipmentService {
     });
 
     if (!shouldPayClient && !shouldPayFournisseur) {
-      console.log(`⏭️ [Fidelity] Aucun nouveau client/fournisseur ajouté → AUCUN paiement fidélité`);
+      console.log(`â­ï¸ [Fidelity] Aucun nouveau client/fournisseur ajoutÃ© â†’ AUCUN paiement fidÃ©litÃ©`);
     } else {
-      console.log(`💰 [Fidelity] Paiement déclenché:`, {
+      console.log(`ðŸ’° [Fidelity] Paiement dÃ©clenchÃ©:`, {
         shouldPayClient,
         shouldPayFournisseur,
       });
@@ -2033,12 +2033,12 @@ export class ShipmentService {
         const amountForLoyalty = shipment.totalPrice || 0;
 
         if (amountForLoyalty > 0) {
-          // ✅ Générer pin et collectedAt
+          // âœ… GÃ©nÃ©rer pin et collectedAt
           shipment.pin = GeneratePin.generate();
           shipment.collectedAt = new Date();
           await this.shipmentRepo.save(shipment);
 
-          // ✅ Récupérer le % de frais fidélité via company settings
+          // âœ… RÃ©cupÃ©rer le % de frais fidÃ©litÃ© via company settings
           let loyaltyFeePercentage = 0;
           let mainCompany: CompanyEntity | null = shipment.shippingCompanyId
             ? await this.companyRepo.findOne({ where: { id: shipment.shippingCompanyId } })
@@ -2057,24 +2057,24 @@ export class ShipmentService {
             });
 
             loyaltyFeePercentage = companySettings?.loyaltyFeeFixed || 5.00;
-            console.log(`[Fidelity] 🔍 Pourcentage: ${loyaltyFeePercentage}%`);
+            console.log(`[Fidelity] ðŸ” Pourcentage: ${loyaltyFeePercentage}%`);
           } else {
             loyaltyFeePercentage = 5.00;
-            console.log(`[Fidelity] ⚠️ Aucune company → 5% par défaut`);
+            console.log(`[Fidelity] âš ï¸ Aucune company â†’ 5% par dÃ©faut`);
           }
 
           const totalFees = (amountForLoyalty * loyaltyFeePercentage) / 100;
           const loyaltyFeeClient = totalFees / 2;
           const loyaltyFeeFournisseur = totalFees / 2;
 
-          console.log(`[Fidelity] 💰 Répartition:`, {
+          console.log(`[Fidelity] ðŸ’° RÃ©partition:`, {
             totalFees,
             loyaltyFeeClient,
             loyaltyFeeFournisseur,
           });
 
           // ============================================================
-          // ✅ Payer le CLIENT UNIQUEMENT si ajouté (vide → rempli)
+          // âœ… Payer le CLIENT UNIQUEMENT si ajoutÃ© (vide â†’ rempli)
           // ============================================================
           if (shouldPayClient && shipment.loyaltyCode && loyaltyFeeClient > 0) {
             const userLoyalty = await this.userLoyaltyRepo.findOne({
@@ -2088,7 +2088,7 @@ export class ShipmentService {
                   {
                     userId: userLoyalty.user.userIdFpay,
                     amount: loyaltyFeeClient,
-                    description: `Frais de fidélité (50%) pour le colis ${shipment.trackingNumber}`,
+                    description: `Frais de fidÃ©litÃ© (50%) pour le colis ${shipment.trackingNumber}`,
                     currency: 'USD',
                     countryCode: 'CD',
                   },
@@ -2102,7 +2102,7 @@ export class ShipmentService {
                     transactionType: LoyaltyTransactionType.EARN,
                     sourceType: LoyaltySourceType.SHIPMENT,
                     sourceId: shipment.id,
-                    description: `Frais de fidélité (50%) pour l'expédition ${shipment.trackingNumber}`,
+                    description: `Frais de fidÃ©litÃ© (50%) pour l'expÃ©dition ${shipment.trackingNumber}`,
                   });
                   await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
@@ -2110,16 +2110,16 @@ export class ShipmentService {
                   userLoyalty.pointsTotalEarned += Math.round(loyaltyFeeClient * 100);
                   await this.userLoyaltyRepo.save(userLoyalty);
 
-                  console.log(`[Fidelity] ✅ ${loyaltyFeeClient} USD envoyé au CLIENT`);
+                  console.log(`[Fidelity] âœ… ${loyaltyFeeClient} USD envoyÃ© au CLIENT`);
                 }
               } catch (err: any) {
-                console.error(`[Fidelity] ❌ Erreur paiement client:`, err.message);
+                console.error(`[Fidelity] âŒ Erreur paiement client:`, err.message);
               }
             }
           }
 
           // ============================================================
-          // ✅ Payer le FOURNISSEUR UNIQUEMENT si ajouté (vide → rempli)
+          // âœ… Payer le FOURNISSEUR UNIQUEMENT si ajoutÃ© (vide â†’ rempli)
           // ============================================================
           if (shouldPayFournisseur && shipment.loyaltyCodeFournisseur && loyaltyFeeFournisseur > 0) {
             const fournisseurLoyalty = await this.userLoyaltyRepo.findOne({
@@ -2133,7 +2133,7 @@ export class ShipmentService {
                   {
                     userId: fournisseurLoyalty.user.userIdFpay,
                     amount: loyaltyFeeFournisseur,
-                    description: `Frais de fidélité (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
+                    description: `Frais de fidÃ©litÃ© (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
                     currency: 'USD',
                     countryCode: 'CD',
                   },
@@ -2147,7 +2147,7 @@ export class ShipmentService {
                     transactionType: LoyaltyTransactionType.EARN,
                     sourceType: LoyaltySourceType.SHIPMENT,
                     sourceId: shipment.id,
-                    description: `Frais de fidélité (50%) fournisseur pour l'expédition ${shipment.trackingNumber}`,
+                    description: `Frais de fidÃ©litÃ© (50%) fournisseur pour l'expÃ©dition ${shipment.trackingNumber}`,
                   });
                   await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
@@ -2155,15 +2155,15 @@ export class ShipmentService {
                   fournisseurLoyalty.pointsTotalEarned += Math.round(loyaltyFeeFournisseur * 100);
                   await this.userLoyaltyRepo.save(fournisseurLoyalty);
 
-                  console.log(`[Fidelity] ✅ ${loyaltyFeeFournisseur} USD envoyé au FOURNISSEUR`);
+                  console.log(`[Fidelity] âœ… ${loyaltyFeeFournisseur} USD envoyÃ© au FOURNISSEUR`);
                 }
               } catch (err: any) {
-                console.error(`[Fidelity] ❌ Erreur paiement fournisseur:`, err.message);
+                console.error(`[Fidelity] âŒ Erreur paiement fournisseur:`, err.message);
               }
             }
           }
 
-          // ✅ Enregistrer l'opération
+          // âœ… Enregistrer l'opÃ©ration
           await this.operation.save({
             debit: amountForLoyalty,
             credit: 0,
@@ -2178,17 +2178,17 @@ export class ShipmentService {
             reference: this.generateOperationReference(),
           });
 
-          console.log(`[Fidelity] ✅ Paiement fidélité complet pour ${shipment.trackingNumber}`);
+          console.log(`[Fidelity] âœ… Paiement fidÃ©litÃ© complet pour ${shipment.trackingNumber}`);
         } else {
-          console.log(`⚠️ [Fidelity] Montant total = 0 → pas de paiement`);
+          console.log(`âš ï¸ [Fidelity] Montant total = 0 â†’ pas de paiement`);
         }
       } catch (err: any) {
-        console.error(`❌ [Fidelity] Erreur globale paiement fidélité:`, err.message);
+        console.error(`âŒ [Fidelity] Erreur globale paiement fidÃ©litÃ©:`, err.message);
       }
     }
 
     // ============================================================
-    // 🔹 RECHARGER LE SHIPMENT
+    // ðŸ”¹ RECHARGER LE SHIPMENT
     // ============================================================
     const updatedShipment = await this.shipmentRepo.findOne({
       where: { id },
@@ -2256,7 +2256,7 @@ export class ShipmentService {
           order: {
             ...shipment,
             currency: 'USD',
-            addressUser: { address: shipment.deliveryAddress?.address || 'Non spécifiée' },
+            addressUser: { address: shipment.deliveryAddress?.address || 'Non spÃ©cifiÃ©e' },
             invoiceNumber: shipment.trackingNumber,
             paymentStatus: shipment.paymentMethod || 'paid',
             pin: shipment.pin,
@@ -2265,8 +2265,8 @@ export class ShipmentService {
           pinCode: shipment.pin,
           trackingNumber: shipment.trackingNumber,
           shipmentReference: shipment.trackingNumber,
-          weight: shipment.package?.weight ? `${shipment.package.weight} kg` : 'Non spécifié',
-          dimensions: shipment.package?.dimensions || 'Non spécifiées',
+          weight: shipment.package?.weight ? `${shipment.package.weight} kg` : 'Non spÃ©cifiÃ©',
+          dimensions: shipment.package?.dimensions || 'Non spÃ©cifiÃ©es',
           packageType: shipment.package?.description || 'Colis standard',
           totalPrice: shipment.totalPrice ? `${shipment.totalPrice} $` : '0 $',
           year: new Date().getFullYear(),
@@ -2332,11 +2332,11 @@ export class ShipmentService {
       .leftJoinAndSelect('lta.tracking', 'ltaTracking')
       .leftJoinAndSelect('shipment.deliveryAddress', 'deliveryAddress')
       .leftJoinAndSelect('shipment.pickupCompany', 'pickupCompany')
-      .leftJoinAndSelect('pickupCompany.invoiceConfiguration', 'pickupInvoiceConfig')        // ✅ AJOUT
+      .leftJoinAndSelect('pickupCompany.invoiceConfiguration', 'pickupInvoiceConfig')        // âœ… AJOUT
       .leftJoinAndSelect('shipment.shippingCompany', 'shippingCompany')
-      .leftJoinAndSelect('shippingCompany.invoiceConfiguration', 'shippingInvoiceConfig')    // ✅ AJOUT
+      .leftJoinAndSelect('shippingCompany.invoiceConfiguration', 'shippingInvoiceConfig')    // âœ… AJOUT
       .leftJoinAndSelect('shipment.deliveryCompany', 'deliveryCompany')
-      .leftJoinAndSelect('deliveryCompany.invoiceConfiguration', 'deliveryInvoiceConfig');  // ✅ AJOUT
+      .leftJoinAndSelect('deliveryCompany.invoiceConfiguration', 'deliveryInvoiceConfig');  // âœ… AJOUT
 
     queryBuilder.andWhere(
       '(shipment.pickupCompanyId = :companyId OR shipment.shippingCompanyId = :companyId OR shipment.deliveryCompanyId = :companyId)',
@@ -2478,11 +2478,11 @@ export class ShipmentService {
         'ltaShipments.lta',
         'deliveryAddress',
         'pickupCompany',
-        'pickupCompany.invoiceConfiguration',      // ✅ AJOUT
+        'pickupCompany.invoiceConfiguration',      // âœ… AJOUT
         'shippingCompany',
-        'shippingCompany.invoiceConfiguration',    // ✅ AJOUT
+        'shippingCompany.invoiceConfiguration',    // âœ… AJOUT
         'deliveryCompany',
-        'deliveryCompany.invoiceConfiguration',    // ✅ AJOUT
+        'deliveryCompany.invoiceConfiguration',    // âœ… AJOUT
       ],
       order: { createdAt: 'DESC' },
     });
@@ -2501,11 +2501,11 @@ export class ShipmentService {
         'ltaShipments.lta',
         'deliveryAddress',
         'pickupCompany',
-        'pickupCompany.invoiceConfiguration',      // ✅ AJOUT
+        'pickupCompany.invoiceConfiguration',      // âœ… AJOUT
         'shippingCompany',
-        'shippingCompany.invoiceConfiguration',    // ✅ AJOUT
+        'shippingCompany.invoiceConfiguration',    // âœ… AJOUT
         'deliveryCompany',
-        'deliveryCompany.invoiceConfiguration',    // ✅ AJOUT
+        'deliveryCompany.invoiceConfiguration',    // âœ… AJOUT
       ],
     });
     if (!shipment) throw new NotFoundException(await this.i18n.translate('shipment.error.not_found', lang, { id }));
@@ -2627,7 +2627,7 @@ export class ShipmentService {
     let fpayTransactionId: string | null = null;
     let fpayReference: string | null = null;
 
-    // ✅ AJOUT FPAY - SHIPMENT
+    // âœ… AJOUT FPAY - SHIPMENT
     if (paymentMethod === PaymentMethod.FPAY) {
       selectedMethod = PaymentMethod.FPAY;
 
@@ -2654,14 +2654,14 @@ export class ShipmentService {
         fpayTransactionId = fpayResponse.data.transaction.id;
         fpayReference = fpayResponse.data.transaction.reference;
 
-        console.log('[Shipment] ✅ Paiement FPAY réussi:', {
+        console.log('[Shipment] âœ… Paiement FPAY rÃ©ussi:', {
           transactionId: fpayTransactionId,
           reference: fpayReference,
           amount: fpayResponse.data.transaction.amount,
         });
       }
     }
-    // ✅ PAIEMENT MOBILE_MONEY (Pawapay)
+    // âœ… PAIEMENT MOBILE_MONEY (Pawapay)
     else {
       selectedMethod = PaymentMethod.MOBILE_MONEY;
 
@@ -2685,7 +2685,7 @@ export class ShipmentService {
 
       try {
         const pawapayResponse = await this.pawapayService.createDepositSimple(pawapayData);
-        console.log('[Shipment] Réponse Pawapay :', JSON.stringify(pawapayResponse, null, 2));
+        console.log('[Shipment] RÃ©ponse Pawapay :', JSON.stringify(pawapayResponse, null, 2));
 
         const depositStatus = pawapayResponse.finalStatus?.data?.status;
         const failureReason = pawapayResponse.finalStatus?.data?.failureReason;
@@ -2693,9 +2693,9 @@ export class ShipmentService {
         console.log(`[Shipment] Statut final Pawapay: ${depositStatus}`);
 
         if (depositStatus === 'COMPLETED') {
-          console.log('[Shipment] ✅ Paiement confirmé : COMPLETED');
+          console.log('[Shipment] âœ… Paiement confirmÃ© : COMPLETED');
         } else if (depositStatus === 'REJECTED') {
-          console.log('[Shipment] ❌ Paiement rejeté');
+          console.log('[Shipment] âŒ Paiement rejetÃ©');
           if (failureReason?.failureMessage) {
             throw new BadRequestException(failureReason.failureMessage);
           }
@@ -2703,7 +2703,7 @@ export class ShipmentService {
             await this.i18n.translate('shipment.error.pawapay_failed', lang)
           );
         } else if (depositStatus === 'FAILED') {
-          console.log('[Shipment] ❌ Paiement échoué');
+          console.log('[Shipment] âŒ Paiement Ã©chouÃ©');
           if (failureReason?.failureMessage) {
             throw new BadRequestException(failureReason.failureMessage);
           }
@@ -2711,21 +2711,21 @@ export class ShipmentService {
             await this.i18n.translate('shipment.error.pawapay_failed', lang)
           );
         } else if (depositStatus === 'CANCELED') {
-          console.log('[Shipment] ❌ Paiement annulé');
-          throw new BadRequestException('Le paiement a été annulé.');
+          console.log('[Shipment] âŒ Paiement annulÃ©');
+          throw new BadRequestException('Le paiement a Ã©tÃ© annulÃ©.');
         } else if (depositStatus === 'EXPIRED') {
-          console.log('[Shipment] ❌ Paiement expiré');
-          throw new BadRequestException('Le paiement a expiré. Veuillez réessayer.');
+          console.log('[Shipment] âŒ Paiement expirÃ©');
+          throw new BadRequestException('Le paiement a expirÃ©. Veuillez rÃ©essayer.');
         } else if (depositStatus === 'TIMEOUT') {
-          console.log('[Shipment] ⏳ Timeout du polling');
+          console.log('[Shipment] â³ Timeout du polling');
           throw new BadRequestException(
-            'Le paiement est en attente de confirmation. Veuillez vérifier le statut plus tard.'
+            'Le paiement est en attente de confirmation. Veuillez vÃ©rifier le statut plus tard.'
           );
         } else if (depositStatus === 'ACCEPTED' || depositStatus === 'PENDING' ||
           depositStatus === 'PROCESSING' || depositStatus === 'WAITING') {
-          console.log(`[Shipment] ⏳ Statut en attente: ${depositStatus}`);
+          console.log(`[Shipment] â³ Statut en attente: ${depositStatus}`);
         } else {
-          console.log(`[Shipment] ❌ Statut inconnu: ${depositStatus}`);
+          console.log(`[Shipment] âŒ Statut inconnu: ${depositStatus}`);
           throw new BadRequestException(
             await this.i18n.translate('shipment.error.pawapay_failed', lang)
           );
@@ -2743,15 +2743,15 @@ export class ShipmentService {
           if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
             fpayTransactionId = fpayResponse.data.transaction.id;
             fpayReference = fpayResponse.data.transaction.reference;
-            console.log('[Shipment] ✅ FPAY Mobile Money réussi:', {
+            console.log('[Shipment] âœ… FPAY Mobile Money rÃ©ussi:', {
               transactionId: fpayTransactionId,
               reference: fpayReference,
             });
           } else {
-            console.log('[Shipment] ⚠️ FPAY Mobile Money échoué (ignoré)');
+            console.log('[Shipment] âš ï¸ FPAY Mobile Money Ã©chouÃ© (ignorÃ©)');
           }
         } catch (error: any) {
-          console.log('[Shipment] FPAY Mobile Money ignoré:', error.message);
+          console.log('[Shipment] FPAY Mobile Money ignorÃ©:', error.message);
         }
 
       } catch (error: any) {
@@ -2768,13 +2768,13 @@ export class ShipmentService {
     }
 
     // ============================================
-    // 🆕 FIDÉLITÉ - RÉCUPÉRATION DE L'ENTREPRISE ET POURCENTAGES
+    // ðŸ†• FIDÃ‰LITÃ‰ - RÃ‰CUPÃ‰RATION DE L'ENTREPRISE ET POURCENTAGES
     // ============================================
     let loyaltyFeePercentage = 0;
     let loyaltyCode = shipment.loyaltyCode || undefined;
     let loyaltyCodeFournisseur = shipment.loyaltyCodeFournisseur || undefined;
 
-    // Récupérer la company
+    // RÃ©cupÃ©rer la company
     let mainCompany: CompanyEntity | null = shipment.shippingCompany || null;
 
     if (!mainCompany && shipment.pickupCompany) {
@@ -2789,9 +2789,9 @@ export class ShipmentService {
       });
     }
 
-    console.log('[Fidelity] 🔍 Company trouvée:', mainCompany?.id || 'Non trouvée');
+    console.log('[Fidelity] ðŸ” Company trouvÃ©e:', mainCompany?.id || 'Non trouvÃ©e');
 
-    // Récupérer les paramètres de la company
+    // RÃ©cupÃ©rer les paramÃ¨tres de la company
     if (mainCompany) {
       const companySettings = await this.companySettingsRepo.findOne({
         where: { companyId: mainCompany.id },
@@ -2799,24 +2799,24 @@ export class ShipmentService {
 
       if (companySettings) {
         loyaltyFeePercentage = companySettings.loyaltyFeeFixed || 0;
-        console.log('[Fidelity] 🔍 Pourcentage récupéré:', loyaltyFeePercentage);
+        console.log('[Fidelity] ðŸ” Pourcentage rÃ©cupÃ©rÃ©:', loyaltyFeePercentage);
       } else {
         loyaltyFeePercentage = 5.00;
-        console.log('[Fidelity] ⚠️ Aucun paramètre, utilisation de 5% par défaut');
+        console.log('[Fidelity] âš ï¸ Aucun paramÃ¨tre, utilisation de 5% par dÃ©faut');
       }
     } else {
       loyaltyFeePercentage = 5.00;
-      console.log('[Fidelity] ⚠️ Aucune company, utilisation de 5% par défaut');
+      console.log('[Fidelity] âš ï¸ Aucune company, utilisation de 5% par dÃ©faut');
     }
 
     // ============================================
-    // 🆕 CALCUL DES FRAIS (50% CLIENT / 50% FOURNISSEUR)
+    // ðŸ†• CALCUL DES FRAIS (50% CLIENT / 50% FOURNISSEUR)
     // ============================================
     const totalFees = (totalAmount * loyaltyFeePercentage) / 100;
     const loyaltyFeeClient = totalFees / 2;
     const loyaltyFeeFournisseur = totalFees / 2;
 
-    console.log('[Fidelity] 🔍 Répartition des frais:', {
+    console.log('[Fidelity] ðŸ” RÃ©partition des frais:', {
       totalFees,
       loyaltyFeeClient,
       loyaltyFeeFournisseur,
@@ -2824,7 +2824,7 @@ export class ShipmentService {
     });
 
     // ============================================
-    // 🆕 PAIEMENT AU CLIENT (EXPÉDITEUR) - 50%
+    // ðŸ†• PAIEMENT AU CLIENT (EXPÃ‰DITEUR) - 50%
     // ============================================
     if (loyaltyCode && loyaltyFeeClient > 0) {
       const userLoyalty = await this.userLoyaltyRepo.findOne({
@@ -2839,12 +2839,12 @@ export class ShipmentService {
           const fpayData = {
             userId: recipientUser.userIdFpay,
             amount: loyaltyFeeClient,
-            description: `Frais de fidélité (50%) pour le colis ${shipment.trackingNumber}`,
+            description: `Frais de fidÃ©litÃ© (50%) pour le colis ${shipment.trackingNumber}`,
             currency: 'USD',
             countryCode: 'CD',
           };
 
-          console.log('[Fidelity] 📤 Envoi FPAY au client:', fpayData);
+          console.log('[Fidelity] ðŸ“¤ Envoi FPAY au client:', fpayData);
 
           try {
             const fpayResponse = await this.fpayService.makeSend(fpayData, user_active);
@@ -2859,23 +2859,23 @@ export class ShipmentService {
                 transactionType: LoyaltyTransactionType.EARN,
                 sourceType: LoyaltySourceType.SHIPMENT,
                 sourceId: shipment.id,
-                description: `Frais de fidélité (50%) pour l'expédition ${shipment.trackingNumber}`,
+                description: `Frais de fidÃ©litÃ© (50%) pour l'expÃ©dition ${shipment.trackingNumber}`,
                 expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
                 isExpired: false,
               });
               await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
-              console.log(`[Fidelity] ✅ ${loyaltyFeeClient} USD envoyé au client (50%) ${recipientUser.id}`);
+              console.log(`[Fidelity] âœ… ${loyaltyFeeClient} USD envoyÃ© au client (50%) ${recipientUser.id}`);
             }
           } catch (error) {
-            console.error('[Fidelity] ❌ Erreur envoi FPAY client:', error.message);
+            console.error('[Fidelity] âŒ Erreur envoi FPAY client:', error.message);
           }
         }
       }
     }
 
     // ============================================
-    // 🆕 PAIEMENT AU FOURNISSEUR - 50%
+    // ðŸ†• PAIEMENT AU FOURNISSEUR - 50%
     // ============================================
     if (loyaltyCodeFournisseur && loyaltyFeeFournisseur > 0) {
       const fournisseurLoyalty = await this.userLoyaltyRepo.findOne({
@@ -2890,12 +2890,12 @@ export class ShipmentService {
           const fpayData = {
             userId: recipientUser.userIdFpay,
             amount: loyaltyFeeFournisseur,
-            description: `Frais de fidélité (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
+            description: `Frais de fidÃ©litÃ© (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
             currency: 'USD',
             countryCode: 'CD',
           };
 
-          console.log('[Fidelity] 📤 Envoi FPAY au fournisseur:', fpayData);
+          console.log('[Fidelity] ðŸ“¤ Envoi FPAY au fournisseur:', fpayData);
 
           try {
             const fpayResponse = await this.fpayService.makeSend(fpayData, user_active);
@@ -2910,16 +2910,16 @@ export class ShipmentService {
                 transactionType: LoyaltyTransactionType.EARN,
                 sourceType: LoyaltySourceType.SHIPMENT,
                 sourceId: shipment.id,
-                description: `Frais de fidélité (50%) fournisseur pour l'expédition ${shipment.trackingNumber}`,
+                description: `Frais de fidÃ©litÃ© (50%) fournisseur pour l'expÃ©dition ${shipment.trackingNumber}`,
                 expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
                 isExpired: false,
               });
               await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
-              console.log(`[Fidelity] ✅ ${loyaltyFeeFournisseur} USD envoyé au fournisseur (50%) ${recipientUser.id}`);
+              console.log(`[Fidelity] âœ… ${loyaltyFeeFournisseur} USD envoyÃ© au fournisseur (50%) ${recipientUser.id}`);
             }
           } catch (error) {
-            console.error('[Fidelity] ❌ Erreur envoi FPAY fournisseur:', error.message);
+            console.error('[Fidelity] âŒ Erreur envoi FPAY fournisseur:', error.message);
           }
         }
       }
@@ -2940,7 +2940,7 @@ export class ShipmentService {
     const operationReference = this.generateOperationReference();
     await this.shipmentRepo.save(shipment);
 
-    // ✅ Enregistrement de l'opération
+    // âœ… Enregistrement de l'opÃ©ration
     const operationData: Partial<OperationEntity> = {
       debit: amount,
       credit: 0,
@@ -3015,11 +3015,11 @@ export class ShipmentService {
     }
 
     // ============================================
-    // 🆕 RÉCUPÉRATION DE L'ENTREPRISE ET DE SES POURCENTAGES
+    // ðŸ†• RÃ‰CUPÃ‰RATION DE L'ENTREPRISE ET DE SES POURCENTAGES
     // ============================================
     let loyaltyFeePercentage = 0;
 
-    // 1️⃣ Récupérer la company
+    // 1ï¸âƒ£ RÃ©cupÃ©rer la company
     let mainCompany: CompanyEntity | null = shipment.shippingCompany || null;
 
     if (!mainCompany && shipment.pickupCompany) {
@@ -3034,37 +3034,37 @@ export class ShipmentService {
       });
     }
 
-    console.log('[Fidelity] 🔍 Company trouvée:', mainCompany?.id || 'Non trouvée');
+    console.log('[Fidelity] ðŸ” Company trouvÃ©e:', mainCompany?.id || 'Non trouvÃ©e');
 
-    // 2️⃣ Récupérer les paramètres de la company
+    // 2ï¸âƒ£ RÃ©cupÃ©rer les paramÃ¨tres de la company
     if (mainCompany) {
       const companySettings = await this.companySettingsRepo.findOne({
         where: { companyId: mainCompany.id },
       });
 
       if (companySettings) {
-        // ✅ Récupérer le pourcentage total (5%)
+        // âœ… RÃ©cupÃ©rer le pourcentage total (5%)
         loyaltyFeePercentage = companySettings.loyaltyFeeFixed || 0;
-        console.log('[Fidelity] 🔍 Pourcentage total récupéré:', loyaltyFeePercentage);
+        console.log('[Fidelity] ðŸ” Pourcentage total rÃ©cupÃ©rÃ©:', loyaltyFeePercentage);
       } else {
-        // Fallback si pas de paramètres
+        // Fallback si pas de paramÃ¨tres
         loyaltyFeePercentage = 5.00;
-        console.log('[Fidelity] ⚠️ Aucun paramètre trouvé, utilisation de 5% par défaut');
+        console.log('[Fidelity] âš ï¸ Aucun paramÃ¨tre trouvÃ©, utilisation de 5% par dÃ©faut');
       }
     } else {
       // Fallback si pas de company
       loyaltyFeePercentage = 5.00;
-      console.log('[Fidelity] ⚠️ Aucune company trouvée, utilisation de 5% par défaut');
+      console.log('[Fidelity] âš ï¸ Aucune company trouvÃ©e, utilisation de 5% par dÃ©faut');
     }
 
     // ============================================
-    // 🆕 CALCUL DES FRAIS (50% CLIENT / 50% FOURNISSEUR)
+    // ðŸ†• CALCUL DES FRAIS (50% CLIENT / 50% FOURNISSEUR)
     // ============================================
     const totalFees = (amount * loyaltyFeePercentage) / 100;
     const loyaltyFeeClient = totalFees / 2;  // 50% pour le client
     const loyaltyFeeFournisseur = totalFees / 2;  // 50% pour le fournisseur
 
-    console.log('[Fidelity] 🔍 Répartition des frais:', {
+    console.log('[Fidelity] ðŸ” RÃ©partition des frais:', {
       totalFees,
       loyaltyFeeClient,
       loyaltyFeeFournisseur,
@@ -3072,16 +3072,16 @@ export class ShipmentService {
     });
 
     // ============================================
-    // 🆕 RÉCUPÉRATION DES CODES DE FIDÉLITÉ
+    // ðŸ†• RÃ‰CUPÃ‰RATION DES CODES DE FIDÃ‰LITÃ‰
     // ============================================
     const loyaltyCode = shipment.loyaltyCode || undefined;
     const loyaltyCodeFournisseur = shipment.loyaltyCodeFournisseur || undefined;
 
-    console.log('[Fidelity] 🔍 Code client:', loyaltyCode);
-    console.log('[Fidelity] 🔍 Code fournisseur:', loyaltyCodeFournisseur);
+    console.log('[Fidelity] ðŸ” Code client:', loyaltyCode);
+    console.log('[Fidelity] ðŸ” Code fournisseur:', loyaltyCodeFournisseur);
 
     // ============================================
-    // 🆕 PAIEMENT AU CLIENT (EXPÉDITEUR) - 50%
+    // ðŸ†• PAIEMENT AU CLIENT (EXPÃ‰DITEUR) - 50%
     // ============================================
     if (loyaltyCode && loyaltyFeeClient > 0) {
       const userLoyalty = await this.userLoyaltyRepo.findOne({
@@ -3092,7 +3092,7 @@ export class ShipmentService {
       if (userLoyalty) {
         const recipientUser = userLoyalty.user;
 
-        console.log('[Fidelity] 🔍 Paiement client - 50%:', {
+        console.log('[Fidelity] ðŸ” Paiement client - 50%:', {
           loyaltyFeeClient,
           recipientId: recipientUser?.id,
         });
@@ -3101,7 +3101,7 @@ export class ShipmentService {
           const fpayData = {
             userId: recipientUser.userIdFpay,
             amount: loyaltyFeeClient,
-            description: `Frais de fidélité (50%) pour le colis ${shipment.trackingNumber}`,
+            description: `Frais de fidÃ©litÃ© (50%) pour le colis ${shipment.trackingNumber}`,
             currency: 'USD',
             countryCode: 'CD',
           };
@@ -3118,20 +3118,20 @@ export class ShipmentService {
               transactionType: LoyaltyTransactionType.EARN,
               sourceType: LoyaltySourceType.SHIPMENT,
               sourceId: shipment.id,
-              description: `Frais de fidélité (50%) pour l'expédition ${shipment.trackingNumber}`,
+              description: `Frais de fidÃ©litÃ© (50%) pour l'expÃ©dition ${shipment.trackingNumber}`,
               expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
               isExpired: false,
             });
             await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
-            console.log(`[Fidelity] ✅ ${loyaltyFeeClient} USD envoyé au client (50%) ${recipientUser.id}`);
+            console.log(`[Fidelity] âœ… ${loyaltyFeeClient} USD envoyÃ© au client (50%) ${recipientUser.id}`);
           }
         }
       }
     }
 
     // ============================================
-    // 🆕 PAIEMENT AU FOURNISSEUR - 50%
+    // ðŸ†• PAIEMENT AU FOURNISSEUR - 50%
     // ============================================
     if (loyaltyCodeFournisseur && loyaltyFeeFournisseur > 0) {
       const fournisseurLoyalty = await this.userLoyaltyRepo.findOne({
@@ -3142,7 +3142,7 @@ export class ShipmentService {
       if (fournisseurLoyalty) {
         const recipientUser = fournisseurLoyalty.user;
 
-        console.log('[Fidelity] 🔍 Paiement fournisseur - 50%:', {
+        console.log('[Fidelity] ðŸ” Paiement fournisseur - 50%:', {
           loyaltyFeeFournisseur,
           recipientId: recipientUser?.id,
         });
@@ -3151,7 +3151,7 @@ export class ShipmentService {
           const fpayData = {
             userId: recipientUser.userIdFpay,
             amount: loyaltyFeeFournisseur,
-            description: `Frais de fidélité (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
+            description: `Frais de fidÃ©litÃ© (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
             currency: 'USD',
             countryCode: 'CD',
           };
@@ -3168,13 +3168,13 @@ export class ShipmentService {
               transactionType: LoyaltyTransactionType.EARN,
               sourceType: LoyaltySourceType.SHIPMENT,
               sourceId: shipment.id,
-              description: `Frais de fidélité (50%) fournisseur pour l'expédition ${shipment.trackingNumber}`,
+              description: `Frais de fidÃ©litÃ© (50%) fournisseur pour l'expÃ©dition ${shipment.trackingNumber}`,
               expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
               isExpired: false,
             });
             await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
-            console.log(`[Fidelity] ✅ ${loyaltyFeeFournisseur} USD envoyé au fournisseur (50%) ${recipientUser.id}`);
+            console.log(`[Fidelity] âœ… ${loyaltyFeeFournisseur} USD envoyÃ© au fournisseur (50%) ${recipientUser.id}`);
           }
         }
       }
@@ -3302,9 +3302,9 @@ export class ShipmentService {
 
     const clientInfo = {
       clientName: shipment.clientName || shipment.user?.fullName || 'Client',
-      clientPhone: shipment.clientPhone || shipment.user?.phone || 'Non renseigné',
+      clientPhone: shipment.clientPhone || shipment.user?.phone || 'Non renseignÃ©',
       trackingNumber: shipment.trackingNumber,
-      email: shipment.user?.email || 'Non renseigné',
+      email: shipment.user?.email || 'Non renseignÃ©',
     };
     const notificationData = {
       id: shipment.id,

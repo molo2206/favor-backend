@@ -1,4 +1,4 @@
-/* eslint-disable prefer-const */
+﻿/* eslint-disable prefer-const */
 import { ConfigService } from '@nestjs/config';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { UserEntity } from './entities/user.entity';
 import { OtpEntity } from 'src/otp/entities/otp.entity';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -90,7 +90,7 @@ export class UsersService {
 
     private readonly i18n: I18nService,
 
-    @Inject(forwardRef(() => FpayService))  // ✅ Utiliser forwardRef
+    @Inject(forwardRef(() => FpayService))  // âœ… Utiliser forwardRef
     private readonly fpayService: FpayService,
   ) { }
 
@@ -105,7 +105,7 @@ export class UsersService {
     let attempts = 0;
     const maxAttempts = 10;
 
-    // ✅ Liste des codes déjà connus (fournie par l'appelant)
+    // âœ… Liste des codes dÃ©jÃ  connus (fournie par l'appelant)
     const codesToCheck = new Set(existingCodes || []);
 
     do {
@@ -117,16 +117,16 @@ export class UsersService {
 
       code = `${userIdShort}${random}`;
 
-      // ✅ Vérif rapide locale d'abord (Set O(1) au lieu de Array.includes)
+      // âœ… VÃ©rif rapide locale d'abord (Set O(1) au lieu de Array.includes)
       if (codesToCheck.has(code)) {
         attempts++;
         continue;
       }
 
-      // ✅ Vérif DB uniquement si pas dans la liste locale
+      // âœ… VÃ©rif DB uniquement si pas dans la liste locale
       const existingUser = await this.usersRepository.findOne({
         where: { referralCode: code },
-        select: ['id'],   // ✅ AJOUT : ne récupère que l'id (plus rapide)
+        select: ['id'],   // âœ… AJOUT : ne rÃ©cupÃ¨re que l'id (plus rapide)
       });
 
       exists = !!existingUser;
@@ -134,7 +134,7 @@ export class UsersService {
 
     } while (exists && attempts < maxAttempts);
 
-    // ✅ Fallback si collision après 10 tentatives
+    // âœ… Fallback si collision aprÃ¨s 10 tentatives
     if (exists) {
       const timestamp = Date.now().toString(36).toUpperCase();
       const randomSuffix = Math.random()
@@ -158,17 +158,17 @@ export class UsersService {
   }
 
   private async getOrCreateLoyaltyAccount(userId: string): Promise<UserLoyaltyEntity> {
-    // ✅ 1. VÉRIFIER SI ÇA EXISTE
+    // âœ… 1. VÃ‰RIFIER SI Ã‡A EXISTE
     const existingLoyalty = await this.loyaltyRepository.findOne({
       where: { userId },
     });
 
-    // ✅ 2. SI EXISTE → NE PAS CRÉER, RETOURNER
+    // âœ… 2. SI EXISTE â†’ NE PAS CRÃ‰ER, RETOURNER
     if (existingLoyalty) {
       return existingLoyalty;
     }
 
-    // ✅ 3. SINON → GÉNÉRER UN CODE UNIQUE ET CRÉER
+    // âœ… 3. SINON â†’ GÃ‰NÃ‰RER UN CODE UNIQUE ET CRÃ‰ER
     let code: string;
     let exists: UserLoyaltyEntity | null = null;
     let attempts = 0;
@@ -178,7 +178,7 @@ export class UsersService {
       code = Math.floor(10000000 + Math.random() * 90000000).toString();
       exists = await this.loyaltyRepository.findOne({
         where: { loyaltyCode: code },
-        select: ['id'],   // ✅ AJOUT : ne récupère que l'id
+        select: ['id'],   // âœ… AJOUT : ne rÃ©cupÃ¨re que l'id
       });
       attempts++;
     } while (exists && attempts < maxAttempts);
@@ -200,7 +200,7 @@ export class UsersService {
     try {
       return await this.loyaltyRepository.save(loyalty);
     } catch (error: any) {
-      // ✅ 4. Si erreur de doublon (concurrence) → retourner l'existant
+      // âœ… 4. Si erreur de doublon (concurrence) â†’ retourner l'existant
       if (error.code === 'ER_DUP_ENTRY' || error.message?.includes('Duplicate')) {
         const existing = await this.loyaltyRepository.findOne({
           where: { userId },
@@ -294,7 +294,7 @@ export class UsersService {
     }
 
     // ============================================================
-    // ✅ VÉRIFICATION DU CODE DE PARRAINAGE
+    // âœ… VÃ‰RIFICATION DU CODE DE PARRAINAGE
     // ============================================================
     let referrer: UserEntity | null = null;
 
@@ -329,8 +329,8 @@ export class UsersService {
     }
 
     // ============================================================
-    // 1️⃣ Vérification doublons
-    // ✅ OPTIMISATION : select uniquement id (plus rapide)
+    // 1ï¸âƒ£ VÃ©rification doublons
+    // âœ… OPTIMISATION : select uniquement id (plus rapide)
     // ============================================================
     const userExists = await this.usersRepository.findOne({
       where: [{ email: email || undefined }, { phone: phone || undefined }],
@@ -344,7 +344,7 @@ export class UsersService {
     }
 
     // ============================================================
-    // 2️⃣ Envoi OTP si non fourni
+    // 2ï¸âƒ£ Envoi OTP si non fourni
     // ============================================================
     if (!otpCode) {
       const generatedOtpCode = Math.floor(
@@ -401,8 +401,8 @@ export class UsersService {
     }
 
     // ============================================================
-    // 3️⃣ Vérification OTP
-    // ✅ OPTIMISATION : select uniquement les champs utiles
+    // 3ï¸âƒ£ VÃ©rification OTP
+    // âœ… OPTIMISATION : select uniquement les champs utiles
     // ============================================================
     const otpEntry = await this.otpRepository.findOne({
       where: { email: destination, otpCode, isUsed: false },
@@ -414,15 +414,15 @@ export class UsersService {
     }
 
     // ============================================================
-    // 4️⃣ CRÉATION UTILISATEUR
-    // ✅ OPTIMISATION : un seul save (avec referralCode généré avant)
+    // 4ï¸âƒ£ CRÃ‰ATION UTILISATEUR
+    // âœ… OPTIMISATION : un seul save (avec referralCode gÃ©nÃ©rÃ© avant)
     // ============================================================
     const hashedPassword = password
       ? await bcrypt.hash(password, 10)
       : undefined;
 
-    // ✅ Générer un referralCode AVANT le save (utilise l'id après création)
-    // On sauvegarde d'abord pour avoir l'id, puis on met à jour.
+    // âœ… GÃ©nÃ©rer un referralCode AVANT le save (utilise l'id aprÃ¨s crÃ©ation)
+    // On sauvegarde d'abord pour avoir l'id, puis on met Ã  jour.
     const newUser = this.usersRepository.create({
       fullName: createUserDto.fullName,
       email: email || undefined,
@@ -434,22 +434,22 @@ export class UsersService {
       country: createUserDto.country,
       city: createUserDto.city,
       fcmToken: clientFcmToken,
-      // referralCode assigné plus bas après génération
+      // referralCode assignÃ© plus bas aprÃ¨s gÃ©nÃ©ration
     });
 
     const savedUser = await this.usersRepository.save(newUser);
 
     // ============================================================
-    // 🔥 GÉNÉRATION DU CODE DE PARRAINAGE
-    // ✅ OPTIMISATION : 1 seul save (au lieu de 2)
+    // ðŸ”¥ GÃ‰NÃ‰RATION DU CODE DE PARRAINAGE
+    // âœ… OPTIMISATION : 1 seul save (au lieu de 2)
     // ============================================================
     const referralCodeGenerated = await this.generateReferralCode(savedUser.id);
     savedUser.referralCode = referralCodeGenerated;
 
-    // ✅ NE PAS save ici - on save plus bas une seule fois
+    // âœ… NE PAS save ici - on save plus bas une seule fois
 
     // ============================================================
-    // ✅ TRAITEMENT DU PARRAINAGE
+    // âœ… TRAITEMENT DU PARRAINAGE
     // ============================================================
     if (referralCode && referrer) {
       if (referrer.id === savedUser.id) {
@@ -458,22 +458,22 @@ export class UsersService {
         );
       }
 
-      // ✅ Mettre à jour le parrain
+      // âœ… Mettre Ã  jour le parrain
       referrer.referralCount = (referrer.referralCount || 0) + 1;
       referrer.lastReferralDate = new Date();
 
-      // ✅ Lier le nouvel utilisateur au parrain (avant le save final)
+      // âœ… Lier le nouvel utilisateur au parrain (avant le save final)
       savedUser.referredBy = referrer.id;
     }
 
-    // ✅ UN SEUL save pour : referralCode + referredBy
+    // âœ… UN SEUL save pour : referralCode + referredBy
     await this.usersRepository.save(savedUser);
 
-    // ✅ Sauvegarder le parrain séparément (seulement si modifié)
+    // âœ… Sauvegarder le parrain sÃ©parÃ©ment (seulement si modifiÃ©)
     if (referralCode && referrer) {
       await this.usersRepository.save(referrer);
 
-      // ✅ Créer l'historique de parrainage
+      // âœ… CrÃ©er l'historique de parrainage
       const referral = this.referralRepository.create({
         referrerId: referrer.id,
         referredId: savedUser.id,
@@ -487,20 +487,20 @@ export class UsersService {
     }
 
     // ============================================================
-    // 5️⃣ CRÉATION DU COMPTE FIDÉLITÉ
+    // 5ï¸âƒ£ CRÃ‰ATION DU COMPTE FIDÃ‰LITÃ‰
     // ============================================================
     const loyalty = await this.getOrCreateLoyaltyAccount(savedUser.id);
     await this.loyaltyRepository.save(loyalty);
 
     // ============================================================
-    // 6️⃣ GESTION DU FCM TOKEN
-    // ✅ OPTIMISATION : assigner directement (sans variable intermédiaire inutile)
+    // 6ï¸âƒ£ GESTION DU FCM TOKEN
+    // âœ… OPTIMISATION : assigner directement (sans variable intermÃ©diaire inutile)
     // ============================================================
     let savedFcmToken: string | undefined;
     if (clientFcmToken && platform) {
       const existingToken = await this.deviceTokenRepo.findOne({
         where: { token: clientFcmToken },
-        select: ['id'],   // ✅ OPTIMISATION
+        select: ['id'],   // âœ… OPTIMISATION
       });
 
       if (existingToken) {
@@ -524,15 +524,15 @@ export class UsersService {
     }
 
     // ============================================================
-    // 7️⃣ MARQUER L'OTP COMME UTILISÉ
+    // 7ï¸âƒ£ MARQUER L'OTP COMME UTILISÃ‰
     // ============================================================
     otpEntry.isUsed = true;
     otpEntry.user = savedUser;
     await this.otpRepository.save(otpEntry);
 
     // ============================================================
-    // 8️⃣ RECHARGER L'UTILISATEUR AVEC SES RELATIONS
-    // ✅ OPTIMISATION : ne charger QUE les relations réellement utilisées
+    // 8ï¸âƒ£ RECHARGER L'UTILISATEUR AVEC SES RELATIONS
+    // âœ… OPTIMISATION : ne charger QUE les relations rÃ©ellement utilisÃ©es
     // ============================================================
     const userFull = await this.usersRepository.findOne({
       where: { id: savedUser.id },
@@ -557,18 +557,18 @@ export class UsersService {
     const { password: _pw, ...userWithoutPassword } = userFull;
 
     // ============================================================
-    // 9️⃣ ENVOI EMAIL DE BIENVENUE
-    // ✅ OPTIMISATION : en ARRIÈRE-PLAN (non bloquant)
+    // 9ï¸âƒ£ ENVOI EMAIL DE BIENVENUE
+    // âœ… OPTIMISATION : en ARRIÃˆRE-PLAN (non bloquant)
     // ============================================================
     if (email && email !== '' && validator.isEmail(email)) {
-      // ✅ Préparer les données maintenant (capturées par closure)
+      // âœ… PrÃ©parer les donnÃ©es maintenant (capturÃ©es par closure)
       const userData = {
         fullName:
           userWithoutPassword.fullName ||
           userWithoutPassword.email ||
           'Utilisateur',
-        email: userWithoutPassword.email || 'Non renseigné',
-        phone: userWithoutPassword.phone || 'Non renseigné',
+        email: userWithoutPassword.email || 'Non renseignÃ©',
+        phone: userWithoutPassword.phone || 'Non renseignÃ©',
         role: userWithoutPassword.role || 'Client',
         referralCode: savedUser.referralCode,
         createdAt: userWithoutPassword.createdAt
@@ -585,7 +585,7 @@ export class UsersService {
           : "Aujourd'hui",
       };
 
-      // ✅ Envoi en arrière-plan (non bloquant)
+      // âœ… Envoi en arriÃ¨re-plan (non bloquant)
       (async () => {
         try {
           const emailTranslations = {
@@ -619,14 +619,14 @@ export class UsersService {
             },
           );
         } catch (err: any) {
-          console.error('❌ [signup] Welcome email error:', err.message);
+          console.error('âŒ [signup] Welcome email error:', err.message);
         }
       })();
     }
 
     // ============================================================
-    // 🔟 GÉNÉRATION DES TOKENS
-    // ✅ OPTIMISATION : Promise.all
+    // ðŸ”Ÿ GÃ‰NÃ‰RATION DES TOKENS
+    // âœ… OPTIMISATION : Promise.all
     // ============================================================
     const [access_token, refresh_token] = await Promise.all([
       this.accessToken(savedUser),
@@ -646,14 +646,14 @@ export class UsersService {
     };
   }
   async signin(userSignInDto: LoginUserDto, lang: string = 'fr'): Promise<any> {
-    console.log('🔍 Langue reçue dans signin :', lang);
+    console.log('ðŸ” Langue reÃ§ue dans signin :', lang);
     const { fcmToken, platform } = userSignInDto;
 
     // ============================================================
-    // ⏱️ TIMERS DEBUG (à retirer en prod si nécessaire)
+    // â±ï¸ TIMERS DEBUG (Ã  retirer en prod si nÃ©cessaire)
     // ============================================================
-    console.time('⏱️ signin TOTAL');
-    console.time('⏱️ 1. query user');
+    console.time('â±ï¸ signin TOTAL');
+    console.time('â±ï¸ 1. query user');
 
     let user = await this.usersRepository
       .createQueryBuilder('users')
@@ -692,7 +692,7 @@ export class UsersService {
       })
       .getOne();
 
-    console.timeEnd('⏱️ 1. query user');
+    console.timeEnd('â±ï¸ 1. query user');
 
     if (!user) {
       throw new BadRequestException(
@@ -706,12 +706,12 @@ export class UsersService {
       );
     }
 
-    console.time('⏱️ 2. bcrypt');
+    console.time('â±ï¸ 2. bcrypt');
     const isPasswordValid = await bcrypt.compare(
       userSignInDto.password,
       user.password,
     );
-    console.timeEnd('⏱️ 2. bcrypt');
+    console.timeEnd('â±ï¸ 2. bcrypt');
 
     if (!isPasswordValid) {
       throw new BadRequestException(
@@ -720,23 +720,23 @@ export class UsersService {
     }
 
     // ============================================================
-    // 🔥 GARANTIR LE referralCode ET LE COMPTE FIDÉLITÉ
-    // ✅ OPTIMISÉ : plus de reload lourd, on met à jour localement
+    // ðŸ”¥ GARANTIR LE referralCode ET LE COMPTE FIDÃ‰LITÃ‰
+    // âœ… OPTIMISÃ‰ : plus de reload lourd, on met Ã  jour localement
     // ============================================================
-    console.time('⏱️ 3. referral + loyalty');
+    console.time('â±ï¸ 3. referral + loyalty');
 
-    // 🔹 ReferralCode manquant
+    // ðŸ”¹ ReferralCode manquant
     if (!user.referralCode || user.referralCode.trim() === '') {
       console.warn(
-        `⚠️ [signin] Utilisateur ${user.id} sans referralCode, génération...`,
+        `âš ï¸ [signin] Utilisateur ${user.id} sans referralCode, gÃ©nÃ©ration...`,
       );
 
-      // ✅ Utilise la méthode existante (elle gère déjà la boucle + fallback)
+      // âœ… Utilise la mÃ©thode existante (elle gÃ¨re dÃ©jÃ  la boucle + fallback)
       const newCode = await this.generateReferralCode(user.id);
 
       if (!newCode || newCode.trim() === '') {
         console.error(
-          `❌ [signin] Impossible de générer un referralCode pour ${user.id}`,
+          `âŒ [signin] Impossible de gÃ©nÃ©rer un referralCode pour ${user.id}`,
         );
         throw new InternalServerErrorException(
           await this.i18n.translate('user.referral_code_generation_failed', lang),
@@ -745,34 +745,34 @@ export class UsersService {
 
       user.referralCode = newCode;
       await this.usersRepository.save(user);
-      console.log(`✅ [signin] referralCode généré: ${newCode}`);
+      console.log(`âœ… [signin] referralCode gÃ©nÃ©rÃ©: ${newCode}`);
     }
 
-    // 🔹 Loyalty manquante
+    // ðŸ”¹ Loyalty manquante
     if (!user.loyalty || user.loyalty.length === 0) {
       const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
 
-      // ✅ OPTIMISATION : assigner directement sans recharger
+      // âœ… OPTIMISATION : assigner directement sans recharger
       user.loyalty = [loyalty];
     }
 
-    console.timeEnd('⏱️ 3. referral + loyalty');
+    console.timeEnd('â±ï¸ 3. referral + loyalty');
 
     // ============================================================
-    // ✅ JWT : parallélisation
+    // âœ… JWT : parallÃ©lisation
     // ============================================================
-    console.time('⏱️ 4. JWT');
+    console.time('â±ï¸ 4. JWT');
     const [access_token, refresh_token] = await Promise.all([
       this.accessToken(user),
       this.refreshToken(user),
     ]);
-    console.timeEnd('⏱️ 4. JWT');
+    console.timeEnd('â±ï¸ 4. JWT');
 
     const { password, ...userWithoutPassword } = user;
 
     // ============================================================
-    // ✅ FCM token : en ARRIÈRE-PLAN (non bloquant)
+    // âœ… FCM token : en ARRIÃˆRE-PLAN (non bloquant)
     // ============================================================
     if (fcmToken && platform) {
       this.deviceTokenRepo
@@ -799,7 +799,7 @@ export class UsersService {
           );
         })
         .catch((err) =>
-          console.error('❌ [signin] FCM token save error:', err.message),
+          console.error('âŒ [signin] FCM token save error:', err.message),
         );
     }
     const loyaltyPoints = user.loyalty?.[0]?.pointsBalance ?? 0;
@@ -807,10 +807,10 @@ export class UsersService {
     const loyaltyCode = user.loyalty?.[0]?.loyaltyCode ?? null;
 
     // ============================================================
-    // ✅ OPTIMISATION : activeCompany calculée depuis user.userHasCompany
-    //    (plus de requête SQL supplémentaire)
+    // âœ… OPTIMISATION : activeCompany calculÃ©e depuis user.userHasCompany
+    //    (plus de requÃªte SQL supplÃ©mentaire)
     // ============================================================
-    console.time('⏱️ 5. build response');
+    console.time('â±ï¸ 5. build response');
 
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
@@ -853,7 +853,7 @@ export class UsersService {
           })) ?? [],
       })) ?? [];
 
-    // ✅ Récupérer activeCompany depuis user (déjà chargé)
+    // âœ… RÃ©cupÃ©rer activeCompany depuis user (dÃ©jÃ  chargÃ©)
     const activeUserHasCompany = user.userHasCompany?.find(
       (uhc) => uhc.company?.id === user.activeCompanyId,
     );
@@ -946,9 +946,9 @@ export class UsersService {
       totalReferrals: user.referrals?.length || 0,
     };
 
-    console.timeEnd('⏱️ 5. build response');
+    console.timeEnd('â±ï¸ 5. build response');
 
-    console.timeEnd('⏱️ signin TOTAL');
+    console.timeEnd('â±ï¸ signin TOTAL');
 
     return {
       message: await this.i18n.translate('user.login_success', lang),
@@ -1022,7 +1022,7 @@ export class UsersService {
     let isNewUser = false;
 
     if (user) {
-      console.log(`🔍 [googleLogin] Utilisateur existant: ${user.id}`);
+      console.log(`ðŸ” [googleLogin] Utilisateur existant: ${user.id}`);
 
       if (user.provider !== 'google' && user.password) {
         throw new BadRequestException(
@@ -1034,11 +1034,11 @@ export class UsersService {
       }
 
       // ============================================================
-      // 🔥 GARANTIR LE referralCode
-      // ✅ OPTIMISATION : utilise directement generateReferralCode
+      // ðŸ”¥ GARANTIR LE referralCode
+      // âœ… OPTIMISATION : utilise directement generateReferralCode
       // ============================================================
       if (!user.referralCode || user.referralCode.trim() === '') {
-        console.warn(`⚠️ [googleLogin] Utilisateur ${user.id} sans referralCode, génération...`);
+        console.warn(`âš ï¸ [googleLogin] Utilisateur ${user.id} sans referralCode, gÃ©nÃ©ration...`);
 
         const newCode = await this.generateReferralCode(user.id);
 
@@ -1050,15 +1050,15 @@ export class UsersService {
 
         user.referralCode = newCode;
         await this.usersRepository.save(user);
-        console.log(`✅ [googleLogin] referralCode généré: ${newCode}`);
+        console.log(`âœ… [googleLogin] referralCode gÃ©nÃ©rÃ©: ${newCode}`);
       }
 
       // ============================================================
-      // 🔥 GARANTIR LE COMPTE FIDÉLITÉ
-      // ✅ OPTIMISATION : assigner directement sans recharger
+      // ðŸ”¥ GARANTIR LE COMPTE FIDÃ‰LITÃ‰
+      // âœ… OPTIMISATION : assigner directement sans recharger
       // ============================================================
       if (!user.loyalty || user.loyalty.length === 0) {
-        console.log(`⚠️ [googleLogin] Utilisateur ${user.id} sans loyalty, création...`);
+        console.log(`âš ï¸ [googleLogin] Utilisateur ${user.id} sans loyalty, crÃ©ation...`);
         const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
         await this.loyaltyRepository.save(loyalty);
         user.loyalty = [loyalty];
@@ -1066,7 +1066,7 @@ export class UsersService {
 
     } else {
       // ============================================================
-      // 🔥 NOUVEL UTILISATEUR
+      // ðŸ”¥ NOUVEL UTILISATEUR
       // ============================================================
       const newUser = this.usersRepository.create({
         email,
@@ -1081,7 +1081,7 @@ export class UsersService {
       user = await this.usersRepository.save(newUser);
       isNewUser = true;
 
-      // ✅ Génération du code de parrainage
+      // âœ… GÃ©nÃ©ration du code de parrainage
       const referralCodeGenerated = await this.generateReferralCode(user.id);
 
       if (!referralCodeGenerated || referralCodeGenerated.trim() === '') {
@@ -1092,14 +1092,14 @@ export class UsersService {
 
       user.referralCode = referralCodeGenerated;
       await this.usersRepository.save(user);
-      console.log(`✅ [googleLogin] Nouveau user créé avec referralCode: ${referralCodeGenerated}`);
+      console.log(`âœ… [googleLogin] Nouveau user crÃ©Ã© avec referralCode: ${referralCodeGenerated}`);
 
-      // ✅ Création du compte fidélité
+      // âœ… CrÃ©ation du compte fidÃ©litÃ©
       const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
       user.loyalty = [loyalty];
 
-      // ✅ Envoi email de bienvenue EN ARRIÈRE-PLAN (non bloquant)
+      // âœ… Envoi email de bienvenue EN ARRIÃˆRE-PLAN (non bloquant)
       (async () => {
         try {
           await this.mailService.sendHtmlEmail(
@@ -1109,11 +1109,11 @@ export class UsersService {
             { userWithoutPassword: user, year: new Date().getFullYear() },
           );
         } catch (err: any) {
-          console.error('❌ [googleLogin] Welcome email error:', err.message);
+          console.error('âŒ [googleLogin] Welcome email error:', err.message);
         }
       })();
 
-      // ✅ Recharger l'utilisateur complet
+      // âœ… Recharger l'utilisateur complet
       user = await this.usersRepository
         .createQueryBuilder('users')
         .addSelect('users.password')
@@ -1153,7 +1153,7 @@ export class UsersService {
         await this.i18n.translate('user.user_not_found', lang),
       );
 
-    // ✅ Définir automatiquement la première compagnie comme active
+    // âœ… DÃ©finir automatiquement la premiÃ¨re compagnie comme active
     if (
       !user.activeCompanyId &&
       user.userHasCompany &&
@@ -1166,11 +1166,11 @@ export class UsersService {
           user.activeBranchId = firstCompany.branches[0].id;
         }
         await this.usersRepository.save(user);
-        // ✅ OPTIMISATION : assigner directement (l'entité user a déjà tout)
+        // âœ… OPTIMISATION : assigner directement (l'entitÃ© user a dÃ©jÃ  tout)
       }
     }
 
-    // ✅ FCM token en arrière-plan (non bloquant)
+    // âœ… FCM token en arriÃ¨re-plan (non bloquant)
     if (fcmToken && platform) {
       (async () => {
         try {
@@ -1194,12 +1194,12 @@ export class UsersService {
             );
           }
         } catch (err: any) {
-          console.error('❌ [googleLogin] FCM token save error:', err.message);
+          console.error('âŒ [googleLogin] FCM token save error:', err.message);
         }
       })();
     }
 
-    // ✅ JWT en parallèle
+    // âœ… JWT en parallÃ¨le
     const [access_token, refresh_token] = await Promise.all([
       this.accessToken(user),
       this.refreshToken(user),
@@ -1208,7 +1208,7 @@ export class UsersService {
     const { password, ...userWithoutPassword } = user;
 
     // ============================================================
-    // ✅ OPTIMISATION : userHasCompany (avec settings + invoiceConfiguration)
+    // âœ… OPTIMISATION : userHasCompany (avec settings + invoiceConfiguration)
     // ============================================================
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
@@ -1262,8 +1262,8 @@ export class UsersService {
       })) ?? [];
 
     // ============================================================
-    // ✅ OPTIMISATION : activeCompany calculée depuis user.userHasCompany
-    //    (plus de requête activeCompanyRaw)
+    // âœ… OPTIMISATION : activeCompany calculÃ©e depuis user.userHasCompany
+    //    (plus de requÃªte activeCompanyRaw)
     // ============================================================
     const activeUserHasCompany = user.userHasCompany?.find(
       (uhc) => uhc.company?.id === user.activeCompanyId,
@@ -1469,7 +1469,7 @@ export class UsersService {
 
     let isNewUser = false;
 
-    // ✅ Vérification email unique (si pas d'user trouvé par appleUserId)
+    // âœ… VÃ©rification email unique (si pas d'user trouvÃ© par appleUserId)
     if (!user && email) {
       const existingUserByEmail = await this.usersRepository.findOne({
         where: { email },
@@ -1484,7 +1484,7 @@ export class UsersService {
 
     if (!user) {
       // ============================================================
-      // 🔥 NOUVEL UTILISATEUR
+      // ðŸ”¥ NOUVEL UTILISATEUR
       // ============================================================
       const newUser = this.usersRepository.create({
         appleUserId,
@@ -1498,9 +1498,9 @@ export class UsersService {
       user = await this.usersRepository.save(newUser);
       isNewUser = true;
 
-      console.log(`🔍 [appleLogin] Nouvel utilisateur: ${user.id}, génération du referralCode...`);
+      console.log(`ðŸ” [appleLogin] Nouvel utilisateur: ${user.id}, gÃ©nÃ©ration du referralCode...`);
 
-      // ✅ OPTIMISATION : utilise la méthode existante directement
+      // âœ… OPTIMISATION : utilise la mÃ©thode existante directement
       const referralCodeGenerated = await this.generateReferralCode(user.id);
 
       if (!referralCodeGenerated || referralCodeGenerated.trim() === '') {
@@ -1511,14 +1511,14 @@ export class UsersService {
 
       user.referralCode = referralCodeGenerated;
       await this.usersRepository.save(user);
-      console.log(`✅ [appleLogin] Nouveau user créé avec referralCode: ${referralCodeGenerated}`);
+      console.log(`âœ… [appleLogin] Nouveau user crÃ©Ã© avec referralCode: ${referralCodeGenerated}`);
 
-      // ✅ Création du compte fidélité + assignation directe
+      // âœ… CrÃ©ation du compte fidÃ©litÃ© + assignation directe
       const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
       user.loyalty = [loyalty];
 
-      // ✅ OPTIMISATION : welcome email EN ARRIÈRE-PLAN (non bloquant)
+      // âœ… OPTIMISATION : welcome email EN ARRIÃˆRE-PLAN (non bloquant)
       if (user.email) {
         const userEmail = user.email;
         const userSnapshot = { ...user };
@@ -1531,12 +1531,12 @@ export class UsersService {
               { userWithoutPassword: userSnapshot, year: new Date().getFullYear() },
             );
           } catch (err: any) {
-            console.error('❌ [appleLogin] Welcome email error:', err.message);
+            console.error('âŒ [appleLogin] Welcome email error:', err.message);
           }
         })();
       }
 
-      // ✅ Recharger l'utilisateur COMPLET (nécessaire pour le retour)
+      // âœ… Recharger l'utilisateur COMPLET (nÃ©cessaire pour le retour)
       user = await this.usersRepository
         .createQueryBuilder('users')
         .addSelect('users.password')
@@ -1571,9 +1571,9 @@ export class UsersService {
         .getOne();
     } else {
       // ============================================================
-      // 🔥 UTILISATEUR EXISTANT
+      // ðŸ”¥ UTILISATEUR EXISTANT
       // ============================================================
-      console.log(`🔍 [appleLogin] Utilisateur existant: ${user.id}`);
+      console.log(`ðŸ” [appleLogin] Utilisateur existant: ${user.id}`);
 
       if (user.provider !== 'APPLE') {
         throw new BadRequestException(
@@ -1585,13 +1585,13 @@ export class UsersService {
 
       let shouldUpdate = false;
 
-      // Mise à jour du nom
+      // Mise Ã  jour du nom
       if (fullName && fullName !== user.fullName) {
         user.fullName = fullName;
         shouldUpdate = true;
       }
 
-      // Mise à jour de l'email (avec vérif unicité)
+      // Mise Ã  jour de l'email (avec vÃ©rif unicitÃ©)
       if (email && email !== user.email) {
         const existingUserByEmail = await this.usersRepository.findOne({
           where: { email },
@@ -1607,11 +1607,11 @@ export class UsersService {
       }
 
       // ============================================================
-      // 🔥 GARANTIR LE referralCode
-      // ✅ OPTIMISATION : utilise generateReferralCode directement
+      // ðŸ”¥ GARANTIR LE referralCode
+      // âœ… OPTIMISATION : utilise generateReferralCode directement
       // ============================================================
       if (!user.referralCode || user.referralCode.trim() === '') {
-        console.warn(`⚠️ [appleLogin] Utilisateur ${user.id} sans referralCode, génération...`);
+        console.warn(`âš ï¸ [appleLogin] Utilisateur ${user.id} sans referralCode, gÃ©nÃ©ration...`);
 
         const newCode = await this.generateReferralCode(user.id);
 
@@ -1623,21 +1623,21 @@ export class UsersService {
 
         user.referralCode = newCode;
         shouldUpdate = true;
-        console.log(`✅ [appleLogin] referralCode généré: ${newCode}`);
+        console.log(`âœ… [appleLogin] referralCode gÃ©nÃ©rÃ©: ${newCode}`);
       }
 
       // ============================================================
-      // 🔥 GARANTIR LE COMPTE FIDÉLITÉ
-      // ✅ OPTIMISATION : assignation directe (pas de rechargement)
+      // ðŸ”¥ GARANTIR LE COMPTE FIDÃ‰LITÃ‰
+      // âœ… OPTIMISATION : assignation directe (pas de rechargement)
       // ============================================================
       if (!user.loyalty || user.loyalty.length === 0) {
-        console.log(`⚠️ [appleLogin] Utilisateur ${user.id} sans loyalty, création...`);
+        console.log(`âš ï¸ [appleLogin] Utilisateur ${user.id} sans loyalty, crÃ©ation...`);
         const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
         await this.loyaltyRepository.save(loyalty);
         user.loyalty = [loyalty];
       }
 
-      // ✅ Save si modifié
+      // âœ… Save si modifiÃ©
       if (shouldUpdate) {
         await this.usersRepository.save(user);
       }
@@ -1649,7 +1649,7 @@ export class UsersService {
       );
 
     // ============================================================
-    // ✅ FCM token en ARRIÈRE-PLAN (non bloquant)
+    // âœ… FCM token en ARRIÃˆRE-PLAN (non bloquant)
     // ============================================================
     if (fcmToken && platform) {
       const userId = user.id;
@@ -1675,13 +1675,13 @@ export class UsersService {
             );
           }
         } catch (err: any) {
-          console.error('❌ [appleLogin] FCM token save error:', err.message);
+          console.error('âŒ [appleLogin] FCM token save error:', err.message);
         }
       })();
     }
 
     // ============================================================
-    // ✅ JWT en PARALLÈLE
+    // âœ… JWT en PARALLÃˆLE
     // ============================================================
     const [access_token, refresh_token] = await Promise.all([
       this.accessToken(user),
@@ -1691,7 +1691,7 @@ export class UsersService {
     const { password, ...userWithoutPassword } = user;
 
     // ============================================================
-    // ✅ userHasCompany (avec settings + invoiceConfiguration)
+    // âœ… userHasCompany (avec settings + invoiceConfiguration)
     // ============================================================
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
@@ -1745,8 +1745,8 @@ export class UsersService {
       })) ?? [];
 
     // ============================================================
-    // ✅ OPTIMISATION : activeCompany calculée depuis user.userHasCompany
-    //    (plus de requête activeCompanyRaw)
+    // âœ… OPTIMISATION : activeCompany calculÃ©e depuis user.userHasCompany
+    //    (plus de requÃªte activeCompanyRaw)
     // ============================================================
     const activeUserHasCompany = user.userHasCompany?.find(
       (uhc) => uhc.company?.id === user.activeCompanyId,
@@ -1894,9 +1894,9 @@ export class UsersService {
   ): Promise<UserEntity> {
     let needsSave = false;
 
-    // 🔥 Garantir le referralCode
+    // ðŸ”¥ Garantir le referralCode
     if (!user.referralCode || user.referralCode.trim() === '') {
-      console.warn(`⚠️ Utilisateur ${user.id} sans referralCode, génération...`);
+      console.warn(`âš ï¸ Utilisateur ${user.id} sans referralCode, gÃ©nÃ©ration...`);
 
       const existingCodesRows = await this.usersRepository
         .createQueryBuilder('u')
@@ -1914,12 +1914,12 @@ export class UsersService {
       }
       user.referralCode = newCode;
       needsSave = true;
-      console.log(`✅ referralCode généré: ${newCode}`);
+      console.log(`âœ… referralCode gÃ©nÃ©rÃ©: ${newCode}`);
     }
 
-    // 🔥 Garantir le compte fidélité
+    // ðŸ”¥ Garantir le compte fidÃ©litÃ©
     if (!user.loyalty || user.loyalty.length === 0) {
-      console.log(`⚠️ Utilisateur ${user.id} sans loyalty, création...`);
+      console.log(`âš ï¸ Utilisateur ${user.id} sans loyalty, crÃ©ation...`);
       const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
     }
@@ -1997,7 +1997,7 @@ export class UsersService {
           await this.i18n.translate('user.user_not_found', lang),
         );
 
-      // ✅ OPTIMISATION : JWT en parallèle
+      // âœ… OPTIMISATION : JWT en parallÃ¨le
       const [access_token, refresh_token] = await Promise.all([
         this.accessToken(fullUser),
         this.refreshToken(fullUser),
@@ -2053,8 +2053,8 @@ export class UsersService {
             })) ?? [],
         })) ?? [];
 
-      // ✅ OPTIMISATION : activeCompany calculée depuis fullUser.userHasCompany
-      //    (plus de requête activeCompanyRaw)
+      // âœ… OPTIMISATION : activeCompany calculÃ©e depuis fullUser.userHasCompany
+      //    (plus de requÃªte activeCompanyRaw)
       const activeUserHasCompany = fullUser.userHasCompany?.find(
         (uhc) => uhc.company?.id === fullUser.activeCompanyId,
       );
@@ -2170,7 +2170,7 @@ export class UsersService {
         refresh_token,
       };
     } catch (error) {
-      console.error('Erreur lors de la mise à jour de l’utilisateur:', error);
+      console.error('Erreur lors de la mise Ã  jour de lâ€™utilisateur:', error);
       throw new InternalServerErrorException(
         await this.i18n.translate('user.user_updated_failed', lang),
       );
@@ -2227,7 +2227,7 @@ export class UsersService {
         const filename = user.image.split('/').pop()!;
         await this.filesService.deleteFile('user', filename);
       } catch (err) {
-        console.warn('⚠️ Échec suppression ancienne image :', err.message);
+        console.warn('âš ï¸ Ã‰chec suppression ancienne image :', err.message);
       }
     }
 
@@ -2240,7 +2240,7 @@ export class UsersService {
     const updatedUser = await this.usersRepository.save(user);
 
     // ============================================================
-    // ✅ OPTIMISATION : on utilise directement `user` (déjà chargé avec toutes
+    // âœ… OPTIMISATION : on utilise directement `user` (dÃ©jÃ  chargÃ© avec toutes
     //    les relations) au lieu de recharger `fullUser`
     // ============================================================
 
@@ -2294,8 +2294,8 @@ export class UsersService {
       }),
     );
 
-    // ✅ OPTIMISATION : activeCompany calculée depuis user.userHasCompany
-    //    (plus de requête activeCompanyRaw)
+    // âœ… OPTIMISATION : activeCompany calculÃ©e depuis user.userHasCompany
+    //    (plus de requÃªte activeCompanyRaw)
     const activeUserHasCompany = user.userHasCompany?.find(
       (uhc) => uhc.company?.id === user.activeCompanyId,
     );
@@ -2448,7 +2448,7 @@ export class UsersService {
     }
 
     // ============================================================
-    // ✅ RÉCUPÉRER LES TRANSACTIONS EN ATTENTE (DEPOSIT PENDING)
+    // âœ… RÃ‰CUPÃ‰RER LES TRANSACTIONS EN ATTENTE (DEPOSIT PENDING)
     // ============================================================
     let pendingTransactions = null;
     try {
@@ -2459,7 +2459,7 @@ export class UsersService {
         );
 
         if (pendingResult && pendingResult.success) {
-          // ✅ Correction avec typage explicite
+          // âœ… Correction avec typage explicite
           const totalsArray = Object.entries(pendingResult.totalsByCurrency || {})
             .filter(([, amount]) => typeof amount === 'number' && amount > 0)
             .map(([currency, amount]) => ({
@@ -2477,13 +2477,13 @@ export class UsersService {
         }
       }
     } catch (error) {
-      console.error('[ReferralPoints] ❌ Erreur récupération transactions PENDING:', error.message);
+      console.error('[ReferralPoints] âŒ Erreur rÃ©cupÃ©ration transactions PENDING:', error.message);
     }
 
     let totalPoints = 0;
     const rewardsByCurrency: Record<string, number> = {};
 
-    // ✅ Historique des parrainages
+    // âœ… Historique des parrainages
     const history = user.referralHistory?.map((referral) => {
       const referred = referral.referred;
       let orderDetails: any[] = [];
@@ -2520,8 +2520,8 @@ export class UsersService {
       return {
         id: referral.id,
         referredUser: referred?.fullName || 'Utilisateur inconnu',
-        referredEmail: referred?.email || 'Non renseigné',
-        referredPhone: referred?.phone || 'Non renseigné',
+        referredEmail: referred?.email || 'Non renseignÃ©',
+        referredPhone: referred?.phone || 'Non renseignÃ©',
         referredId: referred?.id || null,
         status: referral.status,
         rewardAmount: Math.round(rewardAmount * 100) / 100,
@@ -2536,13 +2536,13 @@ export class UsersService {
       };
     }) || [];
 
-    // ✅ Mise à jour des points
+    // âœ… Mise Ã  jour des points
     if (Math.round(totalPoints * 100) / 100 !== user.referralPoints) {
       user.referralPoints = Math.round(totalPoints * 100) / 100;
       await this.usersRepository.save(user);
     }
 
-    // ✅ Liste des utilisateurs parrainés groupés
+    // âœ… Liste des utilisateurs parrainÃ©s groupÃ©s
     const referredUsersMap = new Map<string, {
       id: string;
       fullName: string;
@@ -2646,7 +2646,7 @@ export class UsersService {
         referralPoints: Math.round(totalPoints * 100) / 100,
         totalReferralRewards: Math.round(totalPoints * 100) / 100,
         referralCount: user.referralCount || 0,
-        referralCode: user.referralCode || 'Non généré',
+        referralCode: user.referralCode || 'Non gÃ©nÃ©rÃ©',
         referralLink: referralLink || 'Non disponible',
         referralActive: user.referralActive !== false,
         rewardsByCurrency: rewardsByCurrencyArray,
@@ -2674,13 +2674,13 @@ export class UsersService {
       throw new BadRequestException(errorMessages);
     }
 
-    // Supprimer l'ancien OTP non utilisé
+    // Supprimer l'ancien OTP non utilisÃ©
     const existingOtp = await this.otpRepository.findOne({
       where: { email, isUsed: false },
     });
     if (existingOtp) await this.otpRepository.remove(existingOtp);
 
-    // Créer le nouvel OTP
+    // CrÃ©er le nouvel OTP
     const otp = this.otpRepository.create({
       email,
       otpCode,
@@ -2690,7 +2690,7 @@ export class UsersService {
 
     // Envoi par email ou SMS
     if (validator.isEmail(email)) {
-      // Récupération des traductions pour l'email
+      // RÃ©cupÃ©ration des traductions pour l'email
       const translations = {
         title: await this.i18n.translate('user.otp_email_title', lang),
         description: await this.i18n.translate('user.otp_email_description', lang),
@@ -2748,7 +2748,7 @@ export class UsersService {
     await this.otpRepository.save(otp);
 
     if (validator.isEmail(email)) {
-      // ✅ Construire l'objet translations (identique à sendOtp)
+      // âœ… Construire l'objet translations (identique Ã  sendOtp)
       const translations = {
         title: await this.i18n.translate('user.otp_email_title', lang),
         description: await this.i18n.translate('user.otp_email_description', lang),
@@ -2770,8 +2770,8 @@ export class UsersService {
         {
           otpCode,
           year: new Date().getFullYear(),
-          translations,   // ✅ nécessaire pour le template
-          lang,           // ✅ nécessaire pour l'attribut lang du HTML
+          translations,   // âœ… nÃ©cessaire pour le template
+          lang,           // âœ… nÃ©cessaire pour l'attribut lang du HTML
         }
       );
     } else if (validator.isMobilePhone(email, 'any')) {
@@ -2879,18 +2879,18 @@ export class UsersService {
     if (!user) throw new NotFoundException(await this.i18n.translate('user.user_not_found', lang));
 
     // ============================================================
-    // 🔥 GARANTIR LE referralCode ET LE COMPTE FIDÉLITÉ
-    // ✅ OPTIMISATION : plus de reload, assignation locale
+    // ðŸ”¥ GARANTIR LE referralCode ET LE COMPTE FIDÃ‰LITÃ‰
+    // âœ… OPTIMISATION : plus de reload, assignation locale
     // ============================================================
 
     if (!user.referralCode || user.referralCode.trim() === '') {
-      console.warn(`⚠️ [getFullProfile] Utilisateur ${user.id} sans referralCode, génération...`);
+      console.warn(`âš ï¸ [getFullProfile] Utilisateur ${user.id} sans referralCode, gÃ©nÃ©ration...`);
 
-      // ✅ OPTIMISATION : utilise directement generateReferralCode
+      // âœ… OPTIMISATION : utilise directement generateReferralCode
       const newCode = await this.generateReferralCode(user.id);
 
       if (!newCode || newCode.trim() === '') {
-        console.error(`❌ [getFullProfile] Impossible de générer un referralCode pour ${user.id}`);
+        console.error(`âŒ [getFullProfile] Impossible de gÃ©nÃ©rer un referralCode pour ${user.id}`);
         throw new InternalServerErrorException(
           await this.i18n.translate('user.referral_code_generation_failed', lang),
         );
@@ -2898,20 +2898,20 @@ export class UsersService {
 
       user.referralCode = newCode;
       await this.usersRepository.save(user);
-      console.log(`✅ [getFullProfile] referralCode généré: ${newCode}`);
+      console.log(`âœ… [getFullProfile] referralCode gÃ©nÃ©rÃ©: ${newCode}`);
     }
 
     if (!user.loyalty || user.loyalty.length === 0) {
       const loyalty = await this.getOrCreateLoyaltyAccount(user.id);
       await this.loyaltyRepository.save(loyalty);
 
-      // ✅ OPTIMISATION : assignation directe (plus de reload)
+      // âœ… OPTIMISATION : assignation directe (plus de reload)
       user.loyalty = [loyalty];
     }
 
     const { password, ...userWithoutPassword } = user;
 
-    // ✅ userHasCompany : ajout settings + invoiceConfiguration
+    // âœ… userHasCompany : ajout settings + invoiceConfiguration
     const userHasCompany = (userWithoutPassword.userHasCompany || []).map(
       (uhc) => ({
         id: uhc.id,
@@ -2964,8 +2964,8 @@ export class UsersService {
     );
 
     // ============================================================
-    // ✅ OPTIMISATION : activeCompany calculée depuis user.userHasCompany
-    //    (plus de requête activeCompanyRaw)
+    // âœ… OPTIMISATION : activeCompany calculÃ©e depuis user.userHasCompany
+    //    (plus de requÃªte activeCompanyRaw)
     // ============================================================
     const activeUserHasCompany = user.userHasCompany?.find(
       (uhc) => uhc.company?.id === user.activeCompanyId,
@@ -2997,7 +2997,7 @@ export class UsersService {
         : null,
     }));
 
-    // ✅ activeCompany : ajout settings + invoiceConfiguration
+    // âœ… activeCompany : ajout settings + invoiceConfiguration
     const activeCompany = activeCompanyEntity
       ? {
         ...activeCompanyEntity,
@@ -3748,7 +3748,7 @@ export class UsersService {
         'userCompanyResourceDetail',
       );
 
-    // FILTRE PAR RÔLE
+    // FILTRE PAR RÃ”LE
     if (role) {
       query.andWhere('users.role = :role', { role });
     }
@@ -4024,7 +4024,7 @@ export class UsersService {
         'userCompanyResourceDetail',
       );
 
-    // FILTRE PAR RÔLE
+    // FILTRE PAR RÃ”LE
     if (role) {
       query.andWhere('users.role = :role', { role });
     }
@@ -4282,7 +4282,7 @@ export class UsersService {
     };
   }
   // ============================================================
-  // 🔄 CHANGER LE RÔLE D'UN UTILISATEUR
+  // ðŸ”„ CHANGER LE RÃ”LE D'UN UTILISATEUR
   // ============================================================
   async changeUserRole(
     targetUserId: string,
@@ -4293,7 +4293,7 @@ export class UsersService {
   ) {
 
     // ============================================================
-    // 1. Récupérer l'utilisateur cible
+    // 1. RÃ©cupÃ©rer l'utilisateur cible
     // ============================================================
     const targetUser = await this.usersRepository.findOne({
       where: { id: targetUserId },
@@ -4306,17 +4306,17 @@ export class UsersService {
     }
 
     // ============================================================
-    // 2. Vérifications de sécurité
+    // 2. VÃ©rifications de sÃ©curitÃ©
     // ============================================================
 
-    // ❌ Interdire de changer son propre rôle
+    // âŒ Interdire de changer son propre rÃ´le
     if (targetUser.id === currentUser.id) {
       throw new BadRequestException(
         await this.i18n.translate('user.cannot_change_own_role', lang),
       );
     }
 
-    // ❌ Interdire de modifier un SUPER_ADMIN (sauf par un SUPER_ADMIN lui-même)
+    // âŒ Interdire de modifier un SUPER_ADMIN (sauf par un SUPER_ADMIN lui-mÃªme)
     if (
       targetUser.role === UserRole.SUPER_ADMIN &&
       currentUser.role !== UserRole.SUPER_ADMIN
@@ -4326,7 +4326,7 @@ export class UsersService {
       );
     }
 
-    // ❌ Interdire de promouvoir quelqu'un en SUPER_ADMIN (sauf SUPER_ADMIN)
+    // âŒ Interdire de promouvoir quelqu'un en SUPER_ADMIN (sauf SUPER_ADMIN)
     if (
       newRole === UserRole.SUPER_ADMIN &&
       currentUser.role !== UserRole.SUPER_ADMIN
@@ -4336,7 +4336,7 @@ export class UsersService {
       );
     }
 
-    // ❌ Interdire un rôle identique (pas de changement inutile)
+    // âŒ Interdire un rÃ´le identique (pas de changement inutile)
     if (targetUser.role === newRole) {
       throw new BadRequestException(
         await this.i18n.translate('user.same_role', lang, { role: newRole }),
@@ -4713,7 +4713,7 @@ export class UsersService {
   }
 
   async toggleUserActiveStatus(userId: string, lang: string = 'fr') {
-    // 1️⃣ Récupérer l'utilisateur avec toutes ses relations
+    // 1ï¸âƒ£ RÃ©cupÃ©rer l'utilisateur avec toutes ses relations
     const user = await this.usersRepository.findOne({
       where: { id: userId },
       relations: [
@@ -4736,11 +4736,11 @@ export class UsersService {
       throw new NotFoundException(await this.i18n.translate('user.user_not_found', lang));
     }
 
-    // 2️ Basculer automatiquement le statut (true → false, false → true)
+    // 2ï¸ Basculer automatiquement le statut (true â†’ false, false â†’ true)
     user.isActive = !user.isActive;
     await this.usersRepository.save(user);
 
-    // 3️⃣ Supprimer le mot de passe avant retour
+    // 3ï¸âƒ£ Supprimer le mot de passe avant retour
     const { password, ...rest } = user;
 
     const messageKey = user.isActive ? 'user.user_activated' : 'user.user_deactivated';
@@ -4895,14 +4895,14 @@ export class UsersService {
   }
 
   // ============================================================
-  // 🔧 CRÉER UN UTILISATEUR PAR UN ADMIN
+  // ðŸ”§ CRÃ‰ER UN UTILISATEUR PAR UN ADMIN
   // ============================================================
   async createUserByAdmin(
     dto: CreateUserByAdminDto,
     currentUser: UserEntity,
     lang: string = 'fr',
   ): Promise<{ message: string; data: any }> {
-    // 1. Sécurité : SUPER_ADMIN uniquement par SUPER_ADMIN
+    // 1. SÃ©curitÃ© : SUPER_ADMIN uniquement par SUPER_ADMIN
     if (
       dto.role === UserRole.SUPER_ADMIN &&
       currentUser.role !== UserRole.SUPER_ADMIN
@@ -4932,12 +4932,12 @@ export class UsersService {
       );
     }
 
-    // 3. Mot de passe (par défaut si non fourni)
+    // 3. Mot de passe (par dÃ©faut si non fourni)
     const usedDefaultPassword = !dto.password || dto.password.trim() === '';
     const rawPassword = usedDefaultPassword ? DEFAULT_USER_PASSWORD : dto.password!;
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
-    // 4. Création
+    // 4. CrÃ©ation
     const newUser = this.usersRepository.create({
       fullName: dto.fullName,
       email: dto.email || undefined,
@@ -4956,12 +4956,12 @@ export class UsersService {
 
     const savedUser = await this.usersRepository.save(newUser);
 
-    // 5. Génération du referralCode
+    // 5. GÃ©nÃ©ration du referralCode
     const referralCodeGenerated = await this.generateReferralCode(savedUser.id);
     savedUser.referralCode = referralCodeGenerated;
     await this.usersRepository.save(savedUser);
 
-    // 6. Compte fidélité
+    // 6. Compte fidÃ©litÃ©
     const loyalty = await this.getOrCreateLoyaltyAccount(savedUser.id);
     await this.loyaltyRepository.save(loyalty);
 
@@ -5051,7 +5051,7 @@ export class UsersService {
       }),
     );
 
-    // 9. Réponse
+    // 9. RÃ©ponse
     return {
       message: await this.i18n.translate('user.user_created_by_admin', lang, {
         fullName: fullUser.fullName,
@@ -5067,14 +5067,14 @@ export class UsersService {
         ...(usedDefaultPassword && {
           defaultPasswordUsed: true,
           defaultPasswordHint:
-            'Un mot de passe par défaut a été attribué.',
+            'Un mot de passe par dÃ©faut a Ã©tÃ© attribuÃ©.',
         }),
       }),
     };
   }
 
   // ============================================================
-  // 🔧 MODIFIER UN UTILISATEUR PAR UN ADMIN
+  // ðŸ”§ MODIFIER UN UTILISATEUR PAR UN ADMIN
   // ============================================================
   async updateUserByAdmin(
     targetUserId: string,
@@ -5082,7 +5082,7 @@ export class UsersService {
     currentUser: UserEntity,
     lang: string = 'fr',
   ): Promise<{ message: string; data: any }> {
-    // 1. Récupérer l'utilisateur cible
+    // 1. RÃ©cupÃ©rer l'utilisateur cible
     const targetUser = await this.usersRepository.findOne({
       where: { id: targetUserId },
     });
@@ -5093,7 +5093,7 @@ export class UsersService {
       );
     }
 
-    // 2. Sécurité
+    // 2. SÃ©curitÃ©
     if (
       targetUser.role === UserRole.SUPER_ADMIN &&
       currentUser.role !== UserRole.SUPER_ADMIN
@@ -5262,7 +5262,7 @@ export class UsersService {
       }),
     );
 
-    // 8. Réponse
+    // 8. RÃ©ponse
     return {
       message: await this.i18n.translate('user.user_updated_by_admin', lang, {
         fullName: fullUser.fullName,

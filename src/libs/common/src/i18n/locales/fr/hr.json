@@ -1,0 +1,17 @@
+{
+    "attendance.not_found": "Aucun pointage trouvé.",
+    "attendance.not_found_by_id": "Pointage introuvable : {{id}}.",
+    "attendance.list_retrieved": "Liste des pointages récupérée avec succès.",
+    "attendance.found_success": "Pointage récupéré avec succès.",
+    "attendance.check_in_success": "Check-in enregistré avec succès pour {{name}}.",
+    "attendance.check_out_success": "Check-out enregistré. Temps travaillé : {{minutes}} minutes.",
+    "attendance.stats_retrieved": "Statistiques récupérées avec succès.",
+    "attendance.deleted_success": "Pointage supprimé avec succès.",
+    "attendance.employee_required": "L'employé est obligatoire.",
+    "attendance.date_required": "La date est obligatoire.",
+    "attendance.employee_not_found": "Employé introuvable : {{id}}.",
+    "attendance.already_checked_in": "Cet employé a déjà pointé son arrivée aujourd'hui.",
+    "attendance.already_checked_out": "Cet employé a déjà pointé son départ aujourd'hui.",
+    "attendance.no_check_in_today": "Aucun check-in pour aujourd'hui.",
+    "attendance.missing_check_in": "Impossible de faire un check-out sans check-in préalable."
+}

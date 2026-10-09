@@ -86,6 +86,9 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { I18nModule } from './libs/common/src';
 import { FpayModule } from './fpay/fpay.module';
 import { ExchangeRateModule } from './Exchange/exchange-rate.module';
+import { ServiceClientModule } from './backOffice/service-client/service-client.module';
+import { HrModule } from './backOffice/hr/hr.module';
+import { CommercialModule } from './backOffice/commercial/commercial.module';
 // import { WhatsAppModule } from './users/utility/helpers/whatsapp.module';
 
 @Module({
@@ -203,11 +206,11 @@ import { ExchangeRateModule } from './Exchange/exchange-rate.module';
     I18nModule,
     CommonModule,
     FpayModule,
-    ExchangeRateModule
+    ExchangeRateModule,
     // WhatsAppModule
-    // CommercialModule,
-    // ServiceClientModule,
-    // HrModule,
+    CommercialModule,
+    ServiceClientModule,
+    HrModule,
   ],
   controllers: [AppController],
   exports: [FilesService],
