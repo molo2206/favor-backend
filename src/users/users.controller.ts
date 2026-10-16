@@ -48,6 +48,7 @@ import { Permissions } from './utility/guards/permissions.guard';
 import { ChangeUserRoleDto } from './dto/change-role.dto';
 import { UpdateUserByAdminDto } from './dto/update-user-by-admin.dto';
 import { CreateUserByAdminDto } from './dto/create-user-by-admin.dto';
+import { SendSmsToClientsDto } from './dto/send-sms-to-clients.dto';
 
 // ============================================================
 // ✅ DÉCORATEUR @Platform() INLINE (pas de fichier séparé)
@@ -599,6 +600,8 @@ export class UsersController {
     @Query('city') city?: string,
     @Query('country') country?: string,
     @Query('search') search?: string,
+    @Query('startDate') startDate?: string,    // ✅ AJOUT
+    @Query('endDate') endDate?: string,        // ✅ AJOUT
     @Req() req?: Request,
   ) {
     const lang = this.extractLanguage(req!);
@@ -608,6 +611,31 @@ export class UsersController {
       city,
       country,
       search,
+      startDate,                               // ✅ AJOUT
+      endDate,                                 // ✅ AJOUT
+      lang,
+    });
+  }
+
+  @Post('service-client/send-sms')
+  async sendSmsToClientUsers(
+    @Body() dto: SendSmsToClientsDto,
+    @Req() req: Request,
+  ) {
+    const lang = this.extractLanguage(req);
+    return this.usersService.sendSmsToClientUsersByDestination({
+      message: dto.message,
+      type: dto.type,
+      shippingCompanyId: dto.shippingCompanyId,
+      city: dto.city,
+      country: dto.country,
+      search: dto.search,
+      userId: dto.userId,
+      sendToAll: dto.sendToAll,
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+      batchSize: dto.batchSize,
+      delayBetweenBatchesMs: dto.delayBetweenBatchesMs,
       lang,
     });
   }

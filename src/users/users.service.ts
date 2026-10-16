@@ -5400,6 +5400,8 @@ export class UsersService {
     country?: string;
     search?: string;
     lang?: string;
+    startDate?: string;   // ✅ AJOUT
+    endDate?: string;     // ✅ AJOUT
   }): Promise<{ message: string; data: any[] }> {
     const lang = options.lang || 'fr';
     const searchFilter = options.search ? `%${options.search}%` : null;
@@ -5436,6 +5438,35 @@ export class UsersService {
     const shipmentCompanyId = options.shippingCompanyId;
 
     const cityFilter = options.city ? `%${options.city}%` : null;
+
+    // ============================================================
+    // ✅ NOUVEAU : préparation des filtres de date
+    // ============================================================
+    const startDate = options.startDate ? new Date(options.startDate) : null;
+    const endDate = options.endDate ? new Date(options.endDate) : null;
+
+    // Inclure toute la journée de fin (23:59:59.999)
+    if (endDate) {
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    // Helper SQL : construit la clause de date pour une colonne donnée
+    const buildDateCondition = (
+      column: string,
+      params: any[],
+    ): string | null => {
+      const parts: string[] = [];
+      if (startDate) {
+        parts.push(`${column} >= ?`);
+        params.push(startDate);
+      }
+      if (endDate) {
+        parts.push(`${column} <= ?`);
+        params.push(endDate);
+      }
+      return parts.length > 0 ? parts.join(' AND ') : null;
+    };
+
     const allUserIds = new Set<string>();
 
     // ============================================================
@@ -5450,6 +5481,9 @@ export class UsersService {
         condsNoAlias.push('LOWER(shippingTo) LIKE LOWER(?)');
         params.push(cityFilter);
       }
+      // ✅ Ajout date
+      const dateCond = buildDateCondition('createdAt', params);
+      if (dateCond) condsNoAlias.push(dateCond);
 
       const byUserId: any[] = await this.shipmentRepo.query(
         `SELECT DISTINCT userId FROM shipments
@@ -5464,6 +5498,9 @@ export class UsersService {
         condsAliased.push('LOWER(s.shippingTo) LIKE LOWER(?)');
         paramsAliased.push(cityFilter);
       }
+      // ✅ Ajout date
+      const dateCondAliased = buildDateCondition('s.createdAt', paramsAliased);
+      if (dateCondAliased) condsAliased.push(dateCondAliased);
 
       const byPhone: any[] = await this.shipmentRepo.query(
         `SELECT DISTINCT u.id AS userId
@@ -5487,6 +5524,10 @@ export class UsersService {
         conds.push('(LOWER(ci.name) LIKE LOWER(?) OR LOWER(c.address) LIKE LOWER(?))');
         params.push(cityFilter, cityFilter);
       }
+      // ✅ Ajout date
+      const dateCond = buildDateCondition('o.createdAt', params);
+      if (dateCond) conds.push(dateCond);
+
       const whereClause = conds.length > 0
         ? `WHERE ${conds.join(' AND ')} AND o.userId IS NOT NULL`
         : `WHERE o.userId IS NOT NULL`;
@@ -5510,6 +5551,9 @@ export class UsersService {
         conds.push('(LOWER(ci.name) LIKE LOWER(?) OR LOWER(co.address) LIKE LOWER(?))');
         params.push(cityFilter, cityFilter);
       }
+      // ✅ Ajout date
+      const dateCond = buildDateCondition('rv.reservation_date', params);
+      if (dateCond) conds.push(dateCond);
 
       const rows: any[] = await this.shipmentRepo.query(
         `SELECT DISTINCT rv.user_id AS userId
@@ -5531,6 +5575,10 @@ export class UsersService {
         conds.push('(LOWER(ci.name) LIKE LOWER(?) OR LOWER(p.localization) LIKE LOWER(?))');
         params.push(cityFilter, cityFilter);
       }
+      // ✅ Ajout date
+      const dateCond = buildDateCondition('r.createdAt', params);
+      if (dateCond) conds.push(dateCond);
+
       const whereClause = conds.length > 0
         ? `WHERE ${conds.join(' AND ')} AND r.userId IS NOT NULL`
         : `WHERE r.userId IS NOT NULL`;
@@ -5584,6 +5632,10 @@ export class UsersService {
       shipConds.push('LOWER(shipment.shippingTo) LIKE LOWER(?)');
       shipParams.push(cityFilter);
     }
+    // ✅ Ajout date
+    const shipDateCond = buildDateCondition('shipment.createdAt', shipParams);
+    if (shipDateCond) shipConds.push(shipDateCond);
+
     const shipCondsAliased = shipConds.map((c) =>
       c.replace(/shipment\./g, 's.'),
     );
@@ -5597,6 +5649,9 @@ export class UsersService {
       );
       orderParams.push(cityFilter, cityFilter);
     }
+    // ✅ Ajout date
+    const orderDateCond = buildDateCondition('o.createdAt', orderParams);
+    if (orderDateCond) orderConds.push(orderDateCond);
 
     // VEHICLE
     const vehicleConds: string[] = ["rv.type = 'VEHICLE'"];
@@ -5607,6 +5662,9 @@ export class UsersService {
       );
       vehicleParams.push(cityFilter, cityFilter);
     }
+    // ✅ Ajout date
+    const vehicleDateCond = buildDateCondition('rv.reservation_date', vehicleParams);
+    if (vehicleDateCond) vehicleConds.push(vehicleDateCond);
 
     // HOTEL
     const hotelConds: string[] = [];
@@ -5617,6 +5675,9 @@ export class UsersService {
       );
       hotelParams.push(cityFilter, cityFilter);
     }
+    // ✅ Ajout date
+    const hotelDateCond = buildDateCondition('r.createdAt', hotelParams);
+    if (hotelDateCond) hotelConds.push(hotelDateCond);
 
     // ============================================================
     // 3. TOUT EN PARALLÈLE
@@ -5937,6 +5998,12 @@ export class UsersService {
     country?: string;
     search?: string;
     lang?: string;
+    // ✅ AJOUT : envoi ciblé ou global (tous optionnels)
+    userId?: string;        // Envoyer à UN utilisateur précis
+    sendToAll?: boolean;    // Envoyer à TOUS les utilisateurs de la plateforme
+    // ✅ AJOUT : filtre date (comme dans getClientUsersByCompanyAndDestination)
+    startDate?: string;
+    endDate?: string;
     batchSize?: number;
     delayBetweenBatchesMs?: number;
   }): Promise<{
@@ -5967,17 +6034,64 @@ export class UsersService {
     const DELAY_BETWEEN_BATCHES_MS = options.delayBetweenBatchesMs ?? 200;
 
     // ============================================================
-    // 1. Récupérer les utilisateurs ciblés (même logique que la recherche)
+    // 1. Récupérer les utilisateurs ciblés
     // ============================================================
-    const { data: clientUsers } =
-      await this.getClientUsersByCompanyAndDestination({
-        type: options.type,
-        shippingCompanyId: options.shippingCompanyId,
-        city: options.city,
-        country: options.country,
-        search: options.search,
-        lang,
+    let clientUsers: any[] = [];
+
+    // ============================================================
+    // 🅰️ CAS 1 : Envoi à UN utilisateur précis (userId fourni)
+    // ============================================================
+    if (options.userId) {
+      const user = await this.usersRepository.findOne({
+        where: { id: options.userId },
+        select: ['id', 'fullName', 'email', 'phone', 'image', 'role', 'isActive', 'city', 'country', 'address', 'createdAt'],
       });
+
+      if (!user) {
+        return {
+          message: 'User not found',
+          data: {
+            total: 0,
+            sent: 0,
+            failed: 0,
+            skipped: 0,
+            batches: 0,
+            recipients: [],
+          },
+        };
+      }
+
+      clientUsers = [user];
+    }
+    // ============================================================
+    // 🅱️ CAS 2 : Envoi à TOUS les utilisateurs de la plateforme
+    // ============================================================
+    else if (options.sendToAll) {
+      clientUsers = await this.usersRepository.query(
+        `SELECT id, fullName, email, phone, image, role, isActive, city, country, address, createdAt
+         FROM users
+         WHERE isActive = 1
+         ORDER BY fullName ASC`,
+      );
+    }
+    // ============================================================
+    // 🅲 CAS 3 : Envoi filtré (logique existante)
+    // ============================================================
+    else {
+      const { data } =
+        await this.getClientUsersByCompanyAndDestination({
+          type: options.type,
+          shippingCompanyId: options.shippingCompanyId,
+          city: options.city,
+          country: options.country,
+          search: options.search,
+          startDate: options.startDate,
+          endDate: options.endDate,
+          lang,
+        });
+
+      clientUsers = data;
+    }
 
     if (!clientUsers || clientUsers.length === 0) {
       return {
