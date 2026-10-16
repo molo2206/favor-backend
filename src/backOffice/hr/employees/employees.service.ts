@@ -45,22 +45,14 @@ export class EmployeesService {
             );
         }
 
-        if (dto.email) {
-            const emailExists = await this.employeeRepo.findOne({
-                where: { email: dto.email.toLowerCase().trim() },
-            });
-            if (emailExists) {
-                throw new BadRequestException(
-                    await this.i18nService.translate(
-                        'employee.email_already_exists',
-                        lang,
-                        { email: dto.email },
-                    ),
-                );
-            }
-        }
+        // ============================================================
+        // ⚠️ SUPPRIMÉ : vérification doublon email
+        //    → email n'est plus unique
+        // ============================================================
 
+        // ============================================================
         // ✅ Vérifier unicité du fingerprint si fourni
+        // ============================================================
         if (dto.fingerprint && dto.fingerprint.trim() !== '') {
             const fpExists = await this.employeeRepo.findOne({
                 where: { fingerprint: dto.fingerprint.trim() },
@@ -71,6 +63,29 @@ export class EmployeesService {
                     await this.i18nService.translate(
                         'employee.fingerprint_already_used',
                         lang,
+                    ),
+                );
+            }
+        }
+
+        // ============================================================
+        // ✅ NOUVEAU : vérifier si un employé existe déjà avec ce userId
+        //    (contrainte unique : uq_hr_employees_user)
+        // ============================================================
+        if (dto.userId) {
+            const existingEmployee = await this.employeeRepo.findOne({
+                where: { userId: dto.userId },
+                select: ['id', 'fullName'],
+            });
+
+            if (existingEmployee) {
+                throw new BadRequestException(
+                    await this.i18nService.translate(
+                        'employee.user_already_linked',
+                        lang,
+                        {
+                            name: existingEmployee.fullName,
+                        },
                     ),
                 );
             }
@@ -151,36 +166,30 @@ export class EmployeesService {
         }
 
         // ============================================================
-        // 🔨 Création — avec cast explicite
+        // 🔨 Création
         // ============================================================
         const employee = this.employeeRepo.create({
-            // Champs nettoyés
             fullName: dto.fullName.trim(),
+            // ✅ email et phone : libres, pas de contrainte unique
             email: dto.email ? dto.email.toLowerCase().trim() : undefined,
             phone: dto.phone ? dto.phone.trim() : undefined,
             address: dto.address?.trim() || undefined,
             position: dto.position?.trim() || undefined,
             hireDate: dto.hireDate ? new Date(dto.hireDate) : undefined,
 
-            // ✅ Statut avec fallback ACTIVE
             status: dto.status ?? EmployeeStatus.ACTIVE,
 
-            // Salaire & devise
             baseSalary: dto.baseSalary,
             currency: dto.currency,
 
-            // Relations
             departmentId: dto.departmentId,
             branchId: dto.branchId,
             userId: dto.userId,
 
-            // ✅ Multi-tenant
             companyId: resolvedCompanyId,
 
-            // ✅ Image : priorité au fichier uploadé
             image: uploadedImageUrl ?? dto.image?.trim() ?? undefined,
 
-            // ✅ Fingerprint
             fingerprint: dto.fingerprint?.trim() || undefined,
         } as Partial<EmployeeEntity>);
 
