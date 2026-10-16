@@ -11,6 +11,7 @@ import { AttendanceStatus } from '../common/enums/attendance-status.enum';
 import { EmployeeEntity } from '../employees/entities/employee.entity';
 import { PaginatedResponseDto } from 'src/products/dto/paginated-response.dto';
 import { I18nService } from 'src/libs/common/src';
+import { FingerprintAttendanceDto } from './dto/fingerprint-attendance.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -24,6 +25,31 @@ export class AttendanceService {
         private readonly i18nService: I18nService,
     ) { }
 
+    private async findEmployeeByFingerprint(
+        fingerprint: string,
+        lang: string = 'fr',
+    ): Promise<EmployeeEntity> {
+        if (!fingerprint || fingerprint.trim() === '') {
+            throw new BadRequestException(
+                await this.i18nService.translate('attendance.fingerprint_required', lang),
+            );
+        }
+
+        const employee = await this.employeeRepo.findOne({
+            where: { fingerprint: fingerprint.trim() },
+        });
+
+        if (!employee) {
+            throw new NotFoundException(
+                await this.i18nService.translate(
+                    'attendance.fingerprint_not_recognized',
+                    lang,
+                ),
+            );
+        }
+
+        return employee;
+    }
     // ============================================================
     // 🔒 VÉRIFIER UN EMPLOYÉ
     // ============================================================
@@ -332,5 +358,120 @@ export class AttendanceService {
         return {
             message: await this.i18nService.translate('attendance.deleted_success', lang),
         };
+    }
+
+    // ============================================================
+    // 🔄 POINTAGE UNIFIÉ PAR FINGERPRINT (check-in OU check-out)
+    // ============================================================
+    async punchByFingerprint(
+        dto: FingerprintAttendanceDto,
+        lang: string = 'fr',
+    ): Promise<{
+        message: string;
+        action: 'CHECK_IN' | 'CHECK_OUT';
+        data: AttendanceEntity;
+    }> {
+        // 1. Résoudre l'employé depuis son empreinte
+        const employee = await this.findEmployeeByFingerprint(dto.fingerprint, lang);
+
+        // 2. Normaliser la date
+        const targetDate = dto.date ? new Date(dto.date) : new Date();
+        targetDate.setHours(0, 0, 0, 0);
+
+        const now = dto.timestamp ? new Date(dto.timestamp) : new Date();
+
+        // 3. Chercher un pointage existant pour ce jour
+        let attendance = await this.attendanceRepo.findOne({
+            where: { employeeId: employee.id, date: targetDate },
+        });
+
+        // ============================================================
+        // 🅰️ CAS 1 : Aucun pointage → CHECK-IN
+        // ============================================================
+        if (!attendance) {
+            attendance = this.attendanceRepo.create({
+                employeeId: employee.id,
+                date: targetDate,
+                checkInAt: now,
+                status: dto.status || AttendanceStatus.PRESENT,
+                notes: dto.notes,
+            });
+
+            const saved = await this.attendanceRepo.save(attendance);
+
+            return {
+                message: await this.i18nService.translate(
+                    'attendance.check_in_success',
+                    lang,
+                    { name: employee.fullName },
+                ),
+                action: 'CHECK_IN',
+                data: saved,
+            };
+        }
+
+        // ============================================================
+        // 🅱️ CAS 2 : Pointage existe SANS checkInAt → CHECK-IN
+        // ============================================================
+        if (!attendance.checkInAt) {
+            attendance.checkInAt = now;
+            if (dto.status) attendance.status = dto.status;
+            if (dto.notes !== undefined) attendance.notes = dto.notes;
+
+            const saved = await this.attendanceRepo.save(attendance);
+
+            return {
+                message: await this.i18nService.translate(
+                    'attendance.check_in_success',
+                    lang,
+                    { name: employee.fullName },
+                ),
+                action: 'CHECK_IN',
+                data: saved,
+            };
+        }
+
+        // ============================================================
+        // 🅲 CAS 3 : checkInAt existe SANS checkOutAt → CHECK-OUT
+        // ============================================================
+        if (attendance.checkInAt && !attendance.checkOutAt) {
+            // ✅ Sécurité : checkOut doit être APRÈS checkIn
+            if (now.getTime() < attendance.checkInAt.getTime()) {
+                throw new BadRequestException(
+                    await this.i18nService.translate(
+                        'attendance.checkout_before_checkin',
+                        lang,
+                    ),
+                );
+            }
+
+            attendance.checkOutAt = now;
+            const diff =
+                (attendance.checkOutAt.getTime() - attendance.checkInAt.getTime()) /
+                60000;
+            attendance.workedMinutes = Math.round(diff);
+            if (dto.notes !== undefined) attendance.notes = dto.notes;
+
+            const saved = await this.attendanceRepo.save(attendance);
+
+            return {
+                message: await this.i18nService.translate(
+                    'attendance.check_out_success',
+                    lang,
+                    { minutes: attendance.workedMinutes },
+                ),
+                action: 'CHECK_OUT',
+                data: saved,
+            };
+        }
+
+        // ============================================================
+        // 🅳 CAS 4 : checkIn ET checkOut déjà faits → ERREUR
+        // ============================================================
+        throw new BadRequestException(
+            await this.i18nService.translate('attendance.already_completed_today', lang, {
+                name: employee.fullName,
+            }),
+        );
     }
 }

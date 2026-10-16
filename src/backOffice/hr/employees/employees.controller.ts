@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -11,7 +12,9 @@ import {
     Post,
     Query,
     Req,
+    UploadedFile,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { EmployeesService } from './employees.service';
@@ -24,6 +27,7 @@ import { ActionType } from 'src/audit/enum/action-type.enum';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { AuditAction } from 'src/audit/decorator/audit.decorator';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('hr/employees')
 export class EmployeesController {
@@ -125,5 +129,28 @@ export class EmployeesController {
     ) {
         const lang = this.extractLanguage(req);
         return this.employeesService.remove(id, user, lang);
+    }
+
+    @Patch(':id/image')
+    @UseGuards(AuthentificationGuard)
+    @AuditAction(ActionType.UPDATE, 'employees')
+    @UseInterceptors(FileInterceptor('image'))
+    @HttpCode(HttpStatus.OK)
+    async updateEmployeeImage(
+        @Param('id') id: string,
+        @UploadedFile() file: Express.Multer.File,
+        @CurrentUser() user: UserEntity,
+        @Req() req: Request,
+    ) {
+        const lang = this.extractLanguage(req);
+
+        if (!file) {
+            throw new BadRequestException(
+                'Image file is required (field name: "image")',
+            );
+        }
+
+        // ✅ Nouvel ordre : (id, user, lang, file)
+        return this.employeesService.updateEmployeeImage(id, user, lang, file);
     }
 }

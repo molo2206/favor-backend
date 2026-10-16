@@ -12,6 +12,9 @@ import { I18nService } from 'src/libs/common/src';
 import { PaginatedResponseDto } from 'src/products/dto/paginated-response.dto';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { DepartmentEntity } from '../departments/entities/department.entity';
+import { instanceToPlain } from 'class-transformer';
+import { FilesService } from 'src/files/files.service';
+import { EmployeeStatus } from '../common/enums/employee-status.enum';
 
 @Injectable()
 export class EmployeesService {
@@ -23,6 +26,7 @@ export class EmployeesService {
         private readonly departmentRepo: Repository<DepartmentEntity>,
 
         private readonly i18nService: I18nService,
+        private readonly filesService: FilesService,
     ) { }
 
     // ============================================================
@@ -32,6 +36,7 @@ export class EmployeesService {
         dto: CreateEmployeeDto,
         user: UserEntity,
         lang: string = 'fr',
+        file?: Express.Multer.File,
     ): Promise<{ message: string; data: EmployeeEntity }> {
         // 🔍 Vérifications
         if (!dto.fullName || dto.fullName.trim() === '') {
@@ -55,7 +60,23 @@ export class EmployeesService {
             }
         }
 
-        // 🔹 Résoudre companyId : priorité au département, sinon user connecté
+        // ✅ Vérifier unicité du fingerprint si fourni
+        if (dto.fingerprint && dto.fingerprint.trim() !== '') {
+            const fpExists = await this.employeeRepo.findOne({
+                where: { fingerprint: dto.fingerprint.trim() },
+                select: ['id'],
+            });
+            if (fpExists) {
+                throw new BadRequestException(
+                    await this.i18nService.translate(
+                        'employee.fingerprint_already_used',
+                        lang,
+                    ),
+                );
+            }
+        }
+
+        // 🔹 Résoudre companyId
         let resolvedCompanyId: string | undefined = user.activeCompanyId;
 
         if (dto.departmentId) {
@@ -71,7 +92,6 @@ export class EmployeesService {
                     ),
                 );
             }
-            // 🔒 Sécurité : le département doit appartenir à la company du user
             if (
                 user.activeCompanyId &&
                 dept.companyId &&
@@ -88,7 +108,6 @@ export class EmployeesService {
                     ),
                 );
             }
-            // Priorité au département s'il a une company
             if (dept.companyId) {
                 resolvedCompanyId = dept.companyId;
             }
@@ -109,15 +128,61 @@ export class EmployeesService {
             }
         }
 
-        // 🔨 Création
+        // ============================================================
+        // ✅ UPLOAD DE L'IMAGE (optionnel)
+        // ============================================================
+        let uploadedImageUrl: string | undefined;
+
+        if (file) {
+            try {
+                const uploadedFile = await this.filesService.uploadFile(
+                    file,
+                    'employee',
+                    'avatar',
+                );
+                uploadedImageUrl = uploadedFile.data;
+                console.log(`✅ [create-employee] Image uploadée : ${uploadedImageUrl}`);
+            } catch (err: any) {
+                console.error('❌ [create-employee] Erreur upload image :', err.message);
+                throw new BadRequestException(
+                    await this.i18nService.translate('employee.image_upload_failed', lang),
+                );
+            }
+        }
+
+        // ============================================================
+        // 🔨 Création — avec cast explicite
+        // ============================================================
         const employee = this.employeeRepo.create({
-            ...dto,
-            companyId: resolvedCompanyId,
+            // Champs nettoyés
             fullName: dto.fullName.trim(),
             email: dto.email ? dto.email.toLowerCase().trim() : undefined,
             phone: dto.phone ? dto.phone.trim() : undefined,
+            address: dto.address?.trim() || undefined,
+            position: dto.position?.trim() || undefined,
             hireDate: dto.hireDate ? new Date(dto.hireDate) : undefined,
-        });
+
+            // ✅ Statut avec fallback ACTIVE
+            status: dto.status ?? EmployeeStatus.ACTIVE,
+
+            // Salaire & devise
+            baseSalary: dto.baseSalary,
+            currency: dto.currency,
+
+            // Relations
+            departmentId: dto.departmentId,
+            branchId: dto.branchId,
+            userId: dto.userId,
+
+            // ✅ Multi-tenant
+            companyId: resolvedCompanyId,
+
+            // ✅ Image : priorité au fichier uploadé
+            image: uploadedImageUrl ?? dto.image?.trim() ?? undefined,
+
+            // ✅ Fingerprint
+            fingerprint: dto.fingerprint?.trim() || undefined,
+        } as Partial<EmployeeEntity>);
 
         const saved = await this.employeeRepo.save(employee);
 
@@ -130,7 +195,6 @@ export class EmployeesService {
             data: saved,
         };
     }
-
     // ============================================================
     // 📋 FIND ALL
     // ============================================================
@@ -438,6 +502,134 @@ export class EmployeesService {
                 { name: employee.fullName },
             ),
             data: { id },
+        };
+    }
+
+    // ============================================================
+    // 🖼️ MODIFIER LA PHOTO D'UN EMPLOYÉ
+    // (même logique que UsersService.updateProfileImage)
+    // ============================================================
+    async updateEmployeeImage(
+        employeeId: string,
+        user: UserEntity,
+        lang: string = 'fr',
+        file?: Express.Multer.File,     // ✅ en dernier
+    ): Promise<{ message: string; data: any }> {
+        // ============================================================
+        // 1️⃣ Récupérer l'employé
+        // ============================================================
+        let employee = await this.employeeRepo.findOne({
+            where: { id: employeeId },
+            relations: [
+                'department',
+                'company',
+                'branch',
+                'user',
+                'user.activeCompany',
+            ],
+        });
+
+        if (!employee) {
+            throw new NotFoundException(
+                await this.i18nService.translate(
+                    'employee.not_found_by_id',
+                    lang,
+                    { id: employeeId },
+                ),
+            );
+        }
+
+        // ============================================================
+        // 2️⃣ Sécurité multi-tenant
+        // ============================================================
+        if (
+            user.activeCompanyId &&
+            employee.companyId &&
+            employee.companyId !== user.activeCompanyId
+        ) {
+            throw new NotFoundException(
+                await this.i18nService.translate(
+                    'employee.not_found_by_id',
+                    lang,
+                    { id: employeeId },
+                ),
+            );
+        }
+
+        // ============================================================
+        // 3️⃣ Vérifier le fichier
+        // ============================================================
+        if (!file) {
+            throw new BadRequestException(
+                await this.i18nService.translate('employee.invalid_image', lang),
+            );
+        }
+
+        // ============================================================
+        // 4️⃣ Supprimer l'ancienne image si elle existe
+        // ============================================================
+        if (employee.image && employee.image.includes('/uploads/')) {
+            try {
+                const filename = employee.image.split('/').pop()!;
+                await this.filesService.deleteFile('employee', filename);
+            } catch (err: any) {
+                console.warn('⚠️ Échec suppression ancienne image :', err.message);
+            }
+        }
+
+        // ============================================================
+        // 5️⃣ Uploader la nouvelle image
+        // ============================================================
+        const uploadedFile = await this.filesService.uploadFile(
+            file,
+            'employee',
+            'avatar',
+        );
+        employee.image = uploadedFile.data;
+        const updatedEmployee = await this.employeeRepo.save(employee);
+
+        // ============================================================
+        // 6️⃣ Retour
+        // ============================================================
+        return {
+            message: await this.i18nService.translate(
+                'employee.image_updated_success',
+                lang,
+                { name: updatedEmployee.fullName },
+            ),
+            data: instanceToPlain({
+                id: updatedEmployee.id,
+                fullName: updatedEmployee.fullName,
+                email: updatedEmployee.email,
+                phone: updatedEmployee.phone,
+                address: updatedEmployee.address,
+                position: updatedEmployee.position,
+                hireDate: updatedEmployee.hireDate,
+                status: updatedEmployee.status,
+                baseSalary: updatedEmployee.baseSalary,
+                currency: updatedEmployee.currency,
+                image: updatedEmployee.image,
+                fingerprint: updatedEmployee.fingerprint,
+                departmentId: updatedEmployee.departmentId,
+                companyId: updatedEmployee.companyId,
+                branchId: updatedEmployee.branchId,
+                userId: updatedEmployee.userId,
+                department: updatedEmployee.department ?? null,
+                company: updatedEmployee.company ?? null,
+                branch: updatedEmployee.branch ?? null,
+                user: updatedEmployee.user
+                    ? {
+                        id: updatedEmployee.user.id,
+                        fullName: updatedEmployee.user.fullName,
+                        email: updatedEmployee.user.email,
+                        phone: updatedEmployee.user.phone,
+                        activeCompanyId: updatedEmployee.user.activeCompanyId ?? null,
+                        activeCompany: updatedEmployee.user.activeCompany ?? null,
+                    }
+                    : null,
+                createdAt: updatedEmployee.createdAt,
+                updatedAt: updatedEmployee.updatedAt,
+            }),
         };
     }
 }
