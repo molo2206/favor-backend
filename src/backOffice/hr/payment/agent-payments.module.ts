@@ -1,4 +1,3 @@
-// agent-payments.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -24,8 +23,9 @@ import { PayrollRunController } from './controllers/payroll-run.controller';
 import { PayslipController } from './controllers/payslip.controller';
 import { PayrollItemController } from './controllers/payroll-item.controller';
 
-// ✅ AJOUT : modules nécessaires pour les dépendances injectées
+// ✅ Modules nécessaires
 import { SmsModule } from 'src/users/utility/sms/sms.module';
+import { FpayModule } from 'src/fpay/fpay.module';        // ✅ AJOUT
 
 @Module({
   imports: [
@@ -39,7 +39,8 @@ import { SmsModule } from 'src/users/utility/sms/sms.module';
       EmployeeEntity,
       DepartmentEntity,
     ]),
-    SmsModule, // ✅ AJOUT — fournit SmsService + SmsQuotaService
+    SmsModule,      // ✅ Fournit SmsService + SmsQuotaService
+    FpayModule,     // ✅ AJOUT — Fournit FpayService
   ],
   controllers: [
     AgentPaymentsController,
@@ -60,4 +61,4 @@ import { SmsModule } from 'src/users/utility/sms/sms.module';
     PayrollItemService,
   ],
 })
-export class AgentPaymentsModule {}
+export class AgentPaymentsModule { }

@@ -343,12 +343,13 @@ export class PayrollItemService {
 
         return {
             message: await this.i18n.translate('payroll.item_toggled', lang, {
-                state: isActive ? 'activé' : 'désactivé',
+                state: isActive
+                    ? await this.i18n.translate('payroll.item_activated', lang)
+                    : await this.i18n.translate('payroll.item_deactivated', lang),
             }),
             data: saved,
         };
     }
-
     // ============================================================
     // 📊 ITEMS ACTIFS D'UN EMPLOYÉ (pour calcul de paie)
     // ============================================================

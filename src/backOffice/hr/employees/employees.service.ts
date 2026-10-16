@@ -370,6 +370,9 @@ export class EmployeesService {
     // ============================================================
     // ✏️ UPDATE
     // ============================================================
+    // ============================================================
+    // ✏️ UPDATE
+    // ============================================================
     async update(
         id: string,
         dto: UpdateEmployeeDto,
@@ -385,23 +388,10 @@ export class EmployeesService {
             );
         }
 
-        if (
-            dto.email &&
-            dto.email.toLowerCase().trim() !== employee.email
-        ) {
-            const emailExists = await this.employeeRepo.findOne({
-                where: { email: dto.email.toLowerCase().trim() },
-            });
-            if (emailExists && emailExists.id !== id) {
-                throw new BadRequestException(
-                    await this.i18nService.translate(
-                        'employee.email_already_exists',
-                        lang,
-                        { email: dto.email },
-                    ),
-                );
-            }
-        }
+        // ============================================================
+        // ⚠️ SUPPRIMÉ : vérification doublon email
+        //    → email n'est plus unique (cohérent avec create())
+        // ============================================================
 
         // 🔹 Résoudre companyId : priorité au département, sinon user connecté
         let resolvedCompanyId: string | undefined = user.activeCompanyId;
@@ -476,7 +466,6 @@ export class EmployeesService {
             data: saved,
         };
     }
-
     // ============================================================
     // 🗑️ REMOVE
     // ============================================================

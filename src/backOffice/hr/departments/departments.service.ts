@@ -18,6 +18,8 @@ export class DepartmentsService {
         @InjectRepository(DepartmentEntity)
         private readonly deptRepo: Repository<DepartmentEntity>,
         private readonly i18nService: I18nService,
+        @InjectRepository(UserEntity)                              // ✅ AJOUT
+        private readonly userRepo: Repository<UserEntity>,         // ✅ AJOUT
     ) { }
 
     // ============================================================
@@ -292,7 +294,8 @@ export class DepartmentsService {
     ): Promise<{ message: string; data: DepartmentEntity }> {
         const { data: dept } = await this.findOne(id, lang);
 
-        const managerExists = await this.deptRepo.manager.findOne('users', {
+        // ✅ Utiliser userRepo
+        const managerExists = await this.userRepo.findOne({
             where: { id: managerId },
         });
         if (!managerExists) {
@@ -314,7 +317,7 @@ export class DepartmentsService {
                 lang,
                 {
                     name: saved.name,
-                    managerName: managerExists.id ?? 'N/A',
+                    managerName: managerExists.fullName ?? 'N/A',   // ✅ TYPÉ
                 },
             ),
             data: saved,

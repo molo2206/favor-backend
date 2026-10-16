@@ -13,6 +13,7 @@ import { MailService } from 'src/email/email.service';
 import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 import { I18nService } from 'src/libs/common/src';
 import { UsersModule } from 'src/users/users.module';
+import { EmployeeEntity } from 'src/backOffice/hr/employees/entities/employee.entity';
 
 @Module({
     imports: [
@@ -24,6 +25,7 @@ import { UsersModule } from 'src/users/users.module';
         TypeOrmModule.forFeature([
             UserEntity,
             OtpEntity,
+            EmployeeEntity
         ]),
         JwtModule.registerAsync({
             useFactory: (configService: ConfigService) => ({

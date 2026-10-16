@@ -19,6 +19,8 @@ import { MailService } from 'src/email/email.service';
 import { SmsHelper } from 'src/users/utility/helpers/sms.helper';
 import { I18nService } from 'src/libs/common/src';
 import { ReferralEntity } from 'src/users/entities/referral.entity';
+import { EmployeeEntity } from 'src/backOffice/hr/employees/entities/employee.entity';
+
 
 export interface WalletBalanceResponse {
     success: boolean;
@@ -127,8 +129,9 @@ export class FpayService {
     private readonly apiKey: string;
     private readonly logisticApiKey: string;
     private readonly parrainageApiKey: string;
-    private readonly fideliteApiKey: string;
+    private readonly salaryApiKey: string;
     private readonly appUrl: string;
+    private readonly fideliteApiKey: string;
 
     constructor(
         private readonly httpService: HttpService,
@@ -142,6 +145,9 @@ export class FpayService {
         private readonly mailService: MailService,
         private readonly jwtService: JwtService,
 
+        @InjectRepository(EmployeeEntity)
+        private readonly employeeRepository: Repository<EmployeeEntity>,
+
         @InjectRepository(ReferralEntity)  // ✅ Ajouter
         private readonly referralRepository: Repository<ReferralEntity>,
     ) {
@@ -149,10 +155,14 @@ export class FpayService {
         const apiKey = this.configService.get<string>('FPAY_API_KEY_HELP');
         const parrainageApiKey = this.configService.get<string>('FPAY_API_KEY_PARRAINAGE');
         const logisticApiKey = this.configService.get<string>('FPAY_API_KEY_LOGISTIC');
+        const salaryApiKey = this.configService.get<string>('FPAY_API_KEY_SALARY');
         const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
-
         const fideliteApiKey = this.configService.get<string>('FPAY_API_KEY_FIDELITE');
 
+
+        if (!salaryApiKey) {
+            throw new Error('FPAY_API_KEY_SALARY is not defined in environment variables');
+        }
 
         if (!fpayApiUrl) {
             throw new Error('FPAY_API_URL is not defined in environment variables');
@@ -178,6 +188,7 @@ export class FpayService {
         this.appUrl = appUrl;
         this.parrainageApiKey = parrainageApiKey;
         this.fideliteApiKey = fideliteApiKey;
+        this.salaryApiKey = salaryApiKey;   // ✅ AJOUT : corrige TS6133
     }
 
     private getHeaders() {
@@ -190,6 +201,14 @@ export class FpayService {
     private getLogisticHeaders() {
         return {
             'Authorization': this.logisticApiKey,
+            'Content-Type': 'application/json',
+        };
+    }
+
+    // ✅ AJOUT : headers pour le service SALARY
+    private getSalaryHeaders() {
+        return {
+            'Authorization': this.salaryApiKey,
             'Content-Type': 'application/json',
         };
     }
@@ -753,6 +772,110 @@ export class FpayService {
 
         } catch (error) {
             this.logger.error(`❌ Erreur d'envoi LOGISTIC: ${error.message}`);
+            throw this.handleError(error);
+        }
+    }
+
+    async makeSendSalary(
+        sendDto: FpaySendDto,
+        currentUser: UserEntity,
+    ): Promise<FpayResponse<PaymentResponseDto>> {
+        try {
+            if (!currentUser) {
+                throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+            }
+
+            // ✅ 1. Nettoyer l'API Key SALARY
+            let cleanApiKey = this.salaryApiKey;
+            if (cleanApiKey.startsWith('Bearer ')) {
+                cleanApiKey = cleanApiKey.substring(7);
+            }
+
+            // ✅ 2. Extraire le payeur (company)
+            let payerPhoneOrCode: string | null = null;
+            try {
+                const apiKeyParts = cleanApiKey.split('.');
+                if (apiKeyParts.length === 3) {
+                    const payloadJson = Buffer.from(apiKeyParts[1], 'base64').toString('utf-8');
+                    const payload = JSON.parse(payloadJson);
+                    payerPhoneOrCode = payload.phone || payload.sub;
+                }
+            } catch (error) {
+                this.logger.error(`❌ Erreur décodage API Key SALARY: ${error.message}`);
+            }
+
+            if (!payerPhoneOrCode) {
+                throw new HttpException(
+                    'Impossible d\'extraire le payeur de l\'API Key SALARY',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ 3. Récupérer l'employé DEPUIS hr_employees via userIdFpay
+            const employee = await this.employeeRepository
+                .createQueryBuilder('emp')
+                .leftJoinAndSelect('emp.user', 'user')
+                .where('user.userIdFpay = :userIdFpay', { userIdFpay: sendDto.userId })
+                .getOne();
+
+            if (!employee) {
+                throw new HttpException(
+                    `Employé avec l'userIdFpay ${sendDto.userId} non trouvé`,
+                    HttpStatus.NOT_FOUND,
+                );
+            }
+
+            // ✅ 4. Récupérer le phone (priorité employee.phone, fallback user.phone)
+            const recipientPhone = employee.user?.phone;
+
+            if (!recipientPhone) {
+                throw new HttpException(
+                    'Aucun numéro de téléphone trouvé pour cet employé',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            // ✅ 5. Vérifier que le payeur n'est pas l'employé
+            if (recipientPhone === payerPhoneOrCode) {
+                throw new HttpException(
+                    'Vous ne pouvez pas vous verser un salaire à vous-même',
+                    HttpStatus.BAD_REQUEST,
+                );
+            }
+
+            this.logger.log(`💰 Envoi SALAIRE: ${payerPhoneOrCode} → ${recipientPhone}`);
+            this.logger.log(`👤 Employé: ${employee.fullName} (hr_employees.id=${employee.id})`);
+
+            // ✅ 6. Appel API externe
+            const url = `${this.fpayApiUrl}/api/external/salary`;
+
+            const sendData = {
+                phone: recipientPhone,
+                amount: sendDto.amount,
+                description: sendDto.description || `Paiement de salaire à ${employee.fullName || recipientPhone}`,
+                currency: sendDto.currency || 'USD',
+                countryCode: sendDto.countryCode || 'CD',
+            };
+
+            this.logger.log(`📤 Appel API SALARY: ${url}`);
+            this.logger.log(`📤 Payload:`, JSON.stringify(sendData, null, 2));
+
+            const response = await firstValueFrom(
+                this.httpService.post<FpayResponse<PaymentResponseDto>>(
+                    url,
+                    sendData,
+                    { headers: this.getSalaryHeaders() },
+                ),
+            );
+
+            this.logger.log(`✅ Salaire envoyé: ${response.data.data?.transaction?.reference || 'OK'}`);
+            return response.data;
+
+        } catch (error) {
+            this.logger.error(`❌ Erreur d'envoi SALAIRE: ${error.message}`);
+            if (error.response) {
+                this.logger.error(`📦 Réponse erreur: ${JSON.stringify(error.response.data)}`);
+            }
             throw this.handleError(error);
         }
     }

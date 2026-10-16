@@ -26,6 +26,8 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { SmsService } from 'src/users/utility/sms/sms.service';
 import { SmsQuotaService } from 'src/users/utility/sms/sms-quota.service';
 import { SmsCategory } from 'src/users/utility/sms/entity/sms-recharge.entity';
+import { FpayService } from 'src/fpay/fpay.service';
+import { PaymentMethod } from '../enums/payment-method.enum';
 
 @Injectable()
 export class PayrollRunService {
@@ -45,6 +47,7 @@ export class PayrollRunService {
         private readonly i18n: I18nService,
         private readonly smsService: SmsService,
         private readonly smsQuotaService: SmsQuotaService,
+        private readonly fpayService: FpayService,
     ) { }
 
     // ============================================================
@@ -289,7 +292,7 @@ export class PayrollRunService {
                 payslipId: savedPayslip.id,
                 type: PayslipLineType.EARNING,
                 code: 'BASE',
-                label: 'Salaire de base',
+                label: 'BASE',                  // ← juste le code, la traduction se fera à l'affichage
                 amount: baseSalary,
             }),
         );
@@ -597,6 +600,80 @@ export class PayrollRunService {
         // ✅ 1. TRANSACTION
         await this.dataSource.transaction(async (manager) => {
             for (const payslip of run.payslips) {
+                // ============================================================
+                // ✅ NOUVEAU : Paiement automatique FPay si method === FPAY
+                // ============================================================
+                if (dto.method === PaymentMethod.FPAY) {
+                    // 🔍 1. Récupérer l'employé + son user pour obtenir userIdFpay
+                    const employee = await this.employeeRepo.findOne({
+                        where: { id: payslip.employeeId },
+                        relations: ['user'],
+                    });
+
+                    if (!employee) {
+                        throw new NotFoundException(
+                            await this.i18n.translate(
+                                'payroll.employee_not_found',
+                                lang,
+                                { id: payslip.employeeId },
+                            ),
+                        );
+                    }
+
+                    // 🔍 2. Vérifier que l'employé a un compte FPay lié
+                    const employeeUserIdFpay = employee.user?.userIdFpay;
+
+                    if (!employeeUserIdFpay) {
+                        this.logger.warn(
+                            `⚠️ [payRun] Employé ${employee.fullName} (${employee.id}) n'a pas de userIdFpay → paiement FPay ignoré`,
+                        );
+                        // ⏭️ On passe au suivant (ou on crée quand même le paiement ?)
+                        // → À vous de décider. Ici on skip.
+                        continue;
+                    }
+
+                    // 🔍 3. Calculer le montant net à envoyer
+                    const netAmount = Number(payslip.netSalary);
+
+                    if (netAmount <= 0) {
+                        this.logger.warn(
+                            `⚠️ [payRun] Montant net nul pour ${employee.fullName} → skip`,
+                        );
+                        continue;
+                    }
+
+                    // 🔥 4. Envoi FPay automatique
+                    try {
+                        this.logger.log(
+                            `💰 [payRun] Envoi FPAY SALARY: ${employee.fullName} → ${netAmount} ${payslip.currency}`,
+                        );
+
+                        await this.fpayService.makeSendSalary(
+                            {
+                                userId: employeeUserIdFpay,          // ✅ userIdFpay de l'employé
+                                amount: netAmount,
+                                currency: payslip.currency || 'USD',
+                                countryCode: 'CD',
+                                description: `Paie ${payslip.period} - ${employee.fullName}`,
+                            },
+                            currentUser,
+                        );
+
+                        this.logger.log(
+                            `✅ [payRun] FPAY SALARY envoyé pour ${employee.fullName}`,
+                        );
+                    } catch (fpayError: any) {
+                        this.logger.error(
+                            `❌ [payRun] Erreur FPAY pour ${employee.fullName}: ${fpayError.message}`,
+                        );
+                        // ⚠️ On continue avec les autres employés (pas de throw global)
+                        // → Mais on log l'erreur pour audit
+                    }
+                }
+
+                // ============================================================
+                // 📝 5. Créer l'enregistrement de paiement (dans tous les cas)
+                // ============================================================
                 const paymentResult = await this.agentPaymentsService.create(
                     {
                         employeeId: payslip.employeeId,
