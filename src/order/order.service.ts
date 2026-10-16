@@ -2266,8 +2266,7 @@ export class OrderService {
       // ============================================================
       // 🅰️ BRANCHE 1 : Commande nouvellement validée / payée
       //     → SMS + Email facture PAID
-      //     ⚠️ Le SMS est envoyé UNIQUEMENT via pushNotificationHelper.sendAll
-      //        (plus d'appel direct à smsService.sendSms → pas de double envoi)
+      //     ⚠️ Le SMS n'est envoyé QUE dans cette branche (VALIDATED)
       // ============================================================
       if (isNewlyValidated) {
         const hasEmail = order.user.email && order.user.email.trim() !== '';
@@ -2333,8 +2332,7 @@ export class OrderService {
         };
 
         // ============================================================
-        // 📱 SMS — best effort géré par le helper
-        //    ⚠️ Pas de consumeSmsQuota manuel ici → pas de double envoi
+        // 📱 SMS — envoyé UNIQUEMENT pour VALIDATED
         // ============================================================
         if (hasPhone) {
           notificationOptions.phoneNumber = order.user.phone;
@@ -2369,66 +2367,57 @@ export class OrderService {
           notificationOptions.sendInvoicePaidWithPdf = true;
         }
 
-        // ✅ UN SEUL envoi : push + SMS + email (best effort, jamais bloquant)
+        // ✅ UN SEUL envoi : push + SMS + email
         await this.pushNotificationHelper.sendAll(notificationOptions);
       }
 
       // ============================================================
-      // 🅱️ BRANCHE 2 : Simple changement de statut (PENDING, PROCESSING, etc.)
+      // 🅱️ BRANCHE 2 : Simple changement de statut
+      //     ⚠️ AUCUN SMS ici (pas de smsBody, pas de smsCategory)
       // ============================================================
       else {
-        let pushTitleKey = '', pushBodyKey = '', smsKey = '';
+        let pushTitleKey = '', pushBodyKey = '';
         switch (newStatus) {
           case OrderStatus.PENDING:
             pushTitleKey = 'order.push_order_pending_title';
             pushBodyKey = 'order.push_order_pending_body';
-            smsKey = 'order.sms_order_pending';
             break;
           case OrderStatus.PROCESSING:
             pushTitleKey = 'push_order_processing_title';
             pushBodyKey = 'push_order_processing_body';
-            smsKey = 'order.sms_order_processing';
             break;
           case OrderStatus.COMPLETED:
             pushTitleKey = 'push_order_completed_title';
             pushBodyKey = 'push_order_completed_body';
-            smsKey = 'order.sms_order_completed';
             break;
           case OrderStatus.DELIVERED:
             pushTitleKey = 'push_order_delivered_title';
             pushBodyKey = 'push_order_delivered_body';
-            smsKey = 'order.sms_order_delivered';
             break;
           case OrderStatus.REJECTED:
             pushTitleKey = 'push_order_rejected_title';
             pushBodyKey = 'push_order_rejected_body';
-            smsKey = 'order.sms_order_rejected';
             break;
           default:
             pushTitleKey = 'order.push_order_updated_title';
             pushBodyKey = 'order.push_order_updated_body';
-            smsKey = '';
         }
 
         const pushTitle = this.i18nService.translate(pushTitleKey, lang, { invoiceNumber: order.invoiceNumber });
         const pushBody = this.i18nService.translate(pushBodyKey, lang, { invoiceNumber: order.invoiceNumber });
 
-        // ✅ Le helper gère le quota + le log (plus de consumeSmsQuota manuel)
-        const hasUserPhone = !!order.user.phone?.trim();
-
+        // ✅ Push uniquement — AUCUN SMS dans cette branche
         await this.pushNotificationHelper.sendAll({
           userId: order.userId,
           pushTitle,
           pushBody,
           pushData: { entity: 'ORDER', entityId: order.id },
-          phoneNumber: hasUserPhone ? order.user.phone : undefined,
-          smsBody: (hasUserPhone && smsKey)
-            ? this.i18nService.translate(smsKey, lang, { invoiceNumber: order.invoiceNumber })
-            : undefined,
-          smsCategory: (hasUserPhone && smsKey) ? SmsCategory.ORDER : undefined,
-          smsReferenceId: order.id,
-          smsReferenceType: 'ORDER_STATUS_CHANGED',
           imageUrl,
+          // ❌ Pas de phoneNumber
+          // ❌ Pas de smsBody
+          // ❌ Pas de smsCategory
+          // ❌ Pas de smsReferenceId
+          // ❌ Pas de smsReferenceType
         });
       }
     } catch (error) {
