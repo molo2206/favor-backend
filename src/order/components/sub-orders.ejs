@@ -1,0 +1,14 @@
+<% subOrders.forEach((subOrder, index) => { %>
+  <tr>
+    <td><%= index + 1 %></td>
+    <td><%= subOrder.company.name %></td>
+    <td>
+      <ul>
+        <% subOrder.items.forEach(item => { %>
+          <li><%= item.product.name %> (x<%= item.quantity %>)</li>
+        <% }) %>
+      </ul>
+    </td>
+    <td><%= subOrder.totalAmount.toFixed(2) %> €</td>
+  </tr>
+<% }) %>

@@ -1,0 +1,14 @@
+{
+  "ride.rider_not_found": "لم يتم العثور على الراكب.",
+  "ride.driver_not_found": "لم يتم العثور على السائق.",
+  "ride.city_not_found_or_inactive": "المدينة غير موجودة أو غير نشطة.",
+  "ride.category_not_found_or_inactive": "الفئة غير موجودة أو غير نشطة.",
+  "ride.ride_created_searching_drivers": "تم إنشاء رحلتك. جاري البحث عن سائقين...",
+  "ride.ride_created_success": "تم إنشاء الرحلة بنجاح",
+  "ride.rides_list_retrieved": "تم استرداد قائمة الرحلات",
+  "ride.ride_not_found": "الرحلة غير موجودة.",
+  "site.ride_retrieved": "تم استرداد الرحلة",
+  "ride.ride_updated": "تم تحديث الرحلة",
+  "ride.ride_deleted": "تم حذف الرحلة",
+  "ride.ride_already_accepted": "تم قبول الرحلة بالفعل"
+}

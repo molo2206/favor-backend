@@ -1,0 +1,16 @@
+{
+  "branch_created": "Branch created successfully.",
+  "branch_updated": "Branch updated successfully.",
+  "branch_deleted": "Branch deleted successfully.",
+  "branch_retrieved": "Branch retrieved successfully.",
+  "branches_retrieved": "Branches retrieved successfully.",
+  "branch_not_found": "Branch with id {{id}} not found.",
+  "forbidden_edit_branch": "You can only edit branches of your active company.",
+  "country_not_found": "Country with id {{id}} not found.",
+  "city_not_found": "City with id {{id}} not found.",
+  "failed_retrieve_branches": "Failed to retrieve branches.",
+  "failed_retrieve_branch": "Failed to retrieve branch.",
+  "failed_create_branch": "Failed to create branch.",
+  "failed_update_branch": "Failed to update branch.",
+  "failed_delete_branch": "Failed to delete branch."
+}
