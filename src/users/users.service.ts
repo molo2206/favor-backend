@@ -5400,8 +5400,8 @@ export class UsersService {
     country?: string;
     search?: string;
     lang?: string;
-    startDate?: string;   // ✅ AJOUT
-    endDate?: string;     // ✅ AJOUT
+    startDate?: string;
+    endDate?: string;
   }): Promise<{ message: string; data: any[] }> {
     const lang = options.lang || 'fr';
     const searchFilter = options.search ? `%${options.search}%` : null;
@@ -5415,7 +5415,6 @@ export class UsersService {
         ? [options.type]
         : ['SHIPMENT', 'ORDER', 'VEHICLE_RESERVATION', 'HOTEL_RESERVATION'];
 
-    // ⚠️ Si SHIPMENT est demandé explicitement mais sans shippingCompanyId → erreur claire
     if (options.type === 'SHIPMENT' && !options.shippingCompanyId) {
       return {
         message: 'Company ID is required for SHIPMENT',
@@ -5423,7 +5422,6 @@ export class UsersService {
       };
     }
 
-    // ⚠️ En mode "tous" sans shippingCompanyId → on retire SHIPMENT
     if (!options.type && !options.shippingCompanyId) {
       const idx = selectedTypes.indexOf('SHIPMENT');
       if (idx > -1) selectedTypes.splice(idx, 1);
@@ -5434,36 +5432,20 @@ export class UsersService {
     const includeVehicle = selectedTypes.includes('VEHICLE_RESERVATION');
     const includeHotel = selectedTypes.includes('HOTEL_RESERVATION');
 
-    // 🔹 SHIPMENT → shippingCompanyId (obligatoire si inclus)
     const shipmentCompanyId = options.shippingCompanyId;
-
     const cityFilter = options.city ? `%${options.city}%` : null;
 
     // ============================================================
-    // ✅ NOUVEAU : préparation des filtres de date
+    // ✅ Préparation des filtres de date
     // ============================================================
     const startDate = options.startDate ? new Date(options.startDate) : null;
     const endDate = options.endDate ? new Date(options.endDate) : null;
+    if (endDate) endDate.setHours(23, 59, 59, 999);
 
-    // Inclure toute la journée de fin (23:59:59.999)
-    if (endDate) {
-      endDate.setHours(23, 59, 59, 999);
-    }
-
-    // Helper SQL : construit la clause de date pour une colonne donnée
-    const buildDateCondition = (
-      column: string,
-      params: any[],
-    ): string | null => {
+    const buildDateCondition = (column: string, params: any[]): string | null => {
       const parts: string[] = [];
-      if (startDate) {
-        parts.push(`${column} >= ?`);
-        params.push(startDate);
-      }
-      if (endDate) {
-        parts.push(`${column} <= ?`);
-        params.push(endDate);
-      }
+      if (startDate) { parts.push(`${column} >= ?`); params.push(startDate); }
+      if (endDate) { parts.push(`${column} <= ?`); params.push(endDate); }
       return parts.length > 0 ? parts.join(' AND ') : null;
     };
 
@@ -5471,127 +5453,123 @@ export class UsersService {
 
     // ============================================================
     // 1. Récupérer les userIds
+    //    ✅ OPTIMISATION : une seule requête UNION
     // ============================================================
+    const unionParts: string[] = [];
+    const unionParams: any[] = [];
 
     // ---------- SHIPMENT ----------
     if (includeShipment && shipmentCompanyId) {
-      const condsNoAlias = ['shippingCompanyId = ?'];
-      const params: any[] = [shipmentCompanyId];
+      // Bloc 1 : userId direct
+      const conds1: string[] = ['shippingCompanyId = ?'];
+      unionParams.push(shipmentCompanyId);
       if (cityFilter) {
-        condsNoAlias.push('LOWER(shippingTo) LIKE LOWER(?)');
-        params.push(cityFilter);
+        conds1.push('LOWER(shippingTo) LIKE LOWER(?)');
+        unionParams.push(cityFilter);
       }
-      // ✅ Ajout date
-      const dateCond = buildDateCondition('createdAt', params);
-      if (dateCond) condsNoAlias.push(dateCond);
+      const date1 = buildDateCondition('createdAt', unionParams);
+      if (date1) conds1.push(date1);
 
-      const byUserId: any[] = await this.shipmentRepo.query(
+      unionParts.push(
         `SELECT DISTINCT userId FROM shipments
-       WHERE ${condsNoAlias.join(' AND ')} AND userId IS NOT NULL`,
-        params,
+       WHERE ${conds1.join(' AND ')} AND userId IS NOT NULL`
       );
-      byUserId.forEach((r) => allUserIds.add(r.userId));
 
-      const condsAliased = ['s.shippingCompanyId = ?'];
-      const paramsAliased: any[] = [shipmentCompanyId];
+      // Bloc 2 : match par phone
+      const conds2: string[] = ['s.shippingCompanyId = ?'];
+      unionParams.push(shipmentCompanyId);
       if (cityFilter) {
-        condsAliased.push('LOWER(s.shippingTo) LIKE LOWER(?)');
-        paramsAliased.push(cityFilter);
+        conds2.push('LOWER(s.shippingTo) LIKE LOWER(?)');
+        unionParams.push(cityFilter);
       }
-      // ✅ Ajout date
-      const dateCondAliased = buildDateCondition('s.createdAt', paramsAliased);
-      if (dateCondAliased) condsAliased.push(dateCondAliased);
+      const date2 = buildDateCondition('s.createdAt', unionParams);
+      if (date2) conds2.push(date2);
 
-      const byPhone: any[] = await this.shipmentRepo.query(
+      unionParts.push(
         `SELECT DISTINCT u.id AS userId
        FROM shipments s
        INNER JOIN users u
          ON REPLACE(REPLACE(u.phone, ' ', ''), '+', '')
           = REPLACE(REPLACE(s.clientPhone, ' ', ''), '+', '')
-       WHERE ${condsAliased.join(' AND ')}
+       WHERE ${conds2.join(' AND ')}
          AND s.clientPhone IS NOT NULL
-         AND s.userId IS NULL`,
-        paramsAliased,
+         AND s.userId IS NULL`
       );
-      byPhone.forEach((r) => allUserIds.add(r.userId));
     }
 
     // ---------- ORDER ----------
     if (includeOrder) {
       const conds: string[] = [];
-      const params: any[] = [];
       if (cityFilter) {
         conds.push('(LOWER(ci.name) LIKE LOWER(?) OR LOWER(c.address) LIKE LOWER(?))');
-        params.push(cityFilter, cityFilter);
+        unionParams.push(cityFilter, cityFilter);
       }
-      // ✅ Ajout date
-      const dateCond = buildDateCondition('o.createdAt', params);
+      const dateCond = buildDateCondition('o.createdAt', unionParams);
       if (dateCond) conds.push(dateCond);
 
       const whereClause = conds.length > 0
         ? `WHERE ${conds.join(' AND ')} AND o.userId IS NOT NULL`
         : `WHERE o.userId IS NOT NULL`;
 
-      const rows: any[] = await this.orderRepo.query(
+      unionParts.push(
         `SELECT DISTINCT o.userId FROM orders o
        INNER JOIN sub_orders so ON so.orderId = o.id
        INNER JOIN company c ON c.id = so.companyId
        LEFT JOIN cities ci ON ci.id = c.cityId
-       ${whereClause}`,
-        params,
+       ${whereClause}`
       );
-      rows.forEach((r) => allUserIds.add(r.userId));
     }
 
     // ---------- VEHICLE_RESERVATION ----------
     if (includeVehicle) {
       const conds: string[] = ["rv.type = 'VEHICLE'"];
-      const params: any[] = [];
       if (cityFilter) {
         conds.push('(LOWER(ci.name) LIKE LOWER(?) OR LOWER(co.address) LIKE LOWER(?))');
-        params.push(cityFilter, cityFilter);
+        unionParams.push(cityFilter, cityFilter);
       }
-      // ✅ Ajout date
-      const dateCond = buildDateCondition('rv.reservation_date', params);
+      const dateCond = buildDateCondition('rv.reservation_date', unionParams);
       if (dateCond) conds.push(dateCond);
 
-      const rows: any[] = await this.shipmentRepo.query(
+      unionParts.push(
         `SELECT DISTINCT rv.user_id AS userId
        FROM reservations_vehicules rv
        INNER JOIN products p ON p.id = rv.product_id
        LEFT JOIN company co ON co.id = p.companyId
        LEFT JOIN cities ci ON ci.id = co.cityId
-       WHERE ${conds.join(' AND ')} AND rv.user_id IS NOT NULL`,
-        params,
+       WHERE ${conds.join(' AND ')} AND rv.user_id IS NOT NULL`
       );
-      rows.forEach((r) => allUserIds.add(r.userId));
     }
 
     // ---------- HOTEL_RESERVATION ----------
     if (includeHotel) {
       const conds: string[] = [];
-      const params: any[] = [];
       if (cityFilter) {
         conds.push('(LOWER(ci.name) LIKE LOWER(?) OR LOWER(p.localization) LIKE LOWER(?))');
-        params.push(cityFilter, cityFilter);
+        unionParams.push(cityFilter, cityFilter);
       }
-      // ✅ Ajout date
-      const dateCond = buildDateCondition('r.createdAt', params);
+      const dateCond = buildDateCondition('r.createdAt', unionParams);
       if (dateCond) conds.push(dateCond);
 
       const whereClause = conds.length > 0
         ? `WHERE ${conds.join(' AND ')} AND r.userId IS NOT NULL`
         : `WHERE r.userId IS NOT NULL`;
 
-      const rows: any[] = await this.shipmentRepo.query(
+      unionParts.push(
         `SELECT DISTINCT r.userId FROM reservations r
        INNER JOIN products p ON p.id = r.productId
        INNER JOIN company c ON c.id = p.companyId
        LEFT JOIN cities ci ON ci.id = c.cityId
-       ${whereClause}`,
-        params,
+       ${whereClause}`
       );
-      rows.forEach((r) => allUserIds.add(r.userId));
+    }
+
+    // ✅ Exécution de l'UNION
+    if (unionParts.length > 0) {
+      const rows: any[] = await this.usersRepository.query(
+        `SELECT DISTINCT userId FROM (${unionParts.join(' UNION ')}) AS combined`,
+        unionParams,
+      );
+      rows.forEach((r) => r.userId && allUserIds.add(r.userId));
     }
 
     let userIds = Array.from(allUserIds);
@@ -5632,10 +5610,8 @@ export class UsersService {
       shipConds.push('LOWER(shipment.shippingTo) LIKE LOWER(?)');
       shipParams.push(cityFilter);
     }
-    // ✅ Ajout date
     const shipDateCond = buildDateCondition('shipment.createdAt', shipParams);
     if (shipDateCond) shipConds.push(shipDateCond);
-
     const shipCondsAliased = shipConds.map((c) =>
       c.replace(/shipment\./g, 's.'),
     );
@@ -5649,7 +5625,6 @@ export class UsersService {
       );
       orderParams.push(cityFilter, cityFilter);
     }
-    // ✅ Ajout date
     const orderDateCond = buildDateCondition('o.createdAt', orderParams);
     if (orderDateCond) orderConds.push(orderDateCond);
 
@@ -5662,7 +5637,6 @@ export class UsersService {
       );
       vehicleParams.push(cityFilter, cityFilter);
     }
-    // ✅ Ajout date
     const vehicleDateCond = buildDateCondition('rv.reservation_date', vehicleParams);
     if (vehicleDateCond) vehicleConds.push(vehicleDateCond);
 
@@ -5675,12 +5649,12 @@ export class UsersService {
       );
       hotelParams.push(cityFilter, cityFilter);
     }
-    // ✅ Ajout date
     const hotelDateCond = buildDateCondition('r.createdAt', hotelParams);
     if (hotelDateCond) hotelConds.push(hotelDateCond);
 
     // ============================================================
     // 3. TOUT EN PARALLÈLE
+    //    ✅ OPTIMISATION : ajout de AND xxx.userId IN (?)
     // ============================================================
     const [
       users,
@@ -5700,150 +5674,156 @@ export class UsersService {
         [userIds],
       ),
 
-      // SHIPMENTS + relations
+      // SHIPMENTS + relations — ✅ filtré par userIds
       includeShipment && shipmentCompanyId
         ? this.shipmentRepo.query(
           `SELECT
-             s.id, s.trackingNumber, s.userId, s.pickupEnabled, s.shippingEnabled, s.deliveryEnabled,
-             s.status, s.pickupFrom, s.pickupTo, s.pickupContactName, s.pickupContactPhone,
-             s.shippingFrom, s.shippingTo, s.deliveryFrom, s.deliveryTo,
-             s.deliveryContactName, s.deliveryContactPhone, s.createdAt, s.updatedAt,
-             s.pickupTransportTypeId, s.pickupPrice, s.shippingPrice, s.deliveryPrice,
-             s.totalPrice, s.packageId, s.image, s.whatsapp_number, s.paymentMethod,
-             s.clientName, s.clientPhone, s.deliveryAddressId, s.pin, s.paid, s.collectedAt,
-             s.userAssignId, s.shippingCompanyId, s.pickupCompanyId, s.deliveryCompanyId,
-             s.company_id, s.loyaltyCode, s.fournisseurName, s.fournisseurPhone,
-             s.loyaltyCodeFournisseur, s.isPaid, s.fournisseurId,
-             pd.id AS package_id, pd.description AS package_description,
-             pd.weight AS package_weight, pd.value AS package_value,
-             pd.dimensions AS package_dimensions, pd.fragile AS package_fragile,
-             pc.id AS pickupCompany_id, pc.companyName AS pickupCompany_companyName,
-             pc.logo AS pickupCompany_logo, pc.phone AS pickupCompany_phone,
-             pc.email AS pickupCompany_email, pc.address AS pickupCompany_address,
-             sc.id AS shippingCompany_id, sc.companyName AS shippingCompany_companyName,
-             sc.logo AS shippingCompany_logo, sc.phone AS shippingCompany_phone,
-             sc.email AS shippingCompany_email, sc.address AS shippingCompany_address,
-             dc.id AS deliveryCompany_id, dc.companyName AS deliveryCompany_companyName,
-             dc.logo AS deliveryCompany_logo, dc.phone AS deliveryCompany_phone,
-             dc.email AS deliveryCompany_email, dc.address AS deliveryCompany_address,
-             f.id AS fournisseur_id, f.fullName AS fournisseur_fullName,
-             f.email AS fournisseur_email, f.phone AS fournisseur_phone,
-             f.image AS fournisseur_image, f.country AS fournisseur_country, f.city AS fournisseur_city,
-             da.id AS deliveryAddress_id, da.firstName AS deliveryAddress_firstName,
-             da.lastName AS deliveryAddress_lastName, da.address AS deliveryAddress_address,
-             da.phone AS deliveryAddress_phone, da.type AS deliveryAddress_type,
-             da.isDefault AS deliveryAddress_isDefault, da.latitude AS deliveryAddress_latitude,
-             da.longitude AS deliveryAddress_longitude,
-             tt.id AS pickupTransportType_id, tt.name AS pickupTransportType_name,
-             tt.description AS pickupTransportType_description, tt.image AS pickupTransportType_image,
-             tt.isActive AS pickupTransportType_isActive,
-             tt.createdAt AS pickupTransportType_createdAt,
-             tt.updatedAt AS pickupTransportType_updatedAt
-           FROM shipments s
-           LEFT JOIN package_details pd ON pd.id = s.packageId
-           LEFT JOIN company pc ON pc.id = s.pickupCompanyId
-           LEFT JOIN company sc ON sc.id = s.shippingCompanyId
-           LEFT JOIN company dc ON dc.id = s.deliveryCompanyId
-           LEFT JOIN users f ON f.id = s.fournisseurId
-           LEFT JOIN address_user da ON da.id = s.deliveryAddressId
-           LEFT JOIN type_transport tt ON tt.id = s.pickupTransportTypeId
-           WHERE ${shipCondsAliased.join(' AND ')}
-           ORDER BY s.createdAt DESC`,
-          shipParams,
+           s.id, s.trackingNumber, s.userId, s.pickupEnabled, s.shippingEnabled, s.deliveryEnabled,
+           s.status, s.pickupFrom, s.pickupTo, s.pickupContactName, s.pickupContactPhone,
+           s.shippingFrom, s.shippingTo, s.deliveryFrom, s.deliveryTo,
+           s.deliveryContactName, s.deliveryContactPhone, s.createdAt, s.updatedAt,
+           s.pickupTransportTypeId, s.pickupPrice, s.shippingPrice, s.deliveryPrice,
+           s.totalPrice, s.packageId, s.image, s.whatsapp_number, s.paymentMethod,
+           s.clientName, s.clientPhone, s.deliveryAddressId, s.pin, s.paid, s.collectedAt,
+           s.userAssignId, s.shippingCompanyId, s.pickupCompanyId, s.deliveryCompanyId,
+           s.company_id, s.loyaltyCode, s.fournisseurName, s.fournisseurPhone,
+           s.loyaltyCodeFournisseur, s.isPaid, s.fournisseurId,
+           pd.id AS package_id, pd.description AS package_description,
+           pd.weight AS package_weight, pd.value AS package_value,
+           pd.dimensions AS package_dimensions, pd.fragile AS package_fragile,
+           pc.id AS pickupCompany_id, pc.companyName AS pickupCompany_companyName,
+           pc.logo AS pickupCompany_logo, pc.phone AS pickupCompany_phone,
+           pc.email AS pickupCompany_email, pc.address AS pickupCompany_address,
+           sc.id AS shippingCompany_id, sc.companyName AS shippingCompany_companyName,
+           sc.logo AS shippingCompany_logo, sc.phone AS shippingCompany_phone,
+           sc.email AS shippingCompany_email, sc.address AS shippingCompany_address,
+           dc.id AS deliveryCompany_id, dc.companyName AS deliveryCompany_companyName,
+           dc.logo AS deliveryCompany_logo, dc.phone AS deliveryCompany_phone,
+           dc.email AS deliveryCompany_email, dc.address AS deliveryCompany_address,
+           f.id AS fournisseur_id, f.fullName AS fournisseur_fullName,
+           f.email AS fournisseur_email, f.phone AS fournisseur_phone,
+           f.image AS fournisseur_image, f.country AS fournisseur_country, f.city AS fournisseur_city,
+           da.id AS deliveryAddress_id, da.firstName AS deliveryAddress_firstName,
+           da.lastName AS deliveryAddress_lastName, da.address AS deliveryAddress_address,
+           da.phone AS deliveryAddress_phone, da.type AS deliveryAddress_type,
+           da.isDefault AS deliveryAddress_isDefault, da.latitude AS deliveryAddress_latitude,
+           da.longitude AS deliveryAddress_longitude,
+           tt.id AS pickupTransportType_id, tt.name AS pickupTransportType_name,
+           tt.description AS pickupTransportType_description, tt.image AS pickupTransportType_image,
+           tt.isActive AS pickupTransportType_isActive,
+           tt.createdAt AS pickupTransportType_createdAt,
+           tt.updatedAt AS pickupTransportType_updatedAt
+         FROM shipments s
+         LEFT JOIN package_details pd ON pd.id = s.packageId
+         LEFT JOIN company pc ON pc.id = s.pickupCompanyId
+         LEFT JOIN company sc ON sc.id = s.shippingCompanyId
+         LEFT JOIN company dc ON dc.id = s.deliveryCompanyId
+         LEFT JOIN users f ON f.id = s.fournisseurId
+         LEFT JOIN address_user da ON da.id = s.deliveryAddressId
+         LEFT JOIN type_transport tt ON tt.id = s.pickupTransportTypeId
+         WHERE ${shipCondsAliased.join(' AND ')}
+           AND s.userId IN (?)
+         ORDER BY s.createdAt DESC`,
+          [...shipParams, userIds],
         )
         : Promise.resolve([]),
 
-      // TRACKINGS LTA
+      // TRACKINGS LTA — ✅ filtré par userIds
       includeShipment && shipmentCompanyId
         ? this.shipmentRepo.query(
           `SELECT t.id, t.name, t.type, t.completed, t.time, t.createdAt, t.updatedAt,
-                  ls.shipmentId AS shipmentId,
-                  l.id AS ltaId, l.ltaNumber, l.externalLtaNumber,
-                  l.origin AS ltaOrigin, l.destination AS ltaDestination,
-                  l.originAirportOrPort AS ltaOriginAirport,
-                  l.destinationAirportOrPort AS ltaDestinationAirport,
-                  l.status AS ltaStatus
-           FROM tracking_lta t
-           INNER JOIN lta l ON l.id = t.ltaId
-           INNER JOIN lta_shipments ls ON ls.ltaId = l.id
-           INNER JOIN shipments s ON s.id = ls.shipmentId
-           WHERE ${shipCondsAliased.join(' AND ')}
-           ORDER BY ls.shipmentId ASC, t.createdAt ASC`,
-          shipParams,
+                ls.shipmentId AS shipmentId,
+                l.id AS ltaId, l.ltaNumber, l.externalLtaNumber,
+                l.origin AS ltaOrigin, l.destination AS ltaDestination,
+                l.originAirportOrPort AS ltaOriginAirport,
+                l.destinationAirportOrPort AS ltaDestinationAirport,
+                l.status AS ltaStatus
+         FROM tracking_lta t
+         INNER JOIN lta l ON l.id = t.ltaId
+         INNER JOIN lta_shipments ls ON ls.ltaId = l.id
+         INNER JOIN shipments s ON s.id = ls.shipmentId
+         WHERE ${shipCondsAliased.join(' AND ')}
+           AND s.userId IN (?)
+         ORDER BY ls.shipmentId ASC, t.createdAt ASC`,
+          [...shipParams, userIds],
         )
         : Promise.resolve([]),
 
-      // TRACKINGS SHIPMENT
+      // TRACKINGS SHIPMENT — ✅ filtré par userIds
       includeShipment && shipmentCompanyId
         ? this.shipmentRepo.query(
           `SELECT st.id, st.shipmentId, st.status, st.location, st.comment,
-                  st.createdAt, st.updatedAt
-           FROM shipment_tracking st
-           INNER JOIN shipments s ON s.id = st.shipmentId
-           WHERE ${shipCondsAliased.join(' AND ')}
-           ORDER BY st.shipmentId ASC, st.createdAt ASC`,
-          shipParams,
+                st.createdAt, st.updatedAt
+         FROM shipment_tracking st
+         INNER JOIN shipments s ON s.id = st.shipmentId
+         WHERE ${shipCondsAliased.join(' AND ')}
+           AND s.userId IN (?)
+         ORDER BY st.shipmentId ASC, st.createdAt ASC`,
+          [...shipParams, userIds],
         )
         : Promise.resolve([]),
 
-      // ORDERS
+      // ORDERS — ✅ filtré par userIds
       includeOrder
         ? this.orderRepo.query(
           `SELECT DISTINCT o.id, o.invoiceNumber, o.userId, o.status, o.paymentStatus, o.paid,
-                  o.totalAmount, o.grandTotal, o.currency, o.shippingCost, o.type,
-                  o.createdAt, o.updatedAt
-           FROM orders o
-           INNER JOIN sub_orders so ON so.orderId = o.id
-           INNER JOIN company company ON company.id = so.companyId
-           LEFT JOIN cities ci ON ci.id = company.cityId
-           ${orderConds.length > 0 ? `WHERE ${orderConds.join(' AND ')}` : ''}
-           ORDER BY o.createdAt DESC`,
-          orderParams,
+                o.totalAmount, o.grandTotal, o.currency, o.shippingCost, o.type,
+                o.createdAt, o.updatedAt
+         FROM orders o
+         INNER JOIN sub_orders so ON so.orderId = o.id
+         INNER JOIN company company ON company.id = so.companyId
+         LEFT JOIN cities ci ON ci.id = company.cityId
+         WHERE o.userId IN (?)
+           ${orderConds.length > 0 ? `AND ${orderConds.join(' AND ')}` : ''}
+         ORDER BY o.createdAt DESC`,
+          [userIds, ...orderParams],
         )
         : Promise.resolve([]),
 
-      // VEHICLE RESERVATIONS
+      // VEHICLE RESERVATIONS — ✅ filtré par userIds
       includeVehicle
         ? this.shipmentRepo.query(
           `SELECT rv.id, rv.type, rv.user_id AS userId, rv.product_id AS productId,
-                  rv.start_date AS startDate, rv.end_date AS endDate,
-                  rv.total_amount AS totalAmount, rv.currency, rv.status,
-                  rv.reservation_date AS createdAt,
-                  rv.reservation_date AS updatedAt,
-                  rv.expires_at AS expiresAt,
-                  p.name AS productName,
-                  p.localization AS productLocalization,
-                  co.companyName AS companyName,
-                  co.address AS companyAddress,
-                  ci.name AS companyCity,
-                  co.countryId AS companyCountryId
-           FROM reservations_vehicules rv
-           INNER JOIN products p ON p.id = rv.product_id
-           LEFT JOIN company co ON co.id = p.companyId
-           LEFT JOIN cities ci ON ci.id = co.cityId
-           WHERE ${vehicleConds.join(' AND ')}
-           ORDER BY rv.reservation_date DESC`,
-          vehicleParams,
+                rv.start_date AS startDate, rv.end_date AS endDate,
+                rv.total_amount AS totalAmount, rv.currency, rv.status,
+                rv.reservation_date AS createdAt,
+                rv.reservation_date AS updatedAt,
+                rv.expires_at AS expiresAt,
+                p.name AS productName,
+                p.localization AS productLocalization,
+                co.companyName AS companyName,
+                co.address AS companyAddress,
+                ci.name AS companyCity,
+                co.countryId AS companyCountryId
+         FROM reservations_vehicules rv
+         INNER JOIN products p ON p.id = rv.product_id
+         LEFT JOIN company co ON co.id = p.companyId
+         LEFT JOIN cities ci ON ci.id = co.cityId
+         WHERE rv.user_id IN (?)
+           AND ${vehicleConds.join(' AND ')}
+         ORDER BY rv.reservation_date DESC`,
+          [userIds, ...vehicleParams],
         )
         : Promise.resolve([]),
 
-      // HOTEL RESERVATIONS
+      // HOTEL RESERVATIONS — ✅ filtré par userIds
       includeHotel
         ? this.shipmentRepo.query(
           `SELECT r.id, r.userId, r.productId, r.startDate, r.endDate,
-                  r.adults, r.children, r.roomsBooked, r.quantity,
-                  r.totalPrice, r.invoiceNumber, r.status, r.specialRequest, r.reason,
-                  r.createdAt, r.updatedAt,
-                  p.name AS productName, p.localization AS productLocalization,
-                  c.id AS companyId, c.companyName,
-                  ci.name AS companyCity
-           FROM reservations r
-           INNER JOIN products p ON p.id = r.productId
-           INNER JOIN company c ON c.id = p.companyId
-           LEFT JOIN cities ci ON ci.id = c.cityId
-           ${hotelConds.length > 0 ? `WHERE ${hotelConds.join(' AND ')}` : ''}
-           ORDER BY r.createdAt DESC`,
-          hotelParams,
+                r.adults, r.children, r.roomsBooked, r.quantity,
+                r.totalPrice, r.invoiceNumber, r.status, r.specialRequest, r.reason,
+                r.createdAt, r.updatedAt,
+                p.name AS productName, p.localization AS productLocalization,
+                c.id AS companyId, c.companyName,
+                ci.name AS companyCity
+         FROM reservations r
+         INNER JOIN products p ON p.id = r.productId
+         INNER JOIN company c ON c.id = p.companyId
+         LEFT JOIN cities ci ON ci.id = c.cityId
+         WHERE r.userId IN (?)
+           ${hotelConds.length > 0 ? `AND ${hotelConds.join(' AND ')}` : ''}
+         ORDER BY r.createdAt DESC`,
+          [userIds, ...hotelParams],
         )
         : Promise.resolve([]),
     ]);
@@ -5854,20 +5834,14 @@ export class UsersService {
     const ltaByShip = new Map<string, any[]>();
     for (const t of trackingsLta) {
       let arr = ltaByShip.get(t.shipmentId);
-      if (!arr) {
-        arr = [];
-        ltaByShip.set(t.shipmentId, arr);
-      }
+      if (!arr) { arr = []; ltaByShip.set(t.shipmentId, arr); }
       arr.push(t);
     }
 
     const trackByShip = new Map<string, any[]>();
     for (const t of trackingsShipment) {
       let arr = trackByShip.get(t.shipmentId);
-      if (!arr) {
-        arr = [];
-        trackByShip.set(t.shipmentId, arr);
-      }
+      if (!arr) { arr = []; trackByShip.set(t.shipmentId, arr); }
       arr.push(t);
     }
 
@@ -5879,30 +5853,21 @@ export class UsersService {
         trackByShip.get(r.id) ?? [],
       );
       let arr = shipmentsByUser.get(mapped.userId);
-      if (!arr) {
-        arr = [];
-        shipmentsByUser.set(mapped.userId, arr);
-      }
+      if (!arr) { arr = []; shipmentsByUser.set(mapped.userId, arr); }
       arr.push(mapped);
     }
 
     const ordersByUser = new Map<string, any[]>();
     for (const o of orders) {
       let arr = ordersByUser.get(o.userId);
-      if (!arr) {
-        arr = [];
-        ordersByUser.set(o.userId, arr);
-      }
+      if (!arr) { arr = []; ordersByUser.set(o.userId, arr); }
       arr.push(o);
     }
 
     const vehicleByUser = new Map<string, any[]>();
     for (const r of vehicleReservations) {
       let arr = vehicleByUser.get(r.userId);
-      if (!arr) {
-        arr = [];
-        vehicleByUser.set(r.userId, arr);
-      }
+      if (!arr) { arr = []; vehicleByUser.set(r.userId, arr); }
       arr.push({
         id: r.id,
         type: r.type,
@@ -5936,10 +5901,7 @@ export class UsersService {
     const hotelByUser = new Map<string, any[]>();
     for (const r of hotelReservations) {
       let arr = hotelByUser.get(r.userId);
-      if (!arr) {
-        arr = [];
-        hotelByUser.set(r.userId, arr);
-      }
+      if (!arr) { arr = []; hotelByUser.set(r.userId, arr); }
       arr.push({
         id: r.id,
         userId: r.userId,
