@@ -187,10 +187,12 @@ export class CompanyController {
       { name: 'banner', maxCount: 1 },
     ]),
   )
+
   async updateCompanyAdmin(
     @Req() req: Request,
     @Param('id') id: string,
     @Body() dto: Partial<CreateCompanyAdminDto>,
+    @CurrentUser() currentUser: UserEntity,          // ✅ Utilisateur connecté
     @UploadedFiles()
     files: {
       logo?: Express.Multer.File[];
@@ -207,6 +209,7 @@ export class CompanyController {
       lang,
       logo,
       banner,
+      currentUser,                                 // ✅ Passé en 6ème position
     );
   }
 

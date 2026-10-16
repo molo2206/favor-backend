@@ -750,22 +750,41 @@ export class CompanyService {
     lang: string = 'fr',
     logoFile?: Express.Multer.File,
     bannerFile?: Express.Multer.File,
+    currentUser?: UserEntity,                    // ✅ AJOUT
   ): Promise<{ message: string; data: any }> {
     if (!dto || Object.keys(dto).length === 0) {
       throw new BadRequestException(
         await this.i18n.translate('company_data_required', lang),
       );
     }
-    if (!dto.userId) {
+
+    // ============================================================
+    // ✅ MODIFIÉ : fallback sur l'utilisateur connecté
+    // ============================================================
+    const resolvedUserId = dto.userId || currentUser?.id;
+
+    if (!resolvedUserId) {
       throw new BadRequestException(
         await this.i18n.translate('company_user_not_linked', lang),
       );
     }
 
     const user = await this.userRepository.findOne({
-      where: { id: dto.userId },
+      where: { id: resolvedUserId },
     });
-    if (!user) throw new NotFoundException(await this.i18n.translate('company_not_found', lang));
+    if (!user) {
+      throw new NotFoundException(
+        await this.i18n.translate('user.user_not_found', lang),
+      );
+    }
+
+    // ✅ Injecter dans dto pour que le reste du code fonctionne
+    if (!dto.userId) {
+      dto.userId = resolvedUserId;
+      console.log(
+        `ℹ️ [updateCompanyWithUserAdmin] userId non fourni → utilisation de l'utilisateur connecté : ${resolvedUserId}`,
+      );
+    }
 
     let company = await this.companyRepository.findOne({
       where: { id },
@@ -862,6 +881,9 @@ export class CompanyService {
 
     await this.companyRepository.save(company);
 
+    // ============================================================
+    // ✅ dto.userId est maintenant TOUJOURS rempli
+    // ============================================================
     const userHasCompany = await this.userHasCompanyRepository.findOne({
       where: { user: { id: dto.userId }, company: { id: company.id } },
     });
