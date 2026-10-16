@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="<%= lang || 'fr' %>">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= translations.title %> - FavorHelp</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #eef2ff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        font-family:
+          'Segoe UI', 'Helvetica Neue', 'Roboto', system-ui, sans-serif;
+        padding: 2rem;
+      }
+
+      .verification-container {
+        max-width: 600px;
+        width: 100%;
+        background: white;
+        box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 0 auto;
+      }
+
+      .verification-content {
+        padding: 2rem;
+      }
+
+      /* ========== EN-TÊTE : Logo ========== */
+      .brand-section {
+        border-bottom: 3px solid #0014d2;
+        padding-bottom: 0.7rem;
+        margin-bottom: 1.6rem;
+      }
+
+      /* ========== BADGE APP INTRO ========== */
+      .app-intro {
+        background: #f0f7ff;
+        border-left: 4px solid #0014d2;
+        padding: 0.75rem 1rem;
+        margin: -0.2rem 0 1.2rem 0;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        color: #0c4e6e;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.8rem;
+      }
+      .app-intro-text {
+        flex: 2;
+        line-height: 1.4;
+      }
+      .app-intro-text strong {
+        color: #0014d2;
+        font-weight: 700;
+      }
+      .app-badge {
+        background: white;
+        padding: 0.2rem 0.8rem;
+        border-radius: 40px;
+        font-weight: 600;
+        font-size: 0.7rem;
+        color: #0014d2;
+        border: 1px solid #b9d0f8;
+        white-space: nowrap;
+      }
+
+      /* ========== TITRE ========== */
+      .header-section {
+        text-align: center;
+        margin-bottom: 1.5rem;
+      }
+      .header {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #0014d2;
+        margin-bottom: 0.5rem;
+      }
+      .description {
+        font-size: 0.85rem;
+        color: #1f2a3e;
+      }
+
+      /* ========== CODE OTP ========== */
+      .otp-section {
+        text-align: center;
+        margin: 1.5rem 0;
+      }
+      .otp-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #4b5563;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        display: block;
+        margin-bottom: 0.5rem;
+      }
+      .otp-code {
+        font-size: 2.5rem;
+        font-weight: 800;
+        letter-spacing: 0.5rem;
+        color: #0014d2;
+        background: #f0f4fe;
+        padding: 1rem;
+        border-radius: 12px;
+        margin: 0.5rem 0;
+        border: 2px solid #0014d2;
+        font-family: monospace;
+        display: inline-block;
+        min-width: 250px;
+      }
+      .timer-display {
+        font-size: 0.75rem;
+        color: #4b5563;
+        margin-top: 0.5rem;
+      }
+      .timer {
+        color: #ef4444;
+        font-weight: 600;
+      }
+
+      /* ========== AVERTISSEMENT ========== */
+      .warning-box {
+        background: #fefce8;
+        border-left: 4px solid #0014d2;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1.5rem 0;
+      }
+      .warning-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .warning-header i {
+        color: #0014d2;
+      }
+      .warning-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #0014d2;
+        text-transform: uppercase;
+      }
+      .warning-text {
+        font-size: 0.75rem;
+        color: #4b5563;
+      }
+      .warning-text strong {
+        color: #1f2937;
+      }
+
+      /* ========== SUPPORT ========== */
+      .support-section {
+        text-align: center;
+        margin: 1.5rem 0;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+      }
+      .support-text {
+        font-size: 0.75rem;
+        color: #4b5563;
+        margin-bottom: 0.5rem;
+      }
+      .contact-info {
+        font-size: 0.7rem;
+        color: #6b7280;
+      }
+      .contact-link {
+        color: #0014d2;
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      /* ========== FOOTER ========== */
+      .footer {
+        margin-top: 1.5rem;
+        text-align: center;
+        font-size: 0.6rem;
+        color: #6c86a3;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 1rem;
+      }
+      .footer p {
+        margin: 4px 0;
+      }
+      .footer strong {
+        color: #0014d2;
+      }
+
+      @media (max-width: 600px) {
+        .verification-content {
+          padding: 1.2rem;
+        }
+        .otp-code {
+          font-size: 1.8rem;
+          letter-spacing: 0.3rem;
+          min-width: auto;
+          width: 100%;
+        }
+        .app-intro {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .app-badge {
+          white-space: normal;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="verification-container">
+      <div class="verification-content">
+        <!-- EN-TÊTE -->
+        <div class="brand-section"></div>
+
+        <!-- Titre et description -->
+        <div class="header-section">
+          <div class="header"><%= translations.title %></div>
+          <div class="description"><%= translations.description %></div>
+        </div>
+
+        <!-- Code OTP -->
+        <div class="otp-section">
+          <span class="otp-label"><%= translations.label %></span>
+          <div class="otp-code"><%= otpCode %></div>
+          <div class="timer-display"><%= translations.expiry %></div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+          <p>&copy; <%= year %> <%= translations.footerCopyright %></p>
+          <p><strong><%= translations.footerSecurity %></strong></p>
+        </div>
+
+        <!-- Mention légale -->
+        <div
+          style="
+            text-align: center;
+            font-size: 0.55rem;
+            color: #6c86a3;
+            margin-top: 1rem;
+            border-top: 1px solid #eef2ff;
+            padding-top: 0.7rem;
+          "
+        >
+          <%= translations.legalNote %>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

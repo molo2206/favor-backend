@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="<%= lang || 'fr' %>">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= translations.title %> - FavorHelp</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #eef2ff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        font-family:
+          'Segoe UI', 'Helvetica Neue', 'Roboto', system-ui, sans-serif;
+        padding: 2rem;
+      }
+
+      .status-container {
+        max-width: 600px;
+        width: 100%;
+        background: white;
+        box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.2);
+        border-radius: 12px;
+        overflow: hidden;
+        margin: 0 auto;
+      }
+
+      .status-content {
+        padding: 2rem;
+      }
+
+      .brand-section {
+        border-bottom: 3px solid #0014D2;
+        padding-bottom: 0.7rem;
+        margin-bottom: 1.6rem;
+      }
+
+      .header-section {
+        text-align: center;
+        margin-bottom: 1.5rem;
+      }
+
+      .header {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #0014D2;
+        margin-bottom: 0.5rem;
+      }
+
+      .description {
+        font-size: 0.85rem;
+        color: #1f2a3e;
+      }
+
+      .description strong {
+        color: #0014D2;
+        font-weight: 700;
+      }
+
+      .status-badge {
+        display: inline-block;
+        background: #dcfce7;
+        color: #15803d;
+        padding: 0.75rem 1.5rem;
+        border-radius: 40px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        margin: 0.5rem 0 1rem 0;
+        border: 1px solid #86efac;
+        text-align: center;
+        width: auto;
+      }
+
+      .support-section {
+        text-align: center;
+        margin: 1.5rem 0;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+      }
+
+      .support-text {
+        font-size: 0.75rem;
+        color: #4b5563;
+        margin-bottom: 0.5rem;
+      }
+
+      .contact-info {
+        font-size: 0.7rem;
+        color: #6b7280;
+        line-height: 1.8;
+      }
+
+      .contact-link {
+        color: #0014D2;
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .contact-link:hover {
+        text-decoration: underline;
+      }
+
+      .footer {
+        margin-top: 1.5rem;
+        text-align: center;
+        font-size: 0.6rem;
+        color: #6c86a3;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 1rem;
+      }
+
+      .footer p {
+        margin: 4px 0;
+      }
+
+      .footer strong {
+        color: #0014D2;
+      }
+
+      /* ===== RESPONSIVE ===== */
+      @media (max-width: 600px) {
+        .status-content {
+          padding: 1.2rem;
+        }
+
+        body {
+          padding: 1rem;
+        }
+
+        .header {
+          font-size: 1.2rem;
+        }
+
+        .description {
+          font-size: 0.8rem;
+        }
+
+        .status-badge {
+          font-size: 0.8rem;
+          padding: 0.6rem 1rem;
+        }
+
+        .support-text {
+          font-size: 0.7rem;
+        }
+
+        .contact-info {
+          font-size: 0.65rem;
+        }
+
+        .footer {
+          font-size: 0.55rem;
+        }
+      }
+
+      @media (max-width: 400px) {
+        .status-content {
+          padding: 1rem;
+        }
+
+        .header {
+          font-size: 1rem;
+        }
+
+        .status-badge {
+          font-size: 0.7rem;
+          padding: 0.5rem 0.8rem;
+        }
+      }
+
+      /* ===== IMPRESSION ===== */
+      @media print {
+        body {
+          background: white;
+          padding: 0;
+        }
+
+        .status-container {
+          box-shadow: none;
+          border-radius: 0;
+        }
+
+        .brand-section {
+          border-bottom-color: #000;
+        }
+
+        .header {
+          color: #000;
+        }
+
+        .status-badge {
+          background: #f0f0f0;
+          color: #000;
+          border-color: #ccc;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="status-container">
+      <div class="status-content">
+        <div class="brand-section"></div>
+
+        <div class="header-section">
+          <div class="header"><%= translations.headerTitle %></div>
+          <div class="description">
+            <%= translations.description %> <strong><%= companyName %></strong>.
+          </div>
+        </div>
+
+        <div style="text-align: center">
+          <div class="status-badge"><%= status %></div>
+        </div>
+
+        <div class="support-section">
+          <div class="support-text"><%= translations.supportText %></div>
+          <div class="contact-info">
+            <%= translations.contactUs %><br />
+            <a href="mailto:favorhelp31@gmail.com" class="contact-link"
+              >favorhelp31@gmail.com</a
+            ><br />
+            +243 991 225 122
+          </div>
+        </div>
+
+        <div class="footer">
+          <p><strong>FavorHelp — Marketplace Premium</strong></p>
+          <p>
+            RCCM : 21-A-770 | N° Impôt : A2156062L | National ID:
+            19-G4701-N74976H
+          </p>
+          <p>© <%= year %> <%= translations.footerCopyright %></p>
+        </div>
+
+        <div
+          style="
+            text-align: center;
+            font-size: 0.55rem;
+            color: #6c86a3;
+            margin-top: 1rem;
+            border-top: 1px solid #eef2ff;
+            padding-top: 0.7rem;
+          "
+        >
+          <%= translations.legalNote %>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

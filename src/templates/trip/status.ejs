@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mise à jour de votre réservation | Favor Help</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      :root {
+        --primary: #0014d2;
+        --primary-dark: #0014d2;
+        --secondary: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --bg: #f4f7fb;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background: var(--bg);
+        padding: 8px;
+        color: #1e293b;
+      }
+      .ticket-container {
+        max-width: 650px;
+        margin: auto;
+        background: #fff;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      }
+      .ticket {
+        padding: 0;
+      }
+
+      .logo-image {
+        width: 45px;
+        height: 45px;
+        object-fit: contain;
+        border-radius: 10px;
+        background: white;
+        border: 1px solid #dbeafe;
+        padding: 3px;
+      }
+      .premium-header {
+        background: linear-gradient(135deg, var(--primary) 0%, #0026b3 100%);
+        color: white;
+        padding: 0.7rem 1.2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .logo-area {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .premium-header h1 {
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+      }
+      .premium-header p {
+        font-size: 0.55rem;
+        opacity: 0.8;
+        margin-top: 0.1rem;
+      }
+      .premium-badge {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.3rem 0.6rem;
+        border-radius: 16px;
+        text-align: center;
+      }
+      .premium-badge small {
+        font-size: 0.5rem;
+      }
+      .premium-badge strong {
+        font-size: 0.7rem;
+        letter-spacing: 1px;
+      }
+      .boarding-card {
+        padding: 0.7rem 1rem;
+        background: white;
+      }
+      .boarding-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.3rem;
+        border-bottom: 1px solid #eef2ff;
+      }
+      .boarding-card-header h2 {
+        font-size: 0.6rem;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0.2rem 0.6rem;
+        border-radius: 16px;
+        font-size: 0.55rem;
+        font-weight: 600;
+      }
+      .status-confirmed {
+        background: #dcfce7;
+        color: #15803d;
+        border: 1px solid #86efac;
+      }
+      .status-pending {
+        background: #fff7ed;
+        color: #b45309;
+        border: 1px solid #fde68a;
+      }
+      .status-cancelled {
+        background: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+      }
+      .status-completed {
+        background: #dbeafe;
+        color: #1e40af;
+        border: 1px solid #bfdbfe;
+      }
+      .status-in-progress {
+        background: #dbeafe;
+        color: #1e40af;
+        border: 1px solid #bfdbfe;
+      }
+      .passenger-block {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 0.4rem 0.8rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+      }
+      .passenger-detail {
+        display: flex;
+        align-items: baseline;
+        gap: 0.3rem;
+      }
+      .passenger-label {
+        font-size: 0.5rem;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .passenger-value {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: var(--secondary);
+      }
+      .info-block {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 0.6rem;
+        margin-bottom: 0.5rem;
+      }
+      .info-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.3rem;
+        font-size: 0.65rem;
+      }
+      .info-label {
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .info-value {
+        font-weight: 700;
+        color: var(--secondary);
+      }
+      .footer-notes {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 0.4rem 0.8rem;
+        text-align: center;
+        font-size: 0.5rem;
+        color: var(--muted);
+        border: 1px solid #e2e8f0;
+        margin-top: 0.3rem;
+      }
+      .footer-notes p {
+        margin: 0.1rem 0;
+      }
+      @media (max-width: 600px) {
+        .passenger-block {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.5rem;
+        }
+        .premium-header {
+          flex-direction: column;
+          text-align: center;
+          gap: 0.3rem;
+        }
+        .info-row {
+          flex-direction: column;
+          gap: 0.2rem;
+        }
+      }
+      @media print {
+        body {
+          background: white;
+          padding: 0;
+          margin: 0;
+        }
+        .ticket-container {
+          max-width: 100%;
+          box-shadow: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="ticket-container">
+      <div class="ticket">
+        <div class="premium-header">
+          <div class="logo-area">
+            <img
+              src="https://api-prod.favorhelp.com/uploads/1%20Favor.webp"
+              alt="Favor Help Logo"
+              class="logo-image"
+            />
+            <div>
+              <h1>FAVOR HELP</h1>
+              <p>MISE À JOUR DE RÉSERVATION</p>
+            </div>
+          </div>
+          <div class="premium-badge">
+            <small>RÉFÉRENCE</small>
+            <strong>#<%= reservationRef %></strong>
+          </div>
+        </div>
+
+        <div class="boarding-card">
+          <div class="boarding-card-header">
+            <h2>STATUT DE VOTRE RÉSERVATION</h2>
+            <span class="status-badge status-<%= statusClass %>">
+              <span>●</span> <%= statusText %>
+            </span>
+          </div>
+
+          <div class="passenger-block">
+            <div class="passenger-detail">
+              <span class="passenger-label">PASSAGER</span
+              ><span class="passenger-value"><%= userFullName %></span>
+            </div>
+            <div class="passenger-detail">
+              <span class="passenger-label">TRAJET</span
+              ><span class="passenger-value"
+                ><%= departureCity %> → <%= arrivalCity %></span
+              >
+            </div>
+          </div>
+
+          <div class="info-block">
+            <div class="info-row">
+              <span class="info-label">Ancien statut</span>
+              <span class="info-value"><%= oldStatus %></span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Nouveau statut</span>
+              <span class="info-value"><%= newStatus %></span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Montant total</span>
+              <span class="info-value"><%= totalAmount %> <%= currency %></span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Date de réservation</span>
+              <span class="info-value"><%= reservationDate %></span>
+            </div>
+          </div>
+
+          <div class="footer-notes">
+            <p>✓ Merci de votre confiance</p>
+            <p>📞 +243 991 225 122 | www.favorhelp.com</p>
+            <p>&copy; <%= year %> FavorHelp - Tous droits réservés</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

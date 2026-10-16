@@ -1,0 +1,14 @@
+{
+  "ride.rider_not_found": "Passager non trouvé.",
+  "ride.driver_not_found": "Chauffeur non trouvé.",
+  "ride.city_not_found_or_inactive": "Ville non trouvée ou inactive.",
+  "ride.category_not_found_or_inactive": "Catégorie non trouvée ou inactive.",
+  "ride.ride_created_searching_drivers": "Votre course a été créée. Recherche de chauffeurs en cours...",
+  "ride.ride_created_success": "Course créée avec succès",
+  "ride.rides_list_retrieved": "Liste des courses récupérée",
+  "ride.ride_not_found": "Course non trouvée.",
+  "ride.ride_retrieved": "Course récupérée",
+  "ride.ride_updated": "Course mise à jour",
+  "ride.ride_deleted": "Course supprimée",
+  "ride.ride_already_accepted": "Course déjà acceptée"
+}
