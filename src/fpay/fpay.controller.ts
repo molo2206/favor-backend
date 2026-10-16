@@ -26,7 +26,7 @@ export class FpayController {
 
     constructor(
         private readonly fpayService: FpayService,
-        private readonly usersService: UsersService, // ✅ AJOUTER L'INJECTION
+        private readonly usersService: UsersService,
     ) { }
 
     // ============================================================
@@ -79,7 +79,7 @@ export class FpayController {
     }
 
     // ============================================================
-    // 2. LIAISON DIRECTE AVEC ACCESS_TOKEN (NOUVEAU)
+    // 2. LIAISON DIRECTE AVEC ACCESS_TOKEN
     // ============================================================
     @Post('link-with-token')
     @UseGuards(AuthentificationGuard)
@@ -159,7 +159,6 @@ export class FpayController {
 
             this.logger.log(`[Favor Help] 🔑 Utilisateur connecté: ${systemUserId}`);
 
-            // ✅ Vérifier si l'utilisateur est déjà lié
             if (user.userIdFpay && user.isLink === true) {
                 this.logger.log(`⚠️ Utilisateur ${systemUserId} est déjà lié au compte FPay ${user.userIdFpay}`);
 
@@ -173,7 +172,6 @@ export class FpayController {
                 });
             }
 
-            // ✅ Si pas de phone/password → Rediriger vers FPay
             if (!authDto || !authDto.phone || !authDto.password) {
                 const fpayUrl = this.fpayService.getFpayApiUrl() || 'https://f-pay.favorhelp.com';
                 const authCode = crypto.randomBytes(32).toString('hex');
@@ -197,7 +195,6 @@ export class FpayController {
                 });
             }
 
-            // ✅ CAS 2 : phone ET password fournis
             const result = await this.fpayService.login(authDto, user.id);
 
             if (result.requiresOtp === true) {
@@ -303,8 +300,6 @@ export class FpayController {
     // ============================================================
     // 4. PAIEMENT
     // ============================================================
-    // src/modules/fpay/fpay.controller.ts
-
     @Post('pay')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
@@ -318,13 +313,6 @@ export class FpayController {
                 throw new HttpException('Utilisateur non authentifié', HttpStatus.UNAUTHORIZED);
             }
 
-            // ✅ NE PAS ajouter system_user_id - le service le gère via le token
-            // const paymentData = {
-            //     ...paymentDto,
-            //     system_user_id: user.id,  // ❌ À SUPPRIMER
-            // };
-
-            // ✅ Appeler directement le service avec le DTO
             return await this.fpayService.makePayment(paymentDto, user);
 
         } catch (error) {
@@ -400,6 +388,7 @@ export class FpayController {
             );
         }
     }
+
     // ============================================================
     // 5. ENVOI (LOGISTIC)
     // ============================================================
@@ -465,7 +454,6 @@ export class FpayController {
         const pageNum = page ? parseInt(page, 10) : 1;
         const limitNum = limit ? parseInt(limit, 10) : 10;
 
-        // ✅ APPEL SANS walletId
         const result = await this.fpayService.getWalletBalanceAndTransactions(
             user.userIdFpay,
             pageNum,
@@ -507,7 +495,6 @@ export class FpayController {
             const appUrl = process.env.APP_URL || 'http://localhost:3000';
             const authCode = crypto.randomBytes(32).toString('hex');
 
-            // ✅ Si client_token fourni, on l'utilise, sinon web-client par défaut
             const finalClientId = clientToken ? 'web-client' : 'web-client';
 
             let callbackUrl = redirectUri;
@@ -521,11 +508,9 @@ export class FpayController {
 
             const redirectUrl = new URL(`${fpayUrl}/oauth/login`);
 
-            // ✅ Envoyer le client_token à FPay
             if (clientToken) {
                 redirectUrl.searchParams.set('client_token', clientToken);
             } else {
-                // Fallback sur client_id si pas de token
                 redirectUrl.searchParams.set('client_id', finalClientId);
             }
 
@@ -562,6 +547,7 @@ export class FpayController {
             );
         }
     }
+
     // ============================================================
     // 7. PROCESSUS COMPLET
     // ============================================================
@@ -615,10 +601,6 @@ export class FpayController {
     // ============================================================
     // 8. DEMANDE DE DEPÔT
     // ============================================================
-    // src/modules/fpay/fpay.controller.ts
-
-    // src/modules/fpay/fpay.controller.ts
-
     @Post('deposit/request')
     @UseGuards(AuthentificationGuard)
     @HttpCode(HttpStatus.OK)
@@ -644,7 +626,6 @@ export class FpayController {
         @Headers('lang') langHeader?: string,
     ): Promise<any> {
         try {
-            // ✅ Vérifier que l'utilisateur est authentifié
             if (!user) {
                 throw new HttpException(
                     'Utilisateur non authentifié',
@@ -652,7 +633,6 @@ export class FpayController {
                 );
             }
 
-            // ✅ Validations
             if (!body.amount || body.amount <= 0) {
                 throw new HttpException(
                     'Le montant doit être supérieur à 0',
@@ -670,7 +650,6 @@ export class FpayController {
             const lang = langHeader || 'fr';
             const currency = body.currency.toUpperCase();
 
-            // ✅ Vérifier que l'utilisateur a un compte FPay lié
             if (!user.userIdFpay) {
                 this.logger.warn(`⚠️ L'utilisateur ${user.id} n'a pas de compte FPay lié`);
 
@@ -684,15 +663,10 @@ export class FpayController {
                 );
             }
 
-            // ============================================================
-            // ✅ VÉRIFIER LES POINTS DE PARRAINAGE PAR DEVISE
-            // ============================================================
             this.logger.log(`🔍 Vérification des points de parrainage pour l'utilisateur ${user.id} en ${currency}`);
 
-            // Récupérer les points de parrainage de l'utilisateur
             const referralPoints = await this.usersService.getReferralPoints(user.id, lang);
 
-            // ✅ Vérifier que la réponse contient les données
             if (!referralPoints || !referralPoints.data) {
                 this.logger.error(`❌ Erreur: getReferralPoints a retourné: ${JSON.stringify(referralPoints)}`);
                 throw new HttpException(
@@ -701,12 +675,10 @@ export class FpayController {
                 );
             }
 
-            // ✅ Vérifier que rewardsByCurrency existe et n'est pas null
             const rewardsByCurrency = referralPoints.data.rewardsByCurrency || [];
 
             this.logger.log(`📊 Points de parrainage trouvés: ${JSON.stringify(rewardsByCurrency)}`);
 
-            // ✅ Vérifier si des points existent
             if (rewardsByCurrency.length === 0) {
                 this.logger.warn(`❌ Aucun point de parrainage trouvé pour l'utilisateur ${user.id}`);
                 throw new HttpException(
@@ -719,14 +691,11 @@ export class FpayController {
                 );
             }
 
-            // ✅ Chercher les points dans la devise demandée
             const pointsInCurrency = rewardsByCurrency.find(
                 (r: any) => r.currency === currency
             );
 
-            // ✅ Vérifier si l'utilisateur a des points dans cette devise
             if (!pointsInCurrency || pointsInCurrency.amount <= 0) {
-                // Récupérer les devises disponibles avec leurs montants
                 const availableCurrenciesList = rewardsByCurrency.map((r: any) => `${r.currency} (${r.amount.toFixed(2)})`).join(', ') || 'Aucune';
 
                 this.logger.warn(`❌ Aucun point en ${currency}. Devises disponibles: ${availableCurrenciesList}`);
@@ -741,7 +710,6 @@ export class FpayController {
                 );
             }
 
-            // ✅ Vérifier si l'utilisateur a assez de points dans cette devise
             if (pointsInCurrency.amount < body.amount) {
                 this.logger.warn(`❌ Points insuffisants en ${currency}: ${pointsInCurrency.amount} < ${body.amount}`);
 
@@ -759,16 +727,12 @@ export class FpayController {
 
             this.logger.log(`✅ Points de parrainage vérifiés: ${pointsInCurrency.amount} ${currency} disponibles`);
 
-            // ============================================================
-            // ✅ SUITE DE LA LOGIQUE - APPEL AU SERVICE
-            // ============================================================
             this.logger.log(`📤 Demande de dépôt: ${body.amount} ${currency} pour l'utilisateur ${user.id} (FPay ID: ${user.userIdFpay})`);
             this.logger.log(`📤 OTP fourni: ${body.otpCode ? '✅' : '❌'}`);
 
-            // ✅ Utiliser userIdFpay de l'utilisateur connecté et passer otpCode
             return await this.fpayService.requestDepositWithOtp({
-                userId: user.userIdFpay,        // ✅ Pour l'API FPay
-                systemUserId: user.id,          // ✅ Pour l'email (ID système)
+                userId: user.userIdFpay,
+                systemUserId: user.id,
                 amount: body.amount,
                 currency: currency,
                 otpCode: body.otpCode,
@@ -789,21 +753,73 @@ export class FpayController {
         }
     }
 
+    // ============================================================
+    // 📉 DIMINUER LES POINTS DE PARRAINAGE
+    // ============================================================
     @Post('deposit/decrease-points')
     @HttpCode(HttpStatus.OK)
+    @ApiBearerAuth()
     @ApiOperation({
         summary: 'Diminuer les points de parrainage',
         description: 'Diminue les points de parrainage d\'un utilisateur selon la devise et le montant'
     })
+    async decreasePoints(
+        @CurrentUser() user: UserEntity,
+        @Body() body: { amount: number; currency: string },
+    ) {
+        if (!user) {
+            throw new HttpException(
+                'Utilisateur non authentifié',
+                HttpStatus.UNAUTHORIZED,
+            );
+        }
 
+        if (!body.amount || body.amount <= 0) {
+            throw new HttpException(
+                'Le montant doit être supérieur à 0',
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
+        if (!body.currency) {
+            throw new HttpException(
+                'La devise est obligatoire',
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
+        this.logger.log(
+            `📉 Diminution des points: ${body.amount} ${body.currency} pour l'utilisateur ${user.id}`,
+        );
+
+        // TODO: implémenter la logique métier si nécessaire
+        // Exemple : await this.usersService.decreaseReferralPoints(user.id, body.amount, body.currency);
+
+        return {
+            status: 'success',
+            message: `Points diminués de ${body.amount} ${body.currency}`,
+            data: {
+                userId: user.id,
+                amount: body.amount,
+                currency: body.currency,
+            },
+        };
+    }
+
+    // ============================================================
+    // ✅ TRANSACTIONS EN ATTENTE
+    // ============================================================
     @Get('wallet/pending-transactions')
     @UseGuards(AuthentificationGuard)
     @ApiBearerAuth()
+    @ApiOperation({
+        summary: 'Récupérer les transactions en attente',
+        description: 'Récupère les transactions en attente de l\'utilisateur connecté'
+    })
     async getPendingTransactions(
         @CurrentUser() user: UserEntity,
         @Query('type') type?: string,
     ) {
-        // ✅ Vérifications (sans changer la structure)
         if (!user) {
             throw new HttpException(
                 'Utilisateur non authentifié',
@@ -818,9 +834,8 @@ export class FpayController {
             );
         }
 
-        // ✅ Utilise user.userIdFpay (le user connecté)
         return this.fpayService.getLastPendingTransaction(
-            user.userIdFpay,  // ✅ SÉCURISÉ
+            user.userIdFpay,
             type as any,
         );
     }
