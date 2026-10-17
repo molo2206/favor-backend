@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { OrderEntity } from './order.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { AssignmentStatus } from '../enum/assignment-status.enum';
 
 @Entity('order_delivery_assignments')
 @Index('IDX_oda_order_active', ['orderId', 'isActive'])
