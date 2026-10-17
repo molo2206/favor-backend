@@ -5402,6 +5402,7 @@ export class UsersService {
     lang?: string;
     startDate?: string;
     endDate?: string;
+    onlySellers?: boolean;
   }): Promise<{ message: string; data: any[] }> {
     const lang = options.lang || 'fr';
     const searchFilter = options.search ? `%${options.search}%` : null;
@@ -5432,6 +5433,17 @@ export class UsersService {
     const includeVehicle = selectedTypes.includes('VEHICLE_RESERVATION');
     const includeHotel = selectedTypes.includes('HOTEL_RESERVATION');
 
+    // ✅ NOUVEAU : détection d'absence de filtres
+    const hasAnyFilter =
+      !!options.type ||
+      !!options.shippingCompanyId ||
+      !!options.city ||
+      !!options.country ||
+      !!options.search ||
+      !!options.startDate ||
+      !!options.endDate ||
+      options.onlySellers === true;
+
     const shipmentCompanyId = options.shippingCompanyId;
     const cityFilter = options.city ? `%${options.city}%` : null;
 
@@ -5452,8 +5464,30 @@ export class UsersService {
     const allUserIds = new Set<string>();
 
     // ============================================================
-    // 1. Récupérer les userIds
-    //    ✅ OPTIMISATION : une seule requête UNION
+    // ✅ CAS SPÉCIAL : aucun filtre → retourner TOUS les users actifs
+    // ============================================================
+    if (!hasAnyFilter) {
+      const sellersCondition = options.onlySellers
+        ? `AND EXISTS (
+             SELECT 1 FROM user_has_company uhc
+             INNER JOIN company c ON c.id = uhc.companyId
+             WHERE uhc.userId = u.id AND c.typeCompany = 'SELLER'
+           )`
+        : '';
+
+      const allUsers: any[] = await this.usersRepository.query(
+        `SELECT u.id
+         FROM users u
+         WHERE u.deleted = false
+           ${sellersCondition}
+         ORDER BY u.fullName ASC`,
+      );
+
+      allUsers.forEach((u) => u.id && allUserIds.add(u.id));
+    }
+
+    // ============================================================
+    // 1. Récupérer les userIds (UNION) — uniquement si filtre présent
     // ============================================================
     const unionParts: string[] = [];
     const unionParams: any[] = [];
@@ -5472,7 +5506,7 @@ export class UsersService {
 
       unionParts.push(
         `SELECT DISTINCT userId FROM shipments
-       WHERE ${conds1.join(' AND ')} AND userId IS NOT NULL`
+       WHERE ${conds1.join(' AND ')} AND userId IS NOT NULL`,
       );
 
       // Bloc 2 : match par phone
@@ -5493,7 +5527,7 @@ export class UsersService {
           = REPLACE(REPLACE(s.clientPhone, ' ', ''), '+', '')
        WHERE ${conds2.join(' AND ')}
          AND s.clientPhone IS NOT NULL
-         AND s.userId IS NULL`
+         AND s.userId IS NULL`,
       );
     }
 
@@ -5516,7 +5550,7 @@ export class UsersService {
        INNER JOIN sub_orders so ON so.orderId = o.id
        INNER JOIN company c ON c.id = so.companyId
        LEFT JOIN cities ci ON ci.id = c.cityId
-       ${whereClause}`
+       ${whereClause}`,
       );
     }
 
@@ -5536,7 +5570,7 @@ export class UsersService {
        INNER JOIN products p ON p.id = rv.product_id
        LEFT JOIN company co ON co.id = p.companyId
        LEFT JOIN cities ci ON ci.id = co.cityId
-       WHERE ${conds.join(' AND ')} AND rv.user_id IS NOT NULL`
+       WHERE ${conds.join(' AND ')} AND rv.user_id IS NOT NULL`,
       );
     }
 
@@ -5559,12 +5593,12 @@ export class UsersService {
        INNER JOIN products p ON p.id = r.productId
        INNER JOIN company c ON c.id = p.companyId
        LEFT JOIN cities ci ON ci.id = c.cityId
-       ${whereClause}`
+       ${whereClause}`,
       );
     }
 
-    // ✅ Exécution de l'UNION
-    if (unionParts.length > 0) {
+    // ✅ Exécution de l'UNION — uniquement si filtre présent
+    if (hasAnyFilter && unionParts.length > 0) {
       const rows: any[] = await this.usersRepository.query(
         `SELECT DISTINCT userId FROM (${unionParts.join(' UNION ')}) AS combined`,
         unionParams,
@@ -5590,6 +5624,19 @@ export class UsersService {
         [userIds, searchFilter, searchFilter, searchFilter],
       );
       userIds = filtered.map((u) => u.id);
+    }
+
+    // ✅ NOUVEAU : filtre onlySellers en amont (allège la suite)
+    if (options.onlySellers && userIds.length > 0) {
+      const sellers: any[] = await this.usersRepository.query(
+        `SELECT DISTINCT uhc.userId
+         FROM user_has_company uhc
+         INNER JOIN company c ON c.id = uhc.companyId
+         WHERE uhc.userId IN (?)
+           AND c.typeCompany = 'SELLER'`,
+        [userIds],
+      );
+      userIds = sellers.map((u) => u.userId);
     }
 
     if (userIds.length === 0) {
@@ -5654,7 +5701,6 @@ export class UsersService {
 
     // ============================================================
     // 3. TOUT EN PARALLÈLE
-    //    ✅ OPTIMISATION : ajout de AND xxx.userId IN (?)
     // ============================================================
     const [
       users,

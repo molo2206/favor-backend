@@ -21,6 +21,8 @@ import { QueryCustomerDto } from './dto/query-customer.dto';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { PaginatedResponseDto } from 'src/products/dto/paginated-response.dto';
 import { CustomerEntity } from './entities/customer.entity';
+import { UserEntity } from 'src/users/entities/user.entity';
+import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
 
 @Controller('commercial/customers')
 @UseGuards(AuthentificationGuard)
@@ -43,9 +45,14 @@ export class CustomersController {
     // ============================================================
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    create(@Body() dto: CreateCustomerDto, @Req() req: Request) {
+    @UseGuards(AuthentificationGuard) // ✅ ajoutez si pas déjà
+    create(
+        @Body() dto: CreateCustomerDto,
+        @CurrentUser() user: UserEntity,
+        @Req() req: Request,
+    ) {
         const lang = this.extractLanguage(req);
-        return this.customersService.create(dto, lang);
+        return this.customersService.create(dto, lang, user);
     }
 
     // ============================================================

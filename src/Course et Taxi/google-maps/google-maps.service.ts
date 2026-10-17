@@ -25,6 +25,7 @@ interface GoogleAutocompleteResponse {
   }>;
   html_attributions?: string[];
 }
+
 @Injectable()
 export class GoogleService {
   private readonly apiKey: string;

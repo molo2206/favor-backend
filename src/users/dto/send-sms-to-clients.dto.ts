@@ -29,7 +29,7 @@ export class SendSmsToClientsDto {
     type?: 'SHIPMENT' | 'ORDER' | 'VEHICLE_RESERVATION' | 'HOTEL_RESERVATION';
 
     @IsOptional()
-    @IsUUID('4', { message: 'shippingCompanyId doit être un UUID valide' })
+    @IsString()
     shippingCompanyId?: string;
 
     @IsOptional()

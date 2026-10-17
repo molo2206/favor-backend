@@ -16,9 +16,6 @@ export class CompanySettingsEntity {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    // ============================================
-    // RELATION AVEC LA COMPANY
-    // ============================================
     @Column({ name: 'companyId', type: 'uuid' })
     companyId: string;
 
@@ -28,18 +25,12 @@ export class CompanySettingsEntity {
     @JoinColumn({ name: 'companyId' })
     company: CompanyEntity;
 
-    // ============================================
-    // FRAIS DE FIDÉLITÉ
-    // ============================================
     @Column({ type: 'boolean', default: false })
     enableLoyaltyFees: boolean;
 
     @Column({ type: 'float', nullable: true, default: 0 })
     loyaltyFeeFixed: number;
 
-    // ============================================
-    // TIMESTAMPS
-    // ============================================
     @CreateDateColumn()
     createdAt: Date;
 

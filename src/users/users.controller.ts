@@ -600,19 +600,28 @@ export class UsersController {
     @Query('city') city?: string,
     @Query('country') country?: string,
     @Query('search') search?: string,
-    @Query('startDate') startDate?: string,    // ✅ AJOUT
-    @Query('endDate') endDate?: string,        // ✅ AJOUT
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('onlySellers') onlySellers?: string,   // ✅ AJOUT
     @Req() req?: Request,
   ) {
     const lang = this.extractLanguage(req!);
+
+    // ✅ Conversion string → boolean ("true", "1", "yes" → true)
+    const onlySellersBool =
+      onlySellers === undefined
+        ? undefined
+        : ['true', '1', 'yes'].includes(String(onlySellers).toLowerCase());
+
     return this.usersService.getClientUsersByCompanyAndDestination({
       type,
       shippingCompanyId,
       city,
       country,
       search,
-      startDate,                               // ✅ AJOUT
-      endDate,                                 // ✅ AJOUT
+      startDate,
+      endDate,
+      onlySellers: onlySellersBool,   // ✅ AJOUT
       lang,
     });
   }
