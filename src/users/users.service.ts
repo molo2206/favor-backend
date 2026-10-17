@@ -6006,12 +6006,11 @@ export class UsersService {
     country?: string;
     search?: string;
     lang?: string;
-    // ✅ AJOUT : envoi ciblé ou global (tous optionnels)
-    userId?: string;        // Envoyer à UN utilisateur précis
-    sendToAll?: boolean;    // Envoyer à TOUS les utilisateurs de la plateforme
-    // ✅ AJOUT : filtre date (comme dans getClientUsersByCompanyAndDestination)
+    userId?: string;
+    sendToAll?: boolean;
     startDate?: string;
     endDate?: string;
+    onlySellers?: boolean;   // ✅ AJOUT
     batchSize?: number;
     delayBetweenBatchesMs?: number;
   }): Promise<{
@@ -6075,15 +6074,26 @@ export class UsersService {
     // 🅱️ CAS 2 : Envoi à TOUS les utilisateurs de la plateforme
     // ============================================================
     else if (options.sendToAll) {
+      // ✅ Ajout : possibilité de filtrer sur sellers même en sendToAll
+      const sellersCondition = options.onlySellers
+        ? `AND EXISTS (
+             SELECT 1 FROM user_has_company uhc
+             INNER JOIN company c ON c.id = uhc.companyId
+             WHERE uhc.userId = u.id AND c.typeCompany = 'SELLER'
+           )`
+        : '';
+
       clientUsers = await this.usersRepository.query(
-        `SELECT id, fullName, email, phone, image, role, isActive, city, country, address, createdAt
-         FROM users
-         WHERE isActive = 1
-         ORDER BY fullName ASC`,
+        `SELECT u.id, u.fullName, u.email, u.phone, u.image, u.role,
+                u.isActive, u.city, u.country, u.address, u.createdAt
+         FROM users u
+         WHERE u.isActive = 1
+           ${sellersCondition}
+         ORDER BY u.fullName ASC`,
       );
     }
     // ============================================================
-    // 🅲 CAS 3 : Envoi filtré (logique existante)
+    // 🅲 CAS 3 : Envoi filtré (logique existante + onlySellers)
     // ============================================================
     else {
       const { data } =
@@ -6095,6 +6105,7 @@ export class UsersService {
           search: options.search,
           startDate: options.startDate,
           endDate: options.endDate,
+          onlySellers: options.onlySellers,   // ✅ AJOUT
           lang,
         });
 
@@ -6127,7 +6138,7 @@ export class UsersService {
       const rawPhone = (u.phone || '').trim();
       const normalized = rawPhone.replace(/[^\d]/g, '');
 
-      if (!normalized) continue; // pas de téléphone → on l'ignorera plus tard
+      if (!normalized) continue;
       if (recipientsMap.has(normalized)) continue;
 
       recipientsMap.set(normalized, {
@@ -6167,7 +6178,7 @@ export class UsersService {
     );
 
     // ============================================================
-    // 4. Envoyer par lots (parallèle dans chaque lot, séquentiel entre lots)
+    // 4. Envoyer par lots
     // ============================================================
     const results: Array<{
       userId: string;
@@ -6189,7 +6200,6 @@ export class UsersService {
       );
 
       const batchPromises = batch.map(async (recipient) => {
-        // Pas de téléphone → SKIPPED
         if (!recipient.phone) {
           return {
             ...recipient,
@@ -6234,7 +6244,6 @@ export class UsersService {
           else if (r.status === 'FAILED') failed++;
           else if (r.status === 'SKIPPED') skipped++;
         } else {
-          // Cas exceptionnel : la promise elle-même a rejeté
           failed++;
           results.push({
             userId: 'unknown',
@@ -6250,11 +6259,7 @@ export class UsersService {
         `[sendSmsToClientUsersByDestination] ✅ Lot ${batchIndex + 1}/${chunks.length} terminé — sent: ${sent}, failed: ${failed}, skipped: ${skipped}`,
       );
 
-      // Délai entre les lots (sauf après le dernier)
-      if (
-        batchIndex < chunks.length - 1 &&
-        DELAY_BETWEEN_BATCHES_MS > 0
-      ) {
+      if (batchIndex < chunks.length - 1 && DELAY_BETWEEN_BATCHES_MS > 0) {
         await new Promise((resolve) =>
           setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS),
         );

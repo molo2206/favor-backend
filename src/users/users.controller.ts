@@ -643,6 +643,7 @@ export class UsersController {
       sendToAll: dto.sendToAll,
       startDate: dto.startDate,
       endDate: dto.endDate,
+      onlySellers: dto.onlySellers,   // ✅ AJOUT
       batchSize: dto.batchSize,
       delayBetweenBatchesMs: dto.delayBetweenBatchesMs,
       lang,

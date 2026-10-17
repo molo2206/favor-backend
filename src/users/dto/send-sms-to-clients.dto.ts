@@ -11,7 +11,7 @@ import {
     IsDateString,
     MaxLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class SendSmsToClientsDto {
     @IsString()
@@ -49,8 +49,16 @@ export class SendSmsToClientsDto {
     userId?: string;
 
     @IsOptional()
+    @Transform(({ value }) => {
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'string') {
+        const v = value.toLowerCase();
+        if (['true', '1', 'yes'].includes(v)) return true;
+        if (['false', '0', 'no'].includes(v)) return false;
+      }
+      return value;
+    })
     @IsBoolean()
-    @Type(() => Boolean)
     sendToAll?: boolean;
 
     @IsOptional()
@@ -60,6 +68,20 @@ export class SendSmsToClientsDto {
     @IsOptional()
     @IsDateString({}, { message: 'endDate doit être une date ISO valide' })
     endDate?: string;
+
+    // ✅ NOUVEAU
+    @IsOptional()
+    @Transform(({ value }) => {
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'string') {
+        const v = value.toLowerCase();
+        if (['true', '1', 'yes'].includes(v)) return true;
+        if (['false', '0', 'no'].includes(v)) return false;
+      }
+      return value;
+    })
+    @IsBoolean()
+    onlySellers?: boolean;
 
     @IsOptional()
     @Type(() => Number)
