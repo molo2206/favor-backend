@@ -1,0 +1,14 @@
+{
+  "ride.rider_not_found": "Pasajero no encontrado.",
+  "ride.driver_not_found": "Conductor no encontrado.",
+  "ride.city_not_found_or_inactive": "Ciudad no encontrada o inactiva.",
+  "ride.category_not_found_or_inactive": "Categoría no encontrada o inactiva.",
+  "ride.ride_created_searching_drivers": "Tu viaje ha sido creado. Buscando conductores...",
+  "ride.ride_created_success": "Viaje creado con éxito",
+  "ride.rides_list_retrieved": "Lista de viajes recuperada",
+  "ride.ride_not_found": "Viaje no encontrado.",
+  "ride.ride_retrieved": "Viaje recuperado",
+  "ride.ride_updated": "Viaje actualizado",
+  "ride.ride_deleted": "Viaje eliminado",
+  "ride.ride_already_accepted": "Viaje ya aceptado"
+}

@@ -1,0 +1,25 @@
+<%#
+  E-mail de bienvenue (création de compte)
+  Variables : user | userWithoutPassword, appUrl?, lang, translations?
+  Mise en page commune : src/email/email-layout.ts
+%>
+<%
+  const tr = translations || {};
+  const u = (typeof user !== 'undefined' && user) ? user : ((typeof userWithoutPassword !== 'undefined' && userWithoutPassword) ? userWithoutPassword : {});
+  const url = (typeof appUrl !== 'undefined' && appUrl) ? appUrl : 'https://favorhelp.com';
+  const label = (key, fallbackKey) => tr[key] || t(fallbackKey);
+%>
+<%- emailLayout({
+  preheader: label('welcome_subtitle', 'user.welcome_subtitle'),
+  title: label('welcome_title', 'user.welcome_title'),
+  date: formatDate(u.createdAt || new Date()),
+  badge: { text: label('account_created', 'user.account_created'), tone: 'success' },
+  greeting: t('order.email.greeting', { name: u.fullName || '' }),
+  paragraphs: [ label('welcome_subtitle', 'user.welcome_subtitle'), t('email.welcome.intro') ],
+  highlight: u.referralCode ? {
+    label: label('referral_code_title', 'referral.referral_code_title'),
+    value: String(u.referralCode),
+    hint: label('share_referral', 'referral.share_referral')
+  } : undefined,
+  cta: { label: label('discover_platform', 'user.discover_platform'), url: url }
+}) %>
