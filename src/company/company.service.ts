@@ -2235,12 +2235,21 @@ export class CompanyService {
   async getCompaniesWithShippingResource(): Promise<CompanyEntity[]> {
     return this.companyRepository
       .createQueryBuilder('company')
-      .innerJoin(CompanyHasResourceEntity, 'chr', 'chr.companyId = company.id')
-      .innerJoin('chr.resource', 'resource')
-      .where('company.typeCompany = :typeCompany', {
-        typeCompany: CompanyType.SHIPPING,
+      .where('company.typeCompany IN (:...types)', {
+        types: [CompanyType.SHIPPING, CompanyType.LOGISTIC_AGENCY],
       })
-      .andWhere('chr.can_create = :canCreate', { canCreate: true })
+      .andWhere('company.status = :status', { status: CompanyStatus.VALIDATED })
+      .andWhere(
+        `EXISTS (
+          SELECT 1
+          FROM company_has_resource chr
+          INNER JOIN resources resource ON resource.id = chr.resourceId
+          WHERE chr.companyId = company.id
+            AND chr.status = 1
+            AND (chr.can_create = 1 OR chr.can_manage = 1)
+        )`,
+      )
+      .orderBy('company.companyName', 'ASC')
       .getMany();
   }
 
