@@ -199,7 +199,7 @@ export class ProductController {
   }
 
   @Post('admin')
-  @UseGuards(AuthentificationGuard, CompanyPermissionsGuard)
+  @UseGuards(AuthentificationGuard)
   @AuditAction(ActionType.CREATE, 'products')
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   @UseInterceptors(FilesInterceptor('images', 30))
@@ -261,8 +261,8 @@ export class ProductController {
   }
 
   @Patch('/admin/:id')
-  @UseGuards(AuthentificationGuard, CompanyPermissionsGuard)
-  @Permissions({ resource: 'PRODUCTS', action: 'canUpdate' })
+  @UseGuards(AuthentificationGuard)
+  // @Permissions({ resource: 'PRODUCTS', action: 'canUpdate' })
   @AuditAction(ActionType.UPDATE, 'products')
   @UseInterceptors(FilesInterceptor('images', 30))
   async updateProduct(
