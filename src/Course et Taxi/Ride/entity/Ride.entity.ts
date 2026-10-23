@@ -1,0 +1,176 @@
+import { CategoryEntity } from 'src/category/entities/category.entity';
+import { City } from 'src/company/entities/city.entity';
+import { RideStatus } from 'src/Course et Taxi/Ride/enum/RideStatus.enum';
+import { UserEntity } from 'src/users/entities/user.entity';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
+
+@Entity('rides')
+@Index(['status'])
+@Index(['driverId'])
+@Index(['riderId'])
+@Index(['cityId'])
+export class Ride {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  // Rider (obligatoire)
+  @ManyToOne(() => UserEntity)
+  @JoinColumn({ name: 'riderId' })
+  rider: UserEntity;
+
+  @Column({ type: 'varchar', length: 36 })
+  riderId: string;
+
+  // Driver (optionnel)
+  @ManyToOne(() => UserEntity, { nullable: true })
+  @JoinColumn({ name: 'driverId' })
+  driver: UserEntity;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  driverId?: string;
+
+  // Ville
+  @ManyToOne(() => City)
+  @JoinColumn({ name: 'cityId' })
+  city: City;
+
+  @Column({ type: 'varchar', length: 36 })
+  cityId: string;
+
+  // Catégorie
+  @ManyToOne(() => CategoryEntity)
+  @JoinColumn({ name: 'categoryId' })
+  category: CategoryEntity;
+
+  @Column({ type: 'varchar', length: 36 })
+  categoryId: string;
+
+  // Locations
+  @Column('json')
+  pickupLocation: {
+    lat: number;
+    lng: number;
+    address?: string;
+    placeId?: string;
+  };
+
+  @Column('json')
+  dropoffLocation: {
+    lat: number;
+    lng: number;
+    address?: string;
+    placeId?: string;
+  };
+
+  // Google
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  distance: number;
+
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  duration: number;
+
+  @Column({ nullable: true })
+  directionsPolyline: string;
+
+  // Prix
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  price: number;
+
+  @Column('decimal', { precision: 5, scale: 2, default: 1 })
+  surgeMultiplier: number;
+
+  // Statut
+  @Column({
+    type: 'enum',
+    enum: RideStatus,
+    default: RideStatus.PENDING,
+  })
+  status: RideStatus;
+
+  @Column({ type: 'enum', enum: ['RIDER', 'DRIVER', 'SYSTEM'], nullable: true })
+  cancelledBy?: 'RIDER' | 'DRIVER' | 'SYSTEM';
+
+  @Column({ nullable: true, type: 'text' })
+  cancellationReason?: string;
+
+  // ============================================================
+  // ✅ AJOUT : cycle de course type Bolt (colonnes nullables)
+  // ============================================================
+
+  /** Véhicule du chauffeur utilisé pour la course */
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  vehicleId?: string | null;
+
+  @Column({ type: 'varchar', length: 20, nullable: true, default: 'CASH' })
+  paymentMethod?: string | null;
+
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  currency?: string | null;
+
+  /** Prix final (calculé à la fin de la course) */
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  finalPrice?: number | null;
+
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  commissionAmount?: number | null;
+
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  driverEarning?: number | null;
+
+  /** Recherche de chauffeur */
+  @Column({ type: 'int', default: 0 })
+  dispatchRound: number;
+
+  @Column({ type: 'datetime', precision: 6, nullable: true })
+  lastDispatchAt?: Date | null;
+
+  @Column({ type: 'json', nullable: true })
+  notifiedDriverIds?: string[] | null;
+
+  @Column({ type: 'json', nullable: true })
+  rejectedDriverIds?: string[] | null;
+
+  /** Horodatage des étapes */
+  @Column({ type: 'datetime', precision: 6, nullable: true })
+  acceptedAt?: Date | null;
+
+  @Column({ type: 'datetime', precision: 6, nullable: true })
+  arrivedAt?: Date | null;
+
+  @Column({ type: 'datetime', precision: 6, nullable: true })
+  startedAt?: Date | null;
+
+  @Column({ type: 'datetime', precision: 6, nullable: true })
+  completedAt?: Date | null;
+
+  @Column({ type: 'datetime', precision: 6, nullable: true })
+  cancelledAt?: Date | null;
+
+  /** Notes après la course (1 à 5) */
+  @Column({ type: 'tinyint', nullable: true })
+  driverRating?: number | null; // note donnée AU chauffeur par le passager
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  driverRatingComment?: string | null;
+
+  @Column({ type: 'tinyint', nullable: true })
+  riderRating?: number | null; // note donnée AU passager par le chauffeur
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  riderRatingComment?: string | null;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}

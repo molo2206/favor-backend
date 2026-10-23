@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="<%= lang || 'fr' %>">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= translations.title %> | Favor Help</title>
+  <!-- Même apparence que templates/order/invoice.ejs -->
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @page { size: A4; margin: 0; }
+    html, body { width: 100%; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background-color: #ffffff;
+      color: #1e293b;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .invoice-container {
+      position: relative;
+      width: 100%;
+      max-width: 210mm;
+      margin: 0 auto;
+      background-color: #ffffff;
+      background-image:
+        repeating-linear-gradient(135deg, rgba(56, 189, 248, 0.02) 0px, rgba(56, 189, 248, 0.02) 2px, transparent 2px, transparent 22px),
+        repeating-linear-gradient(45deg, rgba(56, 189, 248, 0.02) 0px, rgba(56, 189, 248, 0.02) 2px, transparent 2px, transparent 22px);
+    }
+    .invoice-padding { padding: 22px 42px 18px 42px; }
+    .parties { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; }
+    .sender, .recipient { font-size: 0.655rem; line-height: 1.5; color: #1e293b; }
+    .sender .bold, .recipient .bold { font-weight: 700; }
+    .recipient { text-align: right; }
+    .logo { width: 150px; }
+    .dates { margin-top: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 0.655rem; color: #1e293b; }
+    .invoice-title { font-size: 2rem; font-weight: 700; color: #0118d8; line-height: 1.2; }
+    .draft-text { font-size: 0.85rem; font-weight: 600; color: #334155; }
+    .date-row { display: flex; gap: 0.5rem; }
+    .date-row .label { font-weight: 700; }
+    .status { font-weight: 700; }
+    .status.ok { color: #15803d; }
+    .status.wait { color: #b45309; }
+    .status.ko { color: #b91c1c; }
+    .table-wrapper { margin-top: 14px; overflow: hidden; border-radius: 0.125rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.655rem; }
+    thead tr { background-color: #0118d8; color: #ffffff; text-align: left; }
+    th { padding: 7px 9px; font-weight: 600; white-space: nowrap; }
+    th:first-child { width: 2.5rem; }
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    td { padding: 9px; color: #334155; }
+    td.bold { font-weight: 600; color: #1e293b; }
+    .right { text-align: right; }
+    .bottom-section { margin-top: 18px; display: flex; justify-content: space-between; align-items: flex-start; gap: 25px; }
+    .terms { max-width: 20rem; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.655rem; color: #1e293b; }
+    .terms .label { font-weight: 700; }
+    .totals { width: 270px; flex-shrink: 0; border: 1px solid #e2e8f0; border-radius: 0.125rem; overflow: hidden; margin-left: auto; }
+    .total-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; font-size: 0.655rem; }
+    .total-row .label { font-weight: 700; color: #1e293b; }
+    .total-row + .total-row { border-top: 1px solid #e2e8f0; }
+    .total-row.ttc { background-color: #0118d8; }
+    .total-row.ttc .label, .total-row.ttc .value { color: #ffffff; font-weight: 700; }
+    .invoice-notes { margin-top: 16px; padding: 10px 14px; background-color: #f8fafc; border-radius: 0.125rem; font-size: 0.655rem; line-height: 1.45; color: #475569; }
+    .invoice-notes p { margin: 0 0 0.35rem 0; }
+    .invoice-notes .notes-title { font-weight: 700; color: #1e293b; margin-bottom: 0.35rem; font-size: 0.75rem; }
+    .thank-you { margin-top: 12px; text-align: center; font-size: 0.655rem; color: #64748b; font-style: italic; }
+    .legal-footer { margin-top: 10px; padding-top: 9px; border-top: 1px solid #e2e8f0; font-size: 0.655rem; line-height: 1.35; color: #94a3b8; text-align: center; }
+    .legal-footer p { margin: 0 0 0.2rem 0; }
+    .info-grid { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #e2e8f0; font-size: 0.655rem; }
+    .info-grid .cell { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+    .info-grid .cell:nth-child(odd) { border-right: 1px solid #f1f5f9; }
+    .info-grid small { display: block; color: #64748b; margin-bottom: 2px; }
+    .info-grid strong { color: #1e293b; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+<%
+  const status = String((reservation && reservation.status) || 'PENDING').toUpperCase();
+  const statusCls = status === 'CONFIRMED' || status === 'PAID' ? 'ok' : (status === 'CANCELLED' || status === 'EXPIRED' ? 'ko' : 'wait');
+  const firstSegment = (segments && segments[0]) || {};
+  const mealsFee = typeof totalMealsFee !== 'undefined' ? Number(totalMealsFee || 0) : 0;
+%>
+  <div class="invoice-container">
+    <div class="invoice-padding">
+      <!-- EXPÉDITEUR / CLIENT -->
+      <div class="parties">
+        <div class="sender">
+          <img src="https://admin.favorhelp.com/logos/logo-dark.png" alt="Favor Help" class="logo" />
+          <p class="bold">Favor Help</p>
+          <p>Office 1, Q.Murara, 012, Goma</p>
+          <p>Nord-Kivu, Congo-Kinshasa</p>
+          <p>RCCM : CD/BN/RCCM/26-B-223</p>
+          <p>N°Tel : +24397964940</p>
+        </div>
+        <div class="recipient">
+          <p style="color:#64748b;"><%= translations.booked_by %></p>
+          <p class="bold"><%= user ? user.fullName : 'Client' %></p>
+          <p><%= user && user.email ? user.email : '' %></p>
+          <p><%= user && user.phone ? user.phone : '' %></p>
+        </div>
+      </div>
+
+      <!-- TITRE / RÉFÉRENCE / DATES -->
+      <div class="dates">
+        <h1 class="invoice-title"><%= translations.title %></h1>
+        <span class="draft-text">N° <%= reservationRef %></span>
+        <div class="date-row">
+          <span class="label"><%= translations.reservation_date %></span>
+          <span><%= new Date().toLocaleDateString(lang) %></span>
+        </div>
+        <div class="date-row">
+          <span class="label"><%= translations.validity %></span>
+          <span><%= reservation && reservation.expires_at ? new Date(reservation.expires_at).toLocaleDateString(lang) : '120 min' %></span>
+        </div>
+        <div class="date-row">
+          <span class="status <%= statusCls %>"><%= translations.status_pending_sheet %></span>
+        </div>
+      </div>
+
+      <!-- DÉTAILS DU VOYAGE -->
+      <div class="info-grid">
+        <div class="cell"><small><%= translations.trip_route %></small><strong><%= departureCity %> → <%= arrivalCity %></strong></div>
+        <div class="cell"><small><%= translations.departure_date %></small><strong><%= firstSegment.departure_datetime ? new Date(firstSegment.departure_datetime).toLocaleString(lang) : '-' %></strong></div>
+        <div class="cell"><small><%= translations.passengers_count %></small><strong><%= passengers ? passengers.length : 0 %></strong></div>
+        <div class="cell"><small><%= translations.seats_reserved %></small><strong><%= (segments || []).map(s => s.seat_number).filter(Boolean).join(', ') || '-' %></strong></div>
+      </div>
+
+      <!-- TABLEAU -->
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th><%= translations.table_header_passenger %></th>
+              <th><%= translations.table_header_segment %></th>
+              <th><%= translations.table_header_seat %></th>
+              <th class="right"><%= translations.table_header_price %></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% let i = 1; for (const rs of (reservationSegments || [])) {
+                 const seatNumber = (rs.seat && rs.seat.seat_number) || 'N/A';
+                 const segment = rs.segment || {};
+            %>
+            <tr>
+              <td><%= i++ %></td>
+              <td class="bold"><%= rs.passenger_prename %> <%= rs.passenger_name %></td>
+              <td><%= segment.departure_city %> → <%= segment.arrival_city %></td>
+              <td><%= seatNumber %></td>
+              <td class="right">USD <%= Number(rs.price || 0).toFixed(2) %></td>
+            </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- PAIEMENT À GAUCHE / TOTAUX À DROITE -->
+      <div class="bottom-section">
+        <div class="terms">
+          <div>
+            <p class="label"><%= translations.payment_instructions %></p>
+            <p>Mobile Money : +243 979 649 404</p>
+            <p>Cash : Goma, Avenue Kanyamuhanga n°12</p>
+          </div>
+        </div>
+        <div class="totals">
+          <div class="total-row"><span class="label"><%= translations.summary %></span><span class="value">USD <%= Number(totalAmount || 0).toFixed(2) %></span></div>
+          <% if (mealsFee > 0) { %>
+          <div class="total-row"><span class="label">Meals</span><span class="value">USD <%= mealsFee.toFixed(2) %></span></div>
+          <% } %>
+          <div class="total-row ttc"><span class="label">Total</span><span class="value">USD <%= Number(finalTotal || 0).toFixed(2) %></span></div>
+        </div>
+      </div>
+
+      <!-- NOTES -->
+      <div class="invoice-notes">
+        <p class="notes-title"><%= translations.thank_you %></p>
+        <p><%= translations.payment_reminder %></p>
+        <p><%= translations.contact %></p>
+      </div>
+
+      <p class="thank-you"><%= translations.thank_you_footer || 'Merci pour votre confiance et votre collaboration.' %></p>
+      <div class="legal-footer">
+        <p><%= translations.legal_line_1 || 'Favor Help — Office 1, Q.Murara, 012, Goma, Nord-Kivu, Congo-Kinshasa' %></p>
+        <p><%= translations.legal_line_2 || 'RCCM : 81194815700029 — N°Tel : +24397964940 — Email : contact@favorhelp.cd' %></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
