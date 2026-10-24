@@ -27,7 +27,6 @@
 |---|---|---|
 | GET | `dashboard` | Projets par statut, encaissé du mois, reste à encaisser, top prestations, séances des 7 jours, projets en retard |
 | POST / GET / PATCH / DELETE | `services`, `services/:id` | Catalogue des prestations |
-| POST / GET / PATCH / DELETE | `team`, `team/:id` | Équipe média (`?role=PHOTOGRAPHER`) |
 | POST / GET | `projects` | Créer / lister (filtres : statut, type, paiement, dates, recherche) |
 | GET | `projects/mine` | Mes projets (chef de projet ou équipe) |
 | GET / PATCH | `projects/:id` | Détail complet (devis, séances, paiements, fichiers, historique) / modifier |
@@ -53,44 +52,41 @@
 
 ---
 
-# Réseaux sociaux — `/backoffice/media/social` (connecté)
+# Équipe = Ressources humaines
 
-**But : savoir ce qu'on poste, sur quelles plateformes, et les chiffres jour par jour (j'aime, commentaires, partages, vues…).**
+L'ancienne « équipe média » est retirée : l'équipe d'une séance est choisie parmi les **employés RH actifs** de l'entreprise (`hr_employees` liés à un compte).
+- `GET /backoffice/media/availability?startAt=&endAt=&departmentId=` : employés (filtre facultatif : département) libres / occupés ; un employé en **congé approuvé** est indisponible.
+- `POST sessions/:id/crew { userId, role }` : refusé si la personne n'est pas un employé RH actif.
 
-## Mise en place
-1. Exécuter `db/sql/backoffice_reseaux_sociaux.sql` **en entier** (après `backoffice_media.sql`) — ou `npm run migration:run` (migration `1792972800000-BackofficeSocialMedia`).
-2. Aucune variable d'environnement nouvelle (fuseau : `COMPANY_DEFAULT_TIMEZONE`, défaut Africa/Lubumbashi).
+---
 
-## Fonctionnement
-- **Comptes** (`bo_social_accounts`) : chaque page / compte géré (Facebook, Instagram, TikTok, YouTube, LinkedIn, X, WhatsApp, Snapchat, Threads, Pinterest…), de l'entreprise ou d'un client (lien facultatif vers un projet média), avec son community manager et ses abonnés.
-- **Publications** (`bo_social_posts`) : titre, texte (légende), hashtags, format (image, carrousel, vidéo, reel, story, live…), visuels de la médiathèque, lien, campagne, date programmée.
-  Cycle : `DRAFT → PENDING_APPROVAL → APPROVED → SCHEDULED → PUBLISHED` (ou `CANCELLED`).
-  Passage en « à valider » → notification + push aux responsables des comptes ; validation / refus → notification au rédacteur.
-  Un contenu modifié après validation repasse en brouillon.
-- **Plateformes d'une publication** (`bo_social_post_targets`) : une même publication peut partir sur plusieurs comptes ; pour chacun : statut, date, **lien du post**, budget sponsorisé, et **totaux** (j'aime, commentaires, partages, enregistrements, vues, portée, impressions, clics).
-- **Chiffres du jour** (`bo_social_post_daily_stats`) : une ligne par plateforme et par jour.
-  - `mode: "DAILY"` (défaut) : on saisit ce qui a été gagné ce jour-là.
-  - `mode: "TOTAL"` : on recopie les compteurs affichés par le réseau ; le gain du jour est calculé (total − jours précédents).
-  Ressaisir la même date **remplace** la ligne. Les totaux de la plateforme sont recalculés à chaque saisie.
-- **Relevé des comptes** (`bo_social_account_daily_stats`) : abonnés en fin de journée (nouveaux abonnés calculés depuis la veille), portée, visites du profil, messages.
-- **Interactions** = j'aime + commentaires + partages + enregistrements ; **taux d'engagement** = interactions / portée × 100.
+# Publications du média interne — `/backoffice/media/publications` (connecté)
+
+**Simple :** on enregistre ce qu'on a diffusé, où, et l'admin **saisit à la main** les chiffres (vues, j'aime, commentaires, partages).
+Aucun lien avec un site web ni avec une API de réseau social.
+
+> ⚠️ Mise à jour : exécuter `db/sql/logistique_media_mise_a_jour.sql` (ou la migration `1793145600000-LogisticsQuantitiesMediaSimple`).
+> Les anciennes tables des réseaux sociaux (`bo_social_*`) et de l'équipe média (`bo_media_team_members`) sont supprimées si elles sont vides (mettre `@force_drop = 1` dans le script pour les supprimer même si elles contiennent des données).
+
+## Une publication
+- Titre, description, type (`PHOTO`, `VIDEO`, `AUDIO`, `TEXT`, `DOCUMENT`, `OTHER`), **image de couverture** (multipart `image`), fichiers de la médiathèque (`mediaFileIds`), projet lié (facultatif).
+- **Où c'est diffusé** : `channels` en texte libre (`["Facebook", "WhatsApp", "Écran de l'accueil"]`) — `GET channels` propose les libellés déjà utilisés.
+- Statut : `DRAFT` → `PUBLISHED` → `ARCHIVED`.
+
+## Les chiffres (saisis par l'admin)
+- `POST :id/stats` `{ date?, views, likes, comments, shares, note? }` : l'admin recopie les **compteurs actuels** (ex. 1 250 vues, 80 j'aime).
+- Un relevé par jour (ressaisir la même date le remplace) ; une valeur non saisie reprend le relevé précédent.
+- Les chiffres affichés sur la publication = dernier relevé ; le **gain du jour** = différence avec le relevé précédent.
+- Saisie de plusieurs publications en une fois : `POST stats/bulk` `{ date, lines: [{ publicationId, views, likes, comments, shares }] }`.
 
 ## Routes
 | Méthode | Route | Rôle |
 |---|---|---|
-| GET | `dashboard` | Publications par statut, à valider, programmées 7 jours, chiffres d'aujourd'hui / hier, 7 derniers jours, posts sans chiffres du jour |
-| GET | `reports?from=&to=&platform=&accountId=&projectId=&campaign=&top=` | Totaux, comparaison période précédente, par plateforme, par compte (abonnés gagnés), par jour, meilleures publications |
-| GET | `calendar?from=&to=&platform=` | Calendrier éditorial (par jour) |
-| GET | `stats/missing?date=&days=` | Publications en ligne sans chiffres pour la date |
-| POST | `stats/bulk` | Saisie groupée `{ date, mode, lines: [{ targetId, likes, comments, … }] }` |
-| POST / GET | `accounts` | Ajouter / lister les comptes (avec totaux) |
-| GET / PATCH / DELETE | `accounts/:id` | Détail (30 derniers jours) / modifier / supprimer (désactivé si déjà utilisé) |
-| POST / GET | `accounts/:id/stats` | Relevé du jour du compte / historique + interactions par jour |
-| POST / GET | `posts` | Créer (avec `accountIds`) / lister (filtres statut, plateforme, compte, campagne, période, recherche) |
-| GET / PATCH / DELETE | `posts/:id` | Détail (plateformes, visuels, totaux) / modifier / supprimer (refusé s'il y a des chiffres) |
-| PATCH | `posts/:id/status` | Changer de statut `{ status, scheduledAt?, note? }` |
-| GET | `posts/:id/stats?from=&to=` | Évolution jour par jour (total et par plateforme) |
-| POST | `posts/:id/targets` | Ajouter des plateformes `{ accountIds }` |
-| POST | `targets/:targetId/publish` | Marquer publié sur la plateforme `{ postUrl, publishedAt?, externalId? }` |
-| PATCH / DELETE | `targets/:targetId` | Modifier (statut, lien, budget sponsorisé) / retirer (si pas encore publié) |
-| POST | `targets/:targetId/stats` | Chiffres du jour `{ date?, mode?, likes, comments, shares, saves, views, reach, impressions, clicks }` |
+| GET | `dashboard` | Publications par statut, totaux, 7 derniers jours, top 5, publications à mettre à jour (sans chiffres depuis 7 jours) |
+| GET | `report?from=&to=&channel=&type=&projectId=&top=` | Gains de la période : totaux, par lieu de diffusion, par type, jour par jour, meilleures publications |
+| GET | `channels` | Lieux de diffusion déjà utilisés |
+| POST / GET | `` | Créer (+ image) / lister (`status`, `type`, `channel`, `search`, `from`, `to`) |
+| GET / PATCH / DELETE | `:id` | Détail (historique des relevés) / modifier (+ image) / supprimer |
+| POST | `:id/stats` | Saisir les chiffres |
+| POST | `stats/bulk` | Saisie groupée |
+| DELETE | `stats/:statId` | Supprimer un relevé erroné |

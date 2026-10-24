@@ -46,3 +46,34 @@ export function langFrom(req: { headers: Record<string, any> }): string {
   const raw = String(req.headers['accept-language'] || 'fr').split(',')[0].split(';')[0].trim().slice(0, 2);
   return SUPPORTED_LANGS.includes(raw) ? raw : 'fr';
 }
+
+/**
+ * ✅ Logisticien : peut valider les demandes de matériel et faire les sorties.
+ * = admin plateforme, propriétaire de l'entreprise, ou utilisateur désigné (table bo_logistics_managers).
+ */
+export async function isLogisticsManager(dataSource: DataSource, user: UserEntity, companyId: string): Promise<boolean> {
+  if (isPlatformAdmin(user)) return true;
+  const owner = await dataSource.query(
+    'SELECT 1 FROM `user_has_company` WHERE `userId` = ? AND `companyId` = ? AND `isOwner` = 1 LIMIT 1',
+    [user.id, companyId],
+  );
+  if (Array.isArray(owner) && owner.length) return true;
+  const manager = await dataSource.query(
+    'SELECT 1 FROM `bo_logistics_managers` WHERE `userId` = ? AND `companyId` = ? LIMIT 1',
+    [user.id, companyId],
+  );
+  return Array.isArray(manager) && manager.length > 0;
+}
+
+export async function isCompanyOwner(dataSource: DataSource, user: UserEntity, companyId: string): Promise<boolean> {
+  if (isPlatformAdmin(user)) return true;
+  const owner = await dataSource.query(
+    'SELECT 1 FROM `user_has_company` WHERE `userId` = ? AND `companyId` = ? AND `isOwner` = 1 LIMIT 1',
+    [user.id, companyId],
+  );
+  return Array.isArray(owner) && owner.length > 0;
+}
+
+/** multipart/form-data : "true"/"false"/"1"/"0" → booléen */
+export const toBool = ({ value }: { value: any }) =>
+  value === undefined || value === null || value === '' ? undefined : value === true || value === 'true' || value === '1';

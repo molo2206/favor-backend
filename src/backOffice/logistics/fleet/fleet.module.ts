@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { FilesModule } from 'src/files/files.module';
+import { LogisticsImageService } from '../common/logistics-image.service';
 import { FleetVehicle } from './entities/fleet-vehicle.entity';
 import { FleetMission } from './entities/fleet-mission.entity';
 import { FleetFuelLog } from './entities/fleet-fuel-log.entity';
@@ -12,6 +14,7 @@ import { FleetController } from './fleet.controller';
 
 @Module({
   imports: [
+    FilesModule, // ✅ images des engins, missions, reçus, entretiens, documents
     TypeOrmModule.forFeature([
       FleetVehicle,
       FleetMission,
@@ -23,7 +26,7 @@ import { FleetController } from './fleet.controller';
     ]),
   ],
   controllers: [FleetController],
-  providers: [FleetService],
+  providers: [FleetService, LogisticsImageService],
   exports: [FleetService],
 })
 export class FleetModule { }

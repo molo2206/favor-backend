@@ -57,9 +57,17 @@ export class Asset {
   @Column({ type: 'varchar', length: 100, nullable: true })
   barcode?: string | null;
 
-  /** Nombre d'unités (ex. 20 chaises enregistrées en un lot) */
+  /** Nombre d'unités dans le patrimoine (ex. 20 chaises enregistrées en un lot) */
   @Column({ type: 'int', default: 1 })
   quantity: number;
+
+  /** ✅ AJOUT : unités encore en stock (non remises à un employé) — sorties partielles possibles */
+  @Column({ type: 'int', default: 1 })
+  quantityAvailable: number;
+
+  /** ✅ AJOUT : unité de comptage (pièce, carton, rame, litre…) */
+  @Column({ type: 'varchar', length: 20, default: 'pièce' })
+  unit: string;
 
   @Column({ type: 'enum', enum: AssetStatus, default: AssetStatus.AVAILABLE })
   status: AssetStatus;

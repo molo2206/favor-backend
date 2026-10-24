@@ -11,11 +11,16 @@ import { PaginatedResponseDto } from 'src/products/dto/paginated-response.dto';
 import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
 import {
+  FLEET_TYPES_WITHOUT_FUEL,
+  FLEET_TYPES_WITHOUT_PLATE,
+  FleetFuelType,
   FleetMaintenanceStatus,
   FleetMissionStatus,
   FleetMissionType,
   FleetVehicleStatus,
+  FleetVehicleType,
 } from '../common/logistics.enums';
+import { LogisticsImageService } from '../common/logistics-image.service';
 import { pageParams, reference, resolveCompanyId } from '../common/logistics-access';
 import { FleetVehicle } from './entities/fleet-vehicle.entity';
 import { FleetMission } from './entities/fleet-mission.entity';
@@ -40,17 +45,67 @@ import {
   UpdateDocumentDto,
   UpdateVehicleDto,
   VehicleQueryDto,
+  FleetFamily,
 } from './dto/fleet.dto';
 
+type File = Express.Multer.File | undefined;
+
+/** ✅ Familles d'engins → types */
+export const FLEET_FAMILY_TYPES: Record<FleetFamily, FleetVehicleType[]> = {
+  BICYCLES: [FleetVehicleType.BICYCLE],
+  MOTORBIKES: [FleetVehicleType.MOTORBIKE, FleetVehicleType.TRICYCLE],
+  VEHICLES: [FleetVehicleType.CAR, FleetVehicleType.PICKUP, FleetVehicleType.VAN],
+  TRUCKS_BUSES: [FleetVehicleType.TRUCK, FleetVehicleType.BUS],
+  OTHER: [FleetVehicleType.OTHER],
+};
+
+export function fleetFamilyOf(type: FleetVehicleType): FleetFamily {
+  return (Object.keys(FLEET_FAMILY_TYPES) as FleetFamily[]).find((f) => FLEET_FAMILY_TYPES[f].includes(type)) ?? 'OTHER';
+}
+
+/** Libellé d'un engin : immatriculation, sinon n° interne */
+export function fleetLabel(v: { plateNumber?: string | null; internalNumber?: string | null }): string {
+  return v.plateNumber || v.internalNumber || '-';
+}
+
 /**
- * Charroi de l'entreprise : véhicules, missions, carburant, entretien, documents.
+ * Charroi de l'entreprise = tout le matériel roulant (voitures, camions, bus, motos, tricycles, vélos) :
+ * engins, missions, carburant, entretien, documents — avec une image pour chaque enregistrement.
  */
 @Injectable()
 export class FleetService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly i18n: I18nService,
+    private readonly images: LogisticsImageService,
   ) { }
+
+  private async photo(file: File, url?: string | null, allowDocuments = false): Promise<string | null> {
+    return (await this.images.upload(file, 'logistics', allowDocuments)) ?? url ?? null;
+  }
+
+  private withFamily<T extends FleetVehicle | null | undefined>(v: T) {
+    return v ? { ...v, family: fleetFamilyOf(v.type), label: fleetLabel(v) } : v;
+  }
+
+  /** N° interne unique : ENG-0001 */
+  private async nextInternalNumber(companyId: string): Promise<string> {
+    const count = await this.dataSource.manager.count(FleetVehicle, { where: { companyId } });
+    for (let n = count + 1; n < count + 1000; n++) {
+      const ref = `ENG-${String(n).padStart(4, '0')}`;
+      if (!(await this.dataSource.manager.count(FleetVehicle, { where: { companyId, internalNumber: ref } }))) return ref;
+    }
+    return `ENG-${Date.now()}`;
+  }
+
+  /** Règles selon le type d'engin : plaque obligatoire ou non, carburant */
+  private normalizeVehicleType(type: FleetVehicleType, plate: string | null | undefined, fuelType: FleetFuelType | undefined, lang: string) {
+    if (!plate && !FLEET_TYPES_WITHOUT_PLATE.includes(type)) {
+      throw new BadRequestException(this.t('fleet.plate_required', lang, { type }));
+    }
+    if (FLEET_TYPES_WITHOUT_FUEL.includes(type)) return FleetFuelType.NONE;
+    return fuelType;
+  }
 
   private t(key: string, lang: string, params?: Record<string, any>): string {
     return this.i18n.translate(key, lang, params);
@@ -97,29 +152,46 @@ export class FleetService {
   // VÉHICULES
   // ============================================================
 
-  async createVehicle(dto: CreateVehicleDto, user: UserEntity, lang: string) {
+  async createVehicle(dto: CreateVehicleDto, file: File, user: UserEntity, lang: string) {
     const companyId = await this.company(user, dto.companyId, lang);
     await this.checkBranch(dto.branchId, companyId, lang);
     await this.checkUser(dto.assignedDriverId, lang);
-    const plate = dto.plateNumber.trim().toUpperCase();
-    const dup = await this.dataSource.manager.count(FleetVehicle, { where: { companyId, plateNumber: plate } });
-    if (dup) throw new ConflictException(this.t('fleet.plate_exists', lang, { plate }));
+    const type = dto.type ?? FleetVehicleType.CAR;
+    const plate = dto.plateNumber?.trim().toUpperCase() || null;
+    const fuelType = this.normalizeVehicleType(type, plate, dto.fuelType, lang);
+    if (plate) {
+      const dup = await this.dataSource.manager.count(FleetVehicle, { where: { companyId, plateNumber: plate } });
+      if (dup) throw new ConflictException(this.t('fleet.plate_exists', lang, { plate }));
+    }
+    let internalNumber = dto.internalNumber?.trim().toUpperCase() || null;
+    if (internalNumber) {
+      const dup = await this.dataSource.manager.count(FleetVehicle, { where: { companyId, internalNumber } });
+      if (dup) throw new ConflictException(this.t('fleet.internal_number_exists', lang, { number: internalNumber }));
+    } else {
+      internalNumber = await this.nextInternalNumber(companyId);
+    }
+    const photoUrl = await this.photo(file, dto.photoUrl);
 
     const vehicle = await this.dataSource.manager.save(
       FleetVehicle,
       this.dataSource.manager.create(FleetVehicle, {
         ...dto,
         companyId,
+        type,
+        ...(fuelType ? { fuelType } : {}),
         plateNumber: plate,
+        internalNumber,
+        brand: dto.brand?.trim() || null,
         mileage: dto.mileage ?? 0,
         status: FleetVehicleStatus.AVAILABLE,
+        photoUrl,
         createdById: user?.id ?? null,
       }),
     );
-    return { message: this.t('fleet.vehicle_created', lang, { plate }), data: vehicle };
+    return { message: this.t('fleet.vehicle_created', lang, { plate: fleetLabel(vehicle) }), data: this.withFamily(vehicle) };
   }
 
-  async updateVehicle(id: string, dto: UpdateVehicleDto, user: UserEntity, lang: string) {
+  async updateVehicle(id: string, dto: UpdateVehicleDto, file: File, user: UserEntity, lang: string) {
     const vehicle = await this.getVehicle(id, user, lang);
     if (dto.companyId && dto.companyId !== vehicle.companyId) {
       throw new BadRequestException(this.t('fleet.company_change_forbidden', lang));
@@ -134,13 +206,30 @@ export class FleetService {
       if (dup) throw new ConflictException(this.t('fleet.plate_exists', lang, { plate }));
       dto.plateNumber = plate;
     }
+    if (dto.internalNumber) {
+      const number = dto.internalNumber.trim().toUpperCase();
+      const dup = await this.dataSource.manager.count(FleetVehicle, {
+        where: { companyId: vehicle.companyId, internalNumber: number, id: Not(id) },
+      });
+      if (dup) throw new ConflictException(this.t('fleet.internal_number_exists', lang, { number }));
+      dto.internalNumber = number;
+    }
+    const nextType = dto.type ?? vehicle.type;
+    const nextPlate = dto.plateNumber !== undefined ? dto.plateNumber || null : vehicle.plateNumber ?? null;
+    const fuel = this.normalizeVehicleType(nextType, nextPlate, dto.fuelType ?? vehicle.fuelType, lang);
+    if (fuel) dto.fuelType = fuel;
+    const uploaded = await this.images.upload(file);
+    if (uploaded) {
+      await this.images.remove(vehicle.photoUrl);
+      dto.photoUrl = uploaded;
+    }
     if (dto.mileage !== undefined && dto.mileage < vehicle.mileage) {
       throw new BadRequestException(this.t('fleet.mileage_decrease', lang, { current: vehicle.mileage }));
     }
     const { companyId: _c, ...data } = dto;
     Object.assign(vehicle, data);
     const saved = await this.dataSource.manager.save(FleetVehicle, vehicle);
-    return { message: this.t('fleet.vehicle_updated', lang), data: saved };
+    return { message: this.t('fleet.vehicle_updated', lang), data: this.withFamily(saved) };
   }
 
   async assignDriver(id: string, dto: AssignDriverDto, user: UserEntity, lang: string) {
@@ -175,20 +264,37 @@ export class FleetService {
     if (query.status) qb.andWhere('v.status = :status', { status: query.status });
     else qb.andWhere('v.status != :retired', { retired: FleetVehicleStatus.RETIRED });
     if (query.type) qb.andWhere('v.type = :type', { type: query.type });
+    if (query.family) qb.andWhere('v.type IN (:...familyTypes)', { familyTypes: FLEET_FAMILY_TYPES[query.family] });
     if (query.search?.trim()) {
       const kw = `%${query.search.trim().toLowerCase()}%`;
       qb.andWhere(
         new Brackets((w) =>
           w
             .where('LOWER(v.plateNumber) LIKE :kw', { kw })
+            .orWhere('LOWER(v.internalNumber) LIKE :kw', { kw })
             .orWhere('LOWER(v.brand) LIKE :kw', { kw })
             .orWhere('LOWER(v.model) LIKE :kw', { kw })
             .orWhere('LOWER(driver.fullName) LIKE :kw', { kw }),
         ),
       );
     }
-    const [items, total] = await qb.orderBy('v.plateNumber', 'ASC').skip(skip).take(limit).getManyAndCount();
-    return { message: this.t('fleet.vehicles', lang), data: new PaginatedResponseDto(items, total, page, limit) };
+    const [items, total] = await qb.orderBy('v.type', 'ASC').addOrderBy('v.plateNumber', 'ASC').addOrderBy('v.internalNumber', 'ASC').skip(skip).take(limit).getManyAndCount();
+    // Nombre d'engins par famille (onglets du backoffice)
+    const byType = await this.dataSource.manager
+      .createQueryBuilder(FleetVehicle, 'v')
+      .select('v.type', 'type')
+      .addSelect('COUNT(*)', 'count')
+      .where('v.companyId = :companyId AND v.status != :retired', { companyId, retired: FleetVehicleStatus.RETIRED })
+      .groupBy('v.type')
+      .getRawMany();
+    const families = (Object.keys(FLEET_FAMILY_TYPES) as FleetFamily[]).map((f) => ({
+      family: f,
+      count: byType.filter((r) => FLEET_FAMILY_TYPES[f].includes(r.type)).reduce((s, r) => s + Number(r.count), 0),
+    }));
+    return {
+      message: this.t('fleet.vehicles', lang),
+      data: { ...new PaginatedResponseDto(items.map((v) => this.withFamily(v)) as any, total, page, limit), families },
+    };
   }
 
   /** Fiche complète d'un véhicule avec son historique */
@@ -217,7 +323,7 @@ export class FleetService {
     return {
       message: this.t('fleet.vehicle_detail', lang),
       data: {
-        vehicle,
+        vehicle: this.withFamily(vehicle),
         totals: {
           fuelLiters: Number(fuelTotals?.liters ?? 0),
           fuelCost: Number(fuelTotals?.cost ?? 0),
@@ -262,17 +368,22 @@ export class FleetService {
     );
   }
 
-  async createMission(dto: CreateMissionDto, user: UserEntity, lang: string) {
+  async createMission(dto: CreateMissionDto, file: File, user: UserEntity, lang: string) {
     const vehicle = await this.getVehicle(dto.vehicleId, user, lang);
     if ([FleetVehicleStatus.RETIRED, FleetVehicleStatus.OUT_OF_SERVICE].includes(vehicle.status)) {
       throw new BadRequestException(this.t('fleet.vehicle_unavailable', lang, { status: vehicle.status }));
     }
     await this.checkUser(dto.driverId, lang);
+    const photoUrl = await this.photo(file, dto.photoUrl);
     const mission = await this.createMissionInternal(this.dataSource.manager, vehicle, {
       ...dto,
       plannedStartAt: dto.plannedStartAt ? new Date(dto.plannedStartAt) : null,
       plannedEndAt: dto.plannedEndAt ? new Date(dto.plannedEndAt) : null,
     } as Partial<FleetMission>, user);
+    if (photoUrl) {
+      mission.photoUrl = photoUrl;
+      await this.dataSource.manager.update(FleetMission, { id: mission.id }, { photoUrl });
+    }
     return { message: this.t('fleet.mission_created', lang, { reference: mission.reference }), data: mission };
   }
 
@@ -342,9 +453,11 @@ export class FleetService {
     return { message: this.t('fleet.mission_started', lang), data: saved };
   }
 
-  async completeMission(id: string, dto: CompleteMissionDto, user: UserEntity, lang: string) {
+  async completeMission(id: string, dto: CompleteMissionDto, file: File, user: UserEntity, lang: string) {
     const mission = await this.getMission(id, user, lang);
     if (dto.note) mission.notes = [mission.notes, dto.note].filter(Boolean).join('\n');
+    const photoUrl = await this.photo(file, dto.photoUrl);
+    if (photoUrl) mission.photoUrl = photoUrl;
     const saved = await this.dataSource.transaction((m) => this.completeMissionInternal(m, mission, dto.endMileage, lang));
     return { message: this.t('fleet.mission_completed', lang, { distance: saved.distanceKm ?? 0 }), data: saved };
   }
@@ -379,8 +492,11 @@ export class FleetService {
   // CARBURANT
   // ============================================================
 
-  async addFuel(dto: CreateFuelLogDto, user: UserEntity, lang: string) {
+  async addFuel(dto: CreateFuelLogDto, file: File, user: UserEntity, lang: string) {
     const vehicle = await this.getVehicle(dto.vehicleId, user, lang);
+    if (vehicle.fuelType === FleetFuelType.NONE) throw new BadRequestException(this.t('fleet.no_fuel', lang));
+    // Image du reçu
+    const receiptUrl = await this.photo(file, dto.receiptUrl);
     await this.checkUser(dto.driverId, lang);
     const totalCost = Math.round(dto.liters * dto.unitPrice * 100) / 100;
     const log = await this.dataSource.transaction(async (m) => {
@@ -389,6 +505,7 @@ export class FleetService {
         m.create(FleetFuelLog, {
           ...dto,
           companyId: vehicle.companyId,
+          receiptUrl,
           filledAt: dto.filledAt ? new Date(dto.filledAt) : new Date(),
           totalCost,
           currency: dto.currency || 'USD',
@@ -442,8 +559,9 @@ export class FleetService {
   // ENTRETIEN / PANNES
   // ============================================================
 
-  async createMaintenance(dto: CreateMaintenanceDto, user: UserEntity, lang: string) {
+  async createMaintenance(dto: CreateMaintenanceDto, file: File, user: UserEntity, lang: string) {
     const vehicle = await this.getVehicle(dto.vehicleId, user, lang);
+    const photoUrl = await this.photo(file, dto.photoUrl);
     const result = await this.dataSource.transaction(async (m) => {
       const { startNow, ...data } = dto;
       const maint = await m.save(
@@ -451,6 +569,7 @@ export class FleetService {
         m.create(FleetMaintenance, {
           ...data,
           companyId: vehicle.companyId,
+          photoUrl,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
           currency: dto.currency || 'USD',
           status: startNow ? FleetMaintenanceStatus.IN_PROGRESS : FleetMaintenanceStatus.SCHEDULED,
@@ -491,8 +610,9 @@ export class FleetService {
     return { message: this.t('fleet.maintenance_started', lang), data: saved };
   }
 
-  async completeMaintenance(id: string, dto: CompleteMaintenanceDto, user: UserEntity, lang: string) {
+  async completeMaintenance(id: string, dto: CompleteMaintenanceDto, file: File, user: UserEntity, lang: string) {
     const maint = await this.getMaintenance(id, user, lang);
+    const photoUrl = await this.photo(file, dto.photoUrl);
     if (![FleetMaintenanceStatus.SCHEDULED, FleetMaintenanceStatus.IN_PROGRESS].includes(maint.status)) {
       throw new BadRequestException(this.t('fleet.maintenance_bad_status', lang, { status: maint.status }));
     }
@@ -503,6 +623,7 @@ export class FleetService {
         nextDueDate: dto.nextDueDate ?? maint.nextDueDate,
         nextDueMileage: dto.nextDueMileage ?? maint.nextDueMileage,
         description: dto.description ?? maint.description,
+        photoUrl: photoUrl ?? maint.photoUrl ?? null,
         status: FleetMaintenanceStatus.COMPLETED,
         startedAt: maint.startedAt ?? new Date(),
         completedAt: new Date(),
@@ -564,11 +685,13 @@ export class FleetService {
   // DOCUMENTS
   // ============================================================
 
-  async createDocument(dto: CreateDocumentDto, user: UserEntity, lang: string) {
+  async createDocument(dto: CreateDocumentDto, file: File, user: UserEntity, lang: string) {
     const vehicle = await this.getVehicle(dto.vehicleId, user, lang);
+    // Scan du document : image ou PDF
+    const fileUrl = await this.photo(file, dto.fileUrl, true);
     const doc = await this.dataSource.manager.save(
       FleetDocument,
-      this.dataSource.manager.create(FleetDocument, { ...dto, companyId: vehicle.companyId }),
+      this.dataSource.manager.create(FleetDocument, { ...dto, fileUrl, companyId: vehicle.companyId }),
     );
     return { message: this.t('fleet.document_created', lang), data: doc };
   }
@@ -580,8 +703,13 @@ export class FleetService {
     return doc;
   }
 
-  async updateDocument(id: string, dto: UpdateDocumentDto, user: UserEntity, lang: string) {
+  async updateDocument(id: string, dto: UpdateDocumentDto, file: File, user: UserEntity, lang: string) {
     const doc = await this.getDocument(id, user, lang);
+    const uploaded = await this.images.upload(file, 'logistics', true);
+    if (uploaded) {
+      await this.images.remove(doc.fileUrl);
+      dto.fileUrl = uploaded;
+    }
     if (dto.vehicleId && dto.vehicleId !== doc.vehicleId) {
       const vehicle = await this.getVehicle(dto.vehicleId, user, lang);
       if (vehicle.companyId !== doc.companyId) throw new BadRequestException(this.t('fleet.company_change_forbidden', lang));

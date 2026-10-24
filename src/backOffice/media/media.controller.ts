@@ -35,7 +35,6 @@ import {
   CreateMediaProjectDto,
   CreateMediaServiceDto,
   CreateMediaSessionDto,
-  CreateTeamMemberDto,
   MediaFileQueryDto,
   MediaProjectQueryDto,
   MediaServiceQueryDto,
@@ -48,7 +47,6 @@ import {
   UpdateMediaProjectDto,
   UpdateMediaServiceDto,
   UpdateMediaSessionDto,
-  UpdateTeamMemberDto,
 } from './dto/media.dto';
 
 /**
@@ -97,37 +95,6 @@ export class MediaController {
   @AuditAction(ActionType.DELETE, 'media_service')
   deleteService(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: UserEntity) {
     return this.catalog.deleteService(id, user, langFrom(req));
-  }
-
-  // ============================================================
-  // ÉQUIPE
-  // ============================================================
-  @Post('team')
-  @AuditAction(ActionType.CREATE, 'media_team')
-  addMember(@Req() req: Request, @Body() dto: CreateTeamMemberDto, @CurrentUser() user: UserEntity) {
-    return this.catalog.addMember(dto, user, langFrom(req));
-  }
-
-  @Get('team')
-  listMembers(
-    @Req() req: Request,
-    @CurrentUser() user: UserEntity,
-    @Query('companyId') companyId?: string,
-    @Query('role') role?: string,
-  ) {
-    return this.catalog.listMembers(user, langFrom(req), companyId, role);
-  }
-
-  @Patch('team/:id')
-  @AuditAction(ActionType.UPDATE, 'media_team')
-  updateMember(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateTeamMemberDto, @CurrentUser() user: UserEntity) {
-    return this.catalog.updateMember(id, dto, user, langFrom(req));
-  }
-
-  @Delete('team/:id')
-  @AuditAction(ActionType.DELETE, 'media_team')
-  removeMember(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: UserEntity) {
-    return this.catalog.removeMember(id, user, langFrom(req));
   }
 
   // ============================================================

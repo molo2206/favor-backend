@@ -8,7 +8,6 @@ import { MediaSession } from '../entities/media-session.entity';
 import { MediaProject } from '../entities/media-project.entity';
 import { MediaSessionCrew } from '../entities/media-session-crew.entity';
 import { MediaSessionEquipment } from '../entities/media-session-equipment.entity';
-import { MediaTeamMember } from '../entities/media-team-member.entity';
 import {
   AssignCrewDto,
   AvailabilityQueryDto,
@@ -95,18 +94,23 @@ export class MediaScheduleService {
     }
   }
 
+  /** ✅ Équipe = employés des Ressources humaines (hr_employees actifs, liés à un compte utilisateur) */
+  private async hrEmployee(m: EntityManager, userId: string, companyId: string): Promise<{ id: string; fullName: string; position: string | null } | null> {
+    const rows = await m.query(
+      "SELECT `id`, `fullName`, `position` FROM `hr_employees` WHERE `userId` = ? AND `companyId` = ? AND `status` = 'ACTIVE' LIMIT 1",
+      [userId, companyId],
+    );
+    return rows?.[0] ?? null;
+  }
+
   private async addCrewInternal(m: EntityManager, session: MediaSession, dto: AssignCrewDto, user: UserEntity, lang: string) {
-    if (!(await this.common.isMember(dto.userId, session.companyId))) {
-      throw new BadRequestException(this.common.t('media.user_not_in_company', lang));
+    if (!(await this.hrEmployee(m, dto.userId, session.companyId))) {
+      throw new BadRequestException(this.common.t('media.not_hr_employee', lang));
     }
     const exists = await m.findOne(MediaSessionCrew, { where: { sessionId: session.id, userId: dto.userId } });
     if (exists) return exists;
     await this.assertCrewFree(m, session, dto.userId, lang);
-    let role = dto.role;
-    if (!role) {
-      const member = await m.findOne(MediaTeamMember, { where: { companyId: session.companyId, userId: dto.userId } });
-      role = (member?.roles?.[0] as MediaCrewRole) ?? MediaCrewRole.OTHER;
-    }
+    const role = dto.role ?? MediaCrewRole.OTHER;
     const crew = await m.save(MediaSessionCrew, m.create(MediaSessionCrew, { sessionId: session.id, userId: dto.userId, role, note: dto.note ?? null }));
     await this.common.record(session.projectId, MediaEventType.CREW_ASSIGNED, `${role} affecté à « ${session.title} »`, user, {
       payload: { sessionId: session.id, userId: dto.userId, role },
@@ -345,15 +349,32 @@ export class MediaScheduleService {
   }
 
   /**
-   * Disponibilités sur un créneau : membres de l'équipe et matériel média
-   * (biens de l'entreprise) libres ou occupés.
+   * Disponibilités sur un créneau : employés (Ressources humaines) et matériel média
+   * (biens de l'entreprise) libres ou occupés. Un employé en congé approuvé est indisponible.
    */
   async availability(query: AvailabilityQueryDto, user: UserEntity, lang: string) {
     const companyId = await this.common.company(user, query.companyId, lang);
     const { start, end } = this.parsePeriod(query.startAt, query.endAt, lang);
     const m = this.m;
 
-    const members = await m.find(MediaTeamMember, { where: { companyId, isActive: true }, relations: ['user'] });
+    // Équipe = employés RH actifs avec un compte (filtre facultatif : département)
+    const members: { employeeId: string; userId: string; fullName: string; position: string | null; departmentId: string | null; department: string | null }[] = await m.query(
+      'SELECT e.`id` AS employeeId, e.`userId` AS userId, e.`fullName` AS fullName, e.`position` AS position, e.`departmentId` AS departmentId, d.`name` AS department ' +
+        'FROM `hr_employees` e LEFT JOIN `hr_departments` d ON d.`id` = e.`departmentId` ' +
+        "WHERE e.`companyId` = ? AND e.`status` = 'ACTIVE' AND e.`userId` IS NOT NULL" +
+        (query.departmentId ? ' AND e.`departmentId` = ?' : '') +
+        ' ORDER BY e.`fullName` ASC',
+      query.departmentId ? [companyId, query.departmentId] : [companyId],
+    );
+    const onLeaveRows: { employeeId: string; startDate: any; endDate: any }[] = members.length
+      ? await m.query(
+        "SELECT `employeeId`, `startDate`, `endDate` FROM `hr_leaves` WHERE `status` = 'APPROVED' AND `startDate` <= ? AND `endDate` >= ? AND `employeeId` IN (" +
+          members.map(() => '?').join(',') +
+          ')',
+        [end, start, ...members.map((x) => x.employeeId)],
+      )
+      : [];
+    const onLeave = new Map(onLeaveRows.map((r) => [r.employeeId, r]));
     const busyCrew = await m
       .createQueryBuilder(MediaSessionCrew, 'c')
       .innerJoinAndSelect('c.session', 's')
@@ -404,10 +425,13 @@ export class MediaScheduleService {
         startAt: start,
         endAt: end,
         team: members.map((mb) => ({
+          employeeId: mb.employeeId,
           userId: mb.userId,
-          fullName: mb.user?.fullName ?? null,
-          roles: mb.roles ?? [],
-          available: !busyByUser.has(mb.userId),
+          fullName: mb.fullName,
+          position: mb.position,
+          department: mb.department,
+          onLeave: onLeave.has(mb.employeeId),
+          available: !busyByUser.has(mb.userId) && !onLeave.has(mb.employeeId),
           busyWith: busyByUser.get(mb.userId) ?? [],
         })),
         equipment: assets.map((a) => ({

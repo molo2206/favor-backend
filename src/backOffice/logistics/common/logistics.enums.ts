@@ -8,14 +8,23 @@ export enum FleetVehicleType {
   TRUCK = 'TRUCK',
   MOTORBIKE = 'MOTORBIKE',
   BUS = 'BUS',
+  // ✅ AJOUT : tout le matériel roulant
+  BICYCLE = 'BICYCLE', // vélo (sans immatriculation ni carburant)
+  TRICYCLE = 'TRICYCLE', // tricycle (motorisé ou non)
   OTHER = 'OTHER',
 }
+
+/** Engins sans immatriculation obligatoire (un n° interne est attribué) */
+export const FLEET_TYPES_WITHOUT_PLATE: FleetVehicleType[] = [FleetVehicleType.BICYCLE, FleetVehicleType.TRICYCLE, FleetVehicleType.OTHER];
+/** Engins sans carburant */
+export const FLEET_TYPES_WITHOUT_FUEL: FleetVehicleType[] = [FleetVehicleType.BICYCLE];
 
 export enum FleetFuelType {
   PETROL = 'PETROL',
   DIESEL = 'DIESEL',
   ELECTRIC = 'ELECTRIC',
   HYBRID = 'HYBRID',
+  NONE = 'NONE', // ✅ AJOUT : sans carburant (vélo…)
   OTHER = 'OTHER',
 }
 
@@ -91,6 +100,7 @@ export enum AssetCondition {
 /** Mouvements enregistrés dans l'historique d'un bien */
 export enum AssetMovementType {
   ACQUIRED = 'ACQUIRED', // entrée dans le patrimoine
+  STOCK_IN = 'STOCK_IN', // ✅ AJOUT : nouvelle entrée de quantité (réapprovisionnement)
   ASSIGNED = 'ASSIGNED', // remis à un employé
   RETURNED = 'RETURNED', // rendu par l'employé
   TRANSFERRED = 'TRANSFERRED', // changement de branche / d'emplacement
@@ -111,4 +121,30 @@ export enum AssetDisposalReason {
   SCRAPPED = 'SCRAPPED', // détruit / mis au rebut
   STOLEN = 'STOLEN',
   OTHER = 'OTHER',
+}
+
+// ============================================================
+// ✅ AJOUT : SORTIES PARTIELLES ET DEMANDES DE MATÉRIEL
+// ============================================================
+/** Remise d'une quantité d'un bien à un employé */
+export enum AssetAssignmentStatus {
+  ACTIVE = 'ACTIVE', // chez l'employé (tout ou partie)
+  RETURNED = 'RETURNED', // entièrement rendu
+}
+
+/** Demande de matériel : employé → logisticien → sortie */
+export enum MaterialRequestStatus {
+  PENDING = 'PENDING', // en attente de validation
+  APPROVED = 'APPROVED', // validée, rien de sorti
+  PARTIALLY_ISSUED = 'PARTIALLY_ISSUED', // une partie remise
+  ISSUED = 'ISSUED', // tout remis
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum MaterialRequestPriority {
+  LOW = 'LOW',
+  NORMAL = 'NORMAL',
+  HIGH = 'HIGH',
+  URGENT = 'URGENT',
 }

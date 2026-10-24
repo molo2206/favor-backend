@@ -1,5 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsDateString,
@@ -24,6 +24,11 @@ import {
   FleetVehicleStatus,
   FleetVehicleType,
 } from '../../common/logistics.enums';
+import { toBool } from '../../common/logistics-access';
+
+/** Familles d'engins (regroupement dans le backoffice) */
+export const FLEET_FAMILIES = ['BICYCLES', 'MOTORBIKES', 'VEHICLES', 'TRUCKS_BUSES', 'OTHER'] as const;
+export type FleetFamily = (typeof FLEET_FAMILIES)[number];
 
 // ============================================================
 // VÉHICULES
@@ -33,8 +38,11 @@ export class CreateVehicleDto {
   @IsOptional() @IsUUID() companyId?: string;
   @IsOptional() @IsUUID() branchId?: string;
 
-  @IsString() @MinLength(2) @MaxLength(30) plateNumber: string;
-  @IsString() @MinLength(1) @MaxLength(80) brand: string;
+  /** Immatriculation : obligatoire sauf vélo, tricycle et « autre » */
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(30) plateNumber?: string;
+  /** N° interne (généré si absent : ENG-0001) */
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(30) internalNumber?: string;
+  @IsOptional() @IsString() @MaxLength(80) brand?: string;
   @IsOptional() @IsString() @MaxLength(80) model?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1950) @Max(2100) year?: number;
   @IsOptional() @IsEnum(FleetVehicleType) type?: FleetVehicleType;
@@ -65,6 +73,8 @@ export class VehicleQueryDto {
   @IsOptional() @IsUUID() branchId?: string;
   @IsOptional() @IsEnum(FleetVehicleStatus) status?: FleetVehicleStatus;
   @IsOptional() @IsEnum(FleetVehicleType) type?: FleetVehicleType;
+  /** ✅ Famille : BICYCLES, MOTORBIKES (motos, tricycles), VEHICLES (voiture, pick-up, fourgon), TRUCKS_BUSES, OTHER */
+  @IsOptional() @IsEnum(FLEET_FAMILIES as unknown as string[]) family?: FleetFamily;
   @IsOptional() @IsString() search?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) limit?: number;
@@ -83,6 +93,7 @@ export class CreateMissionDto {
   @IsOptional() @IsDateString() plannedStartAt?: string;
   @IsOptional() @IsDateString() plannedEndAt?: string;
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
+  @IsOptional() @IsString() @MaxLength(500) photoUrl?: string;
 }
 
 export class StartMissionDto {
@@ -93,6 +104,7 @@ export class StartMissionDto {
 export class CompleteMissionDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) endMileage?: number;
   @IsOptional() @IsString() @MaxLength(1000) note?: string;
+  @IsOptional() @IsString() @MaxLength(500) photoUrl?: string;
 }
 
 export class CancelDto {
@@ -124,7 +136,7 @@ export class CreateFuelLogDto {
   @IsOptional() @IsString() @MaxLength(10) currency?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) mileage?: number;
   @IsOptional() @IsString() @MaxLength(150) station?: string;
-  @IsOptional() @IsBoolean() fullTank?: boolean;
+  @IsOptional() @Transform(toBool) @IsBoolean() fullTank?: boolean;
   @IsOptional() @IsString() @MaxLength(500) receiptUrl?: string;
   @IsOptional() @IsString() @MaxLength(1000) notes?: string;
 }
@@ -154,7 +166,8 @@ export class CreateMaintenanceDto {
   @IsOptional() @IsDateString() nextDueDate?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) nextDueMileage?: number;
   /** Le véhicule part au garage tout de suite */
-  @IsOptional() @IsBoolean() startNow?: boolean;
+  @IsOptional() @Transform(toBool) @IsBoolean() startNow?: boolean;
+  @IsOptional() @IsString() @MaxLength(500) photoUrl?: string;
 }
 
 export class CompleteMaintenanceDto {
@@ -163,6 +176,7 @@ export class CompleteMaintenanceDto {
   @IsOptional() @IsDateString() nextDueDate?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) nextDueMileage?: number;
   @IsOptional() @IsString() @MaxLength(2000) description?: string;
+  @IsOptional() @IsString() @MaxLength(500) photoUrl?: string;
 }
 
 export class MaintenanceQueryDto {

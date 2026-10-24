@@ -2,19 +2,16 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Brackets } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { MediaServiceEntity } from '../entities/media-service.entity';
-import { MediaTeamMember } from '../entities/media-team-member.entity';
 import { MediaProjectItem } from '../entities/media-project-item.entity';
 import {
   CreateMediaServiceDto,
-  CreateTeamMemberDto,
   MediaServiceQueryDto,
   UpdateMediaServiceDto,
-  UpdateTeamMemberDto,
 } from '../dto/media.dto';
 import { MediaServiceCategory, MediaUnit } from '../media.enums';
 import { MediaCommonService } from './media-common.service';
 
-/** Catalogue des prestations + équipe média */
+/** Catalogue des prestations (l'équipe est gérée par les Ressources humaines) */
 @Injectable()
 export class MediaCatalogService {
   constructor(private readonly common: MediaCommonService) { }
@@ -94,57 +91,5 @@ export class MediaCatalogService {
     }
     await this.m.delete(MediaServiceEntity, { id });
     return { message: this.common.t('media.service_deleted', lang), data: { id } };
-  }
-
-  // ============================================================
-  // ÉQUIPE
-  // ============================================================
-
-  async addMember(dto: CreateTeamMemberDto, user: UserEntity, lang: string) {
-    const companyId = await this.common.company(user, dto.companyId, lang);
-    const target = await this.m.findOne(UserEntity, { where: { id: dto.userId } });
-    if (!target) throw new NotFoundException(this.common.t('media.user_not_found', lang));
-    if (!(await this.common.isMember(dto.userId, companyId))) {
-      throw new BadRequestException(this.common.t('media.user_not_in_company', lang));
-    }
-    const dup = await this.m.count(MediaTeamMember, { where: { companyId, userId: dto.userId } });
-    if (dup) throw new ConflictException(this.common.t('media.member_exists', lang));
-    const member = await this.m.save(
-      MediaTeamMember,
-      this.m.create(MediaTeamMember, { ...dto, companyId, isActive: dto.isActive ?? true }),
-    );
-    return { message: this.common.t('media.member_added', lang), data: member };
-  }
-
-  async listMembers(user: UserEntity, lang: string, companyIdParam?: string, role?: string) {
-    const companyId = await this.common.company(user, companyIdParam, lang);
-    const rows = await this.m.find(MediaTeamMember, {
-      where: { companyId },
-      relations: ['user'],
-      order: { createdAt: 'ASC' },
-    });
-    const data = rows
-      .filter((r) => !role || (r.roles ?? []).includes(role))
-      .map((r) => ({
-        ...r,
-        user: r.user ? { id: r.user.id, fullName: r.user.fullName, phone: r.user.phone, email: r.user.email, image: r.user.image } : null,
-      }));
-    return { message: this.common.t('media.team', lang), data };
-  }
-
-  async updateMember(id: string, dto: UpdateTeamMemberDto, user: UserEntity, lang: string) {
-    const member = await this.m.findOne(MediaTeamMember, { where: { id } });
-    if (!member) throw new NotFoundException(this.common.t('media.member_not_found', lang));
-    await this.common.company(user, member.companyId, lang);
-    Object.assign(member, dto);
-    return { message: this.common.t('media.member_updated', lang), data: await this.m.save(MediaTeamMember, member) };
-  }
-
-  async removeMember(id: string, user: UserEntity, lang: string) {
-    const member = await this.m.findOne(MediaTeamMember, { where: { id } });
-    if (!member) throw new NotFoundException(this.common.t('media.member_not_found', lang));
-    await this.common.company(user, member.companyId, lang);
-    await this.m.delete(MediaTeamMember, { id });
-    return { message: this.common.t('media.member_removed', lang), data: { id } };
   }
 }

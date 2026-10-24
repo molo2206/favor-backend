@@ -65,24 +65,6 @@ export class MediaServiceQueryDto {
 }
 
 // ============================================================
-// ÉQUIPE
-// ============================================================
-export class CreateTeamMemberDto {
-  @IsOptional() @IsUUID() companyId?: string;
-  @IsUUID() userId: string;
-  @IsOptional() @IsArray() @ArrayMaxSize(10) @IsEnum(MediaCrewRole, { each: true }) roles?: MediaCrewRole[];
-  @IsOptional() @IsString() @MaxLength(500) skills?: string;
-  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) dayRate?: number;
-  @IsOptional() @IsBoolean() isActive?: boolean;
-}
-export class UpdateTeamMemberDto {
-  @IsOptional() @IsArray() @ArrayMaxSize(10) @IsEnum(MediaCrewRole, { each: true }) roles?: MediaCrewRole[];
-  @IsOptional() @IsString() @MaxLength(500) skills?: string;
-  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) dayRate?: number;
-  @IsOptional() @IsBoolean() isActive?: boolean;
-}
-
-// ============================================================
 // PROJETS
 // ============================================================
 export class MediaItemInputDto {
@@ -253,6 +235,8 @@ export class AvailabilityQueryDto {
   @IsOptional() @IsUUID() excludeSessionId?: string;
   /** Lister le matériel d'une catégorie de biens (ex. « Caméras », « Drones ») */
   @IsOptional() @IsUUID() assetCategoryId?: string;
+  /** ✅ Équipe = employés RH : filtrer sur un département (ex. « Média ») */
+  @IsOptional() @IsUUID() departmentId?: string;
 }
 
 // ============================================================

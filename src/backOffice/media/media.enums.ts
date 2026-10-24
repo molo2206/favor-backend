@@ -141,64 +141,21 @@ export const MEDIA_PROJECT_TRANSITIONS: Record<MediaProjectStatus, MediaProjectS
 };
 
 // ============================================================
-// RÉSEAUX SOCIAUX
+// ✅ PUBLICATIONS (média interne, chiffres saisis par l'admin)
 // ============================================================
-export enum SocialPlatform {
-  FACEBOOK = 'FACEBOOK',
-  INSTAGRAM = 'INSTAGRAM',
-  TIKTOK = 'TIKTOK',
-  YOUTUBE = 'YOUTUBE',
-  LINKEDIN = 'LINKEDIN',
-  X = 'X',
-  WHATSAPP = 'WHATSAPP', // chaîne / statut WhatsApp
-  SNAPCHAT = 'SNAPCHAT',
-  THREADS = 'THREADS',
-  PINTEREST = 'PINTEREST',
-  OTHER = 'OTHER',
-}
-
-/** Format de la publication */
-export enum SocialPostType {
-  IMAGE = 'IMAGE',
-  CAROUSEL = 'CAROUSEL',
+/** Nature du contenu publié */
+export enum MediaContentType {
+  PHOTO = 'PHOTO',
   VIDEO = 'VIDEO',
-  REEL = 'REEL', // reel / short / TikTok
-  STORY = 'STORY',
-  LIVE = 'LIVE',
+  AUDIO = 'AUDIO',
   TEXT = 'TEXT',
-  LINK = 'LINK',
+  DOCUMENT = 'DOCUMENT',
   OTHER = 'OTHER',
 }
 
-/** Cycle d'une publication */
-export enum SocialPostStatus {
-  DRAFT = 'DRAFT', // brouillon
-  PENDING_APPROVAL = 'PENDING_APPROVAL', // à valider (responsable / client)
-  APPROVED = 'APPROVED', // validée
-  SCHEDULED = 'SCHEDULED', // programmée
-  PUBLISHED = 'PUBLISHED', // publiée sur au moins une plateforme
-  CANCELLED = 'CANCELLED',
+/** Cycle simple d'une publication */
+export enum MediaPublicationStatus {
+  DRAFT = 'DRAFT', // en préparation
+  PUBLISHED = 'PUBLISHED', // diffusée
+  ARCHIVED = 'ARCHIVED', // retirée / terminée
 }
-
-/** Situation de la publication sur UNE plateforme / un compte */
-export enum SocialTargetStatus {
-  PLANNED = 'PLANNED',
-  PUBLISHED = 'PUBLISHED',
-  FAILED = 'FAILED',
-  REMOVED = 'REMOVED', // supprimée du réseau
-}
-
-/** Saisie des statistiques : chiffres du jour ou totaux affichés par le réseau */
-export enum SocialStatsMode {
-  DAILY = 'DAILY',
-  TOTAL = 'TOTAL',
-}
-
-export const SOCIAL_POST_TRANSITIONS: Record<SocialPostStatus, SocialPostStatus[]> = {
-  [SocialPostStatus.DRAFT]: [SocialPostStatus.PENDING_APPROVAL, SocialPostStatus.APPROVED, SocialPostStatus.SCHEDULED, SocialPostStatus.PUBLISHED, SocialPostStatus.CANCELLED],
-  [SocialPostStatus.PENDING_APPROVAL]: [SocialPostStatus.DRAFT, SocialPostStatus.APPROVED, SocialPostStatus.CANCELLED],
-  [SocialPostStatus.APPROVED]: [SocialPostStatus.DRAFT, SocialPostStatus.SCHEDULED, SocialPostStatus.PUBLISHED, SocialPostStatus.CANCELLED],
-  [SocialPostStatus.SCHEDULED]: [SocialPostStatus.APPROVED, SocialPostStatus.PUBLISHED, SocialPostStatus.CANCELLED],
-  [SocialPostStatus.PUBLISHED]: [],
-  [SocialPostStatus.CANCELLED]: [SocialPostStatus.DRAFT],
-};

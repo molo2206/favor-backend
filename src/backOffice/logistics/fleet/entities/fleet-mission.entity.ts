@@ -79,6 +79,10 @@ export class FleetMission {
   @Column({ type: 'text', nullable: true })
   notes?: string | null;
 
+  /** ✅ AJOUT : image (bon de mission, état du véhicule au départ / retour…) */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  photoUrl?: string | null;
+
   @Column({ type: 'varchar', length: 36, nullable: true })
   createdById?: string | null;
 

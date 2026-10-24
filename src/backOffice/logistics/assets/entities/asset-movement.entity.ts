@@ -67,6 +67,19 @@ export class AssetMovement {
   @Column({ type: 'varchar', length: 500, nullable: true })
   note?: string | null;
 
+  // ✅ AJOUT : quantité concernée, photo, liens vers la remise et la demande de matériel
+  @Column({ type: 'int', nullable: true })
+  quantity?: number | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  photoUrl?: string | null;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  assignmentId?: string | null;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  requestId?: string | null;
+
   @Column({ type: 'varchar', length: 36, nullable: true })
   performedById?: string | null;
 

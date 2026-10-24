@@ -33,6 +33,10 @@ export class AssetCategory {
   @Column({ type: 'int', nullable: true })
   depreciationYears?: number | null;
 
+  /** ✅ AJOUT : image de la catégorie */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  photoUrl?: string | null;
+
   @Column({ default: true })
   isActive: boolean;
 

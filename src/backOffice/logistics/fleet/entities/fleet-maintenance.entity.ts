@@ -70,6 +70,10 @@ export class FleetMaintenance {
   @Column({ type: 'int', nullable: true })
   nextDueMileage?: number | null;
 
+  /** ✅ AJOUT : image (facture du garage, photo de la panne…) */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  photoUrl?: string | null;
+
   @Column({ type: 'varchar', length: 36, nullable: true })
   createdById?: string | null;
 

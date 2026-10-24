@@ -9,8 +9,11 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Request } from 'express';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
@@ -40,7 +43,8 @@ import {
 } from './dto/fleet.dto';
 
 /**
- * BackOffice — Charroi (parc de véhicules de l'entreprise).
+ * BackOffice — Charroi = tout le matériel roulant (voitures, camions, bus, motos, tricycles, vélos).
+ * ✅ Image (multipart, champ `image`) : engin, mission, reçu de carburant, entretien, document (image ou PDF).
  * Préfixe : /backoffice/fleet
  */
 @Controller('backoffice/fleet')
@@ -57,8 +61,9 @@ export class FleetController {
   // ---------- Véhicules ----------
   @Post('vehicles')
   @AuditAction(ActionType.CREATE, 'fleet_vehicle')
-  createVehicle(@Req() req: Request, @Body() dto: CreateVehicleDto, @CurrentUser() user: UserEntity) {
-    return this.service.createVehicle(dto, user, langFrom(req));
+  @UseInterceptors(FileInterceptor('image'))
+  createVehicle(@Req() req: Request, @Body() dto: CreateVehicleDto, @UploadedFile() file: Express.Multer.File, @CurrentUser() user: UserEntity) {
+    return this.service.createVehicle(dto, file, user, langFrom(req));
   }
 
   @Get('vehicles')
@@ -73,13 +78,15 @@ export class FleetController {
 
   @Patch('vehicles/:id')
   @AuditAction(ActionType.UPDATE, 'fleet_vehicle')
+  @UseInterceptors(FileInterceptor('image'))
   updateVehicle(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateVehicleDto,
+    @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: UserEntity,
   ) {
-    return this.service.updateVehicle(id, dto, user, langFrom(req));
+    return this.service.updateVehicle(id, dto, file, user, langFrom(req));
   }
 
   @Patch('vehicles/:id/driver')
@@ -102,8 +109,9 @@ export class FleetController {
   // ---------- Missions ----------
   @Post('missions')
   @AuditAction(ActionType.CREATE, 'fleet_mission')
-  createMission(@Req() req: Request, @Body() dto: CreateMissionDto, @CurrentUser() user: UserEntity) {
-    return this.service.createMission(dto, user, langFrom(req));
+  @UseInterceptors(FileInterceptor('image'))
+  createMission(@Req() req: Request, @Body() dto: CreateMissionDto, @UploadedFile() file: Express.Multer.File, @CurrentUser() user: UserEntity) {
+    return this.service.createMission(dto, file, user, langFrom(req));
   }
 
   @Get('missions')
@@ -124,13 +132,15 @@ export class FleetController {
 
   @Post('missions/:id/complete')
   @AuditAction(ActionType.UPDATE, 'fleet_mission')
+  @UseInterceptors(FileInterceptor('image'))
   completeMission(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CompleteMissionDto,
+    @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: UserEntity,
   ) {
-    return this.service.completeMission(id, dto, user, langFrom(req));
+    return this.service.completeMission(id, dto, file, user, langFrom(req));
   }
 
   @Post('missions/:id/cancel')
@@ -147,8 +157,9 @@ export class FleetController {
   // ---------- Carburant ----------
   @Post('fuel')
   @AuditAction(ActionType.CREATE, 'fleet_fuel')
-  addFuel(@Req() req: Request, @Body() dto: CreateFuelLogDto, @CurrentUser() user: UserEntity) {
-    return this.service.addFuel(dto, user, langFrom(req));
+  @UseInterceptors(FileInterceptor('image'))
+  addFuel(@Req() req: Request, @Body() dto: CreateFuelLogDto, @UploadedFile() file: Express.Multer.File, @CurrentUser() user: UserEntity) {
+    return this.service.addFuel(dto, file, user, langFrom(req));
   }
 
   @Get('fuel')
@@ -165,8 +176,9 @@ export class FleetController {
   // ---------- Entretien ----------
   @Post('maintenance')
   @AuditAction(ActionType.CREATE, 'fleet_maintenance')
-  createMaintenance(@Req() req: Request, @Body() dto: CreateMaintenanceDto, @CurrentUser() user: UserEntity) {
-    return this.service.createMaintenance(dto, user, langFrom(req));
+  @UseInterceptors(FileInterceptor('image'))
+  createMaintenance(@Req() req: Request, @Body() dto: CreateMaintenanceDto, @UploadedFile() file: Express.Multer.File, @CurrentUser() user: UserEntity) {
+    return this.service.createMaintenance(dto, file, user, langFrom(req));
   }
 
   @Get('maintenance')
@@ -182,13 +194,15 @@ export class FleetController {
 
   @Post('maintenance/:id/complete')
   @AuditAction(ActionType.UPDATE, 'fleet_maintenance')
+  @UseInterceptors(FileInterceptor('image'))
   completeMaintenance(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CompleteMaintenanceDto,
+    @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: UserEntity,
   ) {
-    return this.service.completeMaintenance(id, dto, user, langFrom(req));
+    return this.service.completeMaintenance(id, dto, file, user, langFrom(req));
   }
 
   @Post('maintenance/:id/cancel')
@@ -205,8 +219,9 @@ export class FleetController {
   // ---------- Documents (assurance, contrôle technique…) ----------
   @Post('documents')
   @AuditAction(ActionType.CREATE, 'fleet_document')
-  createDocument(@Req() req: Request, @Body() dto: CreateDocumentDto, @CurrentUser() user: UserEntity) {
-    return this.service.createDocument(dto, user, langFrom(req));
+  @UseInterceptors(FileInterceptor('image'))
+  createDocument(@Req() req: Request, @Body() dto: CreateDocumentDto, @UploadedFile() file: Express.Multer.File, @CurrentUser() user: UserEntity) {
+    return this.service.createDocument(dto, file, user, langFrom(req));
   }
 
   @Get('documents')
@@ -216,13 +231,15 @@ export class FleetController {
 
   @Patch('documents/:id')
   @AuditAction(ActionType.UPDATE, 'fleet_document')
+  @UseInterceptors(FileInterceptor('image'))
   updateDocument(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateDocumentDto,
+    @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: UserEntity,
   ) {
-    return this.service.updateDocument(id, dto, user, langFrom(req));
+    return this.service.updateDocument(id, dto, file, user, langFrom(req));
   }
 
   @Delete('documents/:id')
