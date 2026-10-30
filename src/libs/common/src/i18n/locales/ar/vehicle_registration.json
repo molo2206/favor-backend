@@ -1,0 +1,15 @@
+{
+  "vehicle_registration.forbidden": "ليس لديك صلاحية الوصول إلى هذه المركبة.",
+  "vehicle_registration.not_found": "المركبة غير موجودة.",
+  "vehicle_registration.plate_exists": "اللوحة {{plate}} مسجلة مسبقًا (السجل {{reference}}).",
+  "vehicle_registration.price_range_invalid": "يجب أن يكون السعر الأقصى ({{max}}) أكبر من السعر الأدنى ({{min}}) أو مساويًا له.",
+  "vehicle_registration.broker_incomplete": "الوسيط: أدخل اسمه ورقم هاتفه (أو اترك حقول الوسيط فارغة).",
+  "vehicle_registration.broker_same_as_owner": "يجب أن يكون هاتف الوسيط مختلفًا عن هاتف المالك.",
+  "vehicle_registration.too_many_images": "الحد الأقصى {{max}} صورة لكل مركبة.",
+  "vehicle_registration.created": "تم تسجيل المركبة {{name}} (المرجع {{reference}}).",
+  "vehicle_registration.list": "تم جلب المركبات.",
+  "vehicle_registration.detail": "تم جلب تفاصيل المركبة.",
+  "vehicle_registration.updated": "تم تحديث المركبة {{reference}}.",
+  "vehicle_registration.status_updated": "المركبة {{reference}}: الحالة {{status}}.",
+  "vehicle_registration.deleted": "تم حذف المركبة {{reference}}."
+}

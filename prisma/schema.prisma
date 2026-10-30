@@ -1,0 +1,85 @@
+// =====================================================================
+// Schéma Prisma de Favor Help — base MySQL de PRODUCTION (la même que l'application actuelle)
+//
+// ⚠️ RÈGLES DE SÉCURITÉ
+//   - Ce schéma est LU depuis la base :  npm run prisma:pull   (lecture seule, ne modifie pas la base)
+//   - JAMAIS « prisma migrate » ni « prisma db push » : les tables restent gérées par les scripts SQL
+//     et les migrations TypeORM existantes (db/sql, db/migrations).
+//   - Après chaque pull :  npm run prisma:generate
+//
+// Les modèles ci-dessous sont ceux utilisés par les premiers microservices. Après « prisma:pull »,
+// le fichier contient toutes les tables (mêmes noms de modèles = noms des tables, mêmes champs = colonnes).
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  // Construite à partir de DB_HOST / DB_PORT / DB_USERNAME / DB_PASSWORD / DB_DATABASE (scripts/prisma.js)
+  url      = env("DATABASE_URL")
+}
+
+/// Utilisateurs (lecture seule depuis les microservices : vérification du compte)
+model users {
+  id       String  @id @db.VarChar(36)
+  fullName String? @db.VarChar(255)
+  role     String  @db.VarChar(50)
+  isActive Boolean @default(true)
+
+  user_payment_methods user_payment_methods[]
+}
+
+/// Moyens de paiement des utilisateurs (Mobile Money, FPay, Cash)
+model user_payment_methods {
+  id          String    @id @db.VarChar(36)
+  userId      String    @db.VarChar(36)
+  type        String    @db.VarChar(20)
+  label       String?   @db.VarChar(80)
+  provider    String?   @db.VarChar(60)
+  phone       String?   @db.VarChar(30)
+  fpayAccount String?   @db.VarChar(120)
+  currency    String?   @db.VarChar(10)
+  isDefault   Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  lastUsedAt  DateTime? @db.DateTime(6)
+  createdAt   DateTime  @default(now()) @db.DateTime(6)
+  updatedAt   DateTime  @default(now()) @db.DateTime(6)
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_payment_methods_user")
+
+  @@index([userId, isActive], map: "idx_upm_user")
+}
+
+/// Paramètres globaux de l'application
+model app_settings {
+  id                        String   @id @db.VarChar(36)
+  appName                   String?  @db.VarChar(255)
+  slogan                    String?  @db.VarChar(255)
+  logo                      String?  @db.Text
+  email                     String?  @db.VarChar(255)
+  phone                     String?  @db.VarChar(50)
+  service_phone             String?  @db.VarChar(50)
+  market_phone              String?  @db.VarChar(50)
+  restaurant_phone          String?  @db.VarChar(50)
+  car_phone                 String?  @db.VarChar(50)
+  rental_phone              String?  @db.VarChar(50)
+  booking_phone             String?  @db.VarChar(50)
+  address                   String?  @db.VarChar(255)
+  defaultCurrency           String   @default("USD") @db.VarChar(10)
+  defaultLanguage           String   @default("fr") @db.VarChar(10)
+  support                   String?  @db.LongText
+  seo                       String?  @db.LongText
+  config                    String?  @db.LongText
+  exchangeRate              Decimal  @default(1.00) @db.Decimal(10, 2)
+  ecommerceDeliveryFee      Decimal  @default(2.50) @db.Decimal(10, 2)
+  marketDeliveryFee         Decimal  @default(3.00) @db.Decimal(10, 2)
+  restaurantBaseDeliveryFee Decimal  @default(2.00) @db.Decimal(10, 2)
+  restaurantExtraFeePerItem Decimal  @default(0.50) @db.Decimal(10, 2)
+  privacyPolicy             String?  @db.LongText
+  termsOfUse                String?  @db.LongText
+  legal                     String?  @db.LongText
+  createdAt                 DateTime @default(now()) @db.DateTime(6)
+  updatedAt                 DateTime @default(now()) @db.DateTime(6)
+}

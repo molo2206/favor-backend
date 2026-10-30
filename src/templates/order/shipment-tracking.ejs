@@ -1,0 +1,39 @@
+<%#
+  Nouvelle étape de suivi d'un colis (LTA) — e-mail
+  Variables : shipment (trackingNumber, status, trackingName, trackingTime, shippingFrom, shippingTo, package…),
+              user, statusText (facultatif)
+  Mise en page commune : src/email/email-layout.ts
+%>
+<%
+  const s = (typeof shipment !== 'undefined' && shipment) ? shipment : {};
+  const u = (typeof user !== 'undefined' && user) ? user : {};
+  const ref = s.trackingNumber || String(s.id || '').slice(0, 8).toUpperCase();
+  const st = (typeof statusText !== 'undefined' && statusText) ? statusText : (s.status || '');
+  const step = s.trackingName || '';
+  const cls = String(st + ' ' + (s.trackingType || '')).toLowerCase();
+  const tone = /annul|cancel|retard|delay|perdu|lost/.test(cls) ? 'danger' : /livr|deliver|arriv|arrival|recu|reçu/.test(cls) ? 'success' : 'info';
+  const from = s.shippingFrom || s.pickupFrom || '';
+  const to = s.shippingTo || s.deliveryTo || '';
+  const pkg = s.package || {};
+%>
+<%- emailLayout({
+  preheader: t('email.shipment.tracking_title') + ' — ' + ref + ' : ' + st,
+  title: t('email.shipment.tracking_title'),
+  reference: 'N° ' + ref,
+  date: formatDate(s.trackingTime || new Date(), true),
+  badge: { text: st, tone: tone },
+  recipient: { name: u.fullName, lines: [ u.email, u.phone ] },
+  greeting: t('order.email.greeting', { name: u.fullName || '' }),
+  paragraphs: [ t('email.shipment.tracking_intro', { ref: ref, status: st }) ],
+  details: {
+    items: [
+      { label: t('email.shipment.tracking_number'), value: ref },
+      { label: t('email.shipment.step'), value: step },
+      { label: t('email.layout.status'), value: st },
+      { label: t('email.shipment.route'), value: [from, to].filter(Boolean).join(' → ') },
+      { label: t('email.shipment.package'), value: pkg.description || '' },
+      { label: t('email.shipment.updated_at'), value: formatDate(s.trackingTime || new Date(), true) }
+    ]
+  },
+  boxes: [ { lines: [ t('email.shipment.track_hint') ], tone: 'info' } ]
+}) %>

@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="<%= lang || 'fr' %>">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>
+    <%= translations.invoice || 'Invoice' %> - Favor Help
+  </title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        "Helvetica Neue",
+        sans-serif;
+      background-color: #f1f5f9;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .invoice-container {
+      position: relative;
+      width: 210mm;
+      height: 297mm;
+      background-color: #ffffff;
+      overflow: hidden;
+      background-image:
+        repeating-linear-gradient(135deg,
+          rgba(56, 189, 248, 0.02) 0px,
+          rgba(56, 189, 248, 0.02) 2px,
+          transparent 2px,
+          transparent 22px),
+        repeating-linear-gradient(45deg,
+          rgba(56, 189, 248, 0.02) 0px,
+          rgba(56, 189, 248, 0.02) 2px,
+          transparent 2px,
+          transparent 22px);
+    }
+
+    .invoice-padding {
+      padding: 22px 42px 18px 42px;
+    }
+
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1.5rem;
+    }
+
+    .logo {
+      width: 150px;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .invoice-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #0118d8;
+      line-height: 1.2;
+    }
+
+    .draft-badge-wrapper {
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+
+    .draft-text {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .draft-badge {
+      background-color: #e2e8f0;
+      color: #475569;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 500;
+    }
+
+    .parties {
+      margin-top: 18px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1.5rem;
+    }
+
+    .sender,
+    .recipient {
+      font-size: 0.655rem;
+      line-height: 1.5;
+      color: #1e293b;
+    }
+
+    .sender p,
+    .recipient p {
+      margin: 0;
+    }
+
+    .sender .bold,
+    .recipient .bold {
+      font-weight: 700;
+    }
+
+    .social-icons {
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: #64748b;
+    }
+
+    .social-icons i {
+      font-size: 1rem;
+    }
+
+    .recipient {
+      text-align: right;
+    }
+
+    .dates {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.655rem;
+      color: #1e293b;
+    }
+
+    .date-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .date-row .label {
+      font-weight: 700;
+    }
+
+    .table-wrapper {
+      margin-top: 14px;
+      overflow: hidden;
+      border-radius: 0.125rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.655rem;
+    }
+
+    thead tr {
+      background-color: #0118d8;
+      color: #ffffff;
+      text-align: left;
+    }
+
+    th {
+      padding: 7px 9px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    th:first-child {
+      width: 2.5rem;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    td {
+      padding: 9px;
+      color: #334155;
+    }
+
+    td.bold {
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    /* =========================
+         BOTTOM SECTION
+         PAYMENT METHOD À GAUCHE
+         TOTAUX À DROITE
+      ========================= */
+    .bottom-section {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 25px;
+    }
+
+    /*
+        ✅ Payment Method à GAUCHE
+      */
+    .terms {
+      order: 1;
+      max-width: 20rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      font-size: 0.655rem;
+      color: #1e293b;
+    }
+
+    .terms p {
+      margin: 0;
+    }
+
+    .terms .label {
+      font-weight: 700;
+    }
+
+    /*
+        ✅ Totaux à DROITE
+      */
+    .totals {
+      order: 2;
+      width: 270px;
+      max-width: 270px;
+      flex-shrink: 0;
+      align-self: flex-start;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.125rem;
+      overflow: hidden;
+      margin-left: auto;
+    }
+
+    .total-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      font-size: 0.655rem;
+    }
+
+    .total-row .label {
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .total-row .value {
+      color: #1e293b;
+      white-space: nowrap;
+    }
+
+    .total-row+.total-row {
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .total-row.ttc {
+      background-color: #0118d8;
+      color: #ffffff;
+    }
+
+    .total-row.ttc .label,
+    .total-row.ttc .value {
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    .invoice-notes {
+      margin-top: 16px;
+      padding: 10px 14px;
+      background-color: #f8fafc;
+      border-radius: 0.125rem;
+      font-size: 0.655rem;
+      line-height: 1.45;
+      color: #475569;
+    }
+
+    .invoice-notes p {
+      margin: 0 0 0.35rem 0;
+    }
+
+    .invoice-notes p:last-child {
+      margin-bottom: 0;
+    }
+
+    .invoice-notes .notes-title {
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 0.35rem;
+      font-size: 0.75rem;
+    }
+
+    .thank-you {
+      margin-top: 12px;
+      text-align: center;
+      font-size: 0.655rem;
+      color: #64748b;
+      font-style: italic;
+    }
+
+    .legal-footer {
+      margin-top: 10px;
+      padding-top: 9px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 0.655rem;
+      line-height: 1.35;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    .legal-footer p {
+      margin: 0 0 0.2rem 0;
+    }
+
+    .legal-footer p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* =========================
+         STAMP
+      ========================= */
+    .stamp-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      overflow: hidden;
+    }
+
+    .stamp-image {
+      width: 250px;
+      max-width: 100%;
+      height: auto;
+      opacity: 0.85;
+      transform: rotate(-18deg) scale(1);
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15));
+    }
+
+    .stamp-image.paid {
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15));
+    }
+
+    .stamp-image.unpaid {
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15)) hue-rotate(0deg) saturate(1.2);
+    }
+
+    @media print {
+
+      html,
+      body {
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+      }
+
+      body {
+        display: block;
+      }
+
+      .invoice-container {
+        width: 210mm;
+        height: 297mm;
+        min-height: 297mm;
+        max-height: 297mm;
+        margin: 0;
+        overflow: hidden;
+        page-break-after: avoid;
+        page-break-before: avoid;
+      }
+
+      .invoice-padding {
+        page-break-inside: avoid;
+      }
+
+      .parties,
+      .dates,
+      .table-wrapper,
+      .bottom-section,
+      .invoice-notes,
+      .thank-you,
+      .legal-footer {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="invoice-container">
+    <!-- =========================
+           STAMP PAID / UNPAID
+      ========================= -->
+    <div class="stamp-overlay">
+      <% const paymentStatus=(order && order.paymentStatus ? String(order.paymentStatus).trim().toUpperCase()
+        : 'PENDING' ); %>
+        <% if (paymentStatus==='PAID' ) { %>
+          <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20GREEN.png"
+            alt="<%= translations.status_paid || 'Paid' %>" class="stamp-image paid" />
+          <% } else { %>
+            <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20RED.png"
+              alt="<%= translations.status_pending || 'Unpaid' %>" class="stamp-image unpaid" />
+            <% } %>
+    </div>
+
+    <div class="invoice-padding">
+      <!-- =========================
+             EXPÉDITEUR / CLIENT
+        ========================= -->
+      <div class="parties">
+        <div class="sender">
+          <img src="https://admin.favorhelp.com/logos/logo-dark.png" alt="Favor Help" class="logo" />
+          <p class="bold">Favor Help</p>
+          <p>Office 1, Q.Murara, 012, Goma</p>
+          <p>Nord-Kivu, Congo-Kinshasa</p>
+          <p>RCCM : CD/BN/RCCM/26-B-223</p>
+          <p>N°Tel : +24397964940</p>
+        </div>
+
+        <div class="recipient">
+          <p class="bold">
+            <%= user ? user.fullName : 'Client' %>
+          </p>
+          <p>
+            <%= user ? user.email : '' %>
+          </p>
+          <p>
+            <%= user ? user.phone : '' %>
+          </p>
+        </div>
+      </div>
+
+      <!-- =========================
+             FACTURE / DATE
+        ========================= -->
+      <div class="dates">
+        <div class="header-right">
+          <h1 class="invoice-title">
+            <%= translations.invoice %>
+          </h1>
+          <div class="draft-badge-wrapper">
+            <span class="draft-text">
+              <%= translations.number %>
+                <%= order ? order.invoiceNumber : 'INV-001' %>
+            </span>
+          </div>
+        </div>
+
+        <div class="date-row">
+          <span class="label">
+            <%= translations.date %>
+          </span>
+          <span>
+            <%= order && order.createdAt ? new Date(order.createdAt).toLocaleDateString(lang==='en' ? 'en-US' : 'fr-FR'
+              ) : new Date().toLocaleDateString(lang==='en' ? 'en-US' : 'fr-FR' ) %>
+          </span>
+        </div>
+      </div>
+
+      <!-- =========================
+             TABLEAU DES PRODUITS
+        ========================= -->
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>
+                <%= translations.number %>
+              </th>
+              <th>
+                <%= translations.products %>
+              </th>
+              <!-- <th>
+                <%= translations.unit %>
+              </th> -->
+              <th>
+                <%= translations.qty %>
+              </th>
+              <th>
+                <%= translations.unit_price %>
+              </th>
+              <th>
+                <%= translations.total %>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (subOrders && subOrders.length) { var lineNumber=1; subOrders.forEach(function(subOrder) { if
+              (subOrder.items && subOrder.items.length) { subOrder.items.forEach(function(item) { %>
+              <tr>
+                <td>
+                  <%= lineNumber++ %>
+                </td>
+                <td class="bold">
+                  <%= item.product ? item.product.name : translations.products %>
+                </td>
+                <!-- <td>
+                  <%= item.unit || translations.hour %>
+                </td> -->
+                <td>
+                  <%= item.quantity || 1 %>
+                </td>
+                <td>
+                  <%= order ? order.currency : 'USD' %>
+                    <%= Number(item.price || 0).toFixed(2) %>
+                </td>
+                <td class="bold">
+                  <%= order ? order.currency : 'USD' %>
+                    <%= (Number(item.price || 0) * Number(item.quantity || 1)).toFixed(2) %>
+                </td>
+              </tr>
+              <% }); } }); } else { %>
+                <tr>
+                  <td colspan="6" style="text-align:center; padding:1rem;">
+                    <%= translations.no_items %>
+                  </td>
+                </tr>
+                <% } %>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- =========================
+             BOTTOM SECTION
+             PAYMENT METHOD À GAUCHE
+             TOTAUX À DROITE
+        ========================= -->
+      <div class="bottom-section">
+
+        <!-- ✅ Payment Method à GAUCHE -->
+        <div class="terms">
+          <div>
+            <p class="label">
+              <%= translations.payment_method %>
+            </p>
+            <p>
+              <%= order && order.paymentMethod ? order.paymentMethod : translations.cash %>
+            </p>
+          </div>
+        </div>
+
+        <!-- ✅ Totaux à DROITE -->
+        <div class="totals">
+          <div class="total-row">
+            <span class="label">
+              <%= translations.total_ht %>
+            </span>
+            <span class="value">
+              <%= order ? order.currency : 'USD' %>
+                <%= order ? Number(order.totalAmount || 0).toFixed(2) : '0.00' %>
+            </span>
+          </div>
+
+          <div class="total-row">
+            <span class="label">
+              <%= translations.shipping_cost %>
+            </span>
+            <span class="value">
+              <%= order ? order.currency : 'USD' %>
+                <%= order && order.shippingCost ? Number(order.shippingCost).toFixed(2) : '0.00' %>
+            </span>
+          </div>
+
+          <div class="total-row vat">
+            <span class="label">
+              <%= translations.vat %>
+            </span>
+            <span class="value">
+              <%= order ? order.currency : 'USD' %>
+                <%= order && order.vatAmount ? Number(order.vatAmount).toFixed(2) : '0.00' %>
+            </span>
+          </div>
+
+          <div class="total-row ttc">
+            <span class="label">
+              <%= translations.total_ttc %>
+            </span>
+            <span class="value">
+              <%= order ? order.currency : 'USD' %>
+                <%= order ? (Number(order.totalAmount || 0) + Number(order.shippingCost || 0) + Number(order.vatAmount
+                  || 0)).toFixed(2) : '0.00' %>
+            </span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- =========================
+             NOTES
+        ========================= -->
+      <div class="invoice-notes">
+        <p class="notes-title">
+          <%= translations.notes_conditions %>
+        </p>
+        <p>
+          <%= translations.notes_line_1 %>
+        </p>
+        <p>
+          <%= translations.notes_line_2 %>
+        </p>
+      </div>
+
+      <!-- =========================
+             REMERCIEMENT
+        ========================= -->
+      <p class="thank-you">
+        <%= translations.thank_you_footer %>
+      </p>
+
+      <!-- =========================
+             FOOTER LÉGAL
+        ========================= -->
+      <div class="legal-footer">
+        <p>
+          <%= translations.legal_line_1 %>
+        </p>
+        <p>
+          <%= translations.legal_line_2 %>
+        </p>
+        <p>
+          <%= translations.legal_line_3 %>
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

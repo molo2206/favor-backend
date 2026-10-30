@@ -1,0 +1,16 @@
+{
+  "branch_created": "Tawi limeundwa kwa mafanikio.",
+  "branch_updated": "Tawi limesasishwa kwa mafanikio.",
+  "branch_deleted": "Tawi limefutwa kwa mafanikio.",
+  "branch_retrieved": "Tawi limepatikana kwa mafanikio.",
+  "branches_retrieved": "Matawi yamepatikana kwa mafanikio.",
+  "branch_not_found": "Tawi lenye kitambulisho {{id}} halikupatikana.",
+  "forbidden_edit_branch": "Unaweza kuhariri matawi ya kampuni yako inayotumika pekee.",
+  "country_not_found": "Nchi yenye kitambulisho {{id}} haikupatikana.",
+  "city_not_found": "Mji wenye kitambulisho {{id}} haukupatikana.",
+  "failed_retrieve_branches": "Imeshindwa kupata matawi.",
+  "failed_retrieve_branch": "Imeshindwa kupata tawi.",
+  "failed_create_branch": "Imeshindwa kuunda tawi.",
+  "failed_update_branch": "Imeshindwa kusasisha tawi.",
+  "failed_delete_branch": "Imeshindwa kufuta tawi."
+}

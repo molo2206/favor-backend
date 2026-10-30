@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "monorepo": true,
+  "root": ".",
+  "sourceRoot": "apps/api-gateway/src",
+  "compilerOptions": {
+    "webpack": false,
+    "deleteOutDir": false,
+    "tsConfigPath": "apps/api-gateway/tsconfig.app.json"
+  },
+  "projects": {
+    "api-gateway": {
+      "type": "application",
+      "root": "apps/api-gateway",
+      "entryFile": "apps/api-gateway/src/main",
+      "sourceRoot": "apps/api-gateway/src",
+      "compilerOptions": { "tsConfigPath": "apps/api-gateway/tsconfig.app.json" }
+    },
+    "payment-methods-service": {
+      "type": "application",
+      "root": "apps/payment-methods-service",
+      "entryFile": "apps/payment-methods-service/src/main",
+      "sourceRoot": "apps/payment-methods-service/src",
+      "compilerOptions": { "tsConfigPath": "apps/payment-methods-service/tsconfig.app.json" }
+    },
+    "settings-service": {
+      "type": "application",
+      "root": "apps/settings-service",
+      "entryFile": "apps/settings-service/src/main",
+      "sourceRoot": "apps/settings-service/src",
+      "compilerOptions": { "tsConfigPath": "apps/settings-service/tsconfig.app.json" }
+    },
+    "contracts": { "type": "library", "root": "libs/contracts", "entryFile": "index", "sourceRoot": "libs/contracts/src" },
+    "database": { "type": "library", "root": "libs/database", "entryFile": "index", "sourceRoot": "libs/database/src" },
+    "rpc": { "type": "library", "root": "libs/rpc", "entryFile": "index", "sourceRoot": "libs/rpc/src" }
+  }
+}
