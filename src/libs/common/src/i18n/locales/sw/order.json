@@ -268,5 +268,8 @@
   "order.availability_staff_partial_title": "⚠️ Agizo {{invoiceNumber}}: linapatikana kwa sehemu",
   "order.availability_staff_partial_body": "Hazipatikani: {{unavailable}}. Zinapatikana: {{available}} ({{availableAmount}} {{currency}}). Wasiliana na mteja kurekebisha agizo.",
   "order.availability_staff_unavailable_title": "❌ Agizo {{invoiceNumber}}: hakuna bidhaa inayopatikana",
-  "order.availability_staff_unavailable_body": "Hazipatikani: {{unavailable}}. Agizo haliwezi kufikishwa: likatae au wasiliana na mteja."
+  "order.availability_staff_unavailable_body": "Hazipatikani: {{unavailable}}. Agizo haliwezi kufikishwa: likatae au wasiliana na mteja.",
+  "dashboard.no_active_company": "Hakuna kampuni hai: chagua kampuni yako kwanza.",
+  "dashboard.company_forbidden": "Huna ruhusa ya dashibodi ya kampuni hii.",
+  "dashboard.company_not_found": "Kampuni haijapatikana."
 }

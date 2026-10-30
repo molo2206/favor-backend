@@ -64,6 +64,7 @@ import { DriverVehicleModule } from './Course et Taxi/DriverVehicle/driver-vehic
 import { PricingModule } from './Course et Taxi/Pricing/pricing.module';
 import { DriverLocationModule } from './Course et Taxi/DriverLocation/driver-location.module';
 import { RideModule } from './Course et Taxi/Ride/ride.module';
+import { CompanyDashboardModule } from './company-dashboard/company-dashboard.module'; // ✅ dashboard par type d'entreprise
 import { DriverCashoutModule } from './Course et Taxi/DriverCashout/driver-cashout.module';
 import { DriverAssociationModule } from './Course et Taxi/DriverAssociation/driver-association.module';
 import { RideChatModule } from './Course et Taxi/RideChat/ride-chat.module';
@@ -204,6 +205,7 @@ import { VehicleRegistrationModule } from './vehicle-registration/vehicle-regist
     DriverLocationModule,
     PricingModule,
     RideModule,
+    CompanyDashboardModule,
     DriverCashoutModule, // ✅ retrait des gains des chauffeurs via F-Pay (taxi/driver/cashout)
     DriverAssociationModule, // ✅ chauffeurs privés / membres d'une association
     RideChatModule, // ✅ chat chauffeur ↔ client (texte + vocal) + historique admin

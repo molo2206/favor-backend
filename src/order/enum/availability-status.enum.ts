@@ -25,9 +25,13 @@ export enum OrderAvailabilitySummary {
   UNAVAILABLE = 'UNAVAILABLE',
 }
 
-/** ORDER_AVAILABILITY_CHECK=false dans le .env désactive la confirmation (fonctionnement d'avant) */
-export function availabilityRequiredFor(_orderType?: string | null): boolean {
-  return String(process.env.ORDER_AVAILABILITY_CHECK ?? 'true').trim().toLowerCase() !== 'false';
+/**
+ * Seulement les commandes RESTAURANT (les autres types : rien ne change).
+ * ORDER_AVAILABILITY_CHECK=false dans le .env désactive la confirmation (fonctionnement d'avant).
+ */
+export function availabilityRequiredFor(orderType?: string | null): boolean {
+  if (String(process.env.ORDER_AVAILABILITY_CHECK ?? 'true').trim().toLowerCase() === 'false') return false;
+  return String(orderType || '').toUpperCase() === 'RESTAURANT';
 }
 
 /** Résumé d'une liste de statuts de produits */

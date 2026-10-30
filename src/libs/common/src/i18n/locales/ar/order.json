@@ -268,5 +268,8 @@
   "order.availability_staff_partial_title": "⚠️ الطلب {{invoiceNumber}}: توفر جزئي",
   "order.availability_staff_partial_body": "غير متوفر: {{unavailable}}. متوفر: {{available}} ({{availableAmount}} {{currency}}). تواصل مع العميل لتعديل الطلب.",
   "order.availability_staff_unavailable_title": "❌ الطلب {{invoiceNumber}}: لا يوجد منتج متوفر",
-  "order.availability_staff_unavailable_body": "غير متوفر: {{unavailable}}. لا يمكن توصيل الطلب: ارفضه أو تواصل مع العميل."
+  "order.availability_staff_unavailable_body": "غير متوفر: {{unavailable}}. لا يمكن توصيل الطلب: ارفضه أو تواصل مع العميل.",
+  "dashboard.no_active_company": "لا توجد شركة نشطة: اختر شركتك أولاً.",
+  "dashboard.company_forbidden": "ليس لديك صلاحية الوصول إلى لوحة تحكم هذه الشركة.",
+  "dashboard.company_not_found": "الشركة غير موجودة."
 }

@@ -268,5 +268,8 @@
   "order.availability_staff_partial_title": "⚠️ Order {{invoiceNumber}}: partially available",
   "order.availability_staff_partial_body": "Unavailable: {{unavailable}}. Available: {{available}} ({{availableAmount}} {{currency}}). Contact the customer to adjust the order.",
   "order.availability_staff_unavailable_title": "❌ Order {{invoiceNumber}}: no product available",
-  "order.availability_staff_unavailable_body": "Unavailable: {{unavailable}}. The order cannot be delivered: reject it or contact the customer."
+  "order.availability_staff_unavailable_body": "Unavailable: {{unavailable}}. The order cannot be delivered: reject it or contact the customer.",
+  "dashboard.no_active_company": "No active company: select your company first.",
+  "dashboard.company_forbidden": "You do not have access to this company's dashboard.",
+  "dashboard.company_not_found": "Company not found."
 }

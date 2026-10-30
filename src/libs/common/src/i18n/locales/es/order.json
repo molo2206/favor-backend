@@ -268,5 +268,8 @@
   "order.availability_staff_partial_title": "⚠️ Pedido {{invoiceNumber}}: disponibilidad parcial",
   "order.availability_staff_partial_body": "No disponible(s): {{unavailable}}. Disponible(s): {{available}} ({{availableAmount}} {{currency}}). Contacte al cliente para ajustar el pedido.",
   "order.availability_staff_unavailable_title": "❌ Pedido {{invoiceNumber}}: ningún producto disponible",
-  "order.availability_staff_unavailable_body": "No disponible(s): {{unavailable}}. El pedido no puede entregarse: recháselo o contacte al cliente."
+  "order.availability_staff_unavailable_body": "No disponible(s): {{unavailable}}. El pedido no puede entregarse: recháselo o contacte al cliente.",
+  "dashboard.no_active_company": "Ninguna empresa activa: seleccione primero su empresa.",
+  "dashboard.company_forbidden": "No tiene acceso al panel de esta empresa.",
+  "dashboard.company_not_found": "Empresa no encontrada."
 }

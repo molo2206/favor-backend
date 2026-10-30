@@ -1,5 +1,7 @@
 # Disponibilité des produits d'une commande (version simple)
 
+**Seulement pour les commandes RESTAURANT** (les autres types de commande ne changent pas).
+
 La structure existante ne change pas. Il n'y a aucun nouveau blocage des statuts ni de la livraison.
 
 ## Fonctionnement
