@@ -253,5 +253,20 @@
   "order.push_shop_new_order_body": "{{customer}} a commandé {{quantity}} article(s) : {{products}}. Montant : {{totalAmount}} {{currency}}.",
   "order.classified_not_orderable": "« {{productName}} » est une annonce : contactez directement l'annonceur, elle ne peut pas être commandée.",
   "order.push_order_payment_received_title": "Paiement reçu",
-  "order.push_order_payment_received_body": "Le paiement de votre commande {{invoiceNumber}} est confirmé. Merci pour votre confiance !"
+  "order.push_order_payment_received_body": "Le paiement de votre commande {{invoiceNumber}} est confirmé. Merci pour votre confiance !",
+  "order.availability_view": "Disponibilité des produits de la commande",
+  "order.availability_list": "Commandes à confirmer",
+  "order.availability_forbidden": "Vous n'êtes pas propriétaire des produits de cette commande.",
+  "order.availability_item_forbidden": "Le produit {{orderItemId}} ne fait pas partie de vos produits dans cette commande.",
+  "order.availability_closed": "La disponibilité ne peut plus être modifiée (statut de la commande : {{status}}).",
+  "order.availability_invalid_status": "Choisissez « AVAILABLE » (disponible) ou « UNAVAILABLE » (indisponible).",
+  "order.availability_nothing_to_confirm": "Aucun produit à confirmer.",
+  "order.availability_saved": "Disponibilité enregistrée. Tous les propriétaires ont répondu.",
+  "order.availability_saved_waiting": "Disponibilité enregistrée. En attente des autres propriétaires.",
+  "order.availability_staff_available_title": "✅ Commande {{invoiceNumber}} : produits disponibles",
+  "order.availability_staff_available_body": "Tous les propriétaires ont confirmé. La commande peut être traitée et livrée.",
+  "order.availability_staff_partial_title": "⚠️ Commande {{invoiceNumber}} : disponibilité partielle",
+  "order.availability_staff_partial_body": "Indisponible(s) : {{unavailable}}. Disponible(s) : {{available}} ({{availableAmount}} {{currency}}). Contactez le client pour ajuster la commande.",
+  "order.availability_staff_unavailable_title": "❌ Commande {{invoiceNumber}} : aucun produit disponible",
+  "order.availability_staff_unavailable_body": "Indisponible(s) : {{unavailable}}. La commande ne peut pas partir en livraison : rejetez-la ou contactez le client."
 }

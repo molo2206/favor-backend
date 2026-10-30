@@ -253,5 +253,20 @@
   "order.push_shop_new_order_body": "{{customer}} ordered {{quantity}} item(s): {{products}}. Amount: {{totalAmount}} {{currency}}.",
   "order.classified_not_orderable": "“{{productName}}” is a classified ad: contact the seller directly, it cannot be ordered.",
   "order.push_order_payment_received_title": "Payment received",
-  "order.push_order_payment_received_body": "Payment for your order {{invoiceNumber}} is confirmed. Thank you for your trust!"
+  "order.push_order_payment_received_body": "Payment for your order {{invoiceNumber}} is confirmed. Thank you for your trust!",
+  "order.availability_view": "Order product availability",
+  "order.availability_list": "Orders to confirm",
+  "order.availability_forbidden": "You do not own the products of this order.",
+  "order.availability_item_forbidden": "Item {{orderItemId}} is not one of your products in this order.",
+  "order.availability_closed": "Availability can no longer be changed (order status: {{status}}).",
+  "order.availability_invalid_status": "Choose \"AVAILABLE\" or \"UNAVAILABLE\".",
+  "order.availability_nothing_to_confirm": "No product to confirm.",
+  "order.availability_saved": "Availability saved. All owners have answered.",
+  "order.availability_saved_waiting": "Availability saved. Waiting for the other owners.",
+  "order.availability_staff_available_title": "✅ Order {{invoiceNumber}}: products available",
+  "order.availability_staff_available_body": "All owners confirmed. The order can be processed and delivered.",
+  "order.availability_staff_partial_title": "⚠️ Order {{invoiceNumber}}: partially available",
+  "order.availability_staff_partial_body": "Unavailable: {{unavailable}}. Available: {{available}} ({{availableAmount}} {{currency}}). Contact the customer to adjust the order.",
+  "order.availability_staff_unavailable_title": "❌ Order {{invoiceNumber}}: no product available",
+  "order.availability_staff_unavailable_body": "Unavailable: {{unavailable}}. The order cannot be delivered: reject it or contact the customer."
 }

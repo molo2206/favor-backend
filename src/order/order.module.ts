@@ -46,6 +46,9 @@ import { AttributeModule } from 'src/AttributGlobal/attribute.module';
 import { OrderCallService } from './order-call.service';
 
 import { BranchDeliveryService } from './branch-delivery.service';
+// ✅ Disponibilité des produits confirmée par leur propriétaire
+import { OrderAvailabilityService } from './order-availability.service';
+import { OrderAvailabilityController } from './order-availability.controller';
 
 @Module({
   imports: [
@@ -86,6 +89,7 @@ import { BranchDeliveryService } from './branch-delivery.service';
     OrderCallService, // ✅ nouvelle commande : notification Firebase sous forme d'appel
     OrderDeliveryService,        // 🔥 RENOMMÉ
     BranchDeliveryService,       // ✅ livreurs par branche (commandes restaurant)
+    OrderAvailabilityService,    // ✅ disponibilité des produits (propriétaires)
     SmsHelper,
     OrderNotificationHelper,
     NotificationHelper,
@@ -95,6 +99,7 @@ import { BranchDeliveryService } from './branch-delivery.service';
     I18nService,
   ],
   controllers: [
+    OrderAvailabilityController, // ✅ avant OrderController : routes /orders/availability/*
     OrderController,
     DeliveryController,
   ],

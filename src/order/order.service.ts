@@ -54,6 +54,7 @@ import { PermissionHelper } from 'src/users/utility/helpers/permission.helper';
 import { I18nService } from 'src/libs/common/src';
 import { CancelOrderDto } from './dto/create-cancel-order.dto';
 import { BranchDeliveryService } from './branch-delivery.service';
+import { ItemAvailabilityStatus, availabilityRequiredFor } from './enum/availability-status.enum';
 import { BranchEntity } from 'src/branch/entity/branch.entity';
 import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/company_has_userResource.entity';
 import { Resource } from 'src/ressource/entity/resource.entity';
@@ -621,6 +622,9 @@ export class OrderService {
       console.log(`[Order] Commande ${type} avec paiement ${selectedMethod} – en attente`);
     }
 
+    // ✅ Disponibilité : chaque produit attend la confirmation de son propriétaire
+    const itemAvailability = availabilityRequiredFor(type) ? ItemAvailabilityStatus.PENDING : null;
+
     const isRestaurantAutoPaid = type === CompanyType.RESTAURANT &&
       (selectedMethod === PaymentMethod.MOBILE_MONEY ||
         selectedMethod === PaymentMethod.CASH ||
@@ -666,6 +670,7 @@ export class OrderService {
         sku: selection?.sku ?? null,
         variationLabel: selection?.variationLabel ?? null,
         attributesSnapshot: selection?.attributesSnapshot ?? null,
+        availabilityStatus: itemAvailability, // ✅ en attente de confirmation du propriétaire
         selectedAttributes: this.productAttributeService.buildOrderItemAttributes(
           this.orderItemRepo.manager,
           order.id,
@@ -1976,6 +1981,11 @@ export class OrderService {
         itemsByCompany.set(companyId, entry);
       }
 
+      // ✅ Produits en attente de confirmation de disponibilité ?
+      const needsAvailability = (finalOrder.orderItems ?? []).some(
+        (i) => i.availabilityStatus === ItemAvailabilityStatus.PENDING,
+      );
+
       for (const companyId of companyIds) {
         const group = groupedByCompany.get(companyId);
         const info = itemsByCompany.get(companyId) ?? { names: [], quantity: 0 };
@@ -2013,6 +2023,8 @@ export class OrderService {
               companyId: String(companyId),
               invoiceNumber: String(finalOrder.invoiceNumber ?? ''),
               orderType: String(finalOrder.type ?? ''),
+              // ✅ Le propriétaire doit confirmer la disponibilité (GET / PATCH /orders/availability/:orderId)
+              confirmAvailability: needsAvailability ? 'true' : 'false',
             },
             info.image,
           );
@@ -2027,6 +2039,7 @@ export class OrderService {
                 action: 'NEW_ORDER_FOR_SHOP',
                 companyId: String(companyId),
                 invoiceNumber: String(finalOrder.invoiceNumber ?? ''),
+                confirmAvailability: needsAvailability ? 'true' : 'false',
               },
               imageUrl: info.image,
             })
@@ -2042,6 +2055,7 @@ export class OrderService {
               currency: finalOrder.currency,
               type: finalOrder.type,
               action: 'NEW_ORDER_FOR_SHOP',
+              confirmAvailability: needsAvailability,
             })
             .catch((err: any) => console.error('[ShopOwner] save notification error:', err?.message));
 

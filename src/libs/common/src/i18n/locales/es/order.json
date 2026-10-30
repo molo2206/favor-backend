@@ -253,5 +253,20 @@
   "order.push_shop_new_order_body": "{{customer}} pidió {{quantity}} artículo(s): {{products}}. Importe: {{totalAmount}} {{currency}}.",
   "order.classified_not_orderable": "«{{productName}}» es un anuncio: contacte directamente al anunciante, no se puede pedir.",
   "order.push_order_payment_received_title": "Pago recibido",
-  "order.push_order_payment_received_body": "El pago de su pedido {{invoiceNumber}} está confirmado. ¡Gracias por su confianza!"
+  "order.push_order_payment_received_body": "El pago de su pedido {{invoiceNumber}} está confirmado. ¡Gracias por su confianza!",
+  "order.availability_view": "Disponibilidad de los productos del pedido",
+  "order.availability_list": "Pedidos por confirmar",
+  "order.availability_forbidden": "No es propietario de los productos de este pedido.",
+  "order.availability_item_forbidden": "El artículo {{orderItemId}} no es uno de sus productos en este pedido.",
+  "order.availability_closed": "La disponibilidad ya no se puede modificar (estado del pedido: {{status}}).",
+  "order.availability_invalid_status": "Elija «AVAILABLE» (disponible) o «UNAVAILABLE» (no disponible).",
+  "order.availability_nothing_to_confirm": "Ningún producto por confirmar.",
+  "order.availability_saved": "Disponibilidad guardada. Todos los propietarios han respondido.",
+  "order.availability_saved_waiting": "Disponibilidad guardada. Esperando a los demás propietarios.",
+  "order.availability_staff_available_title": "✅ Pedido {{invoiceNumber}}: productos disponibles",
+  "order.availability_staff_available_body": "Todos los propietarios confirmaron. El pedido puede procesarse y entregarse.",
+  "order.availability_staff_partial_title": "⚠️ Pedido {{invoiceNumber}}: disponibilidad parcial",
+  "order.availability_staff_partial_body": "No disponible(s): {{unavailable}}. Disponible(s): {{available}} ({{availableAmount}} {{currency}}). Contacte al cliente para ajustar el pedido.",
+  "order.availability_staff_unavailable_title": "❌ Pedido {{invoiceNumber}}: ningún producto disponible",
+  "order.availability_staff_unavailable_body": "No disponible(s): {{unavailable}}. El pedido no puede entregarse: recháselo o contacte al cliente."
 }

@@ -253,5 +253,20 @@
   "order.push_shop_new_order_body": "{{customer}} ameagiza bidhaa {{quantity}}: {{products}}. Kiasi: {{totalAmount}} {{currency}}.",
   "order.classified_not_orderable": "« {{productName}} » ni tangazo: wasiliana na muuzaji moja kwa moja, haliwezi kuagizwa.",
   "order.push_order_payment_received_title": "Malipo yamepokelewa",
-  "order.push_order_payment_received_body": "Malipo ya oda yako {{invoiceNumber}} yamethibitishwa. Asante kwa kutuamini!"
+  "order.push_order_payment_received_body": "Malipo ya oda yako {{invoiceNumber}} yamethibitishwa. Asante kwa kutuamini!",
+  "order.availability_view": "Upatikanaji wa bidhaa za agizo",
+  "order.availability_list": "Maagizo ya kuthibitisha",
+  "order.availability_forbidden": "Wewe si mmiliki wa bidhaa za agizo hili.",
+  "order.availability_item_forbidden": "Bidhaa {{orderItemId}} si mojawapo ya bidhaa zako katika agizo hili.",
+  "order.availability_closed": "Upatikanaji hauwezi kubadilishwa tena (hali ya agizo: {{status}}).",
+  "order.availability_invalid_status": "Chagua \"AVAILABLE\" (inapatikana) au \"UNAVAILABLE\" (haipatikani).",
+  "order.availability_nothing_to_confirm": "Hakuna bidhaa ya kuthibitisha.",
+  "order.availability_saved": "Upatikanaji umehifadhiwa. Wamiliki wote wamejibu.",
+  "order.availability_saved_waiting": "Upatikanaji umehifadhiwa. Tunasubiri wamiliki wengine.",
+  "order.availability_staff_available_title": "✅ Agizo {{invoiceNumber}}: bidhaa zinapatikana",
+  "order.availability_staff_available_body": "Wamiliki wote wamethibitisha. Agizo linaweza kushughulikiwa na kufikishwa.",
+  "order.availability_staff_partial_title": "⚠️ Agizo {{invoiceNumber}}: linapatikana kwa sehemu",
+  "order.availability_staff_partial_body": "Hazipatikani: {{unavailable}}. Zinapatikana: {{available}} ({{availableAmount}} {{currency}}). Wasiliana na mteja kurekebisha agizo.",
+  "order.availability_staff_unavailable_title": "❌ Agizo {{invoiceNumber}}: hakuna bidhaa inayopatikana",
+  "order.availability_staff_unavailable_body": "Hazipatikani: {{unavailable}}. Agizo haliwezi kufikishwa: likatae au wasiliana na mteja."
 }

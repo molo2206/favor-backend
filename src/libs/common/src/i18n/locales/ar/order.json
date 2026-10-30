@@ -253,5 +253,20 @@
   "order.push_shop_new_order_body": "طلب {{customer}} عدد {{quantity}} منتج(ات): {{products}}. المبلغ: {{totalAmount}} {{currency}}.",
   "order.classified_not_orderable": "«{{productName}}» إعلان: تواصل مباشرة مع المعلن، لا يمكن طلبه.",
   "order.push_order_payment_received_title": "تم استلام الدفع",
-  "order.push_order_payment_received_body": "تم تأكيد دفع طلبك {{invoiceNumber}}. شكرًا لثقتك!"
+  "order.push_order_payment_received_body": "تم تأكيد دفع طلبك {{invoiceNumber}}. شكرًا لثقتك!",
+  "order.availability_view": "توفر منتجات الطلب",
+  "order.availability_list": "طلبات بانتظار التأكيد",
+  "order.availability_forbidden": "لست مالك منتجات هذا الطلب.",
+  "order.availability_item_forbidden": "المنتج {{orderItemId}} ليس من منتجاتك في هذا الطلب.",
+  "order.availability_closed": "لم يعد من الممكن تعديل التوفر (حالة الطلب: {{status}}).",
+  "order.availability_invalid_status": "اختر «AVAILABLE» (متوفر) أو «UNAVAILABLE» (غير متوفر).",
+  "order.availability_nothing_to_confirm": "لا توجد منتجات للتأكيد.",
+  "order.availability_saved": "تم حفظ التوفر. أجاب جميع الملاك.",
+  "order.availability_saved_waiting": "تم حفظ التوفر. بانتظار الملاك الآخرين.",
+  "order.availability_staff_available_title": "✅ الطلب {{invoiceNumber}}: المنتجات متوفرة",
+  "order.availability_staff_available_body": "أكد جميع الملاك. يمكن معالجة الطلب وتوصيله.",
+  "order.availability_staff_partial_title": "⚠️ الطلب {{invoiceNumber}}: توفر جزئي",
+  "order.availability_staff_partial_body": "غير متوفر: {{unavailable}}. متوفر: {{available}} ({{availableAmount}} {{currency}}). تواصل مع العميل لتعديل الطلب.",
+  "order.availability_staff_unavailable_title": "❌ الطلب {{invoiceNumber}}: لا يوجد منتج متوفر",
+  "order.availability_staff_unavailable_body": "غير متوفر: {{unavailable}}. لا يمكن توصيل الطلب: ارفضه أو تواصل مع العميل."
 }
