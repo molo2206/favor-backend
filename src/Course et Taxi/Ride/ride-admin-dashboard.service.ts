@@ -531,7 +531,7 @@ export class RideAdminDashboardService {
       // Commissions espèces débitées des gains (table driver_wallet_movements)
       this.base(f, range)
         .andWhere('r.status = :done', { done })
-        .innerJoin(DriverWalletMovement, 'mv', "mv.rideId = r.id AND mv.type = 'CASH_COMMISSION'")
+        .innerJoin(DriverWalletMovement, 'mv', "mv.rideId = r.id AND mv.type IN ('CASH_COMMISSION', 'CASH_COMMISSION_FPAY')")
         .select(cur, 'currency')
         .addSelect(methodExpr, 'method')
         .addSelect('SUM(-mv.amount)', 'debited')
@@ -626,7 +626,7 @@ export class RideAdminDashboardService {
       .addSelect("SUM(CASE WHEN m.taxiCreditStatus = 'SUCCESS' THEN -m.amount ELSE 0 END)", 'credited')
       .addSelect("SUM(CASE WHEN m.taxiCreditStatus = 'FAILED' THEN 1 ELSE 0 END)", 'failed')
       .addSelect("SUM(CASE WHEN m.taxiCreditStatus = 'FAILED' THEN -m.amount ELSE 0 END)", 'failedAmount')
-      .where("m.type = 'CASH_COMMISSION'")
+      .where("m.type IN ('CASH_COMMISSION', 'CASH_COMMISSION_FPAY')")
       .andWhere('m.createdAt BETWEEN :from AND :to', { from: range.from, to: range.to });
     if (f.driverId) qb.andWhere('m.driverId = :driverId', { driverId: f.driverId });
     if (f.currency) qb.andWhere('m.currency = :currency', { currency: f.currency });
@@ -814,7 +814,7 @@ export class RideAdminDashboardService {
     const qb = this.movementRepo
       .createQueryBuilder('m')
       .leftJoin(UserEntity, 'u', 'u.id = m.driverId')
-      .where("m.type = 'CASH_COMMISSION'")
+      .where("m.type IN ('CASH_COMMISSION', 'CASH_COMMISSION_FPAY')")
       .andWhere('m.createdAt BETWEEN :from AND :to', { from: range.from, to: range.to });
     if (q.driverId) qb.andWhere('m.driverId = :driverId', { driverId: q.driverId });
     if (q.currency) qb.andWhere('m.currency = :currency', { currency: q.currency });

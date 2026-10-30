@@ -222,6 +222,8 @@ export class DriverCashoutService {
       .addSelect('COALESCE(SUM(mv.amount), 0)', 'amount')
       .addSelect(`COALESCE(SUM(CASE WHEN mv.type = '${DriverWalletMovementType.CASH_COMMISSION}' THEN -mv.amount ELSE 0 END), 0)`, 'cashCommission')
       .where('mv.driverId = :driverId', { driverId })
+      // Commission prélevée dans F-Pay : ne touche pas aux gains Favor Help
+      .andWhere(`mv.type <> '${DriverWalletMovementType.CASH_COMMISSION_FPAY}'`)
       .andWhere(this.deductCashCommission() ? `mv.type <> '${DriverWalletMovementType.CASH_COMMISSION}'` : '1 = 1')
       .groupBy('UPPER(mv.currency)')
       .getRawMany()

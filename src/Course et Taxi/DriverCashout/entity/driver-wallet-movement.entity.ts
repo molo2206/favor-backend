@@ -1,9 +1,20 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
 export enum DriverWalletMovementType {
-  /** Commission d'une course payée en espèces : débitée des gains du chauffeur */
+  /** Commission d'une course payée en espèces : débitée des gains Favor Help du chauffeur */
   CASH_COMMISSION = 'CASH_COMMISSION',
+  /**
+   * Commission d'une course payée en espèces : débitée du wallet F-Pay du chauffeur (route F-Pay taxi/driver/commission).
+   * Suivi seulement : NE réduit PAS ses gains Favor Help (le prélèvement est fait dans F-Pay).
+   */
+  CASH_COMMISSION_FPAY = 'CASH_COMMISSION_FPAY',
 }
+
+/** Les deux sortes de commission espèces (gains Favor Help / wallet F-Pay) */
+export const CASH_COMMISSION_TYPES: string[] = [
+  DriverWalletMovementType.CASH_COMMISSION,
+  DriverWalletMovementType.CASH_COMMISSION_FPAY,
+];
 
 export enum TaxiCreditStatus {
   PENDING = 'PENDING',

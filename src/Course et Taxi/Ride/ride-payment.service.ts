@@ -466,6 +466,8 @@ export class RidePaymentService {
           cashCommission: {
             amount: Math.abs(Number(movement.amount)),
             currency: movement.currency,
+            /** FPAY : débitée du wallet F-Pay du chauffeur ; GAINS : de ses gains Favor Help */
+            source: movement.type === 'CASH_COMMISSION_FPAY' ? 'FPAY' : 'GAINS',
             debitedFromWallet: true,
             taxiCreditStatus: movement.taxiCreditStatus,
           },

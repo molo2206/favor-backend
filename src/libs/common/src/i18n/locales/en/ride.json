@@ -129,5 +129,8 @@
   "ride.admin.dashboard": "Rides dashboard retrieved",
   "ride.admin.list": "Rides list retrieved",
   "ride.admin.drivers": "Drivers retrieved",
-  "ride.admin.cash_commissions": "Cash ride commissions retrieved"
+  "ride.admin.cash_commissions": "Cash ride commissions retrieved",
+  "ride.notif.cash_commission_debited_fpay.title": "Commission charged to F-Pay",
+  "ride.notif.cash_commission_debited_fpay.body": "Ride #{{ref}} paid in cash: the {{amount}} {{currency}} commission has been charged to your F-Pay account.",
+  "ride.cash_commission.no_fpay_account": "The driver has no linked F-Pay account."
 }

@@ -129,5 +129,8 @@
   "ride.admin.dashboard": "Dashibodi ya safari imepatikana",
   "ride.admin.list": "Orodha ya safari imepatikana",
   "ride.admin.drivers": "Madereva wamepatikana",
-  "ride.admin.cash_commissions": "Kamisheni za safari za pesa taslimu zimepatikana"
+  "ride.admin.cash_commissions": "Kamisheni za safari za pesa taslimu zimepatikana",
+  "ride.notif.cash_commission_debited_fpay.title": "Kamisheni imekatwa kwenye F-Pay",
+  "ride.notif.cash_commission_debited_fpay.body": "Safari #{{ref}} imelipwa kwa pesa taslimu: kamisheni ya {{amount}} {{currency}} imekatwa kwenye akaunti yako ya F-Pay.",
+  "ride.cash_commission.no_fpay_account": "Dereva hana akaunti ya F-Pay iliyounganishwa."
 }

@@ -56,14 +56,15 @@ Relance le crédit du compte F-Pay TAXI d'une commission en échec.
 ## Course payée en espèces
 
 Quand le chauffeur valide « espèces reçues » (`POST /rides/:id/payment/confirm`) :
-1. la commission de la course est **débitée de ses gains Favor Help** (portefeuille de la devise de la course).
-   Solde insuffisant → le solde devient négatif (`debt` dans `GET` du solde chauffeur), remboursé par ses
-   prochaines courses payées dans l'application ;
-2. le **compte F-Pay TAXI est crédité** de la même commission ;
+1. **chauffeur avec compte F-Pay lié** (`users.userIdFpay`) : la commission est **prélevée sur son wallet F-Pay**
+   et **créditée au compte F-Pay TAXI**, en une seule opération F-Pay (route `taxi/driver/commission`).
+   Solde F-Pay insuffisant → son solde F-Pay devient **négatif (dette)**, remboursée par ses prochains crédits F-Pay ;
+2. **chauffeur sans compte F-Pay** : la commission est débitée de ses gains Favor Help (dette possible)
+   et le compte F-Pay TAXI est crédité ;
 3. le chauffeur reçoit une notification.
 
-Une seule fois par course. Si F-Pay ne répond pas, la validation du chauffeur réussit quand même et le crédit
-reste en `FAILED` (visible dans le tableau de bord, relançable par un admin).
+Une seule fois par course (contrôlé dans Favor Help ET dans F-Pay). Si F-Pay ne répond pas, la validation du chauffeur
+réussit quand même et l'opération reste en `FAILED` (relançable par un admin, sans risque de double prélèvement en mode F-Pay).
 Les anciennes courses en espèces ne sont pas débitées.
 
 Réglages `.env` :
@@ -72,6 +73,9 @@ Réglages `.env` :
 |---|---|---|
 | `RIDE_CASH_COMMISSION_DEBIT` | `true` | `false` = désactivé (fonctionnement d'avant) |
 | `RIDE_CASH_COMMISSION_METHODS` | `CASH` | Modes concernés (ex. `CASH,CARD`) |
-| `RIDE_CASH_COMMISSION_FPAY_CREDIT` | `true` | `false` = débit du chauffeur seulement, sans crédit F-Pay TAXI |
+| `RIDE_CASH_COMMISSION_SOURCE` | `FPAY` | `FPAY` = wallet F-Pay du chauffeur ; `GAINS` = gains Favor Help |
+| `RIDE_CASH_COMMISSION_FPAY_CREDIT` | `true` | Mode gains : `false` = débit des gains seulement, sans crédit F-Pay TAXI |
+
+F-Pay : la clé `FAVOR_API_TAXI` doit avoir la permission `taxi_commission`.
 
 Base de données : `db/sql/courses_taxi_dashboard_commission_especes.sql` (ou la migration `1794614400000-DriverWalletMovements`).

@@ -129,5 +129,8 @@
   "ride.admin.dashboard": "Tableau de bord des courses récupéré",
   "ride.admin.list": "Liste des courses récupérée",
   "ride.admin.drivers": "Chauffeurs récupérés",
-  "ride.admin.cash_commissions": "Commissions des courses en espèces récupérées"
+  "ride.admin.cash_commissions": "Commissions des courses en espèces récupérées",
+  "ride.notif.cash_commission_debited_fpay.title": "Commission prélevée sur F-Pay",
+  "ride.notif.cash_commission_debited_fpay.body": "Course #{{ref}} payée en espèces : la commission de {{amount}} {{currency}} a été prélevée sur votre compte F-Pay.",
+  "ride.cash_commission.no_fpay_account": "Le chauffeur n'a pas de compte F-Pay lié."
 }

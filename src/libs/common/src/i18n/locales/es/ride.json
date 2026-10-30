@@ -129,5 +129,8 @@
   "ride.admin.dashboard": "Panel de viajes obtenido",
   "ride.admin.list": "Lista de viajes obtenida",
   "ride.admin.drivers": "Conductores obtenidos",
-  "ride.admin.cash_commissions": "Comisiones de viajes en efectivo obtenidas"
+  "ride.admin.cash_commissions": "Comisiones de viajes en efectivo obtenidas",
+  "ride.notif.cash_commission_debited_fpay.title": "Comisión cobrada en F-Pay",
+  "ride.notif.cash_commission_debited_fpay.body": "Viaje #{{ref}} pagado en efectivo: la comisión de {{amount}} {{currency}} se ha cobrado en su cuenta F-Pay.",
+  "ride.cash_commission.no_fpay_account": "El conductor no tiene una cuenta F-Pay vinculada."
 }

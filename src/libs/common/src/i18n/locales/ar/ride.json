@@ -130,5 +130,8 @@
   "ride.admin.dashboard": "تم جلب لوحة معلومات الرحلات",
   "ride.admin.list": "تم جلب قائمة الرحلات",
   "ride.admin.drivers": "تم جلب السائقين",
-  "ride.admin.cash_commissions": "تم جلب عمولات الرحلات النقدية"
+  "ride.admin.cash_commissions": "تم جلب عمولات الرحلات النقدية",
+  "ride.notif.cash_commission_debited_fpay.title": "تم خصم العمولة من F-Pay",
+  "ride.notif.cash_commission_debited_fpay.body": "الرحلة #{{ref}} مدفوعة نقدًا: تم خصم عمولة {{amount}} {{currency}} من حسابك في F-Pay.",
+  "ride.cash_commission.no_fpay_account": "لا يملك السائق حساب F-Pay مرتبطًا."
 }

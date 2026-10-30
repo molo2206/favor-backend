@@ -852,6 +852,57 @@ export class FpayService {
         }
     }
 
+    // ============================================================
+    // ✅ COMMISSION D'UNE COURSE EN ESPÈCES — route F-Pay `taxi/driver/commission`
+    // ============================================================
+    /**
+     * Wallet F-Pay du CHAUFFEUR (userId + devise) ──débit──▶ wallet du compte TAXI (clé FAVOR_API_TAXI), même devise.
+     * Le solde du chauffeur peut devenir négatif (dette). F-Pay ne prélève qu'UNE fois par course (rideId) :
+     * renvoyer la même demande est sans risque (réponse « replayed »).
+     * La clé TAXI doit avoir la permission « taxi_commission » côté F-Pay.
+     * Réponse : { message, data: { taxiWallet, driverWallet: { id, currency, balance }, transaction, driverDebt, replayed? } }
+     */
+    async taxiDriverCommission(input: {
+        amount: number;
+        currency: string;
+        /** users.userIdFpay du chauffeur (wallet débité) */
+        driverUserId: string;
+        rideId: string;
+        description?: string;
+        paymentMethod?: string;
+        lang?: string;
+    }): Promise<any> {
+        if (!input.driverUserId) {
+            throw new HttpException('Compte F-Pay du chauffeur (userIdFpay) manquant', HttpStatus.BAD_REQUEST);
+        }
+        const url = `${this.fpayApiUrl}/taxi/driver/commission`;
+        const authorization = this.taxiApiKey.startsWith('Bearer ') ? this.taxiApiKey : `Bearer ${this.taxiApiKey}`;
+        const currency = String(input.currency || 'USD').toUpperCase();
+        const sendData = {
+            amount: input.amount,
+            currency,
+            userId: input.driverUserId,
+            rideId: input.rideId,
+            description: input.description || `Commission course taxi ${input.amount} ${currency}`,
+            paymentMethod: input.paymentMethod || 'CASH',
+        };
+        const timeoutMs = Number(this.configService.get<string>('FPAY_CASHOUT_TIMEOUT_MS') || 60000);
+        this.logger.log(`🚕 Commission espèces → compte TAXI: ${input.amount} ${currency} (chauffeur F-Pay ${input.driverUserId}, course ${input.rideId})`);
+        try {
+            const response = await firstValueFrom(
+                this.httpService.post<any>(url, sendData, {
+                    headers: { Authorization: authorization, 'Content-Type': 'application/json', lang: input.lang || 'fr' },
+                    timeout: timeoutMs,
+                }),
+            );
+            this.logger.log(`✅ Commission prélevée : ${response.data?.data?.transaction?.reference || 'OK'} (dette chauffeur : ${response.data?.data?.driverDebt ?? 0})`);
+            return response.data;
+        } catch (error: any) {
+            this.logger.error(`❌ Commission espèces F-Pay : ${error?.response?.status ?? error?.code ?? '-'} ${error?.response?.data?.message || error?.message}`);
+            throw this.handleError(error);
+        }
+    }
+
     /**
      * ✅ Wallets F-Pay d'un utilisateur lié (users.userIdFpay), lus avec la route existante wallet/balance-transactions.
      * La réponse F-Pay est parcourue pour trouver les objets « wallet » : { id, currency, balance… }
