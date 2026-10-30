@@ -17,9 +17,10 @@ export class CreateCategoryDto {
   @IsString()
   name: string;
 
+  /** Facultatif : vide / null = catégorie principale */
   @IsOptional()
   @IsString()
-  parentId?: string;
+  parentId?: string | null;
 
   @IsOptional()
   @IsString()

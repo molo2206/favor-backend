@@ -25,6 +25,7 @@ import { RIDE_DRIVER_COLLECTED_METHODS, RidePaymentStatus } from '../Ride/enum/r
 import { RideRealtimeService } from '../Ride/ride-realtime.service';
 import { CASHOUT_RESERVED_STATUSES, DriverCashout, DriverCashoutDestination, DriverCashoutStatus } from './entity/driver-cashout.entity';
 import { DriverWallet } from './entity/driver-wallet.entity';
+import { DriverWalletMovement, DriverWalletMovementType } from './entity/driver-wallet-movement.entity';
 import { ensureDriverWallet } from './driver-wallet.util';
 import { DriverCashoutDto, DriverCashoutQueryDto, DriverEarningsSummaryQueryDto, ResolveDriverCashoutDto } from './dto/driver-cashout.dto';
 
@@ -40,7 +41,9 @@ const DUPLICATE_WINDOW_SECONDS = 120;
  *  Solde disponible (par devise) =
  *      gains (driverEarning) des courses TERMINÉES et PAYÉES dans l'application (Mobile Money, FPay, virement, manuel)
  *    − commission due sur les courses payées en espèces / carte (si DRIVER_CASHOUT_DEDUCT_CASH_COMMISSION=true)
+ *    − commissions des courses en espèces débitées à la validation (table driver_wallet_movements)
  *    − retraits PROCESSING, SUCCESS et UNKNOWN.
+ *  Si le résultat est négatif : disponible = 0 et `debt` = montant dû (remboursé par les prochaines courses).
  *  Les courses en espèces / carte ne sont pas retirables : le chauffeur a déjà encaissé l'argent.
  *
  *  Anti-doublon :
@@ -210,6 +213,20 @@ export class DriverCashoutService {
       .addGroupBy('c.status')
       .getRawMany();
 
+    // ✅ Mouvements (commissions des courses en espèces débitées des gains).
+    //    Avec DRIVER_CASHOUT_DEDUCT_CASH_COMMISSION=true, TOUTES les commissions espèces sont déjà déduites ci-dessous :
+    //    on ne compte pas une deuxième fois celles enregistrées en mouvement.
+    const movements: any[] = await m
+      .createQueryBuilder(DriverWalletMovement, 'mv')
+      .select('UPPER(mv.currency)', 'currency')
+      .addSelect('COALESCE(SUM(mv.amount), 0)', 'amount')
+      .addSelect(`COALESCE(SUM(CASE WHEN mv.type = '${DriverWalletMovementType.CASH_COMMISSION}' THEN -mv.amount ELSE 0 END), 0)`, 'cashCommission')
+      .where('mv.driverId = :driverId', { driverId })
+      .andWhere(this.deductCashCommission() ? `mv.type <> '${DriverWalletMovementType.CASH_COMMISSION}'` : '1 = 1')
+      .groupBy('UPPER(mv.currency)')
+      .getRawMany()
+      .catch(() => [] as any[]); // table pas encore créée : comportement d'avant
+
     // ✅ Portefeuilles déjà créés (même sans gain encore payé : affichés à 0)
     const walletRows: { currency: string; status: string }[] = await m
       .createQueryBuilder(DriverWallet, 'w')
@@ -223,6 +240,7 @@ export class DriverCashoutService {
       ...withdrawn.map((w) => w.currency),
       ...cash.map((c) => c.currency),
       ...walletRows.map((w) => w.currency),
+      ...movements.map((mv) => mv.currency),
     ]);
     const deduct = this.deductCashCommission();
     return [...currencies].sort().map((currency) => {
@@ -234,7 +252,11 @@ export class DriverCashoutService {
       const withdrawnAmount = sumStatus(DriverCashoutStatus.SUCCESS);
       const processing = sumStatus(DriverCashoutStatus.PROCESSING);
       const toVerify = sumStatus(DriverCashoutStatus.UNKNOWN);
-      const available = this.round2(Math.max(0, earnedAmount - (deduct ? commissionDue : 0) - withdrawnAmount - processing - toVerify));
+      const mv = movements.find((x) => x.currency === currency);
+      const movementsAmount = this.round2(mv?.amount);
+      /** Solde réel (peut être négatif = dette du chauffeur) */
+      const balance = this.round2(earnedAmount + movementsAmount - (deduct ? commissionDue : 0) - withdrawnAmount - processing - toVerify);
+      const available = this.round2(Math.max(0, balance));
       return {
         currency,
         /** ✅ Montant retirable maintenant */
@@ -252,6 +274,12 @@ export class DriverCashoutService {
         cashRides: Number(c?.rides || 0),
         cashCommissionDue: commissionDue,
         cashCommissionDeducted: deduct,
+        /** ✅ Commissions espèces débitées des gains à la validation de la course */
+        cashCommissionDebited: this.round2(mv?.cashCommission),
+        /** ✅ Solde réel (négatif = dette) */
+        balance,
+        /** ✅ Montant dû par le chauffeur (commissions espèces non encore couvertes par ses gains) */
+        debt: this.round2(Math.max(0, -balance)),
         minAmount: this.minAmount(currency),
         /** Portefeuille bloqué par l'administration : retrait refusé dans cette devise */
         walletBlocked: walletRows.some((w) => w.currency === currency && String(w.status).toUpperCase() === 'BLOCKED'),

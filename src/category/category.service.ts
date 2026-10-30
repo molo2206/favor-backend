@@ -379,7 +379,8 @@ export class CategoryService {
     file?: Express.Multer.File,
     lang: string = 'fr',
   ): Promise<{ message: string; data: CategoryEntity }> {
-    const category = await this.categoryRepo.findOne({ where: { id } });
+    // ✅ Parent chargé : sans lui, le contrôle des doublons se faisait sur le mauvais niveau
+    const category = await this.categoryRepo.findOne({ where: { id }, relations: ['parent'] });
     if (!category)
       throw new NotFoundException(this.translate('category.error.not_found', lang));
 
@@ -429,7 +430,14 @@ export class CategoryService {
       }
     }
 
-    if (type && category.parent && category.parent.type !== type) {
+    // Contrôle du type avec le parent ACTUEL : seulement si on garde ce parent et si le type change
+    if (
+      parentId === undefined &&
+      type &&
+      type !== category.type &&
+      category.parent &&
+      category.parent.type !== type
+    ) {
       throw new BadRequestException(
         this.translate('category.error.parent_type_mismatch_update', lang),
       );

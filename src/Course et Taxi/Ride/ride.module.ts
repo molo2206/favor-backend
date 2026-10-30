@@ -24,10 +24,15 @@ import { PawapayModule } from 'src/pawapay/pawapay.module';
 // ✅ Devise choisie par le passager : conversion du prix serveur (exchange_rates)
 import { RideCurrencyService } from './ride-currency.service';
 import { ExchangeRateEntity } from 'src/Exchange/entities/exchange-rate.entity';
+// ✅ Tableau de bord admin + commission des courses en espèces
+import { RideAdminController } from './ride-admin.controller';
+import { RideAdminDashboardService } from './ride-admin-dashboard.service';
+import { RideCashCommissionService } from './ride-cash-commission.service';
+import { DriverWalletMovement } from '../DriverCashout/entity/driver-wallet-movement.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Ride, RideEvent, UserEntity, City, CategoryEntity, Pricing, DriverVehicle, ExchangeRateEntity]),
+    TypeOrmModule.forFeature([Ride, RideEvent, UserEntity, City, CategoryEntity, Pricing, DriverVehicle, ExchangeRateEntity, DriverWalletMovement]),
 
     // Utiliser forwardRef pour casser la circular dependency
     // (fournit NotificationsGateway, NotificationsService, FcmService, PresenceService, WsAuthHelper)
@@ -37,8 +42,18 @@ import { ExchangeRateEntity } from 'src/Exchange/entities/exchange-rate.entity';
     forwardRef(() => FpayModule),
     PawapayModule,
   ],
-  controllers: [RideController],
-  providers: [RideService, RideRealtimeService, RideDispatchService, RideHistoryService, RideGateway, RidePaymentService, RideCurrencyService],
-  exports: [RideService, RideRealtimeService, RidePaymentService, RideCurrencyService],
+  controllers: [RideController, RideAdminController],
+  providers: [
+    RideService,
+    RideRealtimeService,
+    RideDispatchService,
+    RideHistoryService,
+    RideGateway,
+    RidePaymentService,
+    RideCurrencyService,
+    RideAdminDashboardService,
+    RideCashCommissionService,
+  ],
+  exports: [RideService, RideRealtimeService, RidePaymentService, RideCurrencyService, RideCashCommissionService],
 })
 export class RideModule {}

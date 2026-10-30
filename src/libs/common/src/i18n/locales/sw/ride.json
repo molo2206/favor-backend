@@ -117,5 +117,17 @@
   "ride.cashout.fpay_wallet_currency": "Pochi hii ya F-Pay ni ya {{walletCurrency}}: chagua pochi yako ya {{currency}}.",
   "ride.cashout.fpay_wallet_inactive": "Pochi yako ya F-Pay ya {{currency}} haifanyi kazi.",
   "ride.payment.fpay_credit_in_progress": "Malipo ya F-Pay kwa safari hii yanaendelea. Jaribu tena baada ya muda mfupi.",
-  "ride.payment.fpay_credit_failed": "F-Pay haikuthibitisha malipo ya safari: {{reason}}. Safari haijawekwa kama imelipwa, jaribu tena."
+  "ride.payment.fpay_credit_failed": "F-Pay haikuthibitisha malipo ya safari: {{reason}}. Safari haijawekwa kama imelipwa, jaribu tena.",
+  "ride.notif.cash_commission_debited.title": "Kamisheni ya safari imekatwa",
+  "ride.notif.cash_commission_debited.body": "Safari #{{ref}} imelipwa kwa pesa taslimu: kamisheni ya {{amount}} {{currency}} imekatwa kutoka kwa mapato yako.",
+  "ride.cash_commission.not_found": "Kamisheni haijapatikana.",
+  "ride.cash_commission.already_credited": "Kamisheni hii tayari imewekwa kwenye akaunti ya TAXI.",
+  "ride.cash_commission.credit_disabled": "Kuweka pesa kwenye akaunti ya TAXI kumezimwa.",
+  "ride.cash_commission.credited": "Kamisheni imewekwa kwenye akaunti ya TAXI.",
+  "ride.cash_commission.credit_failed": "Kuweka pesa kwenye akaunti ya TAXI kumeshindikana: {{reason}}",
+  "ride.admin.invalid_period": "Kipindi si sahihi: tarehe ya kuanza lazima iwe kabla ya tarehe ya mwisho.",
+  "ride.admin.dashboard": "Dashibodi ya safari imepatikana",
+  "ride.admin.list": "Orodha ya safari imepatikana",
+  "ride.admin.drivers": "Madereva wamepatikana",
+  "ride.admin.cash_commissions": "Kamisheni za safari za pesa taslimu zimepatikana"
 }

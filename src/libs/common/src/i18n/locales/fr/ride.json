@@ -117,5 +117,17 @@
   "ride.cashout.fpay_wallet_currency": "Ce wallet F-Pay est en {{walletCurrency}} : choisissez votre wallet {{currency}}.",
   "ride.cashout.fpay_wallet_inactive": "Votre wallet F-Pay {{currency}} est inactif.",
   "ride.payment.fpay_credit_in_progress": "Crédit du compte F-Pay en cours pour cette course. Réessayez dans un instant.",
-  "ride.payment.fpay_credit_failed": "F-Pay n'a pas confirmé le paiement de la course : {{reason}}. La course n'a pas été marquée payée, réessayez."
+  "ride.payment.fpay_credit_failed": "F-Pay n'a pas confirmé le paiement de la course : {{reason}}. La course n'a pas été marquée payée, réessayez.",
+  "ride.notif.cash_commission_debited.title": "Commission de la course déduite",
+  "ride.notif.cash_commission_debited.body": "Course #{{ref}} payée en espèces : la commission de {{amount}} {{currency}} a été déduite de vos gains.",
+  "ride.cash_commission.not_found": "Commission introuvable.",
+  "ride.cash_commission.already_credited": "Cette commission a déjà été créditée sur le compte TAXI.",
+  "ride.cash_commission.credit_disabled": "Le crédit du compte TAXI est désactivé.",
+  "ride.cash_commission.credited": "Commission créditée sur le compte TAXI.",
+  "ride.cash_commission.credit_failed": "Le crédit du compte TAXI a échoué : {{reason}}",
+  "ride.admin.invalid_period": "Période invalide : la date de début doit précéder la date de fin.",
+  "ride.admin.dashboard": "Tableau de bord des courses récupéré",
+  "ride.admin.list": "Liste des courses récupérée",
+  "ride.admin.drivers": "Chauffeurs récupérés",
+  "ride.admin.cash_commissions": "Commissions des courses en espèces récupérées"
 }

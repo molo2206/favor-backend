@@ -117,5 +117,17 @@
   "ride.cashout.fpay_wallet_currency": "Este monedero F-Pay está en {{walletCurrency}}: elija su monedero {{currency}}.",
   "ride.cashout.fpay_wallet_inactive": "Su monedero F-Pay {{currency}} está inactivo.",
   "ride.payment.fpay_credit_in_progress": "Crédito F-Pay en curso para este viaje. Inténtelo de nuevo en un momento.",
-  "ride.payment.fpay_credit_failed": "F-Pay no confirmó el pago del viaje: {{reason}}. El viaje no se marcó como pagado, inténtelo de nuevo."
+  "ride.payment.fpay_credit_failed": "F-Pay no confirmó el pago del viaje: {{reason}}. El viaje no se marcó como pagado, inténtelo de nuevo.",
+  "ride.notif.cash_commission_debited.title": "Comisión del viaje descontada",
+  "ride.notif.cash_commission_debited.body": "Viaje #{{ref}} pagado en efectivo: la comisión de {{amount}} {{currency}} se ha descontado de sus ganancias.",
+  "ride.cash_commission.not_found": "Comisión no encontrada.",
+  "ride.cash_commission.already_credited": "Esta comisión ya se acreditó en la cuenta TAXI.",
+  "ride.cash_commission.credit_disabled": "El abono a la cuenta TAXI está desactivado.",
+  "ride.cash_commission.credited": "Comisión acreditada en la cuenta TAXI.",
+  "ride.cash_commission.credit_failed": "Error al abonar la cuenta TAXI: {{reason}}",
+  "ride.admin.invalid_period": "Periodo no válido: la fecha de inicio debe ser anterior a la fecha de fin.",
+  "ride.admin.dashboard": "Panel de viajes obtenido",
+  "ride.admin.list": "Lista de viajes obtenida",
+  "ride.admin.drivers": "Conductores obtenidos",
+  "ride.admin.cash_commissions": "Comisiones de viajes en efectivo obtenidas"
 }

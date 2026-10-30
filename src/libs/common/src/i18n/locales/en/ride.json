@@ -117,5 +117,17 @@
   "ride.cashout.fpay_wallet_currency": "This F-Pay wallet is in {{walletCurrency}}: choose your {{currency}} wallet.",
   "ride.cashout.fpay_wallet_inactive": "Your {{currency}} F-Pay wallet is inactive.",
   "ride.payment.fpay_credit_in_progress": "F-Pay credit already in progress for this ride. Please try again in a moment.",
-  "ride.payment.fpay_credit_failed": "F-Pay did not confirm the ride payment: {{reason}}. The ride was not marked as paid, please try again."
+  "ride.payment.fpay_credit_failed": "F-Pay did not confirm the ride payment: {{reason}}. The ride was not marked as paid, please try again.",
+  "ride.notif.cash_commission_debited.title": "Ride commission deducted",
+  "ride.notif.cash_commission_debited.body": "Ride #{{ref}} paid in cash: the {{amount}} {{currency}} commission has been deducted from your earnings.",
+  "ride.cash_commission.not_found": "Commission not found.",
+  "ride.cash_commission.already_credited": "This commission has already been credited to the TAXI account.",
+  "ride.cash_commission.credit_disabled": "TAXI account credit is disabled.",
+  "ride.cash_commission.credited": "Commission credited to the TAXI account.",
+  "ride.cash_commission.credit_failed": "TAXI account credit failed: {{reason}}",
+  "ride.admin.invalid_period": "Invalid period: the start date must be before the end date.",
+  "ride.admin.dashboard": "Rides dashboard retrieved",
+  "ride.admin.list": "Rides list retrieved",
+  "ride.admin.drivers": "Drivers retrieved",
+  "ride.admin.cash_commissions": "Cash ride commissions retrieved"
 }

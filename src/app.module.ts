@@ -57,6 +57,8 @@ import { HttpModule } from '@nestjs/axios';
 import { CacheModule } from '@nestjs/cache-manager';
 import * as redisStore from 'cache-manager-redis-store';
 import { GoogleModule } from './Course et Taxi/google-maps/google-maps.module';
+import { ProxyBlockModule } from './common/security/proxy-block/proxy-block.module';
+import { ProxyBlockMiddleware } from './common/security/proxy-block/proxy-block.middleware';
 import { ServiceZonesModule } from './Course et Taxi/ServiceZone/service-zones.module';
 import { DriverVehicleModule } from './Course et Taxi/DriverVehicle/driver-vehicle.module';
 import { PricingModule } from './Course et Taxi/Pricing/pricing.module';
@@ -196,6 +198,7 @@ import { VehicleRegistrationModule } from './vehicle-registration/vehicle-regist
     OperationModule,
     AuditModule,
     GoogleModule,
+    ProxyBlockModule, // ✅ Filtre VPN / proxy / Tor (PROXY_BLOCK_MODE)
     ServiceZonesModule,
     DriverVehicleModule,
     DriverLocationModule,
@@ -255,6 +258,11 @@ import { VehicleRegistrationModule } from './vehicle-registration/vehicle-regist
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
+    // ✅ Filtre VPN / proxy / Tor en premier (rien n'est bloqué tant que PROXY_BLOCK_MODE n'est pas « block »)
+    consumer
+      .apply(ProxyBlockMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+
     consumer
       .apply(CurrentUserMiddleware)
       .forRoutes({ path: '*', method: RequestMethod.ALL });

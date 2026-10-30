@@ -23,9 +23,10 @@ export class UpdateCategoryDto extends PartialType(CreateCategoryDto) {
   @IsString()
   slug?: string;
 
+  /** null = aucun parent (catégorie principale) */
   @IsOptional()
   @IsString()
-  parentId?: string;
+  parentId?: string | null;
 
   @IsOptional()
   @IsString()

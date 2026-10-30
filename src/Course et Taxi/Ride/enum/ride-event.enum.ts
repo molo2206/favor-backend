@@ -17,6 +17,8 @@ export enum RideEventType {
   PAYMENT_STARTED = 'PAYMENT_STARTED',
   PAYMENT_PAID = 'PAYMENT_PAID',
   PAYMENT_FAILED = 'PAYMENT_FAILED',
+  // ✅ Course en espèces : commission débitée des gains du chauffeur + crédit du compte TAXI
+  CASH_COMMISSION_DEBITED = 'CASH_COMMISSION_DEBITED',
 }
 
 /** Qui a annulé (même valeurs que la colonne rides.cancelledBy) */

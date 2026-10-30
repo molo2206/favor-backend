@@ -305,9 +305,22 @@ export class CategoryController {
       }
     }
 
+    // ✅ Parent facultatif :
+    //    champ absent → parent inchangé ;
+    //    vide / "null" / "undefined" → aucun parent (catégorie principale) ;
+    //    sinon → id du parent.
+    const rawParentId = body.parentId;
+    const parentId =
+      rawParentId === undefined
+        ? undefined
+        : rawParentId === null ||
+          ['', 'null', 'undefined', 'none'].includes(String(rawParentId).trim().toLowerCase())
+          ? null
+          : String(rawParentId).trim();
+
     const updateCategoryDto: UpdateCategoryDto = {
       name: body.name,
-      parentId: body.parentId,
+      parentId,
       type: body.type,
       color: body.color,
       specifications,

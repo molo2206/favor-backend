@@ -7,6 +7,7 @@ import { Ride } from '../Ride/entity/Ride.entity';
 import { RideModule } from '../Ride/ride.module';
 import { DriverCashout } from './entity/driver-cashout.entity';
 import { DriverWallet } from './entity/driver-wallet.entity';
+import { DriverWalletMovement } from './entity/driver-wallet-movement.entity';
 import { DriverCashoutService } from './driver-cashout.service';
 import { DriverCashoutController } from './driver-cashout.controller';
 
@@ -17,7 +18,7 @@ import { DriverCashoutController } from './driver-cashout.controller';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([DriverCashout, DriverWallet, Ride, UserEntity]),
+    TypeOrmModule.forFeature([DriverCashout, DriverWallet, DriverWalletMovement, Ride, UserEntity]),
     forwardRef(() => FpayModule),
     forwardRef(() => RideModule), // RideRealtimeService (notifications au chauffeur)
     I18nModule,

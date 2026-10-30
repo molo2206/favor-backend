@@ -25,6 +25,7 @@ import { RideHistoryService } from './ride-history.service';
 import { UserPaymentMethodsService } from 'src/users/payment-methods/user-payment-methods.service';
 import { RideCurrencyService } from './ride-currency.service';
 import { ensureDriverWalletSafe } from '../DriverCashout/driver-wallet.util';
+import { RideCashCommissionService } from './ride-cash-commission.service';
 
 const ADMIN_ROLES: string[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
 const PAWAPAY_SUCCESS = ['COMPLETED'];
@@ -58,6 +59,8 @@ export class RidePaymentService {
     private readonly userPaymentMethods: UserPaymentMethodsService,
     // ✅ Changement de devise : les montants de la course sont convertis (taux exchange_rates)
     private readonly currency: RideCurrencyService,
+    // ✅ Course en espèces validée : commission débitée des gains du chauffeur + crédit du compte TAXI
+    private readonly cashCommission: RideCashCommissionService,
   ) { }
 
   // ============================================================
@@ -450,7 +453,26 @@ export class RidePaymentService {
     }
     if (method !== ride.paymentMethod) ride.paymentMethod = method;
     await this.applyAmounts(ride, { transactionFee: dto.transactionFee }, lang);
-    return this.markPaid(ride, { reference: dto.reference ?? null, actorId: user.id, actorRole: 'DRIVER', confirmedById: user.id }, lang);
+    const result = await this.markPaid(ride, { reference: dto.reference ?? null, actorId: user.id, actorRole: 'DRIVER', confirmedById: user.id }, lang);
+
+    // ✅ Espèces : la commission est débitée de ses gains Favor Help et créditée au compte F-Pay TAXI
+    //    (une seule fois par course ; ne bloque jamais la validation)
+    const movement = await this.cashCommission.onCashConfirmed(ride, user.id, lang);
+    if (movement) {
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          cashCommission: {
+            amount: Math.abs(Number(movement.amount)),
+            currency: movement.currency,
+            debitedFromWallet: true,
+            taxiCreditStatus: movement.taxiCreditStatus,
+          },
+        },
+      };
+    }
+    return result;
   }
 
   /** Admin : virement, agence, ou régularisation de n'importe quel mode */

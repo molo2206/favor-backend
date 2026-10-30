@@ -5720,14 +5720,17 @@ export class UsersService {
     // ✅ « Tous » (pas de type) : les colis sont inclus aussi, de toutes les entreprises
     //    si aucune entreprise n'est choisie (avant : colis retirés → rien de lié au client n'était renvoyé).
 
-    // ✅ Filtre "activité" = type / companyId / city / country / dates.
+    // ✅ onlySellers=true : startDate / endDate filtrent la DATE DE CRÉATION DU COMPTE (users.createdAt),
+    //    pas les colis / commandes / réservations.
+    const datesOnAccount = onlySellers;
+
+    // ✅ Filtre "activité" = type / companyId / city / country / dates (dates : sauf si onlySellers).
     const hasActivityFilter =
       !!options.type ||
       !!options.shippingCompanyId ||
       !!options.city ||
       !!options.country ||
-      !!options.startDate ||
-      !!options.endDate;
+      (!datesOnAccount && (!!options.startDate || !!options.endDate));
 
     // ✅ « Tous » (rien de sélectionné) : TOUS les clients, chacun avec ses éléments liés.
     //    onlyWithActivity = true : seulement les clients qui ont AU MOINS un élément lié
@@ -5757,6 +5760,8 @@ export class UsersService {
     if (endDate) endDate.setHours(23, 59, 59, 999);
 
     const buildDateCondition = (column: string, params: any[]): string | null => {
+      // onlySellers : les dates portent sur la création du compte, pas sur l'activité
+      if (datesOnAccount) return null;
       const parts: string[] = [];
       if (startDate) { parts.push(`${column} >= ?`); params.push(startDate); }
       if (endDate) { parts.push(`${column} <= ?`); params.push(endDate); }
@@ -5950,6 +5955,23 @@ export class UsersService {
         [userIds],
       );
       userIds = sellers.map((u) => u.userId);
+    }
+
+    // ✅ onlySellers : filtre sur la date de création du compte (users.createdAt)
+    if (datesOnAccount && (startDate || endDate) && userIds.length > 0) {
+      const accountConds: string[] = [];
+      const accountParams: any[] = [userIds];
+      if (startDate) { accountConds.push('u.createdAt >= ?'); accountParams.push(startDate); }
+      if (endDate) { accountConds.push('u.createdAt <= ?'); accountParams.push(endDate); }
+      const created: any[] = await this.usersRepository.query(
+        `SELECT u.id
+       FROM users u
+       WHERE u.id IN (?)
+         AND ${accountConds.join(' AND ')}
+       ORDER BY u.fullName ASC`,
+        accountParams,
+      );
+      userIds = created.map((u) => u.id);
     }
 
     // ============================================================

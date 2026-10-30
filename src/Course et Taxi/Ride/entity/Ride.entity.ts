@@ -18,6 +18,7 @@ import {
 @Index(['driverId'])
 @Index(['riderId'])
 @Index(['cityId'])
+@Index('idx_rides_created_at', ['createdAt']) // ✅ tableau de bord admin (filtre par période)
 export class Ride {
   @PrimaryGeneratedColumn('uuid')
   id: string;
