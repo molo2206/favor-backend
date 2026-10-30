@@ -1,0 +1,8 @@
+{
+  "driver_vehicle.notif.kyc_approved.title": "تم قبول المستندات ✅",
+  "driver_vehicle.notif.kyc_approved.body": "تم اعتماد مركبتك {{model}} ({{plate}}). يمكنك الآن استقبال الرحلات.",
+  "driver_vehicle.notif.kyc_rejected.title": "تم رفض المستندات",
+  "driver_vehicle.notif.kyc_rejected.body": "المركبة {{model}} ({{plate}}): {{reason}}. يرجى التصحيح وإعادة إرسال المستندات.",
+  "driver_vehicle.notif.updated.title": "تم تحديث المركبة",
+  "driver_vehicle.notif.updated.body": "قامت الإدارة بتعديل مركبتك {{model}} ({{plate}})."
+}

@@ -1,0 +1,21 @@
+{
+  "delivery_branch.new_order_title": "🍽️ Nouvelle commande à livrer",
+  "delivery_branch.new_order_body": "Commande {{invoiceNumber}} ({{city}}) : {{totalAmount}} {{currency}}. Prenez-la si vous êtes disponible.",
+  "delivery_branch.no_branch": "Vous n'êtes rattaché à aucune branche avec une permission sur les commandes restaurant.",
+  "delivery_branch.orders": "Commandes de votre branche.",
+  "delivery_branch.not_branch_order": "Cette commande n'est pas une commande restaurant.",
+  "delivery_branch.not_your_branch": "Cette commande n'est pas dans votre branche ou vous n'avez pas la permission de la traiter.",
+  "delivery_branch.already_taken": "Cette commande a déjà été prise par un autre livreur.",
+  "delivery_branch.not_takeable": "Cette commande ne peut plus être prise (statut : {{status}}).",
+  "delivery_branch.taken": "La commande vous est affectée.",
+  "delivery_branch.already_yours": "Cette commande vous est déjà affectée.",
+  "delivery_branch.history": "Historique de vos livraisons.",
+  "delivery_branch.deliverers_only": "Réservé aux livreurs.",
+  "delivery_branch.deliverer_not_in_branch": "Ce livreur n'appartient pas à la branche de la commande ou n'a pas la permission de la traiter.",
+  "delivery_branch.deliverer_wrong_city": "Ce livreur n'est rattaché à aucune branche de la ville de la commande ({{city}}). Choisissez un livreur de cette ville.",
+  "delivery_branch.eligible_list": "{{count}} livreur(s) disponible(s) pour {{city}}.",
+  "delivery_branch.eligible_no_city": "Ville de la commande inconnue : impossible de proposer les livreurs de son milieu.",
+  "delivery_branch.eligible_forbidden": "Vous n'avez pas accès à la liste des livreurs.",
+  "delivery_branch.order_not_found": "Commande introuvable.",
+  "delivery_branch.user_not_assignable": "{{name}} ne peut pas livrer cette commande : il faut une permission sur ce type de commande dans une branche de la ville de la commande (ou être livreur de cette ville)."
+}

@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist-ms/api-gateway",
+    "rootDir": "../..",
+    "declaration": false,
+    "incremental": false,
+    "paths": {
+      "@favor/contracts": ["libs/contracts/src"],
+      "@favor/database": ["libs/database/src"],
+      "@favor/rpc": ["libs/rpc/src"]
+    }
+  },
+  "include": ["src/**/*", "../../libs/**/*"],
+  "exclude": ["node_modules", "dist", "dist-ms", "**/*spec.ts"]
+}
