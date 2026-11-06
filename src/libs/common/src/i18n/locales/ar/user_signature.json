@@ -1,0 +1,11 @@
+{
+  "user_signature.fetched": "تم جلب التوقيع.",
+  "user_signature.saved": "تم حفظ التوقيع.",
+  "user_signature.deleted": "تم حذف التوقيع.",
+  "user_signature.not_found": "لا يوجد توقيع محفوظ.",
+  "user_signature.forbidden": "لا يمكنك الوصول إلى هذا التوقيع.",
+  "user_signature.invalid_type": "صيغة غير مقبولة: أرسل صورة PNG أو JPG أو WEBP.",
+  "user_signature.invalid_image": "صورة التوقيع غير قابلة للقراءة.",
+  "user_signature.file_required": "أضف صورة توقيعك (ملف أو توقيع مرسوم).",
+  "user_signature.too_large": "الصورة كبيرة جدًا (الحد الأقصى {{max}} ميغابايت)."
+}

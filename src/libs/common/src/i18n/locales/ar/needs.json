@@ -115,5 +115,6 @@
   "needs.notif.comment.body": "{{author}} على {{reference}}: {{comment}}",
   "needs.department_not_found_id": "القسم غير موجود ({{id}}). أعد تحميل قائمة الأقسام واختر قسمًا من الشركة النشطة.",
   "needs.department_other_company": "القسم «{{name}}» تابع لشركة أخرى. اختر قسمًا من الشركة النشطة.",
-  "needs.departments_fetched": "تم جلب الأقسام."
+  "needs.departments_fetched": "تم جلب الأقسام.",
+  "needs.signature_required": "احفظ توقيعك أولًا (الملف الشخصي ← توقيعي): إنه مطلوب لتوقيع طلب الاحتياجات."
 }

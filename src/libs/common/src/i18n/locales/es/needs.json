@@ -115,5 +115,6 @@
   "needs.notif.comment.body": "{{author}} en {{reference}}: {{comment}}",
   "needs.department_not_found_id": "Departamento no encontrado ({{id}}). Recargue la lista de departamentos y elija uno de la empresa activa.",
   "needs.department_other_company": "El departamento «{{name}}» pertenece a otra empresa. Elija un departamento de la empresa activa.",
-  "needs.departments_fetched": "Departamentos obtenidos."
+  "needs.departments_fetched": "Departamentos obtenidos.",
+  "needs.signature_required": "Guarde primero su firma (Perfil → Mi firma): es obligatoria para firmar una solicitud de necesidades."
 }

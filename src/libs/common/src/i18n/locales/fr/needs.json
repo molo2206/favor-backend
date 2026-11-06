@@ -115,5 +115,6 @@
   "needs.notif.comment.body": "{{author}} sur {{reference}} : {{comment}}",
   "needs.department_not_found_id": "Département introuvable ({{id}}). Rechargez la liste des départements et choisissez-en un de l'entreprise active.",
   "needs.department_other_company": "Le département « {{name}} » appartient à une autre entreprise. Choisissez un département de l'entreprise active.",
-  "needs.departments_fetched": "Départements récupérés."
+  "needs.departments_fetched": "Départements récupérés.",
+  "needs.signature_required": "Enregistrez d'abord votre signature (Profil → Ma signature) : elle est obligatoire pour signer un état de besoin."
 }

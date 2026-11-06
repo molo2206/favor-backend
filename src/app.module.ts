@@ -53,6 +53,7 @@ import { OperationModule } from './operation/operation.module';
 import { AuditModule } from './audit/audit.module';
 import { UserSessionsModule } from './users/sessions/user-sessions.module';
 import { WorkSchedulesModule } from './work-schedules/work-schedules.module';
+import { UserSignaturesModule } from './user-signatures/user-signatures.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditInterceptor } from './audit/interceptor/audit.interceptor';
 import { AuditContextMiddleware } from './audit/context/audit-context.middleware';
@@ -211,6 +212,7 @@ import { VehicleRegistrationModule } from './vehicle-registration/vehicle-regist
     AuditModule,
     UserSessionsModule, // ✅ Sessions de connexion
     WorkSchedulesModule, // ✅ Horaires et programmes de travail (contrôle d'accès)
+    UserSignaturesModule, // ✅ Signatures des utilisateurs (états de besoins…)
     GoogleModule,
     ProxyBlockModule, // ✅ Filtre VPN / proxy / Tor (PROXY_BLOCK_MODE)
     ServiceZonesModule,

@@ -6,6 +6,7 @@ import { NeedContext, NeedRates, NeedsAccessService, round2 } from './common/nee
 import { NeedAction, NeedFinanceStatus, NeedLevelStatus, NeedMemberRole, NeedStatus } from './common/needs.enums';
 import { NeedItem, NeedLevelState, NeedRequest } from './entities/need.entity';
 import { NeedLevelConfig, NeedRule } from './entities/need-config.entity';
+import { NeedSignature, NeedSignatureRole } from './entities/need-signature.entity';
 import { NeedApproveDto, NeedCorrectionDto, NeedRejectDto } from './dto/needs.dto';
 
 export type NeedPlanInput = {
@@ -328,6 +329,16 @@ export class NeedsWorkflowService {
         await this.access.log(m, n.id, NeedAction.LEVEL_SKIPPED, null, { level: l.level, comment: l.skipReason ?? null });
       }
 
+      // ✅ Signature du demandeur ; les signatures des niveaux à refaire sont retirées
+      await m
+        .createQueryBuilder()
+        .delete()
+        .from(NeedSignature)
+        .where('needId = :id AND role = :role AND (level IS NULL OR level >= :from)', { id: n.id, role: NeedSignatureRole.VALIDATOR, from: resumeFrom })
+        .execute()
+        .catch(() => undefined);
+      await this.access.sign(m, n, user, { role: NeedSignatureRole.REQUESTER, action: isResubmit ? 'RESUBMITTED' : 'SUBMITTED', replace: true }, lang);
+
       const next = this.startNext(n, resumeFrom);
       if (next) await this.access.log(m, n.id, NeedAction.LEVEL_STARTED, null, { level: next.level, payload: { name: next.name, approverIds: next.approverIds } });
       else await this.markValidated(m, n, user, 'NO_LEVEL');
@@ -363,6 +374,9 @@ export class NeedsWorkflowService {
         override: override || undefined,
       });
       if (dto.approvedAmount !== undefined && dto.approvedAmount !== null) n.approvedAmount = round2(dto.approvedAmount);
+
+      // ✅ Signature du validateur pour ce niveau
+      await this.access.sign(m, n, user, { role: NeedSignatureRole.VALIDATOR, action: override ? 'OVERRIDE' : 'APPROVED', level: lvl.level, levelName: lvl.name }, lang);
 
       await this.access.log(m, n.id, override ? NeedAction.OVERRIDE : NeedAction.APPROVED, user, {
         level: lvl.level,

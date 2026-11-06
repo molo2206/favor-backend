@@ -1,0 +1,11 @@
+{
+  "user_signature.fetched": "Signature récupérée.",
+  "user_signature.saved": "Signature enregistrée.",
+  "user_signature.deleted": "Signature supprimée.",
+  "user_signature.not_found": "Aucune signature enregistrée.",
+  "user_signature.forbidden": "Vous ne pouvez pas accéder à cette signature.",
+  "user_signature.invalid_type": "Format non accepté : envoyez une image PNG, JPG ou WEBP.",
+  "user_signature.invalid_image": "Image de signature illisible.",
+  "user_signature.file_required": "Ajoutez l'image de votre signature (fichier ou signature dessinée).",
+  "user_signature.too_large": "Image trop lourde (maximum {{max}} Mo)."
+}

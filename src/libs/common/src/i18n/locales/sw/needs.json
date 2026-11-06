@@ -115,5 +115,6 @@
   "needs.notif.comment.body": "{{author}} kwenye {{reference}}: {{comment}}",
   "needs.department_not_found_id": "Idara haijapatikana ({{id}}). Pakia upya orodha ya idara na uchague moja ya kampuni inayotumika.",
   "needs.department_other_company": "Idara “{{name}}” ni ya kampuni nyingine. Chagua idara ya kampuni inayotumika.",
-  "needs.departments_fetched": "Idara zimepatikana."
+  "needs.departments_fetched": "Idara zimepatikana.",
+  "needs.signature_required": "Hifadhi sahihi yako kwanza (Wasifu → Sahihi yangu): inahitajika kusaini ombi la mahitaji."
 }

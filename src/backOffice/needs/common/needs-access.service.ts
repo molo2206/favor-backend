@@ -1,4 +1,4 @@
-import { ForbiddenException, forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { I18nService } from 'src/libs/common/src';
@@ -12,6 +12,8 @@ import { isCompanyOwner, isPlatformAdmin, resolveCompanyId } from 'src/backOffic
 import { NeedAction, NeedMemberRole } from './needs.enums';
 import { NeedLog } from '../entities/need.entity';
 import { NeedMember } from '../entities/need-config.entity';
+import { NeedSignature, NeedSignatureRole } from '../entities/need-signature.entity';
+import { UserSignaturesService } from 'src/user-signatures/user-signatures.service';
 
 export type NeedContext = {
   companyId: string;
@@ -85,7 +87,82 @@ export class NeedsAccessService {
     private readonly notifications: NotificationsService,
     private readonly fcm: FcmService,
     @Inject(forwardRef(() => NotificationsGateway)) private readonly gateway: NotificationsGateway,
+    @Optional() readonly userSignatures?: UserSignaturesService,
   ) { }
+
+  // ============================================================
+  // SIGNATURES
+  // ============================================================
+
+  /** NEEDS_SIGNATURE_REQUIRED=true : impossible de soumettre / valider / autoriser / payer sans signature enregistrée */
+  get signatureRequired(): boolean {
+    return String(process.env.NEEDS_SIGNATURE_REQUIRED ?? 'false').toLowerCase() === 'true';
+  }
+
+  /**
+   * Appose la signature de l'utilisateur (copie de l'URL de son image à cet instant).
+   * À appeler dans la transaction de l'action : si la signature est obligatoire et absente, l'action est annulée.
+   */
+  async sign(
+    m: EntityManager,
+    need: { id: string; companyId: string },
+    user: UserEntity,
+    opts: { role: NeedSignatureRole; action: string; level?: number | null; levelName?: string | null; refId?: string | null; replace?: boolean },
+    lang: string,
+  ): Promise<void> {
+    const url = (await this.userSignatures?.urlOf(user.id)) ?? null;
+    if (!url && this.signatureRequired) throw new BadRequestException(this.t('needs.signature_required', lang));
+    try {
+      if (opts.replace) {
+        await m.delete(NeedSignature, { needId: need.id, role: opts.role, ...(opts.level ? { level: opts.level } : {}) } as any);
+      }
+      await m.insert(NeedSignature, {
+        needId: need.id,
+        companyId: need.companyId,
+        userId: user.id,
+        signerName: user.fullName ?? null,
+        role: opts.role,
+        action: opts.action,
+        level: opts.level ?? null,
+        levelName: opts.levelName ?? null,
+        refId: opts.refId ?? null,
+        signatureUrl: url,
+        signedAt: new Date(),
+      } as any);
+    } catch (e: any) {
+      // Table absente (SQL non exécuté) : l'action continue, la signature n'est pas enregistrée
+      if (this.signatureRequired) throw e;
+      this.logger.warn(`Signature non enregistrée (${need.id}) : ${e?.message}`);
+    }
+  }
+
+  /** Signatures d'un état de besoin, dans l'ordre (la plus récente par signataire / rôle / niveau) */
+  async signaturesOf(needId: string, m: EntityManager = this.m) {
+    let rows: NeedSignature[] = [];
+    try {
+      rows = await m.find(NeedSignature, { where: { needId }, order: { signedAt: 'ASC' } });
+    } catch {
+      return [];
+    }
+    const latest = new Map<string, NeedSignature>();
+    for (const r of rows) latest.set(`${r.role}|${r.level ?? ''}|${r.userId}|${r.refId ?? ''}`, r);
+    const order: Record<string, number> = { REQUESTER: 0, VALIDATOR: 1, FINANCE: 2, CASHIER: 3 };
+    return [...latest.values()]
+      .sort((a, b) => order[a.role] - order[b.role] || (a.level ?? 0) - (b.level ?? 0) || +new Date(a.signedAt) - +new Date(b.signedAt))
+      .map((r) => ({
+        id: r.id,
+        role: r.role,
+        action: r.action,
+        level: r.level ?? null,
+        levelName: r.levelName ?? null,
+        refId: r.refId ?? null,
+        userId: r.userId,
+        signerName: r.signerName ?? null,
+        signatureUrl: r.signatureUrl ?? null,
+        hasImage: !!r.signatureUrl,
+        signedAt: r.signedAt,
+      }));
+  }
 
   t(key: string, lang: string, params?: Record<string, any>): string {
     return this.i18n.translate(key, lang, params);

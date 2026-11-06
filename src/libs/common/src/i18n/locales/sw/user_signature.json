@@ -1,0 +1,11 @@
+{
+  "user_signature.fetched": "Sahihi imepatikana.",
+  "user_signature.saved": "Sahihi imehifadhiwa.",
+  "user_signature.deleted": "Sahihi imefutwa.",
+  "user_signature.not_found": "Hakuna sahihi iliyohifadhiwa.",
+  "user_signature.forbidden": "Huwezi kufikia sahihi hii.",
+  "user_signature.invalid_type": "Muundo haukubaliki: tuma picha ya PNG, JPG au WEBP.",
+  "user_signature.invalid_image": "Picha ya sahihi haisomeki.",
+  "user_signature.file_required": "Ongeza picha ya sahihi yako (faili au sahihi iliyochorwa).",
+  "user_signature.too_large": "Picha ni kubwa mno (kiwango cha juu {{max}} MB)."
+}

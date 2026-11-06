@@ -580,9 +580,16 @@ export class FpayService {
         }
     }
 
+    /**
+     * Paiement F-Pay d'un client (débité via son access_token).
+     * account : compte F-Pay qui ENCAISSE le paiement
+     *   - 'HELP'     → FPAY_API_KEY_HELP (par défaut : commandes, services…)
+     *   - 'LOGISTIC' → FPAY_API_KEY_LOGISTIC (colis / frais d'expédition)
+     */
     async makePayment(
         paymentDto: FpayPaymentDto,
         currentUser: UserEntity,
+        account: 'HELP' | 'LOGISTIC' = 'HELP',
     ): Promise<FpayResponse<PaymentResponseDto>> {
         try {
             if (!currentUser) {
@@ -611,14 +618,14 @@ export class FpayService {
                 access_token: paymentDto.access_token,
             };
 
-            // ✅ Utiliser l'API Key du service (pay)
+            // ✅ Clé du compte qui encaisse (permission « pay » requise côté F-Pay)
+            const receiverKey = account === 'LOGISTIC' ? this.logisticApiKey : this.apiKey;
             const headers = {
-                'Authorization': this.apiKey,
+                'Authorization': receiverKey,
                 'Content-Type': 'application/json',
             };
 
-            this.logger.log(`📤 Appel API Gateway: ${url}`);
-            this.logger.log(`📤 Headers: Authorization: ${this.apiKey.substring(0, 20)}...`);
+            this.logger.log(`📤 Appel API Gateway: ${url} (compte encaisseur : ${account})`);
             this.logger.log(`📤 Payload:`, JSON.stringify(paymentData, null, 2));
 
             const response = await firstValueFrom(
@@ -1048,9 +1055,11 @@ export class FpayService {
         paymentMethod?: string,
         ipAddress?: string,
         lang: string = 'fr',
+        /** Compte F-Pay qui encaisse : HELP (défaut) ou LOGISTIC (colis) */
+        account: 'HELP' | 'LOGISTIC' = 'HELP',
     ): Promise<any> {
         try {
-            this.logger.log(`💰 Paiement Mobile Money: ${amount} ${currency}`);
+            this.logger.log(`💰 Paiement Mobile Money: ${amount} ${currency} (compte encaisseur : ${account})`);
 
             // ✅ Utiliser l'API Key HELP (celle qui a la permission 'pay')
             const url = `${this.fpayApiUrl}/api/external/pay/mobile_money`;
@@ -1062,14 +1071,13 @@ export class FpayService {
                 paymentMethod: paymentMethod || 'CASH',
             };
 
-            // ✅ Utiliser l'API Key du service (pay)
+            // ✅ Clé du compte qui encaisse (permission « pay » requise côté F-Pay)
             const headers = {
-                'Authorization': this.apiKey,
+                'Authorization': account === 'LOGISTIC' ? this.logisticApiKey : this.apiKey,
                 'Content-Type': 'application/json',
             };
 
             this.logger.log(`📤 Appel API Gateway: ${url}`);
-            this.logger.log(`📤 Headers: Authorization: ${this.apiKey.substring(0, 30)}...`);
             this.logger.log(`📤 Payload:`, JSON.stringify(paymentData, null, 2));
 
             const response = await firstValueFrom(

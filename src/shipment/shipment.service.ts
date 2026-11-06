@@ -2737,6 +2737,12 @@ export class ShipmentService {
     let fpayTransactionId: string | null = null;
     let fpayReference: string | null = null;
 
+    // ✅ Compte F-Pay qui encaisse les paiements de colis PAR F-PAY : LOGISTIQUE (FPAY_API_KEY_LOGISTIC)
+    //    FPAY_SHIPMENT_ACCOUNT=HELP pour revenir au compte Favor Help.
+    //    (Le Mobile Money reste enregistré sur le compte Favor Help, FPAY_API_KEY_HELP.)
+    const shipmentAccount: 'HELP' | 'LOGISTIC' =
+      String(process.env.FPAY_SHIPMENT_ACCOUNT || 'LOGISTIC').toUpperCase() === 'HELP' ? 'HELP' : 'LOGISTIC';
+
     // âœ… AJOUT FPAY - SHIPMENT
     if (paymentMethod === PaymentMethod.FPAY) {
       selectedMethod = PaymentMethod.FPAY;
@@ -2758,7 +2764,8 @@ export class ShipmentService {
         hasAccessToken: !!fpayData.access_token,
       });
 
-      const fpayResponse = await this.fpayService.makePayment(fpayData, user);
+      // ✅ Portefeuille F-Pay du client → compte LOGISTIQUE
+      const fpayResponse = await this.fpayService.makePayment(fpayData, user, shipmentAccount);
 
       if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {
         fpayTransactionId = fpayResponse.data.transaction.id;
@@ -2842,12 +2849,15 @@ export class ShipmentService {
         }
 
         try {
+          // Mobile Money enregistré dans F-Pay sur le compte Favor Help (FPAY_API_KEY_HELP)
           const fpayResponse = await this.fpayService.payWithMobileMoney(
             totalAmount,
             currency || shipment.currency || 'USD',
             `Paiement du colis ${shipment.trackingNumber}`,
             'MOBILE_MONEY',
-            lang
+            undefined,
+            lang,
+            'HELP',
           );
 
           if (fpayResponse?.data?.transaction?.status === 'SUCCESS') {

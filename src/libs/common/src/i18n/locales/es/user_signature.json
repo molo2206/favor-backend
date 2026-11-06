@@ -1,0 +1,11 @@
+{
+  "user_signature.fetched": "Firma obtenida.",
+  "user_signature.saved": "Firma guardada.",
+  "user_signature.deleted": "Firma eliminada.",
+  "user_signature.not_found": "No hay firma guardada.",
+  "user_signature.forbidden": "No puede acceder a esta firma.",
+  "user_signature.invalid_type": "Formato no aceptado: envíe una imagen PNG, JPG o WEBP.",
+  "user_signature.invalid_image": "Imagen de firma ilegible.",
+  "user_signature.file_required": "Añada la imagen de su firma (archivo o firma dibujada).",
+  "user_signature.too_large": "Imagen demasiado pesada (máximo {{max}} MB)."
+}

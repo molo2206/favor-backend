@@ -18,6 +18,7 @@ import {
 } from './common/needs.enums';
 import { NeedAttachment, NeedDisbursement, NeedItem, NeedLevelState, NeedLog, NeedRequest } from './entities/need.entity';
 import { NeedRule } from './entities/need-config.entity';
+import { NeedSignature, NeedSignatureRole } from './entities/need-signature.entity';
 import { NeedsWorkflowService } from './needs-workflow.service';
 import {
   CancelNeedDto,
@@ -434,6 +435,8 @@ export class NeedsService {
       n.authorizationNote = dto.note ?? null;
       n.transmittedAt = n.transmittedAt ?? new Date();
       n.financeStatus = Number(n.disbursedTotal) <= 0 ? NeedFinanceStatus.AUTHORIZED : Number(n.disbursedTotal) >= n.authorizedAmount ? NeedFinanceStatus.PAID : NeedFinanceStatus.PARTIALLY_PAID;
+      // ✅ Signature de l'autorisation financière (remplace une autorisation précédente)
+      await this.access.sign(m, n, user, { role: NeedSignatureRole.FINANCE, action: 'AUTHORIZED', replace: true }, lang);
       await m.save(NeedRequest, n);
       await this.access.log(m, n.id, NeedAction.AUTHORIZED, user, {
         fromStatus: from,
@@ -492,6 +495,8 @@ export class NeedsService {
           recordedById: user.id,
         }),
       );
+      // ✅ Signature du décaissement (celui qui l'enregistre)
+      await this.access.sign(m, n, user, { role: NeedSignatureRole.CASHIER, action: 'DISBURSED', refId: d.id }, lang);
       const from = n.financeStatus;
       n.disbursedTotal = round2(Number(n.disbursedTotal) + Number(d.amount));
       n.lastDisbursedAt = date;
@@ -566,6 +571,7 @@ export class NeedsService {
       n.disbursedTotal = round2(Math.max(0, Number(n.disbursedTotal) - Number(d.amount)));
       n.financeStatus = n.disbursedTotal <= 0 ? NeedFinanceStatus.AUTHORIZED : NeedFinanceStatus.PARTIALLY_PAID;
       await m.delete(NeedDisbursement, { id: d.id });
+      await m.delete(NeedSignature, { refId: d.id }).catch(() => undefined);
       await m.save(NeedRequest, n);
       await this.access.log(m, n.id, NeedAction.DISBURSED, user, { comment: `Annulé : la sortie de caisse a échoué (${String(reason).slice(0, 300)})`, payload: { reverted: true, disbursementId, amount: Number(d.amount) } });
     });
@@ -721,6 +727,10 @@ export class NeedsService {
       attachments: attachments.map((a) => ({ ...a, uploadedBy: this.personOf(people, a.uploadedById) })),
       disbursements: disbursements.map((d) => ({ ...d, paidBy: this.personOf(people, d.paidById) ?? { id: null, fullName: d.paidByName } })),
       history: logs.map((l) => ({ ...l, user: this.personOf(people, l.userId) ?? (l.userName ? { id: l.userId, fullName: l.userName } : null) })),
+      // ✅ Signatures apposées (demandeur, validateurs, finance, décaissements)
+      signatures: await this.access.signaturesOf(n.id),
+      signatureRequired: this.access.signatureRequired,
+      mySignatureUrl: (await this.access.userSignatures?.urlOf(user.id)) ?? null,
       permissions: {
         role: ctx.role,
         canEdit: editable,

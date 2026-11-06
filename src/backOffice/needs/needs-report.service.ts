@@ -331,12 +331,31 @@ export class NeedsReportService {
     const d: any = await this.needs.detail(id, user, lang);
     const company: any[] = await this.m.query('SELECT companyName FROM company WHERE id = ? LIMIT 1', [d.companyId]);
     const logs: NeedLog[] = d.history ?? [];
+    // ✅ Signatures : images intégrées au PDF (data URI)
+    const roleFr: Record<string, string> = { REQUESTER: 'Demandeur', VALIDATOR: 'Validation', FINANCE: 'Autorisation financière', CASHIER: 'Décaissement' };
+    const sigs: any[] = [];
+    for (const s of d.signatures ?? []) {
+      const img = s.signatureUrl ? await this.access.userSignatures?.dataUriOf(s.signatureUrl) : null;
+      sigs.push({ ...s, img });
+    }
+    const signaturesHtml = sigs.length
+      ? `<h2>Signatures</h2><div class="sigs">${sigs
+          .map(
+            (s) => `<div class="sig"><div class="sig-role">${h(roleFr[s.role] ?? s.role)}${s.level ? ` — niveau ${s.level}${s.levelName ? ` (${h(s.levelName)})` : ''}` : ''}</div>
+            <div class="sig-img">${s.img ? `<img src="${s.img}" alt="signature">` : '<span class="muted">Sans image de signature</span>'}</div>
+            <div class="sig-name">${h(s.signerName ?? '')}</div><div class="muted">${h(dt(s.signedAt))}</div></div>`,
+          )
+          .join('')}</div>`
+      : '';
     const html = `<!doctype html><html><head><meta charset="utf-8"><style>
       body{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#1f2933}
       h1{font-size:18px;margin:0}h2{font-size:13px;margin:16px 0 6px;border-bottom:1px solid #d9dee5;padding-bottom:3px}
       .muted{color:#6b7280}.grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin-top:8px}
       table{width:100%;border-collapse:collapse}th,td{border:1px solid #d9dee5;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eef2f7}.r{text-align:right}
       .badge{display:inline-block;padding:1px 6px;border:1px solid #9aa5b1;border-radius:8px;font-size:10px}
+      .sigs{display:flex;flex-wrap:wrap;gap:10px}.sig{width:31%;border:1px solid #d9dee5;padding:6px;page-break-inside:avoid}
+      .sig-role{font-weight:bold;font-size:10px}.sig-img{height:70px;display:flex;align-items:center;justify-content:center;margin:4px 0}
+      .sig-img img{max-height:70px;max-width:100%}.sig-name{border-top:1px solid #9aa5b1;padding-top:3px;font-size:10px}
     </style></head><body>
       <div class="muted">${h(company[0]?.companyName ?? '')}</div>
       <h1>État de besoin ${h(d.reference)}</h1>
@@ -365,6 +384,7 @@ export class NeedsReportService {
       ${(d.disbursements ?? []).length ? `<table style="margin-top:6px"><thead><tr><th>Date</th><th class="r">Montant</th><th>Payé par</th><th>Bénéficiaire</th><th>Mode</th><th>Référence</th></tr></thead><tbody>
       ${d.disbursements.map((x: any) => `<tr><td>${h(x.paidAt)}</td><td class="r">${money(x.amount)} ${h(x.currency)}</td><td>${h(x.paidBy?.fullName ?? x.paidByName ?? '')}</td><td>${h(x.beneficiary ?? '')}</td><td>${h(x.paymentMethod ?? '')}</td><td>${h(x.paymentReference ?? '')}</td></tr>`).join('')}
       </tbody></table>` : ''}
+      ${signaturesHtml}
       <h2>Historique</h2>
       <table><thead><tr><th>Date</th><th>Action</th><th>Niveau</th><th>Par</th><th>Observation</th></tr></thead><tbody>
       ${logs.filter((l: any) => !['NOTIFIED', 'CALLED'].includes(l.action)).map((l: any) => `<tr><td>${h(dt(l.createdAt))}</td><td>${h(l.action)}</td><td>${l.level || ''}</td><td>${h(l.user?.fullName ?? l.userName ?? 'Système')}</td><td>${h(l.comment ?? '')}</td></tr>`).join('')}

@@ -115,5 +115,6 @@
   "needs.notif.comment.body": "{{author}} on {{reference}}: {{comment}}",
   "needs.department_not_found_id": "Department not found ({{id}}). Reload the department list and choose one from the active company.",
   "needs.department_other_company": "The department “{{name}}” belongs to another company. Choose a department of the active company.",
-  "needs.departments_fetched": "Departments retrieved."
+  "needs.departments_fetched": "Departments retrieved.",
+  "needs.signature_required": "Save your signature first (Profile → My signature): it is required to sign a needs request."
 }

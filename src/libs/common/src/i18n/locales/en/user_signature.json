@@ -1,0 +1,11 @@
+{
+  "user_signature.fetched": "Signature retrieved.",
+  "user_signature.saved": "Signature saved.",
+  "user_signature.deleted": "Signature deleted.",
+  "user_signature.not_found": "No signature saved.",
+  "user_signature.forbidden": "You cannot access this signature.",
+  "user_signature.invalid_type": "Unsupported format: send a PNG, JPG or WEBP image.",
+  "user_signature.invalid_image": "Unreadable signature image.",
+  "user_signature.file_required": "Add your signature image (file or drawn signature).",
+  "user_signature.too_large": "Image too large (maximum {{max}} MB)."
+}
