@@ -1,0 +1,9 @@
+export enum SalesOrderStatus {
+    DRAFT = 'DRAFT',
+    VALIDATED = 'VALIDATED',
+    IN_PROGRESS = 'IN_PROGRESS',
+    DELIVERED = 'DELIVERED',
+    INVOICED = 'INVOICED',
+    PAID = 'PAID',
+    CANCELLED = 'CANCELLED',
+}

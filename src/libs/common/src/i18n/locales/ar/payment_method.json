@@ -1,0 +1,12 @@
+{
+  "payment_method.list": "طرق الدفع الخاصة بك",
+  "payment_method.created": "تمت إضافة طريقة الدفع",
+  "payment_method.updated": "تم تعديل طريقة الدفع",
+  "payment_method.deleted": "تم حذف طريقة الدفع",
+  "payment_method.default_set": "تم حفظ طريقة الدفع الافتراضية",
+  "payment_method.not_found": "طريقة الدفع غير موجودة",
+  "payment_method.mobile_money_required": "مشغل ورقم Mobile Money مطلوبان",
+  "payment_method.already_exists": "طريقة الدفع هذه مسجلة بالفعل",
+  "payment_method.max_reached": "لا يمكنك حفظ أكثر من {{max}} طرق دفع",
+  "payment_method.not_allowed_here": "لا يُقبل {{method}} لهذه الدفعة"
+}

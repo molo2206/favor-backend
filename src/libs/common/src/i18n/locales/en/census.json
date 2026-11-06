@@ -1,0 +1,19 @@
+{
+  "census.created": "Census record saved.",
+  "census.updated": "Census record updated.",
+  "census.deleted": "Census record deleted.",
+  "census.found": "Census record.",
+  "census.list": "Census records.",
+  "census.not_found": "Census record not found.",
+  "census.duplicate": "This customer / company already has a census record.",
+  "census.followup_saved": "Follow-up saved.",
+  "census.imported": "{{count}} record(s) created from former customers / vendors.",
+  "census.import_note_client": "Former customer: {{orders}} order(s), none for more than {{days}} days.",
+  "census.import_note_vendor": "Vendor with no sale for more than {{days}} days ({{orders}} order(s) in total).",
+  "census.stats": "Census statistics.",
+  "census.client_required": "Select an existing customer (userId).",
+  "census.company_required": "Select an existing company (vendorCompanyId).",
+  "census.client_not_found": "Customer not found on the platform.",
+  "census.company_not_found": "Company not found on the platform.",
+  "census.candidates": "Existing customers / companies to survey."
+}

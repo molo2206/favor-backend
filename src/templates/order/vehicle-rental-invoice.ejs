@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="<%= lang || 'fr' %>" dir="<%= (lang === 'ar') ? 'rtl' : 'ltr' %>">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+        <%= translations.title || 'FACTURE DE LOCATION' %> - Favor Help
+    </title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        html,
+        body {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family:
+                system-ui,
+                -apple-system,
+                "Segoe UI",
+                Roboto,
+                "Noto Naskh Arabic",
+                "Helvetica Neue",
+                sans-serif;
+            background-color: #f1f5f9;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .invoice-container {
+            position: relative;
+            width: 210mm;
+            height: 297mm;
+            background-color: #ffffff;
+            overflow: hidden;
+            background-image:
+                repeating-linear-gradient(135deg,
+                    rgba(56, 189, 248, 0.02) 0px,
+                    rgba(56, 189, 248, 0.02) 2px,
+                    transparent 2px,
+                    transparent 22px),
+                repeating-linear-gradient(45deg,
+                    rgba(56, 189, 248, 0.02) 0px,
+                    rgba(56, 189, 248, 0.02) 2px,
+                    transparent 2px,
+                    transparent 22px);
+        }
+
+        .invoice-padding {
+            padding: 22px 42px 18px 42px;
+        }
+
+        .header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1.5rem;
+        }
+
+        .logo {
+            width: 150px;
+        }
+
+        .header-right {
+            text-align: right;
+        }
+
+        .invoice-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #0118d8;
+            line-height: 1.2;
+        }
+
+        .draft-badge-wrapper {
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        .draft-text {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        .draft-badge {
+            background-color: #e2e8f0;
+            color: #475569;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .parties {
+            margin-top: 18px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1.5rem;
+        }
+
+        .sender,
+        .recipient {
+            font-size: 0.655rem;
+            line-height: 1.5;
+            color: #1e293b;
+        }
+
+        .sender p,
+        .recipient p {
+            margin: 0;
+        }
+
+        .sender .bold,
+        .recipient .bold {
+            font-weight: 700;
+        }
+
+        .social-icons {
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: #64748b;
+        }
+
+        .social-icons i {
+            font-size: 1rem;
+        }
+
+        .recipient {
+            text-align: right;
+        }
+
+        .dates {
+            margin-top: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 0.655rem;
+            color: #1e293b;
+        }
+
+        .date-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .date-row .label {
+            font-weight: 700;
+        }
+
+        .table-wrapper {
+            margin-top: 14px;
+            overflow: hidden;
+            border-radius: 0.125rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.655rem;
+        }
+
+        thead tr {
+            background-color: #0118d8;
+            color: #ffffff;
+            text-align: left;
+        }
+
+        th {
+            padding: 7px 9px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        th:first-child {
+            width: 2.5rem;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        td {
+            padding: 9px;
+            color: #334155;
+        }
+
+        td.bold {
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .bottom-section {
+            margin-top: 18px;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 25px;
+        }
+
+        .terms {
+            order: 1;
+            max-width: 20rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            font-size: 0.655rem;
+            color: #1e293b;
+        }
+
+        .terms p {
+            margin: 0;
+        }
+
+        .terms .label {
+            font-weight: 700;
+        }
+
+        .totals {
+            order: 2;
+            width: 270px;
+            max-width: 270px;
+            flex-shrink: 0;
+            align-self: flex-start;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.125rem;
+            overflow: hidden;
+            margin-left: auto;
+        }
+
+        .total-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            font-size: 0.655rem;
+        }
+
+        .total-row .label {
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .total-row .value {
+            color: #1e293b;
+            white-space: nowrap;
+        }
+
+        .total-row+.total-row {
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .total-row.ttc {
+            background-color: #0118d8;
+            color: #ffffff;
+        }
+
+        .total-row.ttc .label,
+        .total-row.ttc .value {
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+        /* =========================
+           NOTES ET CONDITIONS
+           (un seul bloc structuré)
+        ========================= */
+        .invoice-notes {
+            margin-top: 16px;
+            padding: 10px 14px;
+            background-color: #f8fafc;
+            border-radius: 0.125rem;
+            font-size: 0.655rem;
+            line-height: 1.45;
+            color: #475569;
+        }
+
+        .invoice-notes p {
+            margin: 0 0 0.35rem 0;
+        }
+
+        .invoice-notes p:last-child {
+            margin-bottom: 0;
+        }
+
+        .invoice-notes .notes-title {
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .invoice-notes .note-line {
+            display: flex;
+            gap: 8px;
+            margin: 0.25rem 0;
+        }
+
+        .invoice-notes .note-number {
+            font-weight: 700;
+            min-width: 16px;
+            color: #1e293b;
+            flex-shrink: 0;
+        }
+
+        .thank-you {
+            margin-top: 12px;
+            text-align: center;
+            font-size: 0.655rem;
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .legal-footer {
+            margin-top: 10px;
+            padding-top: 9px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.655rem;
+            line-height: 1.35;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        .legal-footer p {
+            margin: 0 0 0.2rem 0;
+        }
+
+        .legal-footer p:last-child {
+            margin-bottom: 0;
+        }
+
+        .stamp-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+            overflow: hidden;
+        }
+
+        .stamp-image {
+            width: 250px;
+            max-width: 100%;
+            height: auto;
+            opacity: 0.85;
+            transform: rotate(-18deg) scale(1);
+            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15));
+        }
+
+        /* RTL (arabe) */
+        .invoice-container[dir="rtl"] .recipient {
+            text-align: left;
+        }
+
+        .invoice-container[dir="rtl"] .header-right {
+            text-align: left;
+        }
+
+        .invoice-container[dir="rtl"] thead tr {
+            text-align: right;
+        }
+
+        .invoice-container[dir="rtl"] .invoice-notes .note-line {
+            flex-direction: row-reverse;
+        }
+
+        @media print {
+
+            html,
+            body {
+                width: 210mm;
+                height: 297mm;
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+            }
+
+            body {
+                display: block;
+            }
+
+            .invoice-container {
+                width: 210mm;
+                height: 297mm;
+                min-height: 297mm;
+                max-height: 297mm;
+                margin: 0;
+                overflow: hidden;
+                page-break-after: avoid;
+                page-break-before: avoid;
+            }
+
+            .invoice-padding {
+                page-break-inside: avoid;
+            }
+
+            .parties,
+            .dates,
+            .table-wrapper,
+            .bottom-section,
+            .invoice-notes,
+            .thank-you,
+            .legal-footer {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <% /*=========================VARIABLES=========================*/ const isPaid=reservation &&
+        (reservation.status==='CONFIRMED' || reservation.status==='PAID' ); const totalPrice=reservation &&
+        reservation.total_amount ? Number(reservation.total_amount) : 0; const vatAmount=0; const totalTTC=totalPrice +
+        vatAmount; const currency='USD' ; const localeStr=lang==='en' ? 'en-US' : (lang==='ar' ? 'ar-EG' : (lang==='es'
+        ? 'es-ES' : 'fr-FR' )); /* Calcul de la durée de location */ let rentalDays=0; if (reservation &&
+        reservation.start_date && reservation.end_date) { const start=new Date(reservation.start_date); const end=new
+        Date(reservation.end_date); rentalDays=Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)); if
+        (rentalDays < 1) rentalDays=1; } const pricePerDay=rentalDays> 0 ? (totalPrice / rentalDays) : totalPrice;
+        %>
+
+        <div class="invoice-container" dir="<%= (lang === 'ar') ? 'rtl' : 'ltr' %>">
+            <!-- =========================
+         STAMP PAID / UNPAID
+    ========================= -->
+            <div class="stamp-overlay">
+                <% if (isPaid) { %>
+                    <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20GREEN.png"
+                        alt="<%= translations.status_paid || 'Payé' %>" class="stamp-image" />
+                    <% } else { %>
+                        <img src="https://pub-c1b292e32753466e9eba9e44ed833ece.r2.dev/PAID%20RED.png"
+                            alt="<%= translations.status_unpaid || 'Impayé' %>" class="stamp-image" />
+                        <% } %>
+            </div>
+
+            <div class="invoice-padding">
+                <!-- =========================
+             EXPÉDITEUR / CLIENT
+        ========================= -->
+                <div class="parties">
+                    <div class="sender">
+                        <img src="https://admin.favorhelp.com/logos/logo-dark.png" alt="Favor Help" class="logo" />
+                        <p class="bold">Favor Help</p>
+                        <p>Office 1, Q.Murara, 012, Goma</p>
+                        <p>Nord-Kivu, Congo-Kinshasa</p>
+                        <p>RCCM : CD/BN/RCCM/26-B-223</p>
+                        <p>N°Tel : +24397964940</p>
+                    </div>
+
+                    <div class="recipient">
+                        <p class="bold">
+                            <%= user ? user.fullName : 'Client' %>
+                        </p>
+                        <p>
+                            <%= user ? user.email : '' %>
+                        </p>
+                        <p>
+                            <%= user ? user.phone : '' %>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- =========================
+             FACTURE / DATE
+        ========================= -->
+                <div class="dates">
+                    <div class="header-right">
+                        <h1 class="invoice-title">
+                            <%= translations.title || 'FACTURE DE LOCATION' %>
+                        </h1>
+                        <div class="draft-badge-wrapper">
+                            <span class="draft-text">
+                                <%= translations.number || 'N°' %>
+                                    <%= reservation ? reservation.id.slice(0, 8) : 'INV-001' %>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="date-row">
+                        <span class="label">
+                            <%= translations.date || "Date d'émission" %>
+                        </span>
+                        <span>
+                            <%= reservation && reservation.createdAt ? new
+                                Date(reservation.createdAt).toLocaleDateString(localeStr) : new
+                                Date().toLocaleDateString(localeStr) %>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- =========================
+             DÉTAILS DU VÉHICULE
+        ========================= -->
+                <div class="dates" style="margin-top:12px;">
+                    <div style="display:flex; gap:1.5rem; flex-wrap:wrap;">
+                        <div style="display:flex; gap:0.5rem;">
+                            <span class="label">
+                                <%= translations.vehicle || 'Véhicule' %> :
+                            </span>
+                            <span>
+                                <%= (reservation && reservation.product && reservation.product.name) || '-' %>
+                            </span>
+                        </div>
+                        <div style="display:flex; gap:0.5rem;">
+                            <span class="label">
+                                <%= translations.start_date || 'Début' %> :
+                            </span>
+                            <span>
+                                <%= reservation && reservation.start_date ? new
+                                    Date(reservation.start_date).toLocaleDateString(localeStr) : '-' %>
+                            </span>
+                        </div>
+                        <div style="display:flex; gap:0.5rem;">
+                            <span class="label">
+                                <%= translations.end_date || 'Fin' %> :
+                            </span>
+                            <span>
+                                <%= reservation && reservation.end_date ? new
+                                    Date(reservation.end_date).toLocaleDateString(localeStr) : '-' %>
+                            </span>
+                        </div>
+                        <div style="display:flex; gap:0.5rem;">
+                            <span class="label">
+                                <%= translations.duration || 'Durée' %> :
+                            </span>
+                            <span>
+                                <%= rentalDays %>
+                                    <%= translations.days || 'jour(s)' %>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- =========================
+             TABLEAU DE LOCATION
+        ========================= -->
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>
+                                    <%= translations.number || 'N°' %>
+                                </th>
+                                <th>
+                                    <%= translations.designation || 'Désignation' %>
+                                </th>
+                                <th>
+                                    <%= translations.quantity || 'Qté' %>
+                                </th>
+                                <th>
+                                    <%= translations.unit_price || 'Prix u. HT' %>
+                                </th>
+                                <th>
+                                    <%= translations.amount || 'Montant' %>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td class="bold">
+                                    <%= translations.rental_service || 'Location de véhicule' %> —
+                                        <%= (reservation && reservation.product && reservation.product.name) || '' %>
+                                </td>
+                                <td>
+                                    <%= rentalDays %>
+                                </td>
+                                <td>
+                                    <%= currency %>
+                                        <%= pricePerDay.toFixed(2) %>
+                                </td>
+                                <td class="bold">
+                                    <%= currency %>
+                                        <%= totalPrice.toFixed(2) %>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- =========================
+             BOTTOM SECTION
+             PAYMENT METHOD À GAUCHE
+             TOTAUX À DROITE
+        ========================= -->
+                <div class="bottom-section">
+
+                    <!-- ✅ Payment Method à GAUCHE -->
+                    <div class="terms">
+                        <div>
+                            <p class="label">
+                                <%= translations.payment_method || 'Moyens de paiement' %>
+                            </p>
+                            <p>
+                                <%= (reservation && reservation.paymentMethod) || translations.cash || 'Cash' %>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- ✅ Totaux à DROITE -->
+                    <div class="totals">
+                        <div class="total-row">
+                            <span class="label">
+                                <%= translations.total_ht || 'Total HT' %>
+                            </span>
+                            <span class="value">
+                                <%= currency %>
+                                    <%= totalPrice.toFixed(2) %>
+                            </span>
+                        </div>
+
+                        <div class="total-row vat">
+                            <span class="label">
+                                <%= translations.vat || 'TVA' %>
+                            </span>
+                            <span class="value">
+                                <%= currency %>
+                                    <%= vatAmount.toFixed(2) %>
+                            </span>
+                        </div>
+
+                        <div class="total-row ttc">
+                            <span class="label">
+                                <%= translations.total_ttc || 'Total TTC' %>
+                            </span>
+                            <span class="value">
+                                <%= currency %>
+                                    <%= totalTTC.toFixed(2) %>
+                            </span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- =========================
+             NOTES ET CONDITIONS
+             (UN SEUL BLOC STRUCTURÉ)
+        ========================= -->
+                <div class="invoice-notes">
+                    <p class="notes-title">
+                        <%= translations.notes_title || 'Notes et conditions' %>
+                    </p>
+
+                    <p class="note-line">
+                        <span class="note-number">1.</span>
+                        <span>
+                            <%= translations.note_1
+                                || 'Facture émise pour des prestations de location de véhicule. TVA non applicable.' %>
+                        </span>
+                    </p>
+
+                    <p class="note-line">
+                        <span class="note-number">2.</span>
+                        <span>
+                            <%= translations.note_2
+                                || "Le locataire est responsable du véhicule loué pendant toute la durée de la location. Tout dommage constaté sera facturé selon le barème en vigueur."
+                                %>
+                        </span>
+                    </p>
+
+                    <p class="note-line">
+                        <span class="note-number">3.</span>
+                        <span>
+                            <%= translations.note_3
+                                || "À conserver — seul justificatif en cas de litige. Toute réclamation doit être adressée au loueur dans un délai maximum de 24 heures après la restitution du véhicule. Passé ce délai, aucune réclamation ne sera acceptée."
+                                %>
+                        </span>
+                    </p>
+                </div>
+
+                <!-- =========================
+             REMERCIEMENT
+        ========================= -->
+                <p class="thank-you">
+                    <%= translations.thank_you || 'Merci pour votre confiance et votre collaboration.' %>
+                </p>
+
+                <!-- =========================
+             FOOTER LÉGAL
+        ========================= -->
+                <div class="legal-footer">
+                    <p>
+                        <%= translations.legal_line_1
+                            || 'Favor Help — Office 1, Q.Murara, 012, Goma, Nord-Kivu, Congo-Kinshasa' %>
+                    </p>
+                    <p>
+                        <%= translations.legal_line_2 || 'RCCM : CD/BN/RCCM/26-B-223 — N°Tel : +24397964940' %>
+                    </p>
+                    <p>
+                        <%= translations.legal_line_3 || 'Email : contact@favorhelp.cd — Site : www.favorhelp.com' %>
+                    </p>
+                </div>
+            </div>
+        </div>
+</body>
+
+</html>
