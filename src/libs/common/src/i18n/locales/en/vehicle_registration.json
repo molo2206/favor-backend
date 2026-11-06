@@ -1,0 +1,15 @@
+{
+  "vehicle_registration.forbidden": "You do not have access to this vehicle.",
+  "vehicle_registration.not_found": "Vehicle not found.",
+  "vehicle_registration.plate_exists": "Plate {{plate}} is already registered (record {{reference}}).",
+  "vehicle_registration.price_range_invalid": "The maximum price ({{max}}) must be greater than or equal to the minimum price ({{min}}).",
+  "vehicle_registration.broker_incomplete": "Broker: enter their name and phone number (or leave the broker fields empty).",
+  "vehicle_registration.broker_same_as_owner": "The broker's phone number must be different from the owner's.",
+  "vehicle_registration.too_many_images": "A maximum of {{max}} images per vehicle.",
+  "vehicle_registration.created": "Vehicle {{name}} registered (reference {{reference}}).",
+  "vehicle_registration.list": "Vehicles retrieved.",
+  "vehicle_registration.detail": "Vehicle details retrieved.",
+  "vehicle_registration.updated": "Vehicle {{reference}} updated.",
+  "vehicle_registration.status_updated": "Vehicle {{reference}}: status {{status}}.",
+  "vehicle_registration.deleted": "Vehicle {{reference}} deleted."
+}
