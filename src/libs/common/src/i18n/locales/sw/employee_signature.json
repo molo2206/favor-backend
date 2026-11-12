@@ -1,0 +1,13 @@
+{
+  "employee_signature.fetched": "Sahihi imepatikana.",
+  "employee_signature.saved": "Sahihi imehifadhiwa.",
+  "employee_signature.deleted": "Sahihi imefutwa.",
+  "employee_signature.not_found": "Hakuna sahihi iliyohifadhiwa kwa mfanyakazi huyu.",
+  "employee_signature.forbidden": "Huwezi kusimamia sahihi ya mfanyakazi huyu.",
+  "employee_signature.invalid_type": "Muundo haukubaliki: tuma picha ya PNG, JPG au WEBP.",
+  "employee_signature.invalid_image": "Picha ya sahihi haisomeki.",
+  "employee_signature.file_required": "Ongeza picha ya sahihi (faili au sahihi iliyochorwa).",
+  "employee_signature.too_large": "Picha ni kubwa mno (kiwango cha juu {{max}} MB).",
+  "employee_signature.no_employee": "Hakuna faili la mfanyakazi lililounganishwa na akaunti yako katika kampuni hii: omba HR waliunde.",
+  "employee_signature.employee_not_found": "Mfanyakazi hajapatikana."
+}

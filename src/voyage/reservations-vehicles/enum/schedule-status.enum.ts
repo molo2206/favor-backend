@@ -1,0 +1,5 @@
+export enum ScheduleStatus {
+  AVAILABLE = 'AVAILABLE',
+  RESERVED = 'RESERVED',
+  MAINTENANCE = 'MAINTENANCE',
+}

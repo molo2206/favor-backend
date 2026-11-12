@@ -1,0 +1,19 @@
+{
+  "census.created": "تم حفظ بطاقة الإحصاء.",
+  "census.updated": "تم تحديث بطاقة الإحصاء.",
+  "census.deleted": "تم حذف بطاقة الإحصاء.",
+  "census.found": "بطاقة الإحصاء.",
+  "census.list": "بطاقات الإحصاء.",
+  "census.not_found": "بطاقة الإحصاء غير موجودة.",
+  "census.duplicate": "لهذا العميل / لهذه الشركة بطاقة إحصاء بالفعل.",
+  "census.followup_saved": "تم حفظ المتابعة.",
+  "census.imported": "تم إنشاء {{count}} بطاقة من العملاء / البائعين السابقين.",
+  "census.import_note_client": "عميل سابق: {{orders}} طلب، لا شيء منذ أكثر من {{days}} يوماً.",
+  "census.import_note_vendor": "بائع بدون مبيعات منذ أكثر من {{days}} يوماً ({{orders}} طلب إجمالاً).",
+  "census.stats": "إحصاءات الإحصاء.",
+  "census.client_required": "اختر عميلاً موجوداً (userId).",
+  "census.company_required": "اختر شركة موجودة (vendorCompanyId).",
+  "census.client_not_found": "العميل غير موجود على المنصة.",
+  "census.company_not_found": "الشركة غير موجودة على المنصة.",
+  "census.candidates": "العملاء / الشركات الموجودة للإحصاء."
+}

@@ -1,0 +1,12 @@
+{
+  "payment_method.list": "Vos moyens de paiement",
+  "payment_method.created": "Moyen de paiement ajouté",
+  "payment_method.updated": "Moyen de paiement modifié",
+  "payment_method.deleted": "Moyen de paiement supprimé",
+  "payment_method.default_set": "Moyen de paiement par défaut enregistré",
+  "payment_method.not_found": "Moyen de paiement introuvable",
+  "payment_method.mobile_money_required": "L'opérateur et le numéro Mobile Money sont obligatoires",
+  "payment_method.already_exists": "Ce moyen de paiement est déjà enregistré",
+  "payment_method.max_reached": "Vous ne pouvez pas enregistrer plus de {{max}} moyens de paiement",
+  "payment_method.not_allowed_here": "Le mode {{method}} n'est pas accepté pour ce paiement"
+}

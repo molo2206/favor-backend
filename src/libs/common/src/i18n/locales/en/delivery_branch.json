@@ -1,0 +1,21 @@
+{
+  "delivery_branch.new_order_title": "🍽️ New order to deliver",
+  "delivery_branch.new_order_body": "Order {{invoiceNumber}} ({{city}}): {{totalAmount}} {{currency}}. Take it if you are available.",
+  "delivery_branch.no_branch": "You are not attached to any branch with a permission on restaurant orders.",
+  "delivery_branch.orders": "Orders of your branch.",
+  "delivery_branch.not_branch_order": "This order is not a restaurant order.",
+  "delivery_branch.not_your_branch": "This order is not in your branch or you are not allowed to process it.",
+  "delivery_branch.already_taken": "This order has already been taken by another delivery person.",
+  "delivery_branch.not_takeable": "This order can no longer be taken (status: {{status}}).",
+  "delivery_branch.taken": "The order is assigned to you.",
+  "delivery_branch.already_yours": "This order is already assigned to you.",
+  "delivery_branch.history": "Your delivery history.",
+  "delivery_branch.deliverers_only": "Delivery staff only.",
+  "delivery_branch.deliverer_not_in_branch": "This delivery person does not belong to the order's branch or is not allowed to process it.",
+  "delivery_branch.deliverer_wrong_city": "This deliverer is not attached to any branch in the order's city ({{city}}). Choose a deliverer from this city.",
+  "delivery_branch.eligible_list": "{{count}} deliverer(s) available for {{city}}.",
+  "delivery_branch.eligible_no_city": "Order city unknown: unable to suggest deliverers from its area.",
+  "delivery_branch.eligible_forbidden": "You do not have access to the deliverers list.",
+  "delivery_branch.order_not_found": "Order not found.",
+  "delivery_branch.user_not_assignable": "{{name}} cannot deliver this order: a permission on this order type is required in a branch of the order's city (or be a deliverer in that city)."
+}
