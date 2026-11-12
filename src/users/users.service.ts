@@ -1007,7 +1007,7 @@ export class UsersService {
     ]);
     console.timeEnd('⏱️ 4. JWT');
 
-    const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
+    const { password, twoFASecret, fcmToken: _fcmToken, socketId, ...userWithoutPassword } = user as any;
 
     // ============================================================
     // ✅ FCM token : en ARRIÈRE-PLAN (non bloquant)
@@ -1461,7 +1461,7 @@ export class UsersService {
       this.refreshToken(user),
     ]);
 
-    const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
+    const { password, twoFASecret, fcmToken: _fcmToken, socketId, ...userWithoutPassword } = user as any;
 
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
@@ -1857,7 +1857,7 @@ export class UsersService {
       this.refreshToken(user),
     ]);
 
-    const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
+    const { password, twoFASecret, fcmToken: _fcmToken, socketId, ...userWithoutPassword } = user as any;
 
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
