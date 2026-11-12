@@ -387,7 +387,43 @@ export class UsersController {
     return await this.usersService.findAll(role);
   }
 
+  // ✅ Liste des utilisateurs que J'AI parrainés (filleuls). Déclarée AVANT ':id'
+  //    pour éviter que "/users/me/referrals" soit capté par la route ':id'.
+  @Get('me/referrals')
+  @UseGuards(AuthentificationGuard)
+  async getMyReferrals(
+    @CurrentUser() currentUser: UserEntity,
+    @Query('search') search?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.usersService.getMyReferrals(currentUser.id, {
+      search: search || undefined,
+      page: Number(page),
+      limit: Number(limit),
+    });
+  }
+
+  // ✅ ADMIN : filleuls (users parrainés) de N'IMPORTE QUEL utilisateur, par son id.
+  //    Déclarée AVANT ':id' (chemin à 2 segments, pas de conflit mais plus clair).
+  @Get(':id/referrals')
+  @UseGuards(AuthentificationGuard)
+  async getUserReferrals(
+    @Param('id') id: string,
+    @Query('search') search?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.usersService.getMyReferrals(id, {
+      search: search || undefined,
+      page: Number(page),
+      limit: Number(limit),
+    });
+  }
+
+  // ✅ Sécurisé : réservé aux utilisateurs authentifiés (secrets retirés côté service)
   @Get(':id')
+  @UseGuards(AuthentificationGuard)
   async findOne(@Param('id') id: string, @Req() req: Request) {
     const lang = this.extractLanguage(req);
     return this.usersService.findOne(id, lang);

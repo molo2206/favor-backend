@@ -1007,7 +1007,7 @@ export class UsersService {
     ]);
     console.timeEnd('⏱️ 4. JWT');
 
-    const { password, ...userWithoutPassword } = user;
+    const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
 
     // ============================================================
     // ✅ FCM token : en ARRIÈRE-PLAN (non bloquant)
@@ -1461,7 +1461,7 @@ export class UsersService {
       this.refreshToken(user),
     ]);
 
-    const { password, ...userWithoutPassword } = user;
+    const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
 
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
@@ -1857,7 +1857,7 @@ export class UsersService {
       this.refreshToken(user),
     ]);
 
-    const { password, ...userWithoutPassword } = user;
+    const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
 
     const userHasCompany =
       userWithoutPassword.userHasCompany?.map((uhc) => ({
@@ -2633,7 +2633,7 @@ export class UsersService {
     //    les relations) au lieu de recharger `fullUser`
     // ============================================================
 
-    const { password, ...userWithoutPassword } = user;
+    const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
 
     const userHasCompany = (userWithoutPassword.userHasCompany || []).map(
       (uhc) => ({
@@ -3294,7 +3294,7 @@ export class UsersService {
       user.loyalty = [loyalty];
     }
 
-    const { password, ...userWithoutPassword } = user;
+    const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
 
     // ✅ userHasCompany : ajout settings + invoiceConfiguration
     const userHasCompany = (userWithoutPassword.userHasCompany || []).map(
@@ -3691,7 +3691,7 @@ export class UsersService {
       );
     }
 
-    const { password, ...userWithoutPassword } = user;
+    const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
 
     const userHasCompany = (
       userWithoutPassword.userHasCompany || []
@@ -3964,7 +3964,7 @@ export class UsersService {
     const users = await this.hydrateUsers(queryBuilder, { ...UsersService.USER_GRAPH, loyalty: true });
 
     const sanitizedUsers = users.map((user) => {
-      const { password, ...userWithoutPassword } = user;
+      const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
 
       const userHasCompany = (userWithoutPassword.userHasCompany || []).map(
         (uhc) => ({
@@ -4202,7 +4202,7 @@ export class UsersService {
     const users = await this.hydrateUsers(query, UsersService.USER_GRAPH);
 
     const sanitizedUsers = users.map((user) => {
-      const { password, ...userWithoutPassword } = user;
+      const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
 
       const userHasCompany = (
         userWithoutPassword.userHasCompany || []
@@ -4484,7 +4484,7 @@ export class UsersService {
     const [users, total] = await this.hydrateUsersAndCount(query, UsersService.USER_GRAPH);
 
     const sanitizedUsers = users.map((user) => {
-      const { password, ...userWithoutPassword } = user;
+      const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
 
       const userHasCompany = (
         userWithoutPassword.userHasCompany || []
@@ -5032,7 +5032,7 @@ export class UsersService {
       );
     }
 
-    const { password, ...userWithoutPassword } = user;
+    const { password, twoFASecret, fcmToken, socketId, ...userWithoutPassword } = user as any;
 
     const userHasCompany = (
       userWithoutPassword.userHasCompany || []
@@ -5282,6 +5282,52 @@ export class UsersService {
 
   async findUserByEmail(email: string) {
     return await this.usersRepository.findOneBy({ email });
+  }
+
+  /**
+   * ✅ Filleuls : utilisateurs parrainés par `userId` (champ referredBy).
+   *    Paginé, filtrable par `search`, SANS données sensibles.
+   */
+  async getMyReferrals(
+    userId: string,
+    options: { search?: string; page?: number | string; limit?: number | string } = {},
+  ): Promise<{ message: string; data: PaginatedResponseDto<any> }> {
+    const page = Math.max(1, Number(options.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(options.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    const qb = this.usersRepository
+      .createQueryBuilder('u')
+      .where('u.`referredBy` = :id', { id: userId });
+
+    if (options.search) {
+      qb.andWhere('(u.`fullName` LIKE :s OR u.`phone` LIKE :s OR u.`email` LIKE :s)', { s: `%${options.search}%` });
+    }
+
+    qb.select([
+      'u.id', 'u.fullName', 'u.email', 'u.phone', 'u.image',
+      'u.city', 'u.country', 'u.isActive', 'u.referralActive', 'u.createdAt',
+    ]);
+    qb.orderBy('u.`createdAt`', 'DESC').skip(skip).take(limit);
+
+    const [users, total] = await qb.getManyAndCount();
+    const rows = users.map((u: any) => ({
+      id: u.id,
+      fullName: u.fullName ?? null,
+      email: u.email ?? null,
+      phone: u.phone ?? null,
+      image: u.image ?? null,
+      city: u.city ?? null,
+      country: u.country ?? null,
+      isActive: u.isActive,
+      referralActive: u.referralActive ?? null,
+      createdAt: u.createdAt ?? null,
+    }));
+
+    return {
+      message: `${total} filleul(s)`,
+      data: new PaginatedResponseDto<any>(rows, total, page, limit),
+    };
   }
 
   async remove(id: string, lang: string = 'fr') {
