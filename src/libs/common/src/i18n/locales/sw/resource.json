@@ -1,0 +1,13 @@
+{
+  "name_label_required": "Jina na lebo zinahitajika.",
+  "already_exists": "Rasilimali tayari ipo ({{name}} - {{label}}).",
+  "created": "Rasilimali imeundwa kwa mafanikio.",
+  "list_retrieved": "Orodha ya rasilimali imepatikana kwa mafanikio.",
+  "retrieve_failed": "Imeshindwa kupata rasilimali.",
+  "not_found": "Rasilimali yenye kitambulisho {{id}} haikupatikana.",
+  "retrieved": "Rasilimali imepatikana kwa mafanikio.",
+  "updated": "Rasilimali imesasishwa kwa mafanikio.",
+  "name_exists": "Jina hili tayari lipo.",
+  "deleted": "Rasilimali '{{label}}' imefutwa kwa mafanikio.",
+  "create_error": "Hitilafu wakati wa kuunda rasilimali."
+}

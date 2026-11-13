@@ -1,0 +1,12 @@
+{
+  "payment_method.list": "Your payment methods",
+  "payment_method.created": "Payment method added",
+  "payment_method.updated": "Payment method updated",
+  "payment_method.deleted": "Payment method deleted",
+  "payment_method.default_set": "Default payment method saved",
+  "payment_method.not_found": "Payment method not found",
+  "payment_method.mobile_money_required": "The Mobile Money operator and number are required",
+  "payment_method.already_exists": "This payment method is already saved",
+  "payment_method.max_reached": "You cannot save more than {{max}} payment methods",
+  "payment_method.not_allowed_here": "{{method}} is not accepted for this payment"
+}

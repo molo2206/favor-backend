@@ -1,0 +1,9 @@
+export enum ProspectStatus {
+  NEW = 'NEW',
+  CONTACTED = 'CONTACTED',
+  QUALIFIED = 'QUALIFIED',
+  PROPOSAL_SENT = 'PROPOSAL_SENT',
+  NEGOTIATION = 'NEGOTIATION',
+  WON = 'WON',
+  LOST = 'LOST',
+}

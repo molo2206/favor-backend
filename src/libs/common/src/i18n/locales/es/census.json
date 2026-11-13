@@ -1,0 +1,19 @@
+{
+  "census.created": "Ficha de censo guardada.",
+  "census.updated": "Ficha de censo actualizada.",
+  "census.deleted": "Ficha de censo eliminada.",
+  "census.found": "Ficha de censo.",
+  "census.list": "Fichas de censo.",
+  "census.not_found": "Ficha de censo no encontrada.",
+  "census.duplicate": "Este cliente / esta empresa ya tiene una ficha de censo.",
+  "census.followup_saved": "Seguimiento guardado.",
+  "census.imported": "{{count}} ficha(s) creada(s) a partir de antiguos clientes / vendedores.",
+  "census.import_note_client": "Antiguo cliente: {{orders}} pedido(s), ninguno desde hace más de {{days}} días.",
+  "census.import_note_vendor": "Vendedor sin ventas desde hace más de {{days}} días ({{orders}} pedido(s) en total).",
+  "census.stats": "Estadísticas del censo.",
+  "census.client_required": "Elija un cliente existente (userId).",
+  "census.company_required": "Elija una empresa existente (vendorCompanyId).",
+  "census.client_not_found": "Cliente no encontrado en la plataforma.",
+  "census.company_not_found": "Empresa no encontrada en la plataforma.",
+  "census.candidates": "Clientes / empresas existentes por censar."
+}
