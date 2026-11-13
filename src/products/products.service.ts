@@ -25,6 +25,7 @@ import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 import { FuelType } from './enum/fuelType_enum';
 import { Transmission } from './enum/transmission.enum';
 import { Type_rental_both_sale_car } from './enum/type_rental_both_sale_car';
+import { RentalCategory } from './enum/rental-category.enum';
 import { CompanyStatus } from 'src/company/enum/company-status.enum';
 import { UserWithCompanyStatus } from 'src/users/interfaces/user-with-company-status.interface';
 import { OrderItemEntity } from 'src/order-item/entities/order-item.entity';
@@ -181,6 +182,44 @@ export class ProductService {
     return slug;
   }
 
+  /**
+   * ✅ Règles métier des véhicules de LOCATION (CAR RENTAL/BOTH) :
+   *   - catégorie (PRIVATE/ORGANIZATION) obligatoire ;
+   *   - ORGANIZATION → dailyRate obligatoire + responsabilités figées
+   *     (entretien + chauffeur = propriétaire, carburant = client) et paiement après service.
+   *   Ne concerne QUE les véhicules de location → aucun impact sur le reste.
+   *   Mute `data` en place (les champs sont propagés via `...data` au manager.create).
+   */
+  private enforceCarRentalRules(data: any): void {
+    const typecar = data?.typecar;
+    const isRentalCar =
+      typecar === Type_rental_both_sale_car.RENTAL || typecar === Type_rental_both_sale_car.BOTH;
+    if (!isRentalCar) return; // vente / autre produit → inchangé
+
+    if (!data.rentalCategory) {
+      throw new BadRequestException(
+        'Pour un véhicule de location (RENTAL/BOTH), précisez la catégorie : PRIVATE ou ORGANIZATION.',
+      );
+    }
+
+    if (data.rentalCategory === RentalCategory.ORGANIZATION) {
+      if (data.dailyRate === undefined || data.dailyRate === null || Number(data.dailyRate) <= 0) {
+        throw new BadRequestException(
+          'Location pour organisation : le prix de location journalier (dailyRate) est obligatoire.',
+        );
+      }
+      // Responsabilités figées + paiement après prestation (visibles à la réservation / au contrat)
+      data.organizationRentalTerms = {
+        maintenanceAndDriverBy: 'OWNER', // entretien + charges du chauffeur
+        fuelBy: 'CLIENT', // carburant pendant toute la période d'utilisation
+        paymentAfterService: true, // le paiement intervient après la prestation
+      };
+    } else {
+      // PRIVATE : structure inchangée
+      data.organizationRentalTerms = null;
+    }
+  }
+
   async create(
     createProductDto: CreateProductDto,
     files: Express.Multer.File[],
@@ -198,6 +237,9 @@ export class ProductService {
       variations,
       ...data
     } = createProductDto;
+
+    // ✅ Règles véhicules de location (catégorie + conditions organisation)
+    this.enforceCarRentalRules(data);
 
     if (!files || files.length < 1 || files.length > 30) {
       throw new BadRequestException(
@@ -764,6 +806,9 @@ export class ProductService {
       variations,
       ...data
     } = createProductAdminDto;
+
+    // ✅ Règles véhicules de location (catégorie + conditions organisation)
+    this.enforceCarRentalRules(data);
 
     if (!files || files.length < 1 || files.length > 30) {
       throw new BadRequestException(

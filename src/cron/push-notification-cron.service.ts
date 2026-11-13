@@ -1417,21 +1417,49 @@ export class PushNotificationCronService {
                         const cleanPhone = this.normalizePhone(foundPhone);
 
                         if (cleanPhone) {
-                            await this.userRepository.update(user.id, { phone: cleanPhone });
-                            updatedCount++;
+                            // ✅ ANTI-DOUBLON : ne JAMAIS affecter un numéro déjà utilisé par un AUTRE user.
+                            //    Comme l'update est immédiat, ça protège aussi des doublons créés pendant
+                            //    le même passage du cron (2 users sans phone pointant vers le même numéro).
+                            const phoneOwner = await this.userRepository.findOne({
+                                where: { phone: cleanPhone },
+                                select: ['id'],
+                            });
 
-                            this.logger.log(`✅ User ${user.id} → phone: ${cleanPhone}`);
+                            if (phoneOwner && phoneOwner.id !== user.id) {
+                                this.logger.warn(
+                                    `⛔ Phone ${cleanPhone} déjà utilisé par user ${phoneOwner.id} → user ${user.id} NON mis à jour (doublon évité)`,
+                                );
 
-                            // Notifier le user (bonus)
-                            if (user.deviceTokens?.length) {
-                                const title = this.t('cron.phone_synced.title', lang);
-                                const body = this.t('cron.phone_synced.body', lang, { phone: cleanPhone });
+                                // On invite plutôt l'utilisateur à renseigner/corriger lui-même son numéro
+                                if (user.deviceTokens?.length) {
+                                    const title = this.t('cron.phone_missing.title', lang);
+                                    const body = this.t('cron.phone_missing.body', lang);
 
-                                await this.safeSendNotification(user.id, title, body, undefined, {
-                                    entity: 'USER',
-                                    entityId: user.id,
-                                    action: 'PHONE_SYNCED',
-                                });
+                                    await this.safeSendNotification(user.id, title, body, undefined, {
+                                        entity: 'USER',
+                                        entityId: user.id,
+                                        action: 'ADD_PHONE',
+                                        screen: 'ProfileEdit',
+                                    });
+                                    notifiedCount++;
+                                }
+                            } else {
+                                await this.userRepository.update(user.id, { phone: cleanPhone });
+                                updatedCount++;
+
+                                this.logger.log(`✅ User ${user.id} → phone: ${cleanPhone}`);
+
+                                // Notifier le user (bonus)
+                                if (user.deviceTokens?.length) {
+                                    const title = this.t('cron.phone_synced.title', lang);
+                                    const body = this.t('cron.phone_synced.body', lang, { phone: cleanPhone });
+
+                                    await this.safeSendNotification(user.id, title, body, undefined, {
+                                        entity: 'USER',
+                                        entityId: user.id,
+                                        action: 'PHONE_SYNCED',
+                                    });
+                                }
                             }
                         }
                     } else {

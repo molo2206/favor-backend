@@ -17,6 +17,7 @@ import { ProductStatus } from 'src/products/enum/product.status.enum';
 import { MeasureEntity } from 'src/measure/entities/measure.entity';
 import { CompanyActivity } from 'src/company/enum/activity.company.enum';
 import { Type_rental_both_sale_car } from 'src/products/enum/type_rental_both_sale_car';
+import { RentalCategory } from 'src/products/enum/rental-category.enum';
 import { FuelType } from 'src/products/enum/fuelType_enum';
 import { Transmission } from '../enum/transmission.enum';
 import { ProductVariation } from 'src/AttributGlobal/entities/product_variations.entity';
@@ -125,6 +126,32 @@ export class Product {
     default: null,
   })
   typecar?: Type_rental_both_sale_car | null;
+
+  /**
+   * ✅ Catégorie de location (véhicules RENTAL/BOTH uniquement) :
+   *    PRIVATE (défaut) = location privée actuelle, ORGANIZATION = location pour organisations.
+   *    Défaut PRIVATE → aucun impact sur les véhicules déjà enregistrés.
+   */
+  @Column({
+    type: 'enum',
+    enum: RentalCategory,
+    nullable: true,
+    default: RentalCategory.PRIVATE,
+  })
+  rentalCategory?: RentalCategory | null;
+
+  /**
+   * ✅ Conditions de location ORGANISATION (figées côté serveur, renseignées quand
+   *    rentalCategory = ORGANIZATION) :
+   *    { maintenanceAndDriverBy: 'OWNER', fuelBy: 'CLIENT', paymentAfterService: true }
+   *    → entretien + charges chauffeur = propriétaire ; carburant = client locataire.
+   */
+  @Column({ type: 'json', nullable: true })
+  organizationRentalTerms?: any;
+
+  /** ✅ Modes de paiement acceptés par le propriétaire (UserPaymentMethod.id) pour ce véhicule */
+  @Column({ type: 'json', nullable: true })
+  ownerPaymentMethodIds?: any;
 
   @Column({
     type: 'decimal',

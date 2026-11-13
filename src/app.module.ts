@@ -5,6 +5,8 @@ import { CurrentUserMiddleware } from './users/utility/middlewares/current-user.
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { dataSourceOptions } from 'db/data-source';
 import { UsersModule } from './users/users.module';
+import { VehicleTechnicalControlModule } from './vehicle-technical-control/vehicle-technical-control.module';
+import { OrganizationVehicleRentalModule } from './organization-vehicle-rental/organization-vehicle-rental.module';
 import { OtpModule } from './otp/otp.module';
 import { CompanyModule } from './company/company.module';
 import { UserHasCompanyModule } from './user_has_company/user_has_company.module';
@@ -174,6 +176,8 @@ import { VehicleRegistrationModule } from './vehicle-registration/vehicle-regist
     }),
     CommonModule,
     UsersModule,
+    VehicleTechnicalControlModule,
+    OrganizationVehicleRentalModule,
     TauxCompanyModule,
     OtpModule,
     CompanyModule,

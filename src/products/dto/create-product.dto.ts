@@ -14,6 +14,7 @@ import {
 import { Transform, Type } from 'class-transformer';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
 import { Type_rental_both_sale_car } from '../enum/type_rental_both_sale_car';
+import { RentalCategory } from '../enum/rental-category.enum';
 import { FuelType } from '../enum/fuelType_enum';
 import { Transmission } from '../enum/transmission.enum';
 import { ProductSpecificationDto } from './create-product-specification.dto';
@@ -271,6 +272,18 @@ export class CreateProductDto {
   @Transform(({ value }) => (value === '' ? null : value))
   @IsEnum(Type_rental_both_sale_car)
   typecar?: Type_rental_both_sale_car | null;
+
+  /** ✅ Catégorie de location (CAR RENTAL/BOTH) : PRIVATE ou ORGANIZATION */
+  @IsOptional()
+  @Transform(({ value }) => (value === '' ? undefined : value))
+  @IsEnum(RentalCategory)
+  rentalCategory?: RentalCategory;
+
+  /** ✅ Modes de paiement acceptés du propriétaire (UserPaymentMethod.id) — location organisation */
+  @IsOptional()
+  @IsArray()
+  @IsUUID('all', { each: true })
+  ownerPaymentMethodIds?: string[];
 
   @IsOptional()
   @IsString()
