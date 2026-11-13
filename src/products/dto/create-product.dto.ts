@@ -15,6 +15,7 @@ import { Transform, Type } from 'class-transformer';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
 import { Type_rental_both_sale_car } from '../enum/type_rental_both_sale_car';
 import { RentalCategory } from '../enum/rental-category.enum';
+import { OwnerPaymentMethodDto } from './owner-payment-method.dto';
 import { FuelType } from '../enum/fuelType_enum';
 import { Transmission } from '../enum/transmission.enum';
 import { ProductSpecificationDto } from './create-product-specification.dto';
@@ -279,11 +280,12 @@ export class CreateProductDto {
   @IsEnum(RentalCategory)
   rentalCategory?: RentalCategory;
 
-  /** ✅ Modes de paiement acceptés du propriétaire (UserPaymentMethod.id) — location organisation */
+  /** ✅ Modes de paiement acceptés du propriétaire (enum FPAY/MOBILE_MONEY/BANK/CASH + détails) */
   @IsOptional()
   @IsArray()
-  @IsUUID('all', { each: true })
-  ownerPaymentMethodIds?: string[];
+  @ValidateNested({ each: true })
+  @Type(() => OwnerPaymentMethodDto)
+  ownerPaymentMethods?: OwnerPaymentMethodDto[];
 
   @IsOptional()
   @IsString()

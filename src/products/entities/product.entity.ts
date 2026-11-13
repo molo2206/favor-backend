@@ -149,9 +149,12 @@ export class Product {
   @Column({ type: 'json', nullable: true })
   organizationRentalTerms?: any;
 
-  /** ✅ Modes de paiement acceptés par le propriétaire (UserPaymentMethod.id) pour ce véhicule */
+  /**
+   * ✅ Modes de paiement acceptés par le propriétaire pour ce véhicule.
+   *    Liste d'objets { type: FPAY|MOBILE_MONEY|BANK|CASH, mobileMoneyNumber?, bankAccountNumber?, fpayNumber? }.
+   */
   @Column({ type: 'json', nullable: true })
-  ownerPaymentMethodIds?: any;
+  ownerPaymentMethods?: any;
 
   @Column({
     type: 'decimal',

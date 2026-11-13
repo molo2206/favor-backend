@@ -67,9 +67,10 @@ export class OrganizationVehicleRentalService {
     if (!isRentalCar) {
       throw new BadRequestException('Ce produit n\'est pas un véhicule de location.');
     }
-    if ((product as any).rentalCategory !== RentalCategory.ORGANIZATION) {
+    const cat = (product as any).rentalCategory;
+    if (cat !== RentalCategory.ORGANIZATION && cat !== RentalCategory.BOTH) {
       throw new BadRequestException(
-        'Ce véhicule n\'est pas configuré pour la location organisation (rentalCategory = ORGANIZATION).',
+        'Ce véhicule n\'est pas configuré pour la location organisation (rentalCategory = ORGANIZATION ou BOTH).',
       );
     }
 

@@ -202,7 +202,11 @@ export class ProductService {
       );
     }
 
-    if (data.rentalCategory === RentalCategory.ORGANIZATION) {
+    // ORGANIZATION ou BOTH → conditions organisation requises
+    const hasOrganization =
+      data.rentalCategory === RentalCategory.ORGANIZATION || data.rentalCategory === RentalCategory.BOTH;
+
+    if (hasOrganization) {
       if (data.dailyRate === undefined || data.dailyRate === null || Number(data.dailyRate) <= 0) {
         throw new BadRequestException(
           'Location pour organisation : le prix de location journalier (dailyRate) est obligatoire.',
@@ -215,7 +219,7 @@ export class ProductService {
         paymentAfterService: true, // le paiement intervient après la prestation
       };
     } else {
-      // PRIVATE : structure inchangée
+      // PRIVATE uniquement : structure inchangée
       data.organizationRentalTerms = null;
     }
   }
