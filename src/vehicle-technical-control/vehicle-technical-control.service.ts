@@ -359,6 +359,49 @@ export class VehicleTechnicalControlService {
     return { message: 'Fiche de contrôle technique', data: { control, payments } };
   }
 
+  // ============================================================
+  // VUE PUBLIQUE (sans données sensibles)
+  // ============================================================
+  private toPublic(c: VehicleTechnicalControl) {
+    const today = new Date().toISOString().slice(0, 10);
+    const valid =
+      c.status === TechnicalControlStatus.VALIDATED && (!c.expiryDate || c.expiryDate >= today);
+    return {
+      reference: c.reference,
+      vehicle: {
+        registrationNumber: c.vehicleRegistrationNumber ?? null,
+        model: c.vehicleModel ?? null,
+        year: c.vehicleYear ?? null,
+        brand: c.vehicleBrand ?? null,
+      },
+      controlDate: c.controlDate ?? null,
+      status: c.status,
+      valid,
+      expiryDate: c.expiryDate ?? null,
+      generalState: c.generalState ?? null,
+      results: c.results ?? null,
+      observations: c.observations ?? null,
+      documents: c.documents ?? null,
+    };
+  }
+
+  /** Fiche de contrôle technique par sa référence (public). */
+  async getPublicControlByReference(reference: string) {
+    const c = await this.controlRepo.findOne({ where: { reference } });
+    if (!c) throw new NotFoundException('Fiche de contrôle technique introuvable');
+    return { message: 'Fiche de contrôle technique', data: this.toPublic(c) };
+  }
+
+  /** Dernière fiche de contrôle technique d'un véhicule (public). */
+  async getPublicVehicleControl(productId: string) {
+    const c = await this.controlRepo.findOne({
+      where: { productId },
+      order: { createdAt: 'DESC' },
+    });
+    if (!c) throw new NotFoundException('Aucune fiche de contrôle technique pour ce véhicule');
+    return { message: 'Fiche de contrôle technique du véhicule', data: this.toPublic(c) };
+  }
+
   /** Historique des contrôles d'un véhicule (du plus récent au plus ancien). */
   async getVehicleControls(productId: string) {
     const controls = await this.controlRepo.find({
@@ -386,6 +429,63 @@ export class VehicleTechnicalControlService {
   async getVehicleControlValidity(productId: string) {
     const valid = await this.isVehicleControlValid(productId);
     return { message: 'Validité du contrôle technique', data: { productId, valid } };
+  }
+
+  // ============================================================
+  // VUE PUBLIQUE (sans authentification) — champs non sensibles
+  // ============================================================
+
+  private toPublic(control: VehicleTechnicalControl) {
+    const today = new Date().toISOString().slice(0, 10);
+    const valid =
+      control.status === TechnicalControlStatus.VALIDATED &&
+      (!control.expiryDate || control.expiryDate >= today);
+    return {
+      reference: control.reference,
+      status: control.status,
+      valid,
+      vehicle: {
+        registrationNumber: control.vehicleRegistrationNumber ?? null,
+        model: control.vehicleModel ?? null,
+        year: control.vehicleYear ?? null,
+        brand: control.vehicleBrand ?? null,
+      },
+      controlDate: control.controlDate ?? null,
+      expiryDate: control.expiryDate ?? null,
+      generalState: control.generalState ?? null,
+      observations: control.observations ?? null,
+    };
+  }
+
+  /** Public : une fiche par sa référence. */
+  async getPublicByReference(reference: string) {
+    const control = await this.controlRepo.findOne({ where: { reference } });
+    if (!control) throw new NotFoundException('Fiche de contrôle technique introuvable');
+    return { message: 'Fiche de contrôle technique', data: this.toPublic(control) };
+  }
+
+  /** Public : la fiche d'un véhicule (la validée en cours, sinon la plus récente). */
+  async getPublicVehicleControl(productId: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    let control = await this.controlRepo
+      .createQueryBuilder('c')
+      .where('c.productId = :pid', { pid: productId })
+      .andWhere('c.status = :st', { st: TechnicalControlStatus.VALIDATED })
+      .andWhere('(c.expiryDate IS NULL OR c.expiryDate >= :today)', { today })
+      .orderBy('c.createdAt', 'DESC')
+      .getOne();
+
+    if (!control) {
+      control = await this.controlRepo.findOne({
+        where: { productId },
+        order: { createdAt: 'DESC' },
+      });
+    }
+
+    if (!control) {
+      return { message: 'Aucune fiche de contrôle technique pour ce véhicule', data: null };
+    }
+    return { message: 'Fiche de contrôle technique', data: this.toPublic(control) };
   }
 
   /** Marque EXPIRED les contrôles validés dont l'échéance est dépassée (appelé par un cron). */
