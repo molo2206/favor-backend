@@ -172,6 +172,15 @@ export class CreateShipmentDto {
   /** Si PAS encore payé : montant dû au fournisseur (réglé au ramassage) */
   @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) supplierAmountDue?: number;
 
-  /** Mode de paiement prévu du ramassage (mêmes modes que les commandes) */
+  /** Mode de paiement du ramassage (mêmes modes que les commandes).
+   *  Si FPAY ou MOBILE_MONEY : le frais est débité à la création et le shipment
+   *  n'est créé QUE si le paiement passe (comme les commandes). */
   @IsOptional() @IsEnum(PaymentMethod) pickupPaymentMethod?: PaymentMethod;
+
+  /** F-Pay : token du portefeuille du payeur (requis si pickupPaymentMethod = FPAY) */
+  @IsOptional() @IsString() pickupAccessToken?: string;
+
+  /** Mobile Money : opérateur + numéro (requis si pickupPaymentMethod = MOBILE_MONEY) */
+  @IsOptional() @IsString() pickupProvider?: string;
+  @IsOptional() @IsString() pickupPhone?: string;
 }

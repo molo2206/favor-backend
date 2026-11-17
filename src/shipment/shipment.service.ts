@@ -918,6 +918,9 @@ export class ShipmentService {
     // ✅ Ramassage tarifé (même logique que les colis) : prix selon le poids + paiement
     if (pickupEnabled) {
       await this.resolveShipmentPickup(createShipmentDto, weight, shipment, lang);
+      // ✅ Paiement EN LIGNE (FPAY / Mobile Money) : débité AVANT la création.
+      //    Si le paiement échoue → on NE crée PAS le shipment (comme les commandes).
+      await this.chargePickupOnlineOrFail(shipment, createShipmentDto, currentUser);
     }
 
     const savedShipment = await this.shipmentRepo.save(shipment);
@@ -1044,6 +1047,69 @@ export class ShipmentService {
     if (shipment.pickupPrice != null) {
       shipment.totalPrice = Number(shipment.totalPrice ?? 0) + Number(shipment.pickupPrice);
     }
+  }
+
+  /**
+   * ✅ Paiement EN LIGNE du frais de ramassage à la création (FPAY / Mobile Money),
+   *    sur le modèle des commandes : le débit est déclenché AVANT la persistance ;
+   *    s'il échoue, on lève une erreur → le shipment N'EST PAS créé.
+   *    (CASH / BANK / MANUAL : rien ici, paiement au ramassage via /pickup-payment.)
+   */
+  private async chargePickupOnlineOrFail(
+    shipment: Shipment,
+    dto: CreateShipmentDto,
+    currentUser: UserEntity,
+  ): Promise<void> {
+    const method = dto.pickupPaymentMethod;
+    if (method !== PaymentMethod.FPAY && method !== PaymentMethod.MOBILE_MONEY) return;
+
+    const amount = shipment.pickupPrice != null ? Number(shipment.pickupPrice) : 0;
+    if (!amount || amount <= 0) {
+      throw new BadRequestException('Aucun montant de ramassage à payer.');
+    }
+    const currency = shipment.pickupCurrency || shipment.currency || 'USD';
+
+    if (method === PaymentMethod.FPAY) {
+      if (!dto.pickupAccessToken) {
+        throw new BadRequestException('access_token F-Pay requis pour payer le ramassage.');
+      }
+      const resp: any = await this.fpayService.makePayment(
+        {
+          amount,
+          currency,
+          description: `Ramassage ${shipment.trackingNumber}`,
+          access_token: dto.pickupAccessToken,
+        } as any,
+        currentUser,
+        'LOGISTIC',
+      );
+      if (resp?.data?.transaction?.status !== 'SUCCESS') {
+        throw new BadRequestException("Paiement F-Pay du ramassage échoué : le colis n'a pas été créé.");
+      }
+      shipment.pickupPaymentReference = resp?.data?.transaction?.reference ?? null;
+    } else {
+      // MOBILE_MONEY
+      if (!dto.pickupProvider || !dto.pickupPhone) {
+        throw new BadRequestException('Opérateur (provider) et numéro (phone) Mobile Money requis pour payer le ramassage.');
+      }
+      const result: any = await this.pawapayService.createDepositSimple({
+        amount: String(amount),
+        currency,
+        provider: dto.pickupProvider,
+        phone: dto.pickupPhone,
+      });
+      if (!result?.success) {
+        throw new BadRequestException(
+          result?.message || "Paiement Mobile Money du ramassage échoué : le colis n'a pas été créé.",
+        );
+      }
+      shipment.pickupPaymentReference = result?.deposit?.depositId ?? null;
+    }
+
+    // Paiement réussi → frais de ramassage réglé
+    shipment.pickupPaymentMethod = method;
+    shipment.pickupPaymentStatus = ShipmentPickupPaymentStatus.PAID;
+    shipment.pickupPaidAt = new Date();
   }
 
   /**
