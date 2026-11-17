@@ -275,9 +275,9 @@ FavorHelp`;
   }
 
   async getAllColis(currentUser?: UserEntity): Promise<{ message: string; data: ColisEntity[] }> {
-    // ✅ Sécurité : un utilisateur ne voit que SES colis ; l'admin voit tout.
-    const isAdmin = currentUser?.role === UserRole.ADMIN;
-    const where = currentUser && !isAdmin ? { senderId: currentUser.id } : {};
+    // ✅ Sécurité : un utilisateur ne voit que SES colis ; seul le SUPER ADMIN voit tout.
+    const isSuperAdmin = currentUser?.role === UserRole.SUPER_ADMIN;
+    const where = currentUser && !isSuperAdmin ? { senderId: currentUser.id } : {};
     const colisList = await this.colisRepository.find({
       where,
       relations: ['sender', 'receiver', 'trackings', 'trackings.updatedBy'],

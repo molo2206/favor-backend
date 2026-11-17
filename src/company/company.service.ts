@@ -3419,8 +3419,11 @@ export class CompanyService {
       throw new NotFoundException(await this.i18n.translate('company_collaborator_not_found', lang));
     }
 
-    // L'appelant doit être de la même entreprise (ou admin global)
-    if (userHasCompany.company?.id !== activeCompanyId && currentUser.role !== UserRole.ADMIN) {
+    // L'appelant doit être de la même entreprise (seul le SUPER ADMIN peut agir sur une autre entreprise)
+    if (
+      userHasCompany.company?.id !== activeCompanyId &&
+      currentUser.role !== UserRole.SUPER_ADMIN
+    ) {
       throw new ForbiddenException(await this.i18n.translate('company_assignment.not_your_company', lang));
     }
 

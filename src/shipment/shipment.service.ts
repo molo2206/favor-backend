@@ -1136,7 +1136,9 @@ export class ShipmentService {
     if (!shipment) throw new NotFoundException('Colis introuvable.');
 
     // Propriétaire du colis ou admin uniquement
-    if (shipment.userId !== currentUser.id && currentUser.role !== UserRole.ADMIN) {
+    // SUPER_ADMIN a tous les droits ; sinon seul le propriétaire du colis peut encaisser.
+    const isSuperAdmin = currentUser.role === UserRole.SUPER_ADMIN;
+    if (shipment.userId !== currentUser.id && !isSuperAdmin) {
       throw new ForbiddenException("Vous n'êtes pas autorisé à encaisser ce ramassage.");
     }
     // ✅ Deux cas :
@@ -1233,9 +1235,10 @@ export class ShipmentService {
     const shipment = await this.shipmentRepo.findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException('Colis introuvable.');
 
-    const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUPER_ADMIN;
-    if (currentUser.role !== UserRole.DELIVER && !isAdmin) {
-      throw new ForbiddenException('Seul un livreur ou un administrateur peut constater le poids.');
+    // Constat du poids : le livreur (DELIVER), ou le SUPER_ADMIN (tous droits).
+    const isSuperAdmin = currentUser.role === UserRole.SUPER_ADMIN;
+    if (currentUser.role !== UserRole.DELIVER && !isSuperAdmin) {
+      throw new ForbiddenException('Seul un livreur ou un super administrateur peut constater le poids.');
     }
     if (!shipment.pickupEnabled) {
       throw new BadRequestException("Ce colis n'a pas de ramassage.");
