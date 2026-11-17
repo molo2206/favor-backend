@@ -13,6 +13,8 @@ import {
 import { Matches } from 'class-validator';
 import { CURRENCY_CODE, toCurrency } from '../shipment-currency';
 import { ShipmentStatus } from '../enum/shipment.dto';
+import { ShipmentPickupPaymentTiming } from '../enum/shipment-pickup.enum';
+import { PaymentMethod } from 'src/operation/enum/payment-method.enum';
 import { Transform, Type } from 'class-transformer';
 
 export class CreateShipmentDto {
@@ -149,4 +151,24 @@ export class CreateShipmentDto {
   @IsOptional()
   @IsString()
   deliveryAddressId?: string;
+
+  // -----------------------
+  // ✅ RAMASSAGE tarifé (même logique que les colis)
+  // -----------------------
+  /** Pays de ramassage (countries.id) — pour calculer/valider le tarif selon le poids */
+  @IsOptional() @IsUUID() pickupCountryId?: string;
+
+  /** Ville de ramassage (cities.id) — NULL = tarif par défaut du pays */
+  @IsOptional() @IsUUID() pickupCityId?: string;
+
+  /** Prix de ramassage saisi : doit correspondre au tarif pour ce poids (sinon calculé) */
+  @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) pickupPrice?: number;
+
+  @IsOptional() @IsString() pickupCurrency?: string;
+
+  /** Déjà payé au fournisseur, ou à payer pendant le ramassage */
+  @IsOptional() @IsEnum(ShipmentPickupPaymentTiming) pickupPaymentTiming?: ShipmentPickupPaymentTiming;
+
+  /** Mode de paiement prévu du ramassage (mêmes modes que les commandes) */
+  @IsOptional() @IsEnum(PaymentMethod) pickupPaymentMethod?: PaymentMethod;
 }

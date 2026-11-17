@@ -46,6 +46,9 @@ import { CompanyHasUserResource } from 'src/company_has_usrResource/entities/com
 import { CompanyEntity } from 'src/company/entities/company.entity';
 import { I18nService } from 'src/libs/common/src';
 import { FpayService } from 'src/fpay/fpay.service';
+import { PickupTariffService } from 'src/pickup-tariff/pickup-tariff.service';
+import { ShipmentPickupPaymentStatus, ShipmentPickupPaymentTiming } from './enum/shipment-pickup.enum';
+import { CollectShipmentPickupPaymentDto } from './dto/pickup-payment.dto';
 import { LoyaltySourceType, LoyaltyTier, LoyaltyTransactionType, UserLoyaltyEntity } from 'src/users/entities/user-loyalty.entity';
 import { CompanySettingsEntity } from 'src/company/entities/company-settings.entity';
 import { UserLoyaltyHistoryEntity } from 'src/users/entities/user-loyalty-history.entity';
@@ -103,6 +106,8 @@ export class ShipmentService {
 
     private readonly i18n: I18nService,
     private readonly fpayService: FpayService,
+    // ✅ Tarifs de ramassage (calcul/validation du prix selon le poids)
+    private readonly pickupTariffService: PickupTariffService,
 
     @InjectRepository(InvoiceConfigurationEntity)
     private readonly invoiceConfigRepo: Repository<InvoiceConfigurationEntity>,
@@ -904,6 +909,11 @@ export class ShipmentService {
       shipment.deliveryAddressId = deliveryAddressId;
     }
 
+    // ✅ Ramassage tarifé (même logique que les colis) : prix selon le poids + paiement
+    if (pickupEnabled) {
+      await this.resolveShipmentPickup(createShipmentDto, weight, shipment, lang);
+    }
+
     const savedShipment = await this.shipmentRepo.save(shipment);
 
     if (!description || external_quantity === undefined) {
@@ -952,6 +962,112 @@ export class ShipmentService {
       message: await this.i18n.translate('shipment.create_success', lang),
       data: shipmentWithRelations,
     };
+  }
+
+  /**
+   * ✅ Ramassage tarifé d'un shipment (même logique que les colis).
+   *  - Prix calculé/validé via le service des tarifs selon le POIDS ;
+   *  - 400 si pickupPrice envoyé et ne correspond pas au tarif ;
+   *  - PAID_TO_SUPPLIER → statut PAID ; sinon PENDING ;
+   *  - pickupPrice inclus dans totalPrice.
+   */
+  private async resolveShipmentPickup(
+    dto: CreateShipmentDto,
+    weight: number | undefined,
+    shipment: Shipment,
+    lang: string,
+  ): Promise<void> {
+    const hasPickup =
+      !!dto.pickupCountryId || dto.pickupPrice != null || !!dto.pickupPaymentTiming;
+    if (!hasPickup) return;
+
+    shipment.pickupCountryId = dto.pickupCountryId ?? null;
+    shipment.pickupCityId = dto.pickupCityId ?? null;
+
+    if (dto.pickupCountryId) {
+      const { data } = await this.pickupTariffService.quote({
+        countryId: dto.pickupCountryId,
+        cityId: dto.pickupCityId,
+        weight: Number(weight ?? 0),
+      });
+      const expected = Number(data.price);
+      if (dto.pickupPrice != null && Math.abs(Number(dto.pickupPrice) - expected) > 0.009) {
+        throw new BadRequestException(
+          `Le prix de ramassage (${dto.pickupPrice}) ne correspond pas au tarif pour ${weight} kg : attendu ${expected} ${data.currency}.`,
+        );
+      }
+      shipment.pickupPrice = dto.pickupPrice != null ? Number(dto.pickupPrice) : expected;
+      shipment.pickupCurrency = dto.pickupCurrency ?? data.currency;
+    } else if (dto.pickupPrice != null) {
+      shipment.pickupPrice = Number(dto.pickupPrice);
+      shipment.pickupCurrency = dto.pickupCurrency ?? shipment.currency ?? 'USD';
+    }
+
+    if (dto.pickupPaymentMethod) shipment.pickupPaymentMethod = dto.pickupPaymentMethod;
+    const timing = dto.pickupPaymentTiming ?? null;
+    shipment.pickupPaymentTiming = timing;
+    if (timing === ShipmentPickupPaymentTiming.PAID_TO_SUPPLIER) {
+      shipment.pickupPaymentStatus = ShipmentPickupPaymentStatus.PAID;
+      shipment.pickupPaidAt = new Date();
+    } else {
+      shipment.pickupPaymentStatus = ShipmentPickupPaymentStatus.PENDING;
+    }
+
+    // Inclure le prix de ramassage dans le total
+    if (shipment.pickupPrice != null) {
+      shipment.totalPrice = Number(shipment.totalPrice ?? 0) + Number(shipment.pickupPrice);
+    }
+  }
+
+  /**
+   * ✅ Encaissement du ramassage d'un shipment (PAY_ON_PICKUP).
+   * Réservé au propriétaire du colis et aux admins. FPAY encaissé sur FAVOR LOGISTIQUE.
+   */
+  async collectPickupPayment(
+    shipmentId: string,
+    dto: CollectShipmentPickupPaymentDto,
+    currentUser: UserEntity,
+  ): Promise<{ message: string; data: Shipment }> {
+    const shipment = await this.shipmentRepo.findOne({ where: { id: shipmentId } });
+    if (!shipment) throw new NotFoundException('Colis introuvable.');
+
+    // Propriétaire du colis ou admin uniquement
+    if (shipment.userId !== currentUser.id && currentUser.role !== UserRole.ADMIN) {
+      throw new ForbiddenException("Vous n'êtes pas autorisé à encaisser ce ramassage.");
+    }
+    if (shipment.pickupPaymentStatus === ShipmentPickupPaymentStatus.PAID) {
+      throw new BadRequestException('Le ramassage de ce colis est déjà réglé.');
+    }
+
+    const amount = shipment.pickupPrice != null ? Number(shipment.pickupPrice) : 0;
+    let reference = dto.reference ?? null;
+
+    if (dto.method === PaymentMethod.FPAY) {
+      if (!amount || amount <= 0) {
+        throw new BadRequestException('Aucun montant de ramassage à encaisser pour ce colis.');
+      }
+      if (!dto.access_token) {
+        throw new BadRequestException('access_token F-Pay requis pour un paiement FPAY.');
+      }
+      const resp: any = await this.fpayService.makePayment(
+        {
+          amount,
+          currency: shipment.pickupCurrency || shipment.currency || 'USD',
+          description: `Ramassage colis ${shipment.trackingNumber}`,
+          access_token: dto.access_token,
+        } as any,
+        currentUser,
+        'LOGISTIC',
+      );
+      reference = resp?.data?.transaction?.reference ?? reference ?? null;
+    }
+
+    shipment.pickupPaymentMethod = dto.method;
+    shipment.pickupPaymentStatus = ShipmentPickupPaymentStatus.PAID;
+    shipment.pickupPaidAt = new Date();
+    shipment.pickupPaymentReference = reference;
+    const saved = await this.shipmentRepo.save(shipment);
+    return { message: 'Paiement du ramassage encaissé.', data: saved };
   }
 
   async createByAdmin(

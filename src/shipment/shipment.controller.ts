@@ -21,6 +21,7 @@ import {
 } from '@nestjs/common';
 import { ShipmentService } from './shipment.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
+import { CollectShipmentPickupPaymentDto } from './dto/pickup-payment.dto';
 import { UpdateShipmentDto } from './dto/update-shipment.dto';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
@@ -153,6 +154,18 @@ export class ShipmentController {
       throw new NotFoundException(await this.i18n.translate('shipment.error.not_found', lang, { id: shipmentId }));
     }
     return result;
+  }
+
+  // ✅ Encaissement du ramassage (propriétaire du colis + admins)
+  @Patch(':id/pickup-payment')
+  @UseGuards(AuthentificationGuard)
+  @AuditAction(ActionType.UPDATE, 'shipments')
+  async collectPickupPayment(
+    @Param('id') shipmentId: string,
+    @Body() dto: CollectShipmentPickupPaymentDto,
+    @CurrentUser() user: UserEntity,
+  ) {
+    return this.shipmentService.collectPickupPayment(shipmentId, dto, user);
   }
 
   @Get()

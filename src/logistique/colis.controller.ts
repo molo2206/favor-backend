@@ -64,14 +64,16 @@ export class ColisController {
   }
 
   @Get(':id')
+  @UseGuards(AuthentificationGuard)
   async getColisById(@Param('id', ParseUUIDPipe) id: string) {
     return await this.colisService.getColisById(id);
   }
 
   @Get()
   @UseGuards(AuthentificationGuard)
-  async getAllColis() {
-    return await this.colisService.getAllColis();
+  async getAllColis(@CurrentUser() user: UserEntity) {
+    // ✅ Sécurité : filtré par utilisateur (admin = tout)
+    return await this.colisService.getAllColis(user);
   }
 
   @Get('track/:trackingNumber')

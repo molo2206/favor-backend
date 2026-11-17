@@ -43,6 +43,7 @@ import { CompanyEntity } from 'src/company/entities/company.entity';
 import { ConfigService } from '@nestjs/config'; // ✅ AJOUTER
 import { InvoiceConfigurationEntity } from 'src/company/entities/invoice-configuration.entity';
 import { SmsModule } from 'src/users/utility/sms/sms.module';
+import { PickupTariffModule } from 'src/pickup-tariff/pickup-tariff.module';
 
 @Module({
   imports: [
@@ -61,6 +62,8 @@ import { SmsModule } from 'src/users/utility/sms/sms.module';
     }),
     // ✅ IMPORTER FpayModule (au lieu de mettre FpayService dans providers)
     FpayModule,
+    // ✅ Tarifs de ramassage (calcul/validation du prix selon le poids)
+    PickupTariffModule,
     TypeOrmModule.forFeature([
       Shipment,
       PackageDetails,

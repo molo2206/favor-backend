@@ -4,6 +4,7 @@ import { DeepPartial, Repository } from 'typeorm';
 import { ColisEntity, ColisStatus } from './entity/colis.entity';
 import { ColisTrackingEntity, ColisTrackingStatus } from './entity/colis-tracking.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { UserRole } from 'src/users/enum/user-role-enum';
 import { CreateColisDto } from './dto/create-colis.dto';
 import { SetColisPriceDto } from './dto/set-price.dto';
 import { AssignCourierDto } from './dto/assign-courier.dto';
@@ -268,8 +269,12 @@ FavorHelp`;
     return { message: 'Colis récupéré avec succès', data: colis };
   }
 
-  async getAllColis(): Promise<{ message: string; data: ColisEntity[] }> {
+  async getAllColis(currentUser?: UserEntity): Promise<{ message: string; data: ColisEntity[] }> {
+    // ✅ Sécurité : un utilisateur ne voit que SES colis ; l'admin voit tout.
+    const isAdmin = currentUser?.role === UserRole.ADMIN;
+    const where = currentUser && !isAdmin ? { senderId: currentUser.id } : {};
     const colisList = await this.colisRepository.find({
+      where,
       relations: ['sender', 'receiver', 'trackings', 'trackings.updatedBy'],
       order: { createdAt: 'DESC' },
     });

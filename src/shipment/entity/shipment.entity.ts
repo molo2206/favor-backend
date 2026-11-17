@@ -15,6 +15,7 @@ import { TypeTransport } from './type-transport.entity';
 import { PackageDetails } from './package-details.entity';
 import { ShipmentTracking } from './shipment_tracking.entity';
 import { ShipmentStatus } from '../enum/shipment.dto';
+import { ShipmentPickupPaymentStatus, ShipmentPickupPaymentTiming } from '../enum/shipment-pickup.enum';
 import { UserEntity } from '../../users/entities/user.entity';
 import { LtaShipmentEntity } from '../Lta/entity/lta-shipment.entity';
 import { AddressUser } from 'src/address-user/entities/address-user.entity';
@@ -128,6 +129,38 @@ export class Shipment {
 
   @Column({ type: 'float', nullable: true })
   pickupPrice: number;
+
+  // ==========================================================================
+  // ✅ RAMASSAGE tarifé (même logique que les colis) : zone, prix selon le poids,
+  //    moment et état du paiement. (pickupPrice ci-dessus porte le prix calculé.)
+  // ==========================================================================
+  @Column({ type: 'char', length: 36, nullable: true })
+  pickupCountryId?: string | null;
+
+  @Column({ type: 'char', length: 36, nullable: true })
+  pickupCityId?: string | null;
+
+  /** Devise du prix de ramassage */
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  pickupCurrency?: string | null;
+
+  /** Déjà payé au fournisseur, ou à payer pendant le ramassage */
+  @Column({ type: 'enum', enum: ShipmentPickupPaymentTiming, nullable: true })
+  pickupPaymentTiming?: ShipmentPickupPaymentTiming | null;
+
+  /** Mode d'encaissement (mêmes modes que les commandes : CASH, MOBILE_MONEY, BANK, MANUAL, FPAY) */
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  pickupPaymentMethod?: string | null;
+
+  /** État du paiement du ramassage */
+  @Column({ type: 'enum', enum: ShipmentPickupPaymentStatus, default: ShipmentPickupPaymentStatus.PENDING })
+  pickupPaymentStatus: ShipmentPickupPaymentStatus;
+
+  @Column({ type: 'datetime', precision: 6, nullable: true })
+  pickupPaidAt?: Date | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  pickupPaymentReference?: string | null;
 
   @Column({ nullable: true })
   whatsapp_number?: string;
