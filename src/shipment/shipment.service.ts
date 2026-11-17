@@ -3,8 +3,10 @@ import { BranchStockService } from 'src/branch-stock/branch-stock.service';
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, In } from 'typeorm';
@@ -49,6 +51,7 @@ import { FpayService } from 'src/fpay/fpay.service';
 import { PickupTariffService } from 'src/pickup-tariff/pickup-tariff.service';
 import { ShipmentPickupPaymentStatus, ShipmentPickupPaymentTiming } from './enum/shipment-pickup.enum';
 import { CollectShipmentPickupPaymentDto } from './dto/pickup-payment.dto';
+import { BranchDeliveryService } from 'src/order/branch-delivery.service';
 import { LoyaltySourceType, LoyaltyTier, LoyaltyTransactionType, UserLoyaltyEntity } from 'src/users/entities/user-loyalty.entity';
 import { CompanySettingsEntity } from 'src/company/entities/company-settings.entity';
 import { UserLoyaltyHistoryEntity } from 'src/users/entities/user-loyalty-history.entity';
@@ -108,6 +111,9 @@ export class ShipmentService {
     private readonly fpayService: FpayService,
     // ✅ Tarifs de ramassage (calcul/validation du prix selon le poids)
     private readonly pickupTariffService: PickupTariffService,
+    // ✅ Notification/appel des livreurs de la branche (par ville du ramassage)
+    @Inject(forwardRef(() => BranchDeliveryService))
+    private readonly branchDeliveryService: BranchDeliveryService,
 
     @InjectRepository(InvoiceConfigurationEntity)
     private readonly invoiceConfigRepo: Repository<InvoiceConfigurationEntity>,
@@ -958,6 +964,17 @@ export class ShipmentService {
       console.error('Erreur notifications colis:', err),
     );
 
+    // ✅ Ramassage : prévenir / appeler les livreurs de la branche de la VILLE choisie.
+    //    (Livreurs rattachés à une branche, branche rattachée à une ville = pickupCityId.)
+    if (pickupEnabled && savedShipment.pickupCityId) {
+      void this.branchDeliveryService.notifyNewPickup(
+        { id: savedShipment.id, trackingNumber: savedShipment.trackingNumber, userId: savedShipment.userId },
+        [savedShipment.pickupCityId],
+        null,
+        lang,
+      );
+    }
+
     return {
       message: await this.i18n.translate('shipment.create_success', lang),
       data: shipmentWithRelations,
@@ -983,6 +1000,8 @@ export class ShipmentService {
 
     shipment.pickupCountryId = dto.pickupCountryId ?? null;
     shipment.pickupCityId = dto.pickupCityId ?? null;
+    // Poids déclaré par le client (référence du devis initial)
+    shipment.declaredWeight = weight != null ? Number(weight) : null;
 
     if (dto.pickupCountryId) {
       const { data } = await this.pickupTariffService.quote({
@@ -1006,12 +1025,20 @@ export class ShipmentService {
     if (dto.pickupPaymentMethod) shipment.pickupPaymentMethod = dto.pickupPaymentMethod;
     const timing = dto.pickupPaymentTiming ?? null;
     shipment.pickupPaymentTiming = timing;
-    if (timing === ShipmentPickupPaymentTiming.PAID_TO_SUPPLIER) {
-      shipment.pickupPaymentStatus = ShipmentPickupPaymentStatus.PAID;
-      shipment.pickupPaidAt = new Date();
-    } else {
-      shipment.pickupPaymentStatus = ShipmentPickupPaymentStatus.PENDING;
-    }
+
+    // ⚠️ pickupPaymentTiming = paiement AU FOURNISSEUR (marchandise), indépendant du frais de ramassage.
+    //    - PAID_TO_SUPPLIER : déjà réglé au fournisseur → rien dû au fournisseur ;
+    //    - PAY_ON_PICKUP    : pas encore réglé → on enregistre le montant dû au fournisseur.
+    shipment.supplierAmountDue =
+      timing === ShipmentPickupPaymentTiming.PAID_TO_SUPPLIER
+        ? null
+        : dto.supplierAmountDue != null
+          ? Number(dto.supplierAmountDue)
+          : null;
+
+    // Le STATUT de paiement concerne le FRAIS DE RAMASSAGE uniquement :
+    // il reste PENDING à la création et ne passe à PAID qu'après /pickup-payment.
+    shipment.pickupPaymentStatus = ShipmentPickupPaymentStatus.PENDING;
 
     // Inclure le prix de ramassage dans le total
     if (shipment.pickupPrice != null) {
@@ -1040,8 +1067,10 @@ export class ShipmentService {
     }
 
     const amount = shipment.pickupPrice != null ? Number(shipment.pickupPrice) : 0;
+    const currency = shipment.pickupCurrency || shipment.currency || 'USD';
     let reference = dto.reference ?? null;
 
+    // ✅ Déclencher le paiement selon la méthode choisie par le client.
     if (dto.method === PaymentMethod.FPAY) {
       if (!amount || amount <= 0) {
         throw new BadRequestException('Aucun montant de ramassage à encaisser pour ce colis.');
@@ -1049,10 +1078,11 @@ export class ShipmentService {
       if (!dto.access_token) {
         throw new BadRequestException('access_token F-Pay requis pour un paiement FPAY.');
       }
+      // Débit F-Pay encaissé sur le compte FAVOR LOGISTIQUE (clé FPAY_API_KEY_LOGISTIC)
       const resp: any = await this.fpayService.makePayment(
         {
           amount,
-          currency: shipment.pickupCurrency || shipment.currency || 'USD',
+          currency,
           description: `Ramassage colis ${shipment.trackingNumber}`,
           access_token: dto.access_token,
         } as any,
@@ -1060,7 +1090,28 @@ export class ShipmentService {
         'LOGISTIC',
       );
       reference = resp?.data?.transaction?.reference ?? reference ?? null;
+    } else if (dto.method === PaymentMethod.MOBILE_MONEY) {
+      if (!amount || amount <= 0) {
+        throw new BadRequestException('Aucun montant de ramassage à encaisser pour ce colis.');
+      }
+      if (!dto.provider || !dto.phone) {
+        throw new BadRequestException('Opérateur (provider) et numéro (phone) requis pour Mobile Money.');
+      }
+      // Dépôt Mobile Money via Pawapay (synchronisé par polling)
+      const result: any = await this.pawapayService.createDepositSimple({
+        amount: String(amount),
+        currency,
+        provider: dto.provider,
+        phone: dto.phone,
+      });
+      if (!result?.success) {
+        throw new BadRequestException(
+          result?.message || "Le paiement Mobile Money du ramassage a échoué.",
+        );
+      }
+      reference = result?.deposit?.depositId ?? reference ?? null;
     }
+    // CASH / BANK / MANUAL : encaissement enregistré (pas de passerelle)
 
     shipment.pickupPaymentMethod = dto.method;
     shipment.pickupPaymentStatus = ShipmentPickupPaymentStatus.PAID;
@@ -1068,6 +1119,96 @@ export class ShipmentService {
     shipment.pickupPaymentReference = reference;
     const saved = await this.shipmentRepo.save(shipment);
     return { message: 'Paiement du ramassage encaissé.', data: saved };
+  }
+
+  /**
+   * ✅ Vérification du poids au ramassage : le poids CONSTATÉ par le livreur fait foi.
+   *  - Réservé au rôle DELIVER et aux admins ;
+   *  - Sous la tolérance (PICKUP_WEIGHT_TOLERANCE_KG, défaut 0,5 kg) : rien n'est recalculé ;
+   *  - Sinon le frais de ramassage est recalculé depuis la table des tarifs et totalPrice ajusté ;
+   *  - Si déjà payé : complément à encaisser (plus lourd) ou avoir à rembourser (plus léger).
+   */
+  async verifyPickupWeight(
+    shipmentId: string,
+    verifiedWeight: number,
+    currentUser: UserEntity,
+    lang: string = 'fr',
+  ): Promise<{ message: string; data: Shipment }> {
+    const shipment = await this.shipmentRepo.findOne({ where: { id: shipmentId } });
+    if (!shipment) throw new NotFoundException('Colis introuvable.');
+
+    const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUPER_ADMIN;
+    if (currentUser.role !== UserRole.DELIVER && !isAdmin) {
+      throw new ForbiddenException('Seul un livreur ou un administrateur peut constater le poids.');
+    }
+    if (!shipment.pickupEnabled) {
+      throw new BadRequestException("Ce colis n'a pas de ramassage.");
+    }
+
+    const vWeight = Number(verifiedWeight);
+    shipment.verifiedWeight = vWeight;
+    shipment.verifiedBy = currentUser.id;
+    shipment.verifiedAt = new Date();
+
+    const tolerance = Number(process.env.PICKUP_WEIGHT_TOLERANCE_KG) > 0 ? Number(process.env.PICKUP_WEIGHT_TOLERANCE_KG) : 0.5;
+    const declared = shipment.declaredWeight != null ? Number(shipment.declaredWeight) : vWeight;
+
+    // Écart sous la tolérance OU pas de zone (impossible de retarifer) → on enregistre seulement.
+    if (Math.abs(vWeight - declared) <= tolerance || !shipment.pickupCountryId) {
+      const saved = await this.shipmentRepo.save(shipment);
+      return { message: 'Poids constaté enregistré (sans changement de tarif).', data: saved };
+    }
+
+    // Recalcul du frais de ramassage sur le poids constaté
+    const { data } = await this.pickupTariffService.quote({
+      countryId: shipment.pickupCountryId,
+      cityId: shipment.pickupCityId ?? undefined,
+      weight: vWeight,
+    });
+    const before = shipment.pickupPrice != null ? Number(shipment.pickupPrice) : 0;
+    const after = Number(data.price);
+    const adjustment = Math.round((after - before) * 100) / 100;
+
+    // Mise à jour du prix + du total (on remplace l'ancienne part ramassage)
+    shipment.pickupPrice = after;
+    shipment.pickupCurrency = shipment.pickupCurrency ?? data.currency;
+    shipment.pickupPriceAdjustment = adjustment;
+    shipment.totalPrice = Math.round((Number(shipment.totalPrice ?? 0) - before + after) * 100) / 100;
+
+    // Réconciliation si le ramassage était déjà payé
+    if (shipment.pickupPaymentStatus === ShipmentPickupPaymentStatus.PAID) {
+      if (adjustment > 0) {
+        shipment.pickupSurchargeDue = adjustment; // complément à encaisser
+        shipment.pickupRefundDue = null;
+      } else if (adjustment < 0) {
+        shipment.pickupRefundDue = Math.abs(adjustment); // trop-perçu à rembourser (admin)
+        shipment.pickupSurchargeDue = null;
+      }
+    }
+    // Si PENDING : le client paiera simplement le nouveau pickupPrice.
+
+    const saved = await this.shipmentRepo.save(shipment);
+
+    // Notifier le client du changement de tarif (best-effort)
+    if (shipment.userId) {
+      try {
+        const body =
+          adjustment > 0
+            ? `Poids constaté ${vWeight} kg : frais de ramassage ajusté à ${after} ${shipment.pickupCurrency || ''} (+${adjustment}).`
+            : `Poids constaté ${vWeight} kg : frais de ramassage ajusté à ${after} ${shipment.pickupCurrency || ''} (${adjustment}).`;
+        await this.notificationsService.sendAndSaveNotification(
+          shipment.userId,
+          'Frais de ramassage ajusté',
+          body,
+          NotificationType.SHIPMENT_TRACKING,
+          { entity: 'SHIPMENT', entityId: shipment.id, shipmentId: shipment.id, action: 'PICKUP_WEIGHT_VERIFIED' },
+        );
+      } catch (e: any) {
+        console.warn(`Notif client poids (${shipment.trackingNumber}) : ${e?.message}`);
+      }
+    }
+
+    return { message: 'Poids constaté : frais de ramassage recalculé.', data: saved };
   }
 
   async createByAdmin(

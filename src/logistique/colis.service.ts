@@ -85,12 +85,17 @@ export class ColisService {
     const timing = dto.pickupPaymentTiming ?? null;
     out.pickupPaymentTiming = timing;
     if (dto.pickupPaymentMethod) out.pickupPaymentMethod = dto.pickupPaymentMethod;
-    if (timing === ColisPickupPaymentTiming.PAID_TO_SUPPLIER) {
-      out.pickupPaymentStatus = ColisPickupPaymentStatus.PAID;
-      out.pickupPaidAt = new Date();
-    } else {
-      out.pickupPaymentStatus = ColisPickupPaymentStatus.PENDING;
-    }
+
+    // ⚠️ pickupPaymentTiming = paiement AU FOURNISSEUR, indépendant du frais de ramassage.
+    out.supplierAmountDue =
+      timing === ColisPickupPaymentTiming.PAID_TO_SUPPLIER
+        ? null
+        : dto.supplierAmountDue != null
+          ? Number(dto.supplierAmountDue)
+          : null;
+
+    // Le statut concerne le FRAIS DE RAMASSAGE : PENDING à la création, PAID après /pickup-payment.
+    out.pickupPaymentStatus = ColisPickupPaymentStatus.PENDING;
     return out;
   }
 
@@ -353,6 +358,7 @@ FavorHelp`;
       pickupPrice: colis.pickupPrice != null ? Number(colis.pickupPrice) : null,
       pickupCurrency: colis.pickupCurrency ?? null,
       pickupPaymentTiming: colis.pickupPaymentTiming ?? null,
+      supplierAmountDue: colis.supplierAmountDue != null ? Number(colis.supplierAmountDue) : null,
       pickupPaymentStatus: colis.pickupPaymentStatus ?? null,
       pickupPaidAt: colis.pickupPaidAt ?? null,
       pickupPaymentMethod: colis.pickupPaymentMethod ?? null,

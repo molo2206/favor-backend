@@ -112,6 +112,10 @@ export class ColisEntity {
   @Column({ type: 'enum', enum: ColisPickupPaymentTiming, nullable: true })
   pickupPaymentTiming?: ColisPickupPaymentTiming | null;
 
+  /** Si PAS encore payé au fournisseur : montant dû au fournisseur (réglé au ramassage) */
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  supplierAmountDue?: number | null;
+
   /** État du paiement du ramassage */
   @Column({ type: 'enum', enum: ColisPickupPaymentStatus, default: ColisPickupPaymentStatus.PENDING })
   pickupPaymentStatus: ColisPickupPaymentStatus;

@@ -14,3 +14,6 @@ ALTER TABLE `colis` ADD COLUMN `pickupPaymentStatus` ENUM('PENDING','PAID') NOT 
 ALTER TABLE `colis` ADD COLUMN `pickupPaidAt` DATETIME(6) NULL;
 ALTER TABLE `colis` ADD COLUMN `pickupPaymentMethod` VARCHAR(30) NULL;
 ALTER TABLE `colis` ADD COLUMN `pickupPaymentReference` VARCHAR(100) NULL;
+
+-- Montant dû au fournisseur (si pas encore payé)
+ALTER TABLE `colis` ADD COLUMN `supplierAmountDue` DECIMAL(12,2) NULL;

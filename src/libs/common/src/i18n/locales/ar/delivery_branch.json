@@ -17,5 +17,7 @@
   "delivery_branch.eligible_no_city": "مدينة الطلب غير معروفة: لا يمكن اقتراح عمال توصيل من منطقته.",
   "delivery_branch.eligible_forbidden": "ليس لديك صلاحية الوصول إلى قائمة عمال التوصيل.",
   "delivery_branch.order_not_found": "الطلب غير موجود.",
-  "delivery_branch.user_not_assignable": "لا يمكن لـ {{name}} توصيل هذا الطلب: يلزم إذن على هذا النوع من الطلبات في فرع بمدينة الطلب (أو أن يكون موصلًا في تلك المدينة)."
+  "delivery_branch.user_not_assignable": "لا يمكن لـ {{name}} توصيل هذا الطلب: يلزم إذن على هذا النوع من الطلبات في فرع بمدينة الطلب (أو أن يكون موصلًا في تلك المدينة).",
+  "delivery_branch.new_pickup_title": "📦 عملية استلام جديدة",
+  "delivery_branch.new_pickup_body": "استلام {{trackingNumber}} ({{city}}). خذه إذا كنت متاحًا."
 }

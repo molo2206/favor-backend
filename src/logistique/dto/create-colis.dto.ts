@@ -31,6 +31,9 @@ export class CreateColisDto {
   /** Déjà payé au fournisseur, ou à payer pendant le ramassage */
   @IsOptional() @IsEnum(ColisPickupPaymentTiming) pickupPaymentTiming?: ColisPickupPaymentTiming;
 
+  /** Si PAS encore payé : montant dû au fournisseur (réglé au ramassage) */
+  @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) supplierAmountDue?: number;
+
   /** Mode de paiement prévu du ramassage (mêmes modes que les commandes) */
   @IsOptional() @IsEnum(PaymentMethod) pickupPaymentMethod?: PaymentMethod;
 }

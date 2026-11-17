@@ -44,6 +44,7 @@ import { ConfigService } from '@nestjs/config'; // ✅ AJOUTER
 import { InvoiceConfigurationEntity } from 'src/company/entities/invoice-configuration.entity';
 import { SmsModule } from 'src/users/utility/sms/sms.module';
 import { PickupTariffModule } from 'src/pickup-tariff/pickup-tariff.module';
+import { OrderModule } from 'src/order/order.module'; // ✅ livreurs par branche/ville
 
 @Module({
   imports: [
@@ -64,6 +65,8 @@ import { PickupTariffModule } from 'src/pickup-tariff/pickup-tariff.module';
     FpayModule,
     // ✅ Tarifs de ramassage (calcul/validation du prix selon le poids)
     PickupTariffModule,
+    // ✅ Notification/appel des livreurs de la branche (par ville du ramassage)
+    forwardRef(() => OrderModule),
     TypeOrmModule.forFeature([
       Shipment,
       PackageDetails,

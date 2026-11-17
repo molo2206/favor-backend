@@ -254,6 +254,70 @@ export class BranchDeliveryService {
     }
   }
 
+  /**
+   * ✅ Prévient (et appelle) les livreurs des branches de la VILLE du ramassage.
+   *    Les livreurs (rôle DELIVER) sont rattachés à une branche, et la branche à une ville :
+   *    on cible donc par la ville du ramassage (shipment.pickupCityId). Ne bloque jamais la création.
+   */
+  async notifyNewPickup(
+    shipment: { id: string; trackingNumber: string; userId?: string | null },
+    cityIds: string[],
+    cityName: string | null,
+    lang = 'fr',
+    excludeUserIds: string[] = [],
+  ): Promise<number> {
+    try {
+      if (!cityIds.length) return 0;
+      const rights = await this.rights({ cityIds });
+      const byUser = new Map<string, DelivererBranchRight[]>();
+      for (const r of rights) {
+        if (excludeUserIds.includes(r.userId) || r.userId === shipment.userId) continue;
+        byUser.set(r.userId, [...(byUser.get(r.userId) ?? []), r]);
+      }
+      if (!byUser.size) {
+        this.logger.log(`📦 Ramassage ${shipment.trackingNumber} : aucun livreur dans la branche (${cityName || cityIds.join(', ')})`);
+        return 0;
+      }
+      const title = this.t('delivery_branch.new_pickup_title', lang);
+      const body = this.t('delivery_branch.new_pickup_body', lang, {
+        trackingNumber: shipment.trackingNumber,
+        city: cityName || '',
+      });
+      for (const [userId, list] of byUser) {
+        const data = {
+          entity: 'SHIPMENT',
+          entityId: shipment.id,
+          shipmentId: shipment.id,
+          trackingNumber: shipment.trackingNumber,
+          branchId: list[0].branchId,
+          branchName: list[0].branchName,
+          city: cityName,
+          canProcess: list.some((r) => r.canProcess),
+          action: 'PICKUP_NEW',
+        };
+        await this.notificationsService.sendAndSaveNotification(userId, title, body, NotificationType.DELIVERY_NEW_ORDER, data);
+        this.gateway.server?.to(userId).emit('pickup:new', data);
+      }
+
+      // 📞 Appel (sonnerie) des livreurs, comme pour les commandes
+      if (this.ringDeliverers) {
+        const reached = await this.orderCalls.ring([...byUser.keys()], shipment.id, title, body, {
+          action: 'PICKUP_NEW',
+          audience: 'deliverer',
+          trackingNumber: shipment.trackingNumber,
+          city: cityName || '',
+          canTake: 'true',
+        });
+        this.logger.log(`📞 Ramassage ${shipment.trackingNumber} : appel chez ${reached.length}/${byUser.size} livreur(s)`);
+      }
+      this.logger.log(`📦 Ramassage ${shipment.trackingNumber} : ${byUser.size} livreur(s) de la branche prévenu(s)`);
+      return byUser.size;
+    } catch (e: any) {
+      this.logger.warn(`Notification livreurs (ramassage ${shipment?.trackingNumber}) : ${e?.message}`);
+      return 0;
+    }
+  }
+
   // ============================================================
   // 2. COMMANDES DE MA BRANCHE (le livreur ne voit que sa branche)
   // ============================================================

@@ -148,6 +148,38 @@ export class Shipment {
   @Column({ type: 'enum', enum: ShipmentPickupPaymentTiming, nullable: true })
   pickupPaymentTiming?: ShipmentPickupPaymentTiming | null;
 
+  /** Si PAS encore payé au fournisseur : montant dû au fournisseur (à régler au ramassage) */
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  supplierAmountDue?: number | null;
+
+  // ---- Vérification du poids au ramassage (le poids constaté par le livreur fait foi) ----
+  /** Poids déclaré par le client à la création (audit) */
+  @Column({ type: 'float', nullable: true })
+  declaredWeight?: number | null;
+
+  /** Poids constaté par le livreur à l'enlèvement */
+  @Column({ type: 'float', nullable: true })
+  verifiedWeight?: number | null;
+
+  /** Livreur (ou admin) ayant constaté le poids */
+  @Column({ type: 'char', length: 36, nullable: true })
+  verifiedBy?: string | null;
+
+  @Column({ type: 'datetime', precision: 6, nullable: true })
+  verifiedAt?: Date | null;
+
+  /** Écart de prix de ramassage après recalcul (nouveau - ancien) */
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  pickupPriceAdjustment?: number | null;
+
+  /** Déjà payé mais poids plus lourd → complément à encaisser */
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  pickupSurchargeDue?: number | null;
+
+  /** Déjà payé mais poids plus léger → trop-perçu à rembourser (validé par l'admin) */
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  pickupRefundDue?: number | null;
+
   /** Mode d'encaissement (mêmes modes que les commandes : CASH, MOBILE_MONEY, BANK, MANUAL, FPAY) */
   @Column({ type: 'varchar', length: 30, nullable: true })
   pickupPaymentMethod?: string | null;

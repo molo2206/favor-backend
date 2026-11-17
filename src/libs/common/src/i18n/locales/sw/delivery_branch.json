@@ -17,5 +17,7 @@
   "delivery_branch.eligible_no_city": "Mji wa oda haujulikani: haiwezekani kupendekeza wasafirishaji wa eneo lake.",
   "delivery_branch.eligible_forbidden": "Huna ruhusa ya kuona orodha ya wasafirishaji.",
   "delivery_branch.order_not_found": "Oda haikupatikana.",
-  "delivery_branch.user_not_assignable": "{{name}} hawezi kupeleka oda hii: inahitajika ruhusa kwa aina hii ya oda katika tawi la mji wa oda (au awe msambazaji wa mji huo)."
+  "delivery_branch.user_not_assignable": "{{name}} hawezi kupeleka oda hii: inahitajika ruhusa kwa aina hii ya oda katika tawi la mji wa oda (au awe msambazaji wa mji huo).",
+  "delivery_branch.new_pickup_title": "📦 Uchukuaji mpya",
+  "delivery_branch.new_pickup_body": "Uchukuaji {{trackingNumber}} ({{city}}). Uchukue kama upo tayari."
 }

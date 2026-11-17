@@ -17,5 +17,7 @@
   "delivery_branch.eligible_no_city": "Ville de la commande inconnue : impossible de proposer les livreurs de son milieu.",
   "delivery_branch.eligible_forbidden": "Vous n'avez pas accès à la liste des livreurs.",
   "delivery_branch.order_not_found": "Commande introuvable.",
-  "delivery_branch.user_not_assignable": "{{name}} ne peut pas livrer cette commande : il faut une permission sur ce type de commande dans une branche de la ville de la commande (ou être livreur de cette ville)."
+  "delivery_branch.user_not_assignable": "{{name}} ne peut pas livrer cette commande : il faut une permission sur ce type de commande dans une branche de la ville de la commande (ou être livreur de cette ville).",
+  "delivery_branch.new_pickup_title": "📦 Nouveau ramassage à prendre",
+  "delivery_branch.new_pickup_body": "Ramassage {{trackingNumber}} ({{city}}). Prenez-le si vous êtes disponible."
 }

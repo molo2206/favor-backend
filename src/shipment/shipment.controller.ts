@@ -22,6 +22,7 @@ import {
 import { ShipmentService } from './shipment.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { CollectShipmentPickupPaymentDto } from './dto/pickup-payment.dto';
+import { VerifyPickupWeightDto } from './dto/verify-pickup-weight.dto';
 import { UpdateShipmentDto } from './dto/update-shipment.dto';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
@@ -154,6 +155,20 @@ export class ShipmentController {
       throw new NotFoundException(await this.i18n.translate('shipment.error.not_found', lang, { id: shipmentId }));
     }
     return result;
+  }
+
+  // ✅ Le livreur (ou admin) constate le poids réel → recalcul du frais de ramassage
+  @Patch(':id/verify-pickup')
+  @UseGuards(AuthentificationGuard)
+  @AuditAction(ActionType.UPDATE, 'shipments')
+  async verifyPickupWeight(
+    @Param('id') shipmentId: string,
+    @Body() dto: VerifyPickupWeightDto,
+    @CurrentUser() user: UserEntity,
+    @Req() req: Request,
+  ) {
+    const lang = this.extractLanguage(req);
+    return this.shipmentService.verifyPickupWeight(shipmentId, dto.verifiedWeight, user, lang);
   }
 
   // ✅ Encaissement du ramassage (propriétaire du colis + admins)

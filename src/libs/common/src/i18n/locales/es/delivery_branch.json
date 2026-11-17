@@ -17,5 +17,7 @@
   "delivery_branch.eligible_no_city": "Ciudad del pedido desconocida: no se pueden proponer repartidores de su zona.",
   "delivery_branch.eligible_forbidden": "No tiene acceso a la lista de repartidores.",
   "delivery_branch.order_not_found": "Pedido no encontrado.",
-  "delivery_branch.user_not_assignable": "{{name}} no puede entregar este pedido: se necesita un permiso sobre este tipo de pedido en una sucursal de la ciudad del pedido (o ser repartidor de esa ciudad)."
+  "delivery_branch.user_not_assignable": "{{name}} no puede entregar este pedido: se necesita un permiso sobre este tipo de pedido en una sucursal de la ciudad del pedido (o ser repartidor de esa ciudad).",
+  "delivery_branch.new_pickup_title": "📦 Nueva recogida disponible",
+  "delivery_branch.new_pickup_body": "Recogida {{trackingNumber}} ({{city}}). Tómala si estás disponible."
 }

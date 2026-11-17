@@ -17,5 +17,7 @@
   "delivery_branch.eligible_no_city": "Order city unknown: unable to suggest deliverers from its area.",
   "delivery_branch.eligible_forbidden": "You do not have access to the deliverers list.",
   "delivery_branch.order_not_found": "Order not found.",
-  "delivery_branch.user_not_assignable": "{{name}} cannot deliver this order: a permission on this order type is required in a branch of the order's city (or be a deliverer in that city)."
+  "delivery_branch.user_not_assignable": "{{name}} cannot deliver this order: a permission on this order type is required in a branch of the order's city (or be a deliverer in that city).",
+  "delivery_branch.new_pickup_title": "📦 New pickup available",
+  "delivery_branch.new_pickup_body": "Pickup {{trackingNumber}} ({{city}}). Take it if you are available."
 }
