@@ -3342,10 +3342,8 @@ export class ShipmentService {
     const loyaltyFeeFournisseur = Number(Number(shipment.supplierTotal ?? 0).toFixed(2));
 
     console.log('[Fidelity] ðŸ” Répartition des frais:', {
-      totalFees,
       loyaltyFeeClient,
       loyaltyFeeFournisseur,
-      percentageTotal: loyaltyFeePercentage,
     });
 
     // ============================================
@@ -3598,10 +3596,8 @@ export class ShipmentService {
     const loyaltyFeeFournisseur = Number(Number(shipment.supplierTotal ?? 0).toFixed(2));
 
     console.log('[Fidelity] ðŸ” Répartition des frais:', {
-      totalFees,
       loyaltyFeeClient,
       loyaltyFeeFournisseur,
-      percentageTotal: loyaltyFeePercentage,
     });
 
     // ============================================
