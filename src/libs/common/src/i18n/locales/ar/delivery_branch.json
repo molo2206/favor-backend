@@ -1,0 +1,21 @@
+{
+  "delivery_branch.new_order_title": "🍽️ طلب جديد للتوصيل",
+  "delivery_branch.new_order_body": "الطلب {{invoiceNumber}} ({{city}}): {{totalAmount}} {{currency}}. خذه إذا كنت متاحًا.",
+  "delivery_branch.no_branch": "أنت غير مرتبط بأي فرع لديه صلاحية على طلبات المطاعم.",
+  "delivery_branch.orders": "طلبات فرعك.",
+  "delivery_branch.not_branch_order": "هذا الطلب ليس طلب مطعم.",
+  "delivery_branch.not_your_branch": "هذا الطلب ليس من فرعك أو ليس لديك صلاحية معالجته.",
+  "delivery_branch.already_taken": "تم أخذ هذا الطلب من قبل موصل آخر.",
+  "delivery_branch.not_takeable": "لم يعد بالإمكان أخذ هذا الطلب (الحالة: {{status}}).",
+  "delivery_branch.taken": "تم إسناد الطلب إليك.",
+  "delivery_branch.already_yours": "هذا الطلب مسند إليك بالفعل.",
+  "delivery_branch.history": "سجل توصيلاتك.",
+  "delivery_branch.deliverers_only": "مخصص للموصلين فقط.",
+  "delivery_branch.deliverer_not_in_branch": "هذا الموصل لا ينتمي إلى فرع الطلب أو ليس لديه صلاحية معالجته.",
+  "delivery_branch.deliverer_wrong_city": "عامل التوصيل هذا غير مرتبط بأي فرع في مدينة الطلب ({{city}}). اختر عامل توصيل من هذه المدينة.",
+  "delivery_branch.eligible_list": "{{count}} عامل توصيل متاح في {{city}}.",
+  "delivery_branch.eligible_no_city": "مدينة الطلب غير معروفة: لا يمكن اقتراح عمال توصيل من منطقته.",
+  "delivery_branch.eligible_forbidden": "ليس لديك صلاحية الوصول إلى قائمة عمال التوصيل.",
+  "delivery_branch.order_not_found": "الطلب غير موجود.",
+  "delivery_branch.user_not_assignable": "لا يمكن لـ {{name}} توصيل هذا الطلب: يلزم إذن على هذا النوع من الطلبات في فرع بمدينة الطلب (أو أن يكون موصلًا في تلك المدينة)."
+}

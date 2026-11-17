@@ -1,0 +1,8 @@
+{
+  "driver_vehicle.notif.kyc_approved.title": "Documents approved ✅",
+  "driver_vehicle.notif.kyc_approved.body": "Your vehicle {{model}} ({{plate}}) is approved. You can now receive rides.",
+  "driver_vehicle.notif.kyc_rejected.title": "Documents rejected",
+  "driver_vehicle.notif.kyc_rejected.body": "Vehicle {{model}} ({{plate}}): {{reason}}. Please correct and resend your documents.",
+  "driver_vehicle.notif.updated.title": "Vehicle updated",
+  "driver_vehicle.notif.updated.body": "The administration updated your vehicle {{model}} ({{plate}})."
+}

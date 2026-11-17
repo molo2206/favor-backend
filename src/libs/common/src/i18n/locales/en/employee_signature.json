@@ -1,0 +1,13 @@
+{
+  "employee_signature.fetched": "Signature retrieved.",
+  "employee_signature.saved": "Signature saved.",
+  "employee_signature.deleted": "Signature deleted.",
+  "employee_signature.not_found": "No signature saved for this employee.",
+  "employee_signature.forbidden": "You cannot manage this employee's signature.",
+  "employee_signature.invalid_type": "Unsupported format: send a PNG, JPG or WEBP image.",
+  "employee_signature.invalid_image": "Unreadable signature image.",
+  "employee_signature.file_required": "Add the signature image (file or drawn signature).",
+  "employee_signature.too_large": "Image too large (maximum {{max}} MB).",
+  "employee_signature.no_employee": "No employee record is linked to your account in this company: ask HR to create it.",
+  "employee_signature.employee_not_found": "Employee not found."
+}

@@ -1,0 +1,13 @@
+{
+  "employee_signature.fetched": "تم جلب التوقيع.",
+  "employee_signature.saved": "تم حفظ التوقيع.",
+  "employee_signature.deleted": "تم حذف التوقيع.",
+  "employee_signature.not_found": "لا يوجد توقيع محفوظ لهذا الموظف.",
+  "employee_signature.forbidden": "لا يمكنك إدارة توقيع هذا الموظف.",
+  "employee_signature.invalid_type": "صيغة غير مقبولة: أرسل صورة PNG أو JPG أو WEBP.",
+  "employee_signature.invalid_image": "صورة التوقيع غير قابلة للقراءة.",
+  "employee_signature.file_required": "أضف صورة التوقيع (ملف أو توقيع مرسوم).",
+  "employee_signature.too_large": "الصورة كبيرة جدًا (الحد الأقصى {{max}} ميغابايت).",
+  "employee_signature.no_employee": "لا يوجد ملف موظف مرتبط بحسابك في هذه الشركة: اطلب من الموارد البشرية إنشاءه.",
+  "employee_signature.employee_not_found": "الموظف غير موجود."
+}

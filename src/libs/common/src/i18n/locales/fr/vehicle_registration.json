@@ -1,0 +1,15 @@
+{
+  "vehicle_registration.forbidden": "Vous n'avez pas accès à ce véhicule.",
+  "vehicle_registration.not_found": "Véhicule introuvable.",
+  "vehicle_registration.plate_exists": "La plaque {{plate}} est déjà enregistrée (fiche {{reference}}).",
+  "vehicle_registration.price_range_invalid": "Le prix maximum ({{max}}) doit être supérieur ou égal au prix minimum ({{min}}).",
+  "vehicle_registration.broker_incomplete": "Commissionnaire : indiquez son nom et son téléphone (ou laissez les champs du commissionnaire vides).",
+  "vehicle_registration.broker_same_as_owner": "Le téléphone du commissionnaire doit être différent de celui du propriétaire.",
+  "vehicle_registration.too_many_images": "{{max}} images au maximum par véhicule.",
+  "vehicle_registration.created": "Véhicule {{name}} enregistré (référence {{reference}}).",
+  "vehicle_registration.list": "Véhicules récupérés.",
+  "vehicle_registration.detail": "Détail du véhicule récupéré.",
+  "vehicle_registration.updated": "Véhicule {{reference}} mis à jour.",
+  "vehicle_registration.status_updated": "Véhicule {{reference}} : statut {{status}}.",
+  "vehicle_registration.deleted": "Véhicule {{reference}} supprimé."
+}

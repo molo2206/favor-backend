@@ -1,0 +1,15 @@
+{
+  "image_search.image_required": "Ajoutez une photo pour lancer la recherche.",
+  "image_search.invalid_type": "Format non accepté : envoyez une image JPG, PNG, WEBP ou HEIC.",
+  "image_search.invalid_image": "Image illisible : essayez une autre photo.",
+  "image_search.too_large": "Image trop lourde (maximum {{max}} Mo).",
+  "image_search.rate_limited": "Trop de recherches par image en peu de temps. Réessayez dans une minute.",
+  "image_search.results": "{{count}} produit(s) similaire(s) trouvé(s).",
+  "image_search.results_for": "{{count}} produit(s) trouvé(s) pour « {{label}} ».",
+  "image_search.no_results": "Aucun produit similaire trouvé.",
+  "image_search.no_results_for": "Aucun produit trouvé pour « {{label}} ». Essayez une autre photo ou une recherche par mot-clé.",
+  "image_search.not_product": "La photo ne semble pas montrer un produit. Prenez le produit en photo, bien centré.",
+  "image_search.admin_only": "Action réservée aux administrateurs.",
+  "image_search.status_fetched": "État de la recherche par image récupéré.",
+  "image_search.reindex_started": "Indexation lancée en arrière-plan."
+}

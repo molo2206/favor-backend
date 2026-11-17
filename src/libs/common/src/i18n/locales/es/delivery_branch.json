@@ -1,0 +1,21 @@
+{
+  "delivery_branch.new_order_title": "🍽️ Nuevo pedido para entregar",
+  "delivery_branch.new_order_body": "Pedido {{invoiceNumber}} ({{city}}): {{totalAmount}} {{currency}}. Tómelo si está disponible.",
+  "delivery_branch.no_branch": "No está vinculado a ninguna sucursal con permiso sobre pedidos de restaurante.",
+  "delivery_branch.orders": "Pedidos de su sucursal.",
+  "delivery_branch.not_branch_order": "Este pedido no es de restaurante.",
+  "delivery_branch.not_your_branch": "Este pedido no es de su sucursal o no tiene permiso para procesarlo.",
+  "delivery_branch.already_taken": "Otro repartidor ya tomó este pedido.",
+  "delivery_branch.not_takeable": "Este pedido ya no se puede tomar (estado: {{status}}).",
+  "delivery_branch.taken": "El pedido le ha sido asignado.",
+  "delivery_branch.already_yours": "Este pedido ya le está asignado.",
+  "delivery_branch.history": "Historial de sus entregas.",
+  "delivery_branch.deliverers_only": "Reservado a los repartidores.",
+  "delivery_branch.deliverer_not_in_branch": "Este repartidor no pertenece a la sucursal del pedido o no tiene permiso para procesarlo.",
+  "delivery_branch.deliverer_wrong_city": "Este repartidor no está vinculado a ninguna sucursal de la ciudad del pedido ({{city}}). Elija un repartidor de esa ciudad.",
+  "delivery_branch.eligible_list": "{{count}} repartidor(es) disponible(s) para {{city}}.",
+  "delivery_branch.eligible_no_city": "Ciudad del pedido desconocida: no se pueden proponer repartidores de su zona.",
+  "delivery_branch.eligible_forbidden": "No tiene acceso a la lista de repartidores.",
+  "delivery_branch.order_not_found": "Pedido no encontrado.",
+  "delivery_branch.user_not_assignable": "{{name}} no puede entregar este pedido: se necesita un permiso sobre este tipo de pedido en una sucursal de la ciudad del pedido (o ser repartidor de esa ciudad)."
+}

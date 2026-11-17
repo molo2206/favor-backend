@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/**/*", "db/**/*"],
+  "exclude": [
+    "node_modules",
+    "**/node_modules",
+    "test",
+    "dist",
+    "docs",
+    "**/*spec.ts",
+    "apps",
+    "libs",
+    "prisma",
+    "dist-ms",
+    "scripts",
+    "backups",
+    "uploads",
+    "temp",
+    "certs",
+    "deploy"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "delivery_branch.new_order_title": "🍽️ Agizo jipya la kusafirisha",
+  "delivery_branch.new_order_body": "Agizo {{invoiceNumber}} ({{city}}): {{totalAmount}} {{currency}}. Lichukue ukiwa tayari.",
+  "delivery_branch.no_branch": "Hujaunganishwa na tawi lolote lenye ruhusa ya maagizo ya mgahawa.",
+  "delivery_branch.orders": "Maagizo ya tawi lako.",
+  "delivery_branch.not_branch_order": "Agizo hili si la mgahawa.",
+  "delivery_branch.not_your_branch": "Agizo hili si la tawi lako au huna ruhusa ya kulishughulikia.",
+  "delivery_branch.already_taken": "Agizo hili tayari limechukuliwa na msafirishaji mwingine.",
+  "delivery_branch.not_takeable": "Agizo hili haliwezi tena kuchukuliwa (hali: {{status}}).",
+  "delivery_branch.taken": "Agizo limekabidhiwa kwako.",
+  "delivery_branch.already_yours": "Agizo hili tayari ni lako.",
+  "delivery_branch.history": "Historia ya usafirishaji wako.",
+  "delivery_branch.deliverers_only": "Kwa wasafirishaji pekee.",
+  "delivery_branch.deliverer_not_in_branch": "Msafirishaji huyu si wa tawi la agizo au hana ruhusa ya kulishughulikia.",
+  "delivery_branch.deliverer_wrong_city": "Msafirishaji huyu hayupo katika tawi lolote la mji wa oda ({{city}}). Chagua msafirishaji wa mji huo.",
+  "delivery_branch.eligible_list": "Wasafirishaji {{count}} wanapatikana kwa {{city}}.",
+  "delivery_branch.eligible_no_city": "Mji wa oda haujulikani: haiwezekani kupendekeza wasafirishaji wa eneo lake.",
+  "delivery_branch.eligible_forbidden": "Huna ruhusa ya kuona orodha ya wasafirishaji.",
+  "delivery_branch.order_not_found": "Oda haikupatikana.",
+  "delivery_branch.user_not_assignable": "{{name}} hawezi kupeleka oda hii: inahitajika ruhusa kwa aina hii ya oda katika tawi la mji wa oda (au awe msambazaji wa mji huo)."
+}
