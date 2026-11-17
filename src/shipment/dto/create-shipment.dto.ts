@@ -28,16 +28,19 @@ export class CreateShipmentDto {
   @IsEnum(ShipmentStatus)
   status?: ShipmentStatus = ShipmentStatus.PENDING;
 
-  // Flags optionnels
+  // Flags optionnels — en multipart/form-data ils arrivent en texte ("true"/"false")
   @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
   @IsBoolean()
   pickupEnabled?: boolean = false;
 
   @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
   @IsBoolean()
   shippingEnabled?: boolean = false;
 
   @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
   @IsBoolean()
   deliveryEnabled?: boolean = false;
 
@@ -145,6 +148,7 @@ export class CreateShipmentDto {
   value?: number;
 
   @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
   @IsBoolean()
   fragile?: boolean;
 
