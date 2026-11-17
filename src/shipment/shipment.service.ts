@@ -817,6 +817,7 @@ export class ShipmentService {
     createShipmentDto: CreateShipmentDto,
     currentUser: UserEntity,
     lang: string = 'fr',
+    file?: Express.Multer.File,
   ): Promise<{ message: string; data: Shipment }> {
     const {
       pickupEnabled = false,
@@ -921,6 +922,16 @@ export class ShipmentService {
       // ✅ Paiement EN LIGNE (FPAY / Mobile Money) : débité AVANT la création.
       //    Si le paiement échoue → on NE crée PAS le shipment (comme les commandes).
       await this.chargePickupOnlineOrFail(shipment, createShipmentDto, currentUser);
+    }
+
+    // ✅ Image du colis (ramassage) : upload et rattachement si un fichier est fourni
+    if (file) {
+      try {
+        const uploadedFile = await this.filesService.uploadFile(file, 'shipment', 'product');
+        shipment.image = uploadedFile.data;
+      } catch (err: any) {
+        console.warn('Upload image colis (ramassage) échoué:', err?.message);
+      }
     }
 
     const savedShipment = await this.shipmentRepo.save(shipment);
@@ -1790,36 +1801,11 @@ export class ShipmentService {
         shipment.collectedAt = new Date();
         await this.shipmentRepo.save(shipment);
 
-        let loyaltyFeePercentage = 0;
-        let mainCompany: CompanyEntity | null = shipment.shippingCompanyId
-          ? await this.companyRepo.findOne({ where: { id: shipment.shippingCompanyId } })
-          : null;
+        // ✅ Fidélité = clientTotal (client) et supplierTotal (fournisseur), SANS loyaltyFeeFixed.
+        const loyaltyFeeClient = Number(Number(clientTotal).toFixed(2));
+        const loyaltyFeeFournisseur = Number(Number(supplierTotal).toFixed(2));
 
-        if (!mainCompany && shipment.pickupCompanyId) {
-          mainCompany = await this.companyRepo.findOne({ where: { id: shipment.pickupCompanyId } });
-        }
-        if (!mainCompany && shipment.deliveryCompanyId) {
-          mainCompany = await this.companyRepo.findOne({ where: { id: shipment.deliveryCompanyId } });
-        }
-
-        if (mainCompany) {
-          const companySettings = await this.companySettingsRepo.findOne({
-            where: { companyId: mainCompany.id },
-          });
-
-          loyaltyFeePercentage = companySettings?.loyaltyFeeFixed || 5.00;
-          console.log(`[Fidelity] Pourcentage: ${loyaltyFeePercentage}%`);
-        } else {
-          loyaltyFeePercentage = 5.00;
-          console.log(`[Fidelity] Aucune company -> 5% par défaut`);
-        }
-
-        // ✅ Fidélité calculée séparément : client sur clientTotal, fournisseur sur supplierTotal
-        const loyaltyFeeClient = Number(((clientTotal * loyaltyFeePercentage) / 100).toFixed(2));
-        const loyaltyFeeFournisseur = Number(((supplierTotal * loyaltyFeePercentage) / 100).toFixed(2));
-
-        console.log(`[Fidelity] Répartition (sur totaux par entreprise):`, {
-          loyaltyFeePercentage,
+        console.log(`[Fidelity] Répartition (= clientTotal / supplierTotal):`, {
           clientTotal,
           supplierTotal,
           loyaltyFeeClient,
@@ -1841,7 +1827,7 @@ export class ShipmentService {
                 {
                   userId: userLoyalty.user.userIdFpay,
                   amount: loyaltyFeeClient,
-                  description: `Frais de fidélité (50%) pour le colis ${shipment.trackingNumber}`,
+                  description: `Frais de fidélité pour le colis ${shipment.trackingNumber}`,
                   currency: shipment.currency || 'USD',
                   countryCode: 'CD',
                 },
@@ -1855,7 +1841,7 @@ export class ShipmentService {
                   transactionType: LoyaltyTransactionType.EARN,
                   sourceType: LoyaltySourceType.SHIPMENT,
                   sourceId: shipment.id,
-                  description: `Frais de fidélité (50%) pour l'expédition ${shipment.trackingNumber}`,
+                  description: `Frais de fidélité pour l'expédition ${shipment.trackingNumber}`,
                 });
                 await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
@@ -1888,7 +1874,7 @@ export class ShipmentService {
                 {
                   userId: fournisseurLoyalty.user.userIdFpay,
                   amount: loyaltyFeeFournisseur,
-                  description: `Frais de fidélité (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
+                  description: `Frais de fidélité fournisseur pour le colis ${shipment.trackingNumber}`,
                   currency: shipment.currency || 'USD',
                   countryCode: 'CD',
                 },
@@ -1902,7 +1888,7 @@ export class ShipmentService {
                   transactionType: LoyaltyTransactionType.EARN,
                   sourceType: LoyaltySourceType.SHIPMENT,
                   sourceId: shipment.id,
-                  description: `Frais de fidélité (50%) fournisseur pour l'expédition ${shipment.trackingNumber}`,
+                  description: `Frais de fidélité fournisseur pour l'expédition ${shipment.trackingNumber}`,
                 });
                 await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
@@ -2551,19 +2537,18 @@ export class ShipmentService {
               where: { companyId: mainCompany.id },
             });
 
-            loyaltyFeePercentage = companySettings?.loyaltyFeeFixed || 5.00;
+            loyaltyFeePercentage = 0; // loyaltyFeeFixed retiré du calcul
             console.log(`[Fidelity] ðŸ” Pourcentage: ${loyaltyFeePercentage}%`);
           } else {
             loyaltyFeePercentage = 5.00;
             console.log(`[Fidelity] âš ï¸ Aucune company → 5% par défaut`);
           }
 
-          const totalFees = (amountForLoyalty * loyaltyFeePercentage) / 100;
-          const loyaltyFeeClient = totalFees / 2;
-          const loyaltyFeeFournisseur = totalFees / 2;
+          // ✅ Fidélité = clientTotal / supplierTotal (sans loyaltyFeeFixed)
+          const loyaltyFeeClient = Number(Number(shipment.clientTotal ?? 0).toFixed(2));
+          const loyaltyFeeFournisseur = Number(Number(shipment.supplierTotal ?? 0).toFixed(2));
 
-          console.log(`[Fidelity] 💰 Répartition:`, {
-            totalFees,
+          console.log(`[Fidelity] 💰 Répartition (= clientTotal / supplierTotal):`, {
             loyaltyFeeClient,
             loyaltyFeeFournisseur,
           });
@@ -2583,7 +2568,7 @@ export class ShipmentService {
                   {
                     userId: userLoyalty.user.userIdFpay,
                     amount: loyaltyFeeClient,
-                    description: `Frais de fidélité (50%) pour le colis ${shipment.trackingNumber}`,
+                    description: `Frais de fidélité pour le colis ${shipment.trackingNumber}`,
                     currency: shipment.currency || 'USD',
                     countryCode: 'CD',
                   },
@@ -2597,7 +2582,7 @@ export class ShipmentService {
                     transactionType: LoyaltyTransactionType.EARN,
                     sourceType: LoyaltySourceType.SHIPMENT,
                     sourceId: shipment.id,
-                    description: `Frais de fidélité (50%) pour l'expédition ${shipment.trackingNumber}`,
+                    description: `Frais de fidélité pour l'expédition ${shipment.trackingNumber}`,
                   });
                   await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
@@ -2628,7 +2613,7 @@ export class ShipmentService {
                   {
                     userId: fournisseurLoyalty.user.userIdFpay,
                     amount: loyaltyFeeFournisseur,
-                    description: `Frais de fidélité (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
+                    description: `Frais de fidélité fournisseur pour le colis ${shipment.trackingNumber}`,
                     currency: shipment.currency || 'USD',
                     countryCode: 'CD',
                   },
@@ -2642,7 +2627,7 @@ export class ShipmentService {
                     transactionType: LoyaltyTransactionType.EARN,
                     sourceType: LoyaltySourceType.SHIPMENT,
                     sourceId: shipment.id,
-                    description: `Frais de fidélité (50%) fournisseur pour l'expédition ${shipment.trackingNumber}`,
+                    description: `Frais de fidélité fournisseur pour l'expédition ${shipment.trackingNumber}`,
                   });
                   await this.loyaltyHistoryRepo.save(loyaltyHistory);
 
@@ -3338,7 +3323,7 @@ export class ShipmentService {
       });
 
       if (companySettings) {
-        loyaltyFeePercentage = companySettings.loyaltyFeeFixed || 0;
+        loyaltyFeePercentage = 0; // loyaltyFeeFixed retiré du calcul
         console.log('[Fidelity] ðŸ” Pourcentage récupéré:', loyaltyFeePercentage);
       } else {
         loyaltyFeePercentage = 5.00;
@@ -3352,9 +3337,9 @@ export class ShipmentService {
     // ============================================
     // 🆕 CALCUL DES FRAIS (50% CLIENT / 50% FOURNISSEUR)
     // ============================================
-    const totalFees = (totalAmount * loyaltyFeePercentage) / 100;
-    const loyaltyFeeClient = totalFees / 2;
-    const loyaltyFeeFournisseur = totalFees / 2;
+    // ✅ Fidélité = clientTotal / supplierTotal (sans loyaltyFeeFixed)
+    const loyaltyFeeClient = Number(Number(shipment.clientTotal ?? 0).toFixed(2));
+    const loyaltyFeeFournisseur = Number(Number(shipment.supplierTotal ?? 0).toFixed(2));
 
     console.log('[Fidelity] ðŸ” Répartition des frais:', {
       totalFees,
@@ -3379,7 +3364,7 @@ export class ShipmentService {
           const fpayData = {
             userId: recipientUser.userIdFpay,
             amount: loyaltyFeeClient,
-            description: `Frais de fidélité (50%) pour le colis ${shipment.trackingNumber}`,
+            description: `Frais de fidélité pour le colis ${shipment.trackingNumber}`,
             currency: shipment.currency || 'USD',
             countryCode: 'CD',
           };
@@ -3399,7 +3384,7 @@ export class ShipmentService {
                 transactionType: LoyaltyTransactionType.EARN,
                 sourceType: LoyaltySourceType.SHIPMENT,
                 sourceId: shipment.id,
-                description: `Frais de fidélité (50%) pour l'expédition ${shipment.trackingNumber}`,
+                description: `Frais de fidélité pour l'expédition ${shipment.trackingNumber}`,
                 expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
                 isExpired: false,
               });
@@ -3430,7 +3415,7 @@ export class ShipmentService {
           const fpayData = {
             userId: recipientUser.userIdFpay,
             amount: loyaltyFeeFournisseur,
-            description: `Frais de fidélité (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
+            description: `Frais de fidélité fournisseur pour le colis ${shipment.trackingNumber}`,
             currency: shipment.currency || 'USD',
             countryCode: 'CD',
           };
@@ -3450,7 +3435,7 @@ export class ShipmentService {
                 transactionType: LoyaltyTransactionType.EARN,
                 sourceType: LoyaltySourceType.SHIPMENT,
                 sourceId: shipment.id,
-                description: `Frais de fidélité (50%) fournisseur pour l'expédition ${shipment.trackingNumber}`,
+                description: `Frais de fidélité fournisseur pour l'expédition ${shipment.trackingNumber}`,
                 expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
                 isExpired: false,
               });
@@ -3592,7 +3577,7 @@ export class ShipmentService {
 
       if (companySettings) {
         // ✅ Récupérer le pourcentage total (5%)
-        loyaltyFeePercentage = companySettings.loyaltyFeeFixed || 0;
+        loyaltyFeePercentage = 0; // loyaltyFeeFixed retiré du calcul
         console.log('[Fidelity] ðŸ” Pourcentage total récupéré:', loyaltyFeePercentage);
       } else {
         // Fallback si pas de paramètres
@@ -3608,9 +3593,9 @@ export class ShipmentService {
     // ============================================
     // 🆕 CALCUL DES FRAIS (50% CLIENT / 50% FOURNISSEUR)
     // ============================================
-    const totalFees = (amount * loyaltyFeePercentage) / 100;
-    const loyaltyFeeClient = totalFees / 2;  // 50% pour le client
-    const loyaltyFeeFournisseur = totalFees / 2;  // 50% pour le fournisseur
+    // ✅ Fidélité = clientTotal / supplierTotal (sans loyaltyFeeFixed)
+    const loyaltyFeeClient = Number(Number(shipment.clientTotal ?? 0).toFixed(2));
+    const loyaltyFeeFournisseur = Number(Number(shipment.supplierTotal ?? 0).toFixed(2));
 
     console.log('[Fidelity] ðŸ” Répartition des frais:', {
       totalFees,
@@ -3649,7 +3634,7 @@ export class ShipmentService {
           const fpayData = {
             userId: recipientUser.userIdFpay,
             amount: loyaltyFeeClient,
-            description: `Frais de fidélité (50%) pour le colis ${shipment.trackingNumber}`,
+            description: `Frais de fidélité pour le colis ${shipment.trackingNumber}`,
             currency: shipment.currency || 'USD',
             countryCode: 'CD',
           };
@@ -3666,7 +3651,7 @@ export class ShipmentService {
               transactionType: LoyaltyTransactionType.EARN,
               sourceType: LoyaltySourceType.SHIPMENT,
               sourceId: shipment.id,
-              description: `Frais de fidélité (50%) pour l'expédition ${shipment.trackingNumber}`,
+              description: `Frais de fidélité pour l'expédition ${shipment.trackingNumber}`,
               expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
               isExpired: false,
             });
@@ -3699,7 +3684,7 @@ export class ShipmentService {
           const fpayData = {
             userId: recipientUser.userIdFpay,
             amount: loyaltyFeeFournisseur,
-            description: `Frais de fidélité (50%) fournisseur pour le colis ${shipment.trackingNumber}`,
+            description: `Frais de fidélité fournisseur pour le colis ${shipment.trackingNumber}`,
             currency: shipment.currency || 'USD',
             countryCode: 'CD',
           };
@@ -3716,7 +3701,7 @@ export class ShipmentService {
               transactionType: LoyaltyTransactionType.EARN,
               sourceType: LoyaltySourceType.SHIPMENT,
               sourceId: shipment.id,
-              description: `Frais de fidélité (50%) fournisseur pour l'expédition ${shipment.trackingNumber}`,
+              description: `Frais de fidélité fournisseur pour l'expédition ${shipment.trackingNumber}`,
               expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
               isExpired: false,
             });

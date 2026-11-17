@@ -62,13 +62,15 @@ export class ShipmentController {
   @Post()
   @UseGuards(AuthentificationGuard)
   @AuditAction(ActionType.CREATE, 'shipments')
+  @UseInterceptors(FileInterceptor('image')) // ✅ image du colis (ramassage) optionnelle
   async createShipment(
     @Body() createShipmentDto: CreateShipmentDto,
+    @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: UserEntity,
     @Req() req: Request,
   ) {
     const lang = this.extractLanguage(req);
-    const result = await this.shipmentService.create(createShipmentDto, user, lang);
+    const result = await this.shipmentService.create(createShipmentDto, user, lang, file);
     return {
       message: result.message,
       data: result.data,
