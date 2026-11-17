@@ -1062,12 +1062,26 @@ export class ShipmentService {
     if (shipment.userId !== currentUser.id && currentUser.role !== UserRole.ADMIN) {
       throw new ForbiddenException("Vous n'êtes pas autorisé à encaisser ce ramassage.");
     }
-    if (shipment.pickupPaymentStatus === ShipmentPickupPaymentStatus.PAID) {
+    // ✅ Deux cas :
+    //  - frais de ramassage pas encore réglé (PENDING) → on encaisse pickupPrice ;
+    //  - déjà réglé mais complément dû après constat du poids (pickupSurchargeDue > 0) → on encaisse le complément.
+    const surcharge = shipment.pickupSurchargeDue != null ? Number(shipment.pickupSurchargeDue) : 0;
+    const isSurchargePayment =
+      shipment.pickupPaymentStatus === ShipmentPickupPaymentStatus.PAID && surcharge > 0;
+
+    if (shipment.pickupPaymentStatus === ShipmentPickupPaymentStatus.PAID && !isSurchargePayment) {
       throw new BadRequestException('Le ramassage de ce colis est déjà réglé.');
     }
 
-    const amount = shipment.pickupPrice != null ? Number(shipment.pickupPrice) : 0;
+    const amount = isSurchargePayment
+      ? surcharge
+      : shipment.pickupPrice != null
+        ? Number(shipment.pickupPrice)
+        : 0;
     const currency = shipment.pickupCurrency || shipment.currency || 'USD';
+    const label = isSurchargePayment
+      ? `Complément ramassage ${shipment.trackingNumber}`
+      : `Ramassage colis ${shipment.trackingNumber}`;
     let reference = dto.reference ?? null;
 
     // ✅ Déclencher le paiement selon la méthode choisie par le client.
@@ -1083,7 +1097,7 @@ export class ShipmentService {
         {
           amount,
           currency,
-          description: `Ramassage colis ${shipment.trackingNumber}`,
+          description: label,
           access_token: dto.access_token,
         } as any,
         currentUser,
@@ -1117,8 +1131,13 @@ export class ShipmentService {
     shipment.pickupPaymentStatus = ShipmentPickupPaymentStatus.PAID;
     shipment.pickupPaidAt = new Date();
     shipment.pickupPaymentReference = reference;
+    // Complément encaissé → on le solde
+    if (isSurchargePayment) shipment.pickupSurchargeDue = null;
     const saved = await this.shipmentRepo.save(shipment);
-    return { message: 'Paiement du ramassage encaissé.', data: saved };
+    return {
+      message: isSurchargePayment ? 'Complément de ramassage encaissé.' : 'Paiement du ramassage encaissé.',
+      data: saved,
+    };
   }
 
   /**
@@ -1159,21 +1178,28 @@ export class ShipmentService {
       return { message: 'Poids constaté enregistré (sans changement de tarif).', data: saved };
     }
 
-    // Recalcul du frais de ramassage sur le poids constaté
-    const { data } = await this.pickupTariffService.quote({
+    // ✅ Recalcul 100 % tarifaire : on compare le TARIF du poids constaté au TARIF du poids déclaré.
+    const verifiedQuote = await this.pickupTariffService.quote({
       countryId: shipment.pickupCountryId,
       cityId: shipment.pickupCityId ?? undefined,
       weight: vWeight,
     });
-    const before = shipment.pickupPrice != null ? Number(shipment.pickupPrice) : 0;
-    const after = Number(data.price);
-    const adjustment = Math.round((after - before) * 100) / 100;
+    const declaredQuote = await this.pickupTariffService.quote({
+      countryId: shipment.pickupCountryId,
+      cityId: shipment.pickupCityId ?? undefined,
+      weight: declared,
+    });
+    const after = Number(verifiedQuote.data.price); // tarif pour le poids constaté
+    const declaredTariff = Number(declaredQuote.data.price); // tarif pour le poids déclaré
+    const oldStored = shipment.pickupPrice != null ? Number(shipment.pickupPrice) : declaredTariff;
+    // L'écart (complément / avoir) est la différence de TARIF entre les deux poids.
+    const adjustment = Math.round((after - declaredTariff) * 100) / 100;
 
-    // Mise à jour du prix + du total (on remplace l'ancienne part ramassage)
+    // Le frais devient le tarif du poids constaté ; le total remplace l'ancienne part ramassage.
     shipment.pickupPrice = after;
-    shipment.pickupCurrency = shipment.pickupCurrency ?? data.currency;
+    shipment.pickupCurrency = shipment.pickupCurrency ?? verifiedQuote.data.currency;
     shipment.pickupPriceAdjustment = adjustment;
-    shipment.totalPrice = Math.round((Number(shipment.totalPrice ?? 0) - before + after) * 100) / 100;
+    shipment.totalPrice = Math.round((Number(shipment.totalPrice ?? 0) - oldStored + after) * 100) / 100;
 
     // Réconciliation si le ramassage était déjà payé
     if (shipment.pickupPaymentStatus === ShipmentPickupPaymentStatus.PAID) {
