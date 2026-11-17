@@ -12,6 +12,8 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { OrderEntity } from './entities/order.entity';
 import { OrderDeliveryAssignment } from './entities/order-delivery-assignment.entity';
+import { Shipment } from 'src/shipment/entity/shipment.entity';
+import { ShipmentStatus } from 'src/shipment/enum/shipment.dto';
 import { AssignmentStatus } from './enum/assignment-status.enum';
 import { OrderStatus } from './enum/order.status.enum';
 import { OrderDeliveryService } from './order-delivery.service';
@@ -301,13 +303,21 @@ export class BranchDeliveryService {
 
       // 📞 Appel (sonnerie) des livreurs, comme pour les commandes
       if (this.ringDeliverers) {
-        const reached = await this.orderCalls.ring([...byUser.keys()], shipment.id, title, body, {
-          action: 'PICKUP_NEW',
-          audience: 'deliverer',
-          trackingNumber: shipment.trackingNumber,
-          city: cityName || '',
-          canTake: 'true',
-        });
+        const reached = await this.orderCalls.ring(
+          [...byUser.keys()],
+          shipment.id,
+          title,
+          body,
+          {
+            action: 'PICKUP_NEW',
+            audience: 'deliverer',
+            trackingNumber: shipment.trackingNumber,
+            city: cityName || '',
+            canTake: 'true',
+          },
+          undefined,
+          'pickup',
+        );
         this.logger.log(`📞 Ramassage ${shipment.trackingNumber} : appel chez ${reached.length}/${byUser.size} livreur(s)`);
       }
       this.logger.log(`📦 Ramassage ${shipment.trackingNumber} : ${byUser.size} livreur(s) de la branche prévenu(s)`);
@@ -542,6 +552,179 @@ export class BranchDeliveryService {
     const order = await this.orderRepo.findOne({ where: { id: orderId }, select: ['id', 'type'] });
     if (!order || !this.isBranchOrder(order)) return;
     await this.takeOrder(orderId, user, lang, { fromStatusChange: true });
+  }
+
+  // ============================================================
+  // 📦 RAMASSAGE D'UNE EXPÉDITION (shipment) — prise (livreur) / affectation (admin)
+  // ============================================================
+
+  /** Repository des expéditions via la DataSource (pas d'injection croisée de module). */
+  private get shipmentRepo(): Repository<Shipment> {
+    return this.dataSource.getRepository(Shipment);
+  }
+
+  /** Charge l'expédition et vérifie qu'un ramassage est bien attendu. */
+  private async loadPickupShipment(shipmentId: string, lang: string): Promise<Shipment> {
+    const shipment = await this.shipmentRepo.findOne({ where: { id: shipmentId } });
+    if (!shipment) throw new NotFoundException(this.t('delivery_branch.pickup_shipment_not_found', lang));
+    if (!shipment.pickupEnabled) throw new BadRequestException(this.t('delivery_branch.pickup_not_enabled', lang));
+    return shipment;
+  }
+
+  /**
+   * ✅ Livreurs éligibles pour le ramassage : ceux rattachés à une branche de la VILLE
+   * de ramassage de l'expédition (même source que la notification/appel).
+   */
+  async pickupDeliverers(shipmentId: string, user: UserEntity, query: { search?: string } = {}, lang = 'fr') {
+    const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN;
+    if (!isAdmin && !user?.activeCompanyId) {
+      throw new ForbiddenException(this.t('delivery_branch.eligible_forbidden', lang));
+    }
+    const shipment = await this.loadPickupShipment(shipmentId, lang);
+    const cityIds = shipment.pickupCityId ? [shipment.pickupCityId] : [];
+    const rights = cityIds.length ? await this.rights({ cityIds }) : [];
+
+    const byUser = new Map<string, any>();
+    for (const r of rights) {
+      let d = byUser.get(r.userId);
+      if (!d) {
+        d = {
+          userId: r.userId,
+          fullName: r.fullName ?? null,
+          phone: r.phone ?? null,
+          canProcess: false,
+          isCurrent: shipment.pickupDelivererId === r.userId,
+          branches: [] as any[],
+        };
+        byUser.set(r.userId, d);
+      }
+      if (r.canProcess) d.canProcess = true;
+      if (!d.branches.find((b: any) => b.branchId === r.branchId)) {
+        d.branches.push({ branchId: r.branchId, branchName: r.branchName, cityId: r.cityId, cityName: r.cityName });
+      }
+    }
+    let items = [...byUser.values()];
+    const search = (query.search || '').trim().toLowerCase();
+    if (search) {
+      items = items.filter(
+        (d) => (d.fullName || '').toLowerCase().includes(search) || (d.phone || '').toLowerCase().includes(search),
+      );
+    }
+    return { message: 'OK', data: items };
+  }
+
+  /**
+   * ✅ LE LIVREUR PREND le ramassage lui-même (le premier qui le prend le garde).
+   */
+  async takePickup(shipmentId: string, user: UserEntity, lang = 'fr') {
+    this.assertDeliverer(user, lang);
+    const shipment = await this.loadPickupShipment(shipmentId, lang);
+
+    // Le livreur doit être rattaché à une branche de la ville de ramassage
+    const cityIds = shipment.pickupCityId ? [shipment.pickupCityId] : [];
+    const eligible = cityIds.length ? await this.rights({ userIds: [user.id], cityIds }) : [];
+    if (!eligible.length) throw new ForbiddenException(this.t('delivery_branch.not_your_branch', lang));
+
+    // Prise atomique : on n'affecte que si personne ne l'a déjà pris
+    const res = await this.shipmentRepo
+      .createQueryBuilder()
+      .update(Shipment)
+      .set({
+        pickupDelivererId: user.id,
+        pickupAssignedById: user.id,
+        pickupAssignedAt: () => 'CURRENT_TIMESTAMP(6)',
+      })
+      .where('id = :id AND pickupDelivererId IS NULL', { id: shipmentId })
+      .execute();
+
+    if (!res.affected) {
+      const fresh = await this.shipmentRepo.findOne({ where: { id: shipmentId }, select: ['id', 'pickupDelivererId'] });
+      if (fresh?.pickupDelivererId === user.id) {
+        return { message: this.t('delivery_branch.already_yours', lang), data: { shipmentId, deliverId: user.id } };
+      }
+      throw new ConflictException(this.t('delivery_branch.already_taken', lang));
+    }
+    // Le statut ne « recule » jamais : on ne passe à PICKUP_ASSIGNED que depuis PENDING.
+    await this.shipmentRepo.update(
+      { id: shipmentId, status: ShipmentStatus.PENDING },
+      { status: ShipmentStatus.PICKUP_ASSIGNED },
+    );
+
+    void this.afterPickupTaken(shipment, user, true, lang);
+    return { message: this.t('delivery_branch.pickup_taken', lang), data: { shipmentId, deliverId: user.id } };
+  }
+
+  /**
+   * ✅ CÔTÉ ADMIN : affecter le ramassage à un livreur donné
+   *    (SUPER_ADMIN partout ; ADMIN selon sa permission — contrôlé par le guard de la route).
+   */
+  async assignPickup(shipmentId: string, deliverId: string, actor: UserEntity, lang = 'fr') {
+    const shipment = await this.loadPickupShipment(shipmentId, lang);
+
+    const deliver = await this.userRepo.findOne({ where: { id: deliverId } });
+    if (!deliver) throw new NotFoundException(this.t('user_not_found', lang));
+
+    // Le livreur doit être éligible pour la ville de ramassage
+    const cityIds = shipment.pickupCityId ? [shipment.pickupCityId] : [];
+    const eligible = cityIds.length ? await this.rights({ userIds: [deliverId], cityIds }) : [];
+    if ((deliver as any).isActive === false || !eligible.length) {
+      throw new BadRequestException(this.t('delivery_branch.pickup_deliverer_not_eligible', lang));
+    }
+
+    // Déjà pris par un AUTRE livreur ?
+    if (shipment.pickupDelivererId && shipment.pickupDelivererId !== deliverId) {
+      throw new ConflictException(this.t('delivery_branch.already_taken', lang));
+    }
+
+    await this.shipmentRepo.update(
+      { id: shipmentId },
+      { pickupDelivererId: deliverId, pickupAssignedById: actor.id, pickupAssignedAt: new Date() },
+    );
+    await this.shipmentRepo.update(
+      { id: shipmentId, status: ShipmentStatus.PENDING },
+      { status: ShipmentStatus.PICKUP_ASSIGNED },
+    );
+
+    void this.afterPickupTaken(shipment, deliver, false, lang);
+    return { message: this.t('delivery_branch.pickup_assigned', lang), data: { shipmentId, deliverId } };
+  }
+
+  /**
+   * Après la prise/affectation d'un ramassage : coupe l'appel chez les autres livreurs,
+   * nettoie leurs notifications et prévient le livreur retenu (sauf prise par lui-même).
+   */
+  private async afterPickupTaken(shipment: Shipment, deliver: UserEntity, assignedBySelf: boolean, lang: string) {
+    // 📞 Ramassage pris : la sonnerie s'arrête sur tous les téléphones (callId = pickup-<id>)
+    this.orderCalls.stop(shipment.id, 'HANDLED', deliver.id, 'pickup');
+    try {
+      const cityIds = shipment.pickupCityId ? [shipment.pickupCityId] : [];
+      const others = cityIds.length
+        ? [...new Set((await this.rights({ cityIds })).map((r) => r.userId))].filter((id) => id !== deliver.id)
+        : [];
+      // Les autres livreurs : le ramassage n'est plus disponible
+      for (const id of others) {
+        this.gateway.server?.to(id).emit('delivery:pickup-taken', { shipmentId: shipment.id, deliverId: deliver.id });
+      }
+      if (others.length) {
+        await this.notificationsService.deleteByData(others, 'shipmentId', shipment.id, [NotificationType.DELIVERY_NEW_ORDER]);
+      }
+      // Le livreur retenu est prévenu (sauf s'il vient de le prendre lui-même)
+      if (!assignedBySelf) {
+        const title = this.t('delivery_branch.pickup_assigned_title', lang);
+        const body = this.t('delivery_branch.pickup_assigned_body', lang, { trackingNumber: shipment.trackingNumber });
+        const data = {
+          entity: 'SHIPMENT',
+          entityId: shipment.id,
+          shipmentId: shipment.id,
+          trackingNumber: shipment.trackingNumber,
+          action: 'PICKUP_ASSIGNED',
+        };
+        await this.notificationsService.sendAndSaveNotification(deliver.id, title, body, NotificationType.DELIVERY_NEW_ORDER, data);
+        this.gateway.server?.to(deliver.id).emit('pickup:assigned', data);
+      }
+    } catch (e: any) {
+      this.logger.warn(`Après prise du ramassage ${shipment.trackingNumber} : ${e?.message}`);
+    }
   }
 
   // ============================================================

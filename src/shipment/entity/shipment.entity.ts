@@ -194,6 +194,18 @@ export class Shipment {
   @Column({ type: 'varchar', length: 100, nullable: true })
   pickupPaymentReference?: string | null;
 
+  // ---- Affectation du ramassage à un livreur (côté livreur ou côté admin) ----
+  /** Livreur affecté au ramassage (le premier qui le prend le garde) */
+  @Column({ type: 'char', length: 36, nullable: true })
+  pickupDelivererId?: string | null;
+
+  /** Qui a affecté le ramassage : le livreur lui-même (prise) ou un admin (affectation) */
+  @Column({ type: 'char', length: 36, nullable: true })
+  pickupAssignedById?: string | null;
+
+  @Column({ type: 'datetime', precision: 6, nullable: true })
+  pickupAssignedAt?: Date | null;
+
   @Column({ nullable: true })
   whatsapp_number?: string;
 

@@ -19,5 +19,12 @@
   "delivery_branch.order_not_found": "Commande introuvable.",
   "delivery_branch.user_not_assignable": "{{name}} ne peut pas livrer cette commande : il faut une permission sur ce type de commande dans une branche de la ville de la commande (ou être livreur de cette ville).",
   "delivery_branch.new_pickup_title": "📦 Nouveau ramassage à prendre",
-  "delivery_branch.new_pickup_body": "Ramassage {{trackingNumber}} ({{city}}). Prenez-le si vous êtes disponible."
+  "delivery_branch.new_pickup_body": "Ramassage {{trackingNumber}} ({{city}}). Prenez-le si vous êtes disponible.",
+  "delivery_branch.pickup_shipment_not_found": "Expédition introuvable.",
+  "delivery_branch.pickup_not_enabled": "Cette expédition ne comporte pas de ramassage.",
+  "delivery_branch.pickup_taken": "Le ramassage vous est affecté.",
+  "delivery_branch.pickup_assigned": "Le ramassage a été affecté au livreur.",
+  "delivery_branch.pickup_assigned_title": "📦 Ramassage à effectuer",
+  "delivery_branch.pickup_assigned_body": "Le ramassage {{trackingNumber}} vous a été affecté.",
+  "delivery_branch.pickup_deliverer_not_eligible": "Ce livreur n'est rattaché à aucune branche de la ville de ramassage."
 }

@@ -19,5 +19,12 @@
   "delivery_branch.order_not_found": "الطلب غير موجود.",
   "delivery_branch.user_not_assignable": "لا يمكن لـ {{name}} توصيل هذا الطلب: يلزم إذن على هذا النوع من الطلبات في فرع بمدينة الطلب (أو أن يكون موصلًا في تلك المدينة).",
   "delivery_branch.new_pickup_title": "📦 عملية استلام جديدة",
-  "delivery_branch.new_pickup_body": "استلام {{trackingNumber}} ({{city}}). خذه إذا كنت متاحًا."
+  "delivery_branch.new_pickup_body": "استلام {{trackingNumber}} ({{city}}). خذه إذا كنت متاحًا.",
+  "delivery_branch.pickup_shipment_not_found": "الشحنة غير موجودة.",
+  "delivery_branch.pickup_not_enabled": "لا تتضمن هذه الشحنة عملية استلام.",
+  "delivery_branch.pickup_taken": "تم تعيين عملية الاستلام لك.",
+  "delivery_branch.pickup_assigned": "تم تعيين عملية الاستلام للموزّع.",
+  "delivery_branch.pickup_assigned_title": "📦 عملية استلام مطلوبة",
+  "delivery_branch.pickup_assigned_body": "تم تعيين عملية الاستلام {{trackingNumber}} لك.",
+  "delivery_branch.pickup_deliverer_not_eligible": "هذا الموزّع غير مرتبط بأي فرع في مدينة الاستلام."
 }

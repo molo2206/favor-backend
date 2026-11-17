@@ -19,5 +19,12 @@
   "delivery_branch.order_not_found": "Oda haikupatikana.",
   "delivery_branch.user_not_assignable": "{{name}} hawezi kupeleka oda hii: inahitajika ruhusa kwa aina hii ya oda katika tawi la mji wa oda (au awe msambazaji wa mji huo).",
   "delivery_branch.new_pickup_title": "📦 Uchukuaji mpya",
-  "delivery_branch.new_pickup_body": "Uchukuaji {{trackingNumber}} ({{city}}). Uchukue kama upo tayari."
+  "delivery_branch.new_pickup_body": "Uchukuaji {{trackingNumber}} ({{city}}). Uchukue kama upo tayari.",
+  "delivery_branch.pickup_shipment_not_found": "Usafirishaji haujapatikana.",
+  "delivery_branch.pickup_not_enabled": "Usafirishaji huu hauna uchukuaji.",
+  "delivery_branch.pickup_taken": "Uchukuaji umekabidhiwa kwako.",
+  "delivery_branch.pickup_assigned": "Uchukuaji umekabidhiwa kwa dereva wa usambazaji.",
+  "delivery_branch.pickup_assigned_title": "📦 Uchukuaji wa kufanya",
+  "delivery_branch.pickup_assigned_body": "Uchukuaji {{trackingNumber}} umekabidhiwa kwako.",
+  "delivery_branch.pickup_deliverer_not_eligible": "Dereva huyu hahusiani na tawi lolote la jiji la uchukuaji."
 }

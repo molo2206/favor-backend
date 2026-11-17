@@ -19,5 +19,12 @@
   "delivery_branch.order_not_found": "Pedido no encontrado.",
   "delivery_branch.user_not_assignable": "{{name}} no puede entregar este pedido: se necesita un permiso sobre este tipo de pedido en una sucursal de la ciudad del pedido (o ser repartidor de esa ciudad).",
   "delivery_branch.new_pickup_title": "📦 Nueva recogida disponible",
-  "delivery_branch.new_pickup_body": "Recogida {{trackingNumber}} ({{city}}). Tómala si estás disponible."
+  "delivery_branch.new_pickup_body": "Recogida {{trackingNumber}} ({{city}}). Tómala si estás disponible.",
+  "delivery_branch.pickup_shipment_not_found": "Envío no encontrado.",
+  "delivery_branch.pickup_not_enabled": "Este envío no incluye recogida.",
+  "delivery_branch.pickup_taken": "La recogida te ha sido asignada.",
+  "delivery_branch.pickup_assigned": "La recogida ha sido asignada al repartidor.",
+  "delivery_branch.pickup_assigned_title": "📦 Recogida por realizar",
+  "delivery_branch.pickup_assigned_body": "Se te ha asignado la recogida {{trackingNumber}}.",
+  "delivery_branch.pickup_deliverer_not_eligible": "Este repartidor no está vinculado a ninguna sucursal de la ciudad de recogida."
 }

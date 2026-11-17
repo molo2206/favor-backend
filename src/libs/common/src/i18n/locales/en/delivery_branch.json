@@ -19,5 +19,12 @@
   "delivery_branch.order_not_found": "Order not found.",
   "delivery_branch.user_not_assignable": "{{name}} cannot deliver this order: a permission on this order type is required in a branch of the order's city (or be a deliverer in that city).",
   "delivery_branch.new_pickup_title": "📦 New pickup available",
-  "delivery_branch.new_pickup_body": "Pickup {{trackingNumber}} ({{city}}). Take it if you are available."
+  "delivery_branch.new_pickup_body": "Pickup {{trackingNumber}} ({{city}}). Take it if you are available.",
+  "delivery_branch.pickup_shipment_not_found": "Shipment not found.",
+  "delivery_branch.pickup_not_enabled": "This shipment has no pickup.",
+  "delivery_branch.pickup_taken": "The pickup is assigned to you.",
+  "delivery_branch.pickup_assigned": "The pickup has been assigned to the deliverer.",
+  "delivery_branch.pickup_assigned_title": "📦 Pickup to handle",
+  "delivery_branch.pickup_assigned_body": "Pickup {{trackingNumber}} has been assigned to you.",
+  "delivery_branch.pickup_deliverer_not_eligible": "This deliverer is not attached to any branch of the pickup city."
 }

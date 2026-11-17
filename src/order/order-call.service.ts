@@ -18,10 +18,13 @@ import { FcmService } from 'src/notification/fcm.service';
  *   ORDER_CALL_ADMINS=true                  admins de la ville (ressource commandes)
  *   ORDER_CALL_SUPER_ADMINS=false           super admins (toutes les villes)
  */
+/** Type d'appel : commande (`order-<id>`) ou ramassage d'une expédition (`pickup-<id>`). */
+export type OrderCallKind = 'order' | 'pickup';
+
 @Injectable()
 export class OrderCallService {
   private readonly logger = new Logger(OrderCallService.name);
-  /** commande → utilisateurs qui sonnent + fin de la sonnerie (pour arrêter la sonnerie) */
+  /** callId (order-<id> / pickup-<id>) → utilisateurs qui sonnent + fin de la sonnerie (pour arrêter la sonnerie) */
   private readonly ringing = new Map<string, { userIds: Set<string>; timer: NodeJS.Timeout; endsAt: number }>();
 
   constructor(
@@ -55,25 +58,34 @@ export class OrderCallService {
     return Number.isFinite(n) && n >= 10 ? Math.min(n, 120) : 45;
   }
 
-  private callId(orderId: string) {
-    return `order-${orderId}`;
+  /**
+   * Identifiant de l'appel. `kind` distingue une commande (`order-<id>`) d'un
+   * ramassage (`pickup-<id>`) : l'application mobile reçoit ainsi le bon type d'appel
+   * et la fin d'appel cible le bon callId.
+   */
+  private callId(id: string, kind: OrderCallKind = 'order') {
+    return `${kind}-${id}`;
   }
 
   /**
    * Fait sonner les appareils de ces utilisateurs.
+   * `kind` = 'order' (commande, défaut) ou 'pickup' (ramassage d'une expédition).
    * Renvoie les utilisateurs effectivement joints (au moins un appareil) : les autres
    * doivent recevoir le push classique.
    */
   async ring(
     userIds: string[],
-    orderId: string,
+    id: string,
     title: string,
     body: string,
     data: Record<string, any> = {},
     imageUrl?: string,
+    kind: OrderCallKind = 'order',
   ): Promise<string[]> {
     const ids = [...new Set((userIds || []).filter(Boolean))];
-    if (!this.enabled || !ids.length || !orderId) return [];
+    if (!this.enabled || !ids.length || !id) return [];
+    const cid = this.callId(id, kind);
+    const isPickup = kind === 'pickup';
     try {
       const reached = await this.fcm.sendCallToUsers(
         ids,
@@ -81,15 +93,15 @@ export class OrderCallService {
         body,
         {
           ...data,
-          category: 'order',
-          entity: 'ORDER',
-          entityId: orderId,
-          orderId,
-          type: 'order_call',
+          category: isPickup ? 'pickup' : 'order',
+          entity: isPickup ? 'SHIPMENT' : 'ORDER',
+          entityId: id,
+          ...(isPickup ? { shipmentId: id, pickupId: id } : { orderId: id }),
+          type: isPickup ? 'pickup_call' : 'order_call',
           ...(imageUrl ? { imageUrl } : {}),
         },
         {
-          callId: this.callId(orderId),
+          callId: cid,
           ttlSeconds: this.ringSeconds,
           androidChannelId: this.config.get<string>('ORDER_CALL_ANDROID_CHANNEL_ID') || 'order_calls',
           iosSound: this.config.get<string>('ORDER_CALL_IOS_SOUND') || 'order_ringtone.caf',
@@ -98,23 +110,23 @@ export class OrderCallService {
           iosCategory: 'ORDER_CALL',
         },
       );
-      if (reached.length) this.remember(orderId, reached);
+      if (reached.length) this.remember(cid, reached);
       return reached;
     } catch (e: any) {
-      this.logger.warn(`Appel commande ${orderId} impossible : ${e?.message}`);
+      this.logger.warn(`Appel ${kind} ${id} impossible : ${e?.message}`);
       return [];
     }
   }
 
-  private remember(orderId: string, userIds: string[]) {
-    const current = this.ringing.get(orderId);
+  private remember(cid: string, userIds: string[]) {
+    const current = this.ringing.get(cid);
     if (current) clearTimeout(current.timer);
     const set = current?.userIds ?? new Set<string>();
     userIds.forEach((id) => set.add(id));
-    // Fin de sonnerie côté appareil après ringSeconds : on oublie la commande un peu après
-    const timer = setTimeout(() => this.ringing.delete(orderId), (this.ringSeconds + 15) * 1000);
+    // Fin de sonnerie côté appareil après ringSeconds : on oublie l'appel un peu après
+    const timer = setTimeout(() => this.ringing.delete(cid), (this.ringSeconds + 15) * 1000);
     if (typeof (timer as any).unref === 'function') (timer as any).unref();
-    this.ringing.set(orderId, { userIds: set, timer, endsAt: Date.now() + this.ringSeconds * 1000 });
+    this.ringing.set(cid, { userIds: set, timer, endsAt: Date.now() + this.ringSeconds * 1000 });
   }
 
   /**
@@ -127,21 +139,30 @@ export class OrderCallService {
    *    - `actorId` (celui qui prend / traite / annule la commande) : il est déjà dans l'application,
    *      il reçoit seulement la fin d'appel Firebase (pas de push VoIP → pas d'écran d'appel).
    */
-  stop(orderId: string, reason: 'HANDLED' | 'CANCELLED' | 'PAID' = 'HANDLED', actorId?: string | null): void {
-    const entry = orderId ? this.ringing.get(orderId) : undefined;
+  stop(
+    id: string,
+    reason: 'HANDLED' | 'CANCELLED' | 'PAID' = 'HANDLED',
+    actorId?: string | null,
+    kind: OrderCallKind = 'order',
+  ): void {
+    const cid = id ? this.callId(id, kind) : '';
+    const entry = cid ? this.ringing.get(cid) : undefined;
     if (!entry) return;
     clearTimeout(entry.timer);
-    this.ringing.delete(orderId);
+    this.ringing.delete(cid);
     if (Date.now() >= entry.endsAt) return; // appel déjà terminé sur les téléphones (manqué) : rien à arrêter
+    const isPickup = kind === 'pickup';
     this.fcm
       .cancelCallForUsers(
         [...entry.userIds],
-        this.callId(orderId),
+        cid,
         reason,
-        { category: 'order', orderId, type: 'order_call_cancel' },
+        isPickup
+          ? { category: 'pickup', shipmentId: id, type: 'pickup_call_cancel' }
+          : { category: 'order', orderId: id, type: 'order_call_cancel' },
         undefined,
         { noVoipUserIds: actorId ? [actorId] : [] },
       )
-      .catch((e: any) => this.logger.warn(`Arrêt appel commande ${orderId} : ${e?.message}`));
+      .catch((e: any) => this.logger.warn(`Arrêt appel ${kind} ${id} : ${e?.message}`));
   }
 }

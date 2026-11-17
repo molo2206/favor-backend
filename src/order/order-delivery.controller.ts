@@ -15,6 +15,8 @@ import { Request } from 'express';
 
 import { AssignDeliveryDto } from './dto/assign-delivery.dto';
 import { AuthentificationGuard } from 'src/users/utility/guards/authentification.guard';
+import { CompanyPermissionsGuard } from 'src/users/utility/guards/company-permissions.guard';
+import { Permissions } from 'src/users/utility/guards/permissions.guard';
 import { CurrentUser } from 'src/users/utility/decorators/current-user-decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { StartTrackingDto } from './enum/start-tracking.dto';
@@ -124,6 +126,52 @@ export class DeliveryController {
             user.id,
             lang,
         );
+    }
+
+    // ============================================================
+    // 📦 RAMASSAGE D'UNE EXPÉDITION (shipment)
+    // ============================================================
+    /** Livreurs éligibles pour le ramassage (livreurs d'une branche de la ville de ramassage). */
+    @Get('pickups/:shipmentId/deliverers')
+    @UseGuards(AuthentificationGuard)
+    async pickupDeliverers(
+        @Req() req: Request,
+        @Param('shipmentId') shipmentId: string,
+        @CurrentUser() user: UserEntity,
+        @Query('search') search?: string,
+    ) {
+        const lang = (user as any).preferredLanguage || this.extractLanguage(req);
+        return this.branchDelivery.pickupDeliverers(shipmentId, user, { search }, lang);
+    }
+
+    /** ✅ CÔTÉ ADMIN — affecter le ramassage à un livreur (SUPER_ADMIN partout ; ADMIN selon permission LOGISTICS). */
+    @Post('pickups/:shipmentId/assign')
+    @UseGuards(AuthentificationGuard, CompanyPermissionsGuard)
+    @Permissions({ resource: 'LOGISTICS', action: 'canManage' })
+    @HttpCode(HttpStatus.OK)
+    async assignPickup(
+        @Req() req: Request,
+        @Param('shipmentId') shipmentId: string,
+        @Body() dto: AssignDeliveryDto,
+        @CurrentUser() user: UserEntity,
+    ) {
+        const lang = (user as any).preferredLanguage || this.extractLanguage(req);
+        this.logger.log(`📥 POST /delivery/pickups/${shipmentId}/assign by ${user.id}`);
+        return this.branchDelivery.assignPickup(shipmentId, dto.deliverId, user, lang);
+    }
+
+    /** ✅ LE LIVREUR PREND le ramassage (le premier qui le prend le garde ; coupe l'appel chez les autres). */
+    @Post('pickups/:shipmentId/take')
+    @UseGuards(AuthentificationGuard)
+    @HttpCode(HttpStatus.OK)
+    async takePickup(
+        @Req() req: Request,
+        @Param('shipmentId') shipmentId: string,
+        @CurrentUser() user: UserEntity,
+    ) {
+        const lang = (user as any).preferredLanguage || this.extractLanguage(req);
+        this.logger.log(`📦 POST /delivery/pickups/${shipmentId}/take by deliver ${user.id}`);
+        return this.branchDelivery.takePickup(shipmentId, user, lang);
     }
 
     // ============================================================
