@@ -427,24 +427,6 @@ export class LtaService {
         );
       }
 
-      // Vérification de permission avec try/catch pour éviter l'erreur 500
-      let hasManagePermission = false;
-      try {
-        hasManagePermission = await this.permissionHelper.hasManageOnResource(
-          currentUser,
-          'WAYBILLS',
-        );
-      } catch (permError) {
-        console.error('Erreur vérification permission:', permError);
-        hasManagePermission = false;
-      }
-
-      if (!hasManagePermission) {
-        throw new ForbiddenException(
-          await this.i18n.translate('lta.tracking_modify_forbidden', lang),
-        );
-      }
-
       if (tracking.lta.status !== 'SHIPPING_IN_PROGRESS') {
         throw new BadRequestException(
           await this.i18n.translate('lta.tracking_invalid_status', lang),
