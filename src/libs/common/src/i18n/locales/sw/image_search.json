@@ -1,0 +1,15 @@
+{
+  "image_search.image_required": "Ongeza picha ili kuanza kutafuta.",
+  "image_search.invalid_type": "Muundo haukubaliki: tuma picha ya JPG, PNG, WEBP au HEIC.",
+  "image_search.invalid_image": "Picha haisomeki: jaribu picha nyingine.",
+  "image_search.too_large": "Picha ni kubwa mno (kiwango cha juu {{max}} MB).",
+  "image_search.rate_limited": "Utafutaji mwingi wa picha kwa muda mfupi. Jaribu tena baada ya dakika moja.",
+  "image_search.results": "Bidhaa {{count}} zinazofanana zimepatikana.",
+  "image_search.results_for": "Bidhaa {{count}} zimepatikana kwa “{{label}}”.",
+  "image_search.no_results": "Hakuna bidhaa inayofanana iliyopatikana.",
+  "image_search.no_results_for": "Hakuna bidhaa iliyopatikana kwa “{{label}}”. Jaribu picha nyingine au utafutaji kwa neno.",
+  "image_search.not_product": "Picha haionekani kuonyesha bidhaa. Piga picha ya bidhaa ikiwa katikati.",
+  "image_search.admin_only": "Kitendo hiki ni cha wasimamizi pekee.",
+  "image_search.status_fetched": "Hali ya utafutaji wa picha imepatikana.",
+  "image_search.reindex_started": "Uorodheshaji umeanza chinichini."
+}

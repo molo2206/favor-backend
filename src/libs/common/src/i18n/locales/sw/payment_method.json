@@ -1,0 +1,12 @@
+{
+  "payment_method.list": "Njia zako za malipo",
+  "payment_method.created": "Njia ya malipo imeongezwa",
+  "payment_method.updated": "Njia ya malipo imesasishwa",
+  "payment_method.deleted": "Njia ya malipo imefutwa",
+  "payment_method.default_set": "Njia ya malipo ya msingi imehifadhiwa",
+  "payment_method.not_found": "Njia ya malipo haipatikani",
+  "payment_method.mobile_money_required": "Mtoa huduma na namba ya Mobile Money vinahitajika",
+  "payment_method.already_exists": "Njia hii ya malipo tayari imehifadhiwa",
+  "payment_method.max_reached": "Huwezi kuhifadhi zaidi ya njia {{max}} za malipo",
+  "payment_method.not_allowed_here": "{{method}} haikubaliki kwa malipo haya"
+}

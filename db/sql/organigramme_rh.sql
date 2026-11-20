@@ -1,0 +1,171 @@
+-- ============================================================================
+-- RH — Organigramme (hr_departments / hr_positions) — EXACT selon le document.
+-- Ré-exécutable : insère si absent (WHERE @x IS NULL), adapte l'existant (UPDATE).
+-- ============================================================================
+SET @companyId := NULL;  -- ou l'id de ta société (hr_departments.companyId nullable)
+
+-- 1) DIRECTION GÉNÉRALE (racine)
+SET @dg := (SELECT id FROM hr_departments WHERE name='Direction Générale' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt)
+SELECT UUID(),'Direction Générale',NULL,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @dg IS NULL;
+SET @dg := (SELECT id FROM hr_departments WHERE name='Direction Générale' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=NULL WHERE id=@dg;
+SET @p := (SELECT id FROM hr_positions WHERE name='Président du Conseil d''Administration (PCA)' AND departmentId=@dg LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Président du Conseil d''Administration (PCA)','ACTIVE',@dg,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Assistant du PCA' AND departmentId=@dg LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Assistant du PCA','ACTIVE',@dg,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Directeur General (DG)' AND departmentId=@dg LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Directeur General (DG)','ACTIVE',@dg,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+
+-- 2) SERVICES RATTACHÉS À LA DIRECTION GÉNÉRALE (enfants de la DG)
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Programmes' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Programmes',@dg,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+UPDATE hr_departments SET parentDepartmentId=@dg WHERE name='Service Programmes';
+SET @s := (SELECT id FROM hr_departments WHERE name='Service des Ressources Humaines et Administration' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service des Ressources Humaines et Administration',@dg,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+UPDATE hr_departments SET parentDepartmentId=@dg WHERE name='Service des Ressources Humaines et Administration';
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Comptabilité et finance' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Comptabilité et finance',@dg,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+UPDATE hr_departments SET parentDepartmentId=@dg WHERE name='Service Comptabilité et finance';
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Caisse' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Caisse',@dg,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+UPDATE hr_departments SET parentDepartmentId=@dg WHERE name='Service Caisse';
+SET @s := (SELECT id FROM hr_departments WHERE name='Service informatique et Technique' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service informatique et Technique',@dg,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+UPDATE hr_departments SET parentDepartmentId=@dg WHERE name='Service informatique et Technique';
+
+-- 3) DÉPARTEMENT FAVOR LOGISTIQUE
+SET @dep := (SELECT id FROM hr_departments WHERE name='Favor Logistique' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Favor Logistique',@dg,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @dep IS NULL;
+SET @dep := (SELECT id FROM hr_departments WHERE name='Favor Logistique' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dg WHERE id=@dep;
+SET @p := (SELECT id FROM hr_positions WHERE name='Responsable FAVOR LOGISTIQUE' AND departmentId=@dep LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Responsable FAVOR LOGISTIQUE','ACTIVE',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service commercial et développement logistique' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service commercial et développement logistique',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service commercial et développement logistique' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Chargé logistique' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Chargé logistique','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agent commercial logistique bureau' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agent commercial logistique bureau','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agent commercial logistique terrain' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agent commercial logistique terrain','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Cargo et Import-Export' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Cargo et Import-Export',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Cargo et Import-Export' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Chargé des partenariats cargo' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Chargé des partenariats cargo','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agent de suivi des expéditions' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agent de suivi des expéditions','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Stock et Approvisionnement' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Stock et Approvisionnement',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Stock et Approvisionnement' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Chargé de stock' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Chargé de stock','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agent de stock' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agent de stock','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Transport et Opérations' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Transport et Opérations',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Transport et Opérations' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Responsable transport' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Responsable transport','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Chauffeurs' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Chauffeurs','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agents de suivi des livraisons et expéditions' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agents de suivi des livraisons et expéditions','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+
+-- 4) DÉPARTEMENT FAVOR HELP
+SET @dep := (SELECT id FROM hr_departments WHERE name='Favor Help' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Favor Help',@dg,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @dep IS NULL;
+SET @dep := (SELECT id FROM hr_departments WHERE name='Favor Help' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dg WHERE id=@dep;
+SET @p := (SELECT id FROM hr_positions WHERE name='Responsable FAVOR HELP' AND departmentId=@dep LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Responsable FAVOR HELP','ACTIVE',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Client' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Client',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Client' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Responsable service client' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Responsable service client','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agents service client' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agents service client','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Commercial' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Commercial',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Commercial' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Responsable commercial' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Responsable commercial','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agent commercial bureau' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agent commercial bureau','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agent commercial terrain' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agent commercial terrain','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Media et Communication' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Media et Communication',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Media et Communication' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Responsable média' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Responsable média','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Créateurs de contenus / Agents média' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Créateurs de contenus / Agents média','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Supply Chain' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Supply Chain',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Supply Chain' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Responsable Supply Chain' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Responsable Supply Chain','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agents de coordination des commandes' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agents de coordination des commandes','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Livraison' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Livraison',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Livraison' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Responsable livraison' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Responsable livraison','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Livreurs' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Livreurs','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+
+-- 5) DÉPARTEMENT FAVOR SELLER
+SET @dep := (SELECT id FROM hr_departments WHERE name='Favor Seller' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Favor Seller',@dg,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @dep IS NULL;
+SET @dep := (SELECT id FROM hr_departments WHERE name='Favor Seller' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dg WHERE id=@dep;
+SET @p := (SELECT id FROM hr_positions WHERE name='Chargé de programme / Responsable FAVOR SELLER' AND departmentId=@dep LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Chargé de programme / Responsable FAVOR SELLER','ACTIVE',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Commercial Seller' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Commercial Seller',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Commercial Seller' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Responsable commercial Seller' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Responsable commercial Seller','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agent commercial Seller bureau' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agent commercial Seller bureau','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agent commercial Seller terrain' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agent commercial Seller terrain','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Marketing Seller' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Marketing Seller',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Marketing Seller' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Responsable marketing Seller' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Responsable marketing Seller','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agents marketing Seller' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agents marketing Seller','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Fournisseurs' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Fournisseurs',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Fournisseurs' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Chargé des fournisseurs' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Chargé des fournisseurs','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agents de suivi des fournisseurs' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agents de suivi des fournisseurs','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Logistique Seller' LIMIT 1);
+INSERT INTO hr_departments (id,name,parentDepartmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Service Logistique Seller',@dep,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @s IS NULL;
+SET @s := (SELECT id FROM hr_departments WHERE name='Service Logistique Seller' LIMIT 1);
+UPDATE hr_departments SET parentDepartmentId=@dep WHERE id=@s;
+SET @p := (SELECT id FROM hr_positions WHERE name='Logisticien' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Logisticien','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;
+SET @p := (SELECT id FROM hr_positions WHERE name='Agents de préparation et suivi des commandes' AND departmentId=@s LIMIT 1);
+INSERT INTO hr_positions (id,name,status,departmentId,companyId,createdAt,updatedAt) SELECT UUID(),'Agents de préparation et suivi des commandes','ACTIVE',@s,@companyId,NOW(6),NOW(6) FROM DUAL WHERE @p IS NULL;

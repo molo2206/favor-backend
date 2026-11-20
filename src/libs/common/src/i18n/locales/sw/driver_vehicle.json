@@ -1,0 +1,8 @@
+{
+  "driver_vehicle.notif.kyc_approved.title": "Nyaraka zimeidhinishwa ✅",
+  "driver_vehicle.notif.kyc_approved.body": "Gari lako {{model}} ({{plate}}) limeidhinishwa. Sasa unaweza kupokea safari.",
+  "driver_vehicle.notif.kyc_rejected.title": "Nyaraka zimekataliwa",
+  "driver_vehicle.notif.kyc_rejected.body": "Gari {{model}} ({{plate}}): {{reason}}. Rekebisha na utume tena nyaraka zako.",
+  "driver_vehicle.notif.updated.title": "Gari limesasishwa",
+  "driver_vehicle.notif.updated.body": "Utawala umebadilisha gari lako {{model}} ({{plate}})."
+}

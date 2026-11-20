@@ -1,0 +1,19 @@
+{
+  "census.created": "Fomu ya sensa imehifadhiwa.",
+  "census.updated": "Fomu ya sensa imesasishwa.",
+  "census.deleted": "Fomu ya sensa imefutwa.",
+  "census.found": "Fomu ya sensa.",
+  "census.list": "Fomu za sensa.",
+  "census.not_found": "Fomu ya sensa haijapatikana.",
+  "census.duplicate": "Mteja / kampuni hii tayari ina fomu ya sensa.",
+  "census.followup_saved": "Ufuatiliaji umehifadhiwa.",
+  "census.imported": "Fomu {{count}} zimeundwa kutoka kwa wateja / wauzaji wa zamani.",
+  "census.import_note_client": "Mteja wa zamani: maagizo {{orders}}, hakuna kwa zaidi ya siku {{days}}.",
+  "census.import_note_vendor": "Muuzaji bila mauzo kwa zaidi ya siku {{days}} (maagizo {{orders}} jumla).",
+  "census.stats": "Takwimu za sensa.",
+  "census.client_required": "Chagua mteja aliyepo (userId).",
+  "census.company_required": "Chagua kampuni iliyopo (vendorCompanyId).",
+  "census.client_not_found": "Mteja hajapatikana kwenye jukwaa.",
+  "census.company_not_found": "Kampuni haijapatikana kwenye jukwaa.",
+  "census.candidates": "Wateja / kampuni zilizopo za kusajili."
+}

@@ -1,0 +1,15 @@
+{
+  "vehicle_registration.forbidden": "Huna ruhusa ya kuona gari hili.",
+  "vehicle_registration.not_found": "Gari halikupatikana.",
+  "vehicle_registration.plate_exists": "Namba ya gari {{plate}} imeshasajiliwa (rekodi {{reference}}).",
+  "vehicle_registration.price_range_invalid": "Bei ya juu ({{max}}) lazima iwe sawa au kubwa kuliko bei ya chini ({{min}}).",
+  "vehicle_registration.broker_incomplete": "Dalali: weka jina lake na namba ya simu (au acha sehemu za dalali wazi).",
+  "vehicle_registration.broker_same_as_owner": "Namba ya simu ya dalali lazima iwe tofauti na ya mmiliki.",
+  "vehicle_registration.too_many_images": "Picha {{max}} tu kwa kila gari.",
+  "vehicle_registration.created": "Gari {{name}} limesajiliwa (rejea {{reference}}).",
+  "vehicle_registration.list": "Magari yamepatikana.",
+  "vehicle_registration.detail": "Maelezo ya gari yamepatikana.",
+  "vehicle_registration.updated": "Gari {{reference}} limesasishwa.",
+  "vehicle_registration.status_updated": "Gari {{reference}}: hali {{status}}.",
+  "vehicle_registration.deleted": "Gari {{reference}} limefutwa."
+}

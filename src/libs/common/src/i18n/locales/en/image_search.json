@@ -1,0 +1,15 @@
+{
+  "image_search.image_required": "Add a photo to start the search.",
+  "image_search.invalid_type": "Unsupported format: send a JPG, PNG, WEBP or HEIC image.",
+  "image_search.invalid_image": "Unreadable image: try another photo.",
+  "image_search.too_large": "Image too large (maximum {{max}} MB).",
+  "image_search.rate_limited": "Too many image searches in a short time. Try again in a minute.",
+  "image_search.results": "{{count}} similar product(s) found.",
+  "image_search.results_for": "{{count}} product(s) found for “{{label}}”.",
+  "image_search.no_results": "No similar product found.",
+  "image_search.no_results_for": "No product found for “{{label}}”. Try another photo or a keyword search.",
+  "image_search.not_product": "The photo does not seem to show a product. Take a centered photo of the product.",
+  "image_search.admin_only": "Action restricted to administrators.",
+  "image_search.status_fetched": "Image search status retrieved.",
+  "image_search.reindex_started": "Indexing started in the background."
+}
