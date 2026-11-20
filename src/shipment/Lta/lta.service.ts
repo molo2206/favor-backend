@@ -445,6 +445,16 @@ export class LtaService {
         );
       }
 
+      // ✅ On ne peut modifier que les étapes de tracking des LTA destinées à SA PROPRE entreprise :
+      //    la LTA doit avoir l'entreprise active de l'agent comme DESTINATAIRE (celui qui reçoit).
+      //    SUPER_ADMIN peut tracker toutes les LTA.
+      const isSuperAdmin = String(currentUser.role) === 'SUPER ADMIN';
+      if (!isSuperAdmin && tracking.lta?.consigneeId !== currentUser.activeCompanyId) {
+        throw new ForbiddenException(
+          await this.i18n.translate('lta.tracking_modify_forbidden', lang),
+        );
+      }
+
       if (tracking.lta.status !== 'SHIPPING_IN_PROGRESS') {
         throw new BadRequestException(
           await this.i18n.translate('lta.tracking_invalid_status', lang),
