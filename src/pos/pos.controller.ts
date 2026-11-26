@@ -28,7 +28,7 @@ import { SyncBatchDto } from './dto/pos-sync.dto';
 export class PosController {
   constructor(
     private readonly pos: PosService,
-    private readonly sync: PosSyncService,
+    private readonly posSync: PosSyncService,
     private readonly i18n: I18nService,
   ) {}
 
@@ -114,11 +114,11 @@ export class PosController {
   // Synchro offline
   @Post('sync')
   sync(@Body() dto: SyncBatchDto, @CurrentUser() user: UserEntity, @Headers('lang') lang = 'fr') {
-    return this.sync.applyBatch(this.companyId(user, lang), dto, user.id, lang);
+    return this.posSync.applyBatch(this.companyId(user, lang), dto, user.id, lang);
   }
 
   @Get('sync/:terminalId/cursor')
   cursor(@Param('terminalId') terminalId: string, @CurrentUser() user: UserEntity, @Headers('lang') lang = 'fr') {
-    return this.sync.cursor(this.companyId(user, lang), terminalId, lang);
+    return this.posSync.cursor(this.companyId(user, lang), terminalId, lang);
   }
 }
