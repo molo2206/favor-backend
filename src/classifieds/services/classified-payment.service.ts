@@ -15,6 +15,7 @@ import {
   addDays,
   ClassifiedCommonService,
   FREE_MAX_ACTIVE,
+  FREE_MAX_TOTAL,
   MODERATION_ENABLED,
   REMINDER_DAYS,
   REQUIRE_IMAGE,
@@ -96,6 +97,7 @@ export class ClassifiedPaymentService {
     const isFree = amount <= 0;
     if (isFree) {
       await this.checkFreeOnce(productId, lang);
+      await this.checkFreeTotal(user.id, lang); // ✅ gratuit limité à 3 fois À VIE → au-delà, paiement obligatoire
       await this.checkFreeQuota(user.id, productId, lang);
     }
     const method = isFree ? ClassifiedPaymentMethod.FREE : dto.paymentMethod;
@@ -160,6 +162,23 @@ export class ClassifiedPaymentService {
       where: { productId, method: ClassifiedPaymentMethod.FREE, status: ClassifiedPaymentStatus.SUCCESS },
     });
     if (used > 0) throw new BadRequestException(this.common.t('classified.free_already_used', lang));
+  }
+
+  /**
+   * ✅ Forfait gratuit limité à FREE_MAX_TOTAL utilisations PAR UTILISATEUR, À VIE (défaut 3).
+   *    On compte les annonces DISTINCTES de l'utilisateur ayant déjà été publiées en gratuit (paiement FREE réussi).
+   *    Au-delà, le gratuit est refusé : l'annonceur doit choisir un forfait payant.
+   *    Désactivable : CLASSIFIED_FREE_MAX_TOTAL=0.
+   */
+  private async checkFreeTotal(userId: string, lang: string) {
+    if (FREE_MAX_TOTAL <= 0) return;
+    const rows = await this.common.dataSource.query(
+      "SELECT COUNT(DISTINCT `productId`) AS n FROM `classified_payments` WHERE `userId` = ? AND `method` = 'FREE' AND `status` = 'SUCCESS'",
+      [userId],
+    );
+    if (Number(rows?.[0]?.n || 0) >= FREE_MAX_TOTAL) {
+      throw new BadRequestException(this.common.t('classified.free_limit_reached', lang, { max: FREE_MAX_TOTAL }));
+    }
   }
 
   /** Limite d'annonces gratuites en ligne (anti-spam) */

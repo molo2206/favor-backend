@@ -16,6 +16,7 @@
   "classified.forbidden": "Este anuncio no le pertenece.",
   "classified.fpay_token_required": "Se requiere el token FPay (access_token).",
   "classified.free_quota_reached": "Ya tiene {{max}} anuncio(s) gratuito(s) en línea. Elija un plan de pago.",
+  "classified.free_limit_reached": "Ha alcanzado el límite de {{max}} anuncio(s) gratis. Elija un plan de pago para publicar.",
   "classified.free_already_used": "Este anuncio ya utilizó el plan gratuito. Elija un plan de pago.",
   "classified.image_not_found": "Foto no encontrada.",
   "classified.image_removed": "Foto eliminada.",

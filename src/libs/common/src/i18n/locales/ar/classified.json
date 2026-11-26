@@ -16,6 +16,7 @@
   "classified.forbidden": "هذا الإعلان لا يخصك.",
   "classified.fpay_token_required": "رمز FPay (access_token) مطلوب.",
   "classified.free_quota_reached": "لديك بالفعل {{max}} إعلان(ات) مجانية منشورة. اختر باقة مدفوعة.",
+  "classified.free_limit_reached": "لقد وصلت إلى حد {{max}} إعلان(ات) مجانية. اختر باقة مدفوعة للنشر.",
   "classified.free_already_used": "هذا الإعلان استفاد بالفعل من الباقة المجانية. اختر باقة مدفوعة.",
   "classified.image_not_found": "الصورة غير موجودة.",
   "classified.image_removed": "تم حذف الصورة.",

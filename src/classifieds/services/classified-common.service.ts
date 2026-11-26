@@ -34,8 +34,10 @@ export function addDays(date: Date, days: number): Date {
 
 /** Modération avant mise en ligne : CLASSIFIED_MODERATION=true (défaut : false, publication immédiate) */
 export const MODERATION_ENABLED = String(process.env.CLASSIFIED_MODERATION || 'false').toLowerCase() === 'true';
-/** Nombre max d'annonces GRATUITES en ligne par utilisateur (défaut 3) */
+/** Nombre max d'annonces GRATUITES en ligne SIMULTANÉMENT par utilisateur (défaut 3) */
 export const FREE_MAX_ACTIVE = Number(process.env.CLASSIFIED_FREE_MAX_ACTIVE || 3);
+/** Nombre max d'utilisations du forfait GRATUIT par utilisateur, À VIE (défaut 3). Au-delà : paiement obligatoire. */
+export const FREE_MAX_TOTAL = Number(process.env.CLASSIFIED_FREE_MAX_TOTAL || 3);
 /** Au moins une photo pour publier (défaut : oui) */
 export const REQUIRE_IMAGE = String(process.env.CLASSIFIED_REQUIRE_IMAGE || 'true').toLowerCase() !== 'false';
 /** Rappel avant expiration (jours, défaut 2) */

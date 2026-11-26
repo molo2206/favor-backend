@@ -16,6 +16,7 @@
   "classified.forbidden": "This ad does not belong to you.",
   "classified.fpay_token_required": "The FPay token (access_token) is required.",
   "classified.free_quota_reached": "You already have {{max}} free ad(s) online. Choose a paid plan.",
+  "classified.free_limit_reached": "You have reached the limit of {{max}} free ad(s). Choose a paid plan to publish.",
   "classified.free_already_used": "This ad has already used the free plan. Choose a paid plan.",
   "classified.image_not_found": "Photo not found.",
   "classified.image_removed": "Photo removed.",

@@ -7,13 +7,13 @@ export const dataSourceOptions: DataSourceOptions = {
   host: '127.0.0.1',
   port: 3306,
 
-  // username: 'admin',
-  // password: 'admin2025',
-  // database: 'favor_db',
-
   username: 'admin',
   password: 'admin2025',
-  database: 'favor_db1',
+  database: 'favor_db',
+
+  // username: 'admin',
+  // password: 'admin2025',
+  // database: 'favor_db1',
 
   // username: 'root',
   // password: '',

@@ -16,6 +16,7 @@
   "classified.forbidden": "Cette annonce ne vous appartient pas.",
   "classified.fpay_token_required": "Le jeton FPay (access_token) est requis.",
   "classified.free_quota_reached": "Vous avez déjà {{max}} annonce(s) gratuite(s) en ligne. Choisissez un forfait payant.",
+  "classified.free_limit_reached": "Vous avez atteint la limite de {{max}} annonce(s) gratuite(s). Choisissez un forfait payant pour publier.",
   "classified.free_already_used": "Cette annonce a déjà bénéficié du forfait gratuit. Choisissez un forfait payant.",
   "classified.image_not_found": "Photo introuvable.",
   "classified.image_removed": "Photo supprimée.",
