@@ -1,0 +1,14 @@
+{
+  "inventory.not_enabled_for_type": "La gestion d'inventaire n'est pas activée pour ce type d'entreprise.",
+  "inventory.invalid_quantity": "Quantité invalide.",
+  "inventory.expiry_required": "La date de péremption est obligatoire pour ce produit.",
+  "inventory.received": "Stock reçu avec succès.",
+  "inventory.consumed": "Sortie de stock enregistrée.",
+  "inventory.adjusted": "Inventaire ajusté.",
+  "inventory.transferred": "Transfert effectué.",
+  "inventory.insufficient_stock": "Stock insuffisant.",
+  "inventory.prescription_required": "Ce produit nécessite une ordonnance.",
+  "inventory.location_not_found": "Emplacement introuvable.",
+  "inventory.same_location": "Les emplacements source et destination doivent être différents.",
+  "inventory.expiry_not_tracked": "Le suivi des péremptions n'est pas activé pour ce type d'entreprise."
+}

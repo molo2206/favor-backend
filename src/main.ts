@@ -1,3 +1,5 @@
+// ✅ EN PREMIER : plus de threads pour les fichiers / DNS / gzip / images (avant toute autre opération)
+import './common/perf/threadpool';
 // ✅ Paramètres système : les valeurs de la base (system_settings) remplacent le .env AVANT le chargement des modules
 import './system-settings/runtime-settings.preload';
 import { NestFactory, Reflector } from '@nestjs/core';
@@ -19,11 +21,16 @@ import {
   bodyParserErrorHandler,
   registerProcessErrorHandlers,
 } from './common/errors/process-error-handlers';
+import { recentRequestsTracker, startEventLoopMonitor } from './common/perf/event-loop-monitor';
+import { configureSharp } from './common/perf/sharp-config';
 
 dotenv.config();
 
 // ✅ Erreurs hors requête (promesses oubliées...) : journalisées au lieu de tuer le serveur
 registerProcessErrorHandlers();
+
+// ✅ sharp : nombre de threads par image limité (sinon quelques uploads prennent tout le processeur)
+configureSharp();
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -44,6 +51,10 @@ async function bootstrap() {
   logger.log(`Upload Path: ${UPLOAD_PATH}`);
 
   const i18n = app.get(I18nService);
+
+  // ✅ Diagnostic : « ⛔ Boucle bloquée X ms » dans pm2 logs quand le serveur gèle, avec les routes en cause
+  app.use(recentRequestsTracker());
+  startEventLoopMonitor();
 
   // ⚠️ AUCUNE CONFIGURATION CORS ICI
   // Ni app.enableCors(), ni middleware OPTIONS global
@@ -114,6 +125,16 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   await app.listen(PORT, HOST);
+
+  // ✅ Connexions keep-alive avec Apache / Nginx.
+  //    Node ferme une connexion inactive après 5 s ; Apache la garde plus longtemps dans son pool et la réutilise
+  //    → « 502 Proxy Error / connexion réinitialisée » par rafales quand il y a du trafic, puis tout revient.
+  //    Node doit garder la connexion PLUS longtemps que le proxy.
+  const server = app.getHttpServer();
+  server.keepAliveTimeout = Number(process.env.HTTP_KEEP_ALIVE_MS) || 65000;
+  server.headersTimeout = server.keepAliveTimeout + 5000;
+  // Délai max d'une requête (uploads vidéo compris) : 0 = illimité (défaut Node 18+ : 300 s)
+  server.requestTimeout = Number(process.env.HTTP_REQUEST_TIMEOUT_MS ?? 300000);
   logger.log(`Application démarrée sur http://localhost:${PORT}`);
 }
 

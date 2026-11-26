@@ -1,0 +1,14 @@
+{
+  "inventory.not_enabled_for_type": "إدارة المخزون غير مفعّلة لهذا النوع من الشركات.",
+  "inventory.invalid_quantity": "كمية غير صالحة.",
+  "inventory.expiry_required": "تاريخ انتهاء الصلاحية مطلوب لهذا المنتج.",
+  "inventory.received": "تم استلام المخزون بنجاح.",
+  "inventory.consumed": "تم تسجيل حركة المخزون.",
+  "inventory.adjusted": "تم تعديل الجرد.",
+  "inventory.transferred": "تم التحويل.",
+  "inventory.insufficient_stock": "المخزون غير كافٍ.",
+  "inventory.prescription_required": "هذا المنتج يتطلب وصفة طبية.",
+  "inventory.location_not_found": "الموقع غير موجود.",
+  "inventory.same_location": "يجب أن يختلف موقع المصدر عن موقع الوجهة.",
+  "inventory.expiry_not_tracked": "تتبع انتهاء الصلاحية غير مفعّل لهذا النوع من الشركات."
+}

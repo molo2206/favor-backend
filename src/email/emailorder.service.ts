@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { SubOrderEntity } from 'src/sub-order/entities/sub-order.entity';
 import ejs from 'ejs';
-import puppeteer from 'puppeteer';
+import { renderHtmlToPdf } from 'src/common/pdf/html-to-pdf';
 import { OrderEntity } from 'src/order/entities/order.entity';
 import { I18nService } from 'src/libs/common/src';
 import { escapeHtml, formatDate, formatMoney, getEmailBrand, renderBrandedEmail } from './email-layout';
@@ -175,19 +175,14 @@ export class MailOrderService {
       templateName,
     );
     const htmlContent = await ejs.renderFile(templatePath, context, { async: true });
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    // ✅ Chromium partagé + file d'attente (au lieu d'un Chromium lancé à chaque facture)
+    return renderHtmlToPdf(htmlContent, {
+      pdf: {
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '20px', bottom: '30px', left: '20px', right: '20px' },
+      },
     });
-    const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '20px', bottom: '30px', left: '20px', right: '20px' },
-    });
-    await browser.close();
-    return pdfBuffer;
   }
 
   async sendInvoiceCarWithPdf(to: string, subject: string, context: Context, lang: string = 'fr') {
@@ -894,11 +889,10 @@ async sendVehicleRentalPdf(
       );
       const html = (await ejs.renderFile(templatePath, { ...context, lang })) as string;
 
-      const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
-      const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '20px', bottom: '30px', left: '20px', right: '20px' } });
-      await browser.close();
+      // ✅ Chromium partagé + file d'attente
+      const pdfBuffer = await renderHtmlToPdf(html, {
+        pdf: { format: 'A4', printBackground: true, margin: { top: '20px', bottom: '30px', left: '20px', right: '20px' } },
+      });
 
       const filename = templateName === 'invoice'
         ? `billet-${context.reservation.id.slice(0, 8)}.pdf`

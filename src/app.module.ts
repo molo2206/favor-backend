@@ -119,6 +119,8 @@ import { NeedsModule } from './backOffice/needs/needs.module';
 // ✅ AJOUT : annonces type Jiji (publication payante, tarifs par ville)
 import { ClassifiedsModule } from './classifieds/classifieds.module';
 import { VehicleRegistrationModule } from './vehicle-registration/vehicle-registration.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { PosModule } from './pos/pos.module';
 // import { WhatsAppModule } from './users/utility/helpers/whatsapp.module';
 
 @Module({
@@ -279,6 +281,8 @@ import { VehicleRegistrationModule } from './vehicle-registration/vehicle-regist
     NeedsModule, // ✅ BackOffice — États de besoins (validation hiérarchique, décaissement, exécution)
     ClassifiedsModule,
     VehicleRegistrationModule, // ✅ enregistrement des véhicules (propriétaire + commissionnaire)
+    InventoryModule, // ✅ Inventaire avancé + capacités par type (socle POS & synchro offline)
+    PosModule, // ✅ Point de vente (caisse) + synchro offline par lots
   ],
   controllers: [AppController],
   exports: [FilesService],

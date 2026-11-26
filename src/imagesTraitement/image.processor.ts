@@ -1,6 +1,8 @@
 // image.processor.ts
 import sharp from 'sharp';
 import { createRequire } from 'module';
+// ✅ Suppression de fond (IA) : une seule à la fois, sinon le processeur et la mémoire saturent
+import { heavyAiLimiter } from 'src/common/perf/concurrency';
 
 // Types exportés
 export type BackgroundType = 'white' | 'black' | 'color' | 'gradient' | 'transparent';
@@ -76,7 +78,7 @@ export const removeImageBackground = async (
       }
     };
 
-    const blob = await removeBackground(enhancedBuffer, config);
+    const blob = await heavyAiLimiter.run(() => removeBackground(enhancedBuffer, config));
     const arrayBuffer = await blob.arrayBuffer();
     const withoutBg = Buffer.from(arrayBuffer);
 

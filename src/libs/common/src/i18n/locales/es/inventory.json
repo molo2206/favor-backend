@@ -1,0 +1,14 @@
+{
+  "inventory.not_enabled_for_type": "La gestión de inventario no está habilitada para este tipo de empresa.",
+  "inventory.invalid_quantity": "Cantidad no válida.",
+  "inventory.expiry_required": "La fecha de caducidad es obligatoria para este producto.",
+  "inventory.received": "Stock recibido correctamente.",
+  "inventory.consumed": "Movimiento de stock registrado.",
+  "inventory.adjusted": "Inventario ajustado.",
+  "inventory.transferred": "Transferencia completada.",
+  "inventory.insufficient_stock": "Stock insuficiente.",
+  "inventory.prescription_required": "Este producto requiere receta.",
+  "inventory.location_not_found": "Ubicación no encontrada.",
+  "inventory.same_location": "Las ubicaciones de origen y destino deben ser diferentes.",
+  "inventory.expiry_not_tracked": "El seguimiento de caducidad no está habilitado para este tipo de empresa."
+}

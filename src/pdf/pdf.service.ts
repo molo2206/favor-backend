@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import * as puppeteer from 'puppeteer';
 import * as ejs from 'ejs';
 import { join } from 'path';
 import * as fs from 'fs/promises';
+import { renderHtmlToPdf } from 'src/common/pdf/html-to-pdf';
 
 @Injectable()
 export class PdfService {
@@ -14,23 +14,13 @@ export class PdfService {
     const htmlTemplate = await fs.readFile(templatePath, 'utf8');
     const renderedHtml = ejs.render(htmlTemplate, data);
 
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    // ✅ Chromium partagé + file d'attente (au lieu d'un Chromium lancé à chaque PDF)
+    return renderHtmlToPdf(renderedHtml, {
+      pdf: {
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' },
+      },
     });
-
-    const page = await browser.newPage();
-
-    await page.setContent(renderedHtml, { waitUntil: 'networkidle0' });
-
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' },
-    });
-
-    await browser.close();
-
-    return pdfBuffer;
   }
 }

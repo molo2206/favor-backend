@@ -1,0 +1,14 @@
+{
+  "inventory.not_enabled_for_type": "Usimamizi wa bohari haujawezeshwa kwa aina hii ya biashara.",
+  "inventory.invalid_quantity": "Kiasi si sahihi.",
+  "inventory.expiry_required": "Tarehe ya mwisho wa matumizi inahitajika kwa bidhaa hii.",
+  "inventory.received": "Bidhaa zimepokelewa.",
+  "inventory.consumed": "Utoaji wa bidhaa umerekodiwa.",
+  "inventory.adjusted": "Bohari imesahihishwa.",
+  "inventory.transferred": "Uhamisho umekamilika.",
+  "inventory.insufficient_stock": "Bidhaa hazitoshi bohari.",
+  "inventory.prescription_required": "Bidhaa hii inahitaji cheti cha daktari.",
+  "inventory.location_not_found": "Eneo halijapatikana.",
+  "inventory.same_location": "Eneo la chanzo na la lengo lazima yatofautiane.",
+  "inventory.expiry_not_tracked": "Ufuatiliaji wa tarehe za mwisho haujawezeshwa kwa aina hii ya biashara."
+}

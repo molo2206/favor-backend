@@ -10,4 +10,6 @@ export enum CompanyType {
   LOGISTIC_AGENCY = 'LOGISTIC_AGENCY',
   TRANSPORT_AGENCY = 'TRANSPORT_AGENCY',
   TAXI = 'TAXI',
+  // ✅ Nouveau : pharmacie (gestion par lots, péremption FEFO, ordonnance…)
+  PHARMACIE = 'PHARMACIE',
 }

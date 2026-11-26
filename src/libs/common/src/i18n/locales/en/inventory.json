@@ -1,0 +1,14 @@
+{
+  "inventory.not_enabled_for_type": "Inventory management is not enabled for this company type.",
+  "inventory.invalid_quantity": "Invalid quantity.",
+  "inventory.expiry_required": "An expiry date is required for this product.",
+  "inventory.received": "Stock received successfully.",
+  "inventory.consumed": "Stock movement recorded.",
+  "inventory.adjusted": "Inventory adjusted.",
+  "inventory.transferred": "Transfer completed.",
+  "inventory.insufficient_stock": "Insufficient stock.",
+  "inventory.prescription_required": "This product requires a prescription.",
+  "inventory.location_not_found": "Location not found.",
+  "inventory.same_location": "Source and destination locations must be different.",
+  "inventory.expiry_not_tracked": "Expiry tracking is not enabled for this company type."
+}

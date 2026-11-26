@@ -10,8 +10,14 @@ import { ConfigService } from '@nestjs/config';
 import sharp from 'sharp';
 import crypto from 'crypto';
 import ffmpeg from 'fluent-ffmpeg';
-import convert from 'heic-convert';  // <-- AJOUT
+// ✅ HEIC (iPhone) converti dans un thread séparé : ne bloque plus l'API pendant plusieurs secondes
+import { convertHeicInWorker } from 'src/common/perf/heic';
+// ✅ Traitements lourds limités (sharp, ffmpeg) : une rafale d'uploads ne gèle plus le serveur
+import { imageLimiter, videoLimiter } from 'src/common/perf/concurrency';
 import { buildPublicFileUrl, getMediaBaseUrl, storedRelativePath } from './media-url.util';
+
+/** Effort de compression webp (0 à 6). 6 = 3 à 4 fois plus de CPU pour ~3 % de poids en moins. */
+const WEBP_EFFORT = Math.min(6, Math.max(0, Number(process.env.WEBP_EFFORT ?? 4)));
 
 export const IMAGE_TYPES = [
   'image/jpeg',
@@ -275,14 +281,36 @@ export class FilesService implements OnModuleInit {
       maxSizeKB?: number;
     },
   ): Promise<{ path: string; sizeKB: number }> {
+    return imageLimiter.run(() => this.optimizeImageNow(buffer, outputPath, options));
+  }
+
+  private async optimizeImageNow(
+    buffer: Buffer,
+    outputPath: string,
+    options?: {
+      width?: number;
+      quality?: number;
+      maxSizeKB?: number;
+    },
+  ): Promise<{ path: string; sizeKB: number }> {
     const width = options?.width || 700;
     let quality = options?.quality || 70;
     const maxSizeKB = options?.maxSizeKB || 80;
 
-    let outputBuffer = await sharp(buffer)
+    // ✅ Image décodée et redimensionnée UNE seule fois, puis ré-encodée si trop lourde
+    //    (avant : jusqu'à 6 décodages complets de la photo d'origine par image)
+    const resized = await sharp(buffer)
       .rotate()
       .resize(width, null, { withoutEnlargement: true })
-      .webp({ quality: quality, effort: 6 })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const base = () =>
+      sharp(resized.data, {
+        raw: { width: resized.info.width, height: resized.info.height, channels: resized.info.channels as 1 | 2 | 3 | 4 },
+      });
+
+    let outputBuffer = await base()
+      .webp({ quality: quality, effort: WEBP_EFFORT })
       .toBuffer();
 
     let outputSizeKB = outputBuffer.length / 1024;
@@ -290,10 +318,8 @@ export class FilesService implements OnModuleInit {
     let attempts = 0;
     while (outputSizeKB > maxSizeKB && quality > 35 && attempts < 5) {
       quality -= 8;
-      outputBuffer = await sharp(buffer)
-        .rotate()
-        .resize(width, null, { withoutEnlargement: true })
-        .webp({ quality: quality, effort: 6 })
+      outputBuffer = await base()
+        .webp({ quality: quality, effort: WEBP_EFFORT })
         .toBuffer();
       outputSizeKB = outputBuffer.length / 1024;
       attempts++;
@@ -357,11 +383,22 @@ export class FilesService implements OnModuleInit {
   }
 
   // --- VIDEO COMPRESSION (équilibrée) ---
+  // ✅ Une seule compression à la fois (VIDEO_MAX_CONCURRENCY) et nombre de threads ffmpeg limité
+  //    (FFMPEG_THREADS, 2 par défaut) : ffmpeg ne prend plus tout le processeur du serveur.
   private async compressVideo(
     input: string,
     output: string,
     thumbOutput: string,
   ): Promise<void> {
+    return videoLimiter.run(() => this.compressVideoNow(input, output, thumbOutput));
+  }
+
+  private async compressVideoNow(
+    input: string,
+    output: string,
+    thumbOutput: string,
+  ): Promise<void> {
+    const threads = String(Math.max(1, Number(process.env.FFMPEG_THREADS) || 2));
     return new Promise((resolve, reject) => {
       ffmpeg(input)
         .videoCodec('libx264')
@@ -375,6 +412,7 @@ export class FilesService implements OnModuleInit {
           '-bufsize 1000k',
           '-ac 2',
           '-b:a 96k',
+          `-threads ${threads}`,
         ])
         .on('start', (commandLine) => {
           this.logger.log(`🎬 FFmpeg started: ${commandLine}`);
@@ -457,11 +495,7 @@ export class FilesService implements OnModuleInit {
       if (isHeic) {
         this.logger.log(`🔄 Converting HEIC file: ${file.originalname}`);
         try {
-          const outputBuffer = await convert({
-            buffer: fileBuffer,
-            format: 'JPEG',
-            quality: 0.85, // qualité légèrement augmentée
-          });
+          const outputBuffer = await imageLimiter.run(() => convertHeicInWorker(fileBuffer, 'JPEG', 0.85));
           fileBuffer = outputBuffer;
           // On modifie le mimetype pour que la suite le traite comme une image JPEG
           file.mimetype = 'image/jpeg';
@@ -474,9 +508,7 @@ export class FilesService implements OnModuleInit {
           try {
             this.logger.log('🔄 Tentative de conversion avec sharp...');
             // Sharp peut parfois lire les HEIC si libheif est installé
-            const sharpBuffer = await sharp(fileBuffer)
-              .jpeg({ quality: 80 })
-              .toBuffer();
+            const sharpBuffer = await imageLimiter.run(() => sharp(fileBuffer).jpeg({ quality: 80 }).toBuffer());
             fileBuffer = sharpBuffer;
             file.mimetype = 'image/jpeg';
             this.logger.log(`✅ HEIC converted to JPEG via sharp (${(fileBuffer.length / 1024).toFixed(2)} KB)`);
@@ -709,10 +741,11 @@ export class FilesService implements OnModuleInit {
       if (kind === 'IMAGE') {
         let buffer = tempFilePath ? await fs.readFile(tempFilePath) : file.buffer;
         if (mime === 'image/heic' || mime === 'image/heif') {
+          const heicBuffer = buffer;
           try {
-            buffer = Buffer.from(await convert({ buffer, format: 'JPEG', quality: 0.85 }));
+            buffer = await imageLimiter.run(() => convertHeicInWorker(heicBuffer, 'JPEG', 0.85));
           } catch {
-            buffer = await sharp(buffer).jpeg({ quality: 85 }).toBuffer();
+            buffer = await imageLimiter.run(() => sharp(heicBuffer).jpeg({ quality: 85 }).toBuffer());
           }
           mime = 'image/jpeg';
         }
@@ -735,11 +768,14 @@ export class FilesService implements OnModuleInit {
         let thumbnailUrl: string | null = null;
         if (options.imageThumbnail !== false) {
           const thumbName = `${filename}_thumb.webp`;
-          await sharp(buffer, { animated: false })
-            .rotate()
-            .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
-            .webp({ quality: 65 })
-            .toFile(join(dir, thumbName));
+          const source = buffer;
+          await imageLimiter.run(() =>
+            sharp(source, { animated: false })
+              .rotate()
+              .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
+              .webp({ quality: 65, effort: WEBP_EFFORT })
+              .toFile(join(dir, thumbName)),
+          );
           thumbnailUrl = publicUrl(thumbName);
         }
         if (tempFilePath) await this.cleanupFile(tempFilePath);
@@ -935,6 +971,10 @@ export class FilesService implements OnModuleInit {
   }
 
   private videoScreenshot(input: string, folder: string, filename: string): Promise<boolean> {
+    return videoLimiter.run(() => this.videoScreenshotNow(input, folder, filename));
+  }
+
+  private videoScreenshotNow(input: string, folder: string, filename: string): Promise<boolean> {
     return new Promise((resolve) => {
       ffmpeg(input)
         .screenshots({ timestamps: ['1'], filename, folder, size: '320x?' })
@@ -1050,4 +1090,4 @@ export class FilesService implements OnModuleInit {
       );
     }
   }
-}
+}

@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import * as puppeteer from 'puppeteer';
+import { renderHtmlToPdf } from 'src/common/pdf/html-to-pdf';
 
 export type Cell = string | number | null | undefined | Date;
 export type Sheet = { name: string; columns: { header: string; width?: number }[]; rows: Cell[][] };
@@ -97,22 +97,17 @@ ${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.open
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
 
-/** ✅ HTML → PDF (puppeteer, comme le reste du projet) */
+/** ✅ HTML → PDF (Chromium partagé + file d'attente, au lieu d'un Chromium lancé à chaque export) */
 export async function htmlToPdf(html: string, landscape = false): Promise<Buffer> {
-  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-  try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'load' });
-    const pdf = await page.pdf({
+  return renderHtmlToPdf(html, {
+    waitUntil: 'load',
+    pdf: {
       format: 'A4',
       landscape,
       printBackground: true,
       margin: { top: '16mm', bottom: '16mm', left: '12mm', right: '12mm' },
-    });
-    return Buffer.from(pdf);
-  } finally {
-    await browser.close().catch(() => undefined);
-  }
+    },
+  });
 }
 
 export const h = esc;
