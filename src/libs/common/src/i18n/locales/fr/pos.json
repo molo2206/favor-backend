@@ -20,5 +20,6 @@
   "pos.payment_already_recorded": "Règlement déjà enregistré.",
   "pos.product_name_required": "Le nom du produit est obligatoire.",
   "pos.product_recorded": "Produit enregistré.",
-  "pos.product_not_found": "Produit introuvable ou appartenant à une autre entreprise."
+  "pos.product_not_found": "Produit introuvable ou appartenant à une autre entreprise.",
+  "pos.invalid_updated_since": "Date « updatedSince » invalide : format ISO attendu (ex. 2026-11-27T10:00:00Z)."
 }

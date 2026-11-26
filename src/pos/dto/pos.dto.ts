@@ -103,8 +103,8 @@ export class AddPaymentDto {
 export class CreditsQueryDto {
   @IsOptional() @IsString() customerId?: string;
   @IsOptional() @IsString() customerPhone?: string;
-  @IsOptional() @IsInt() @Min(1) page?: number;
-  @IsOptional() @IsInt() @Min(1) limit?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) limit?: number;
 }
 
 /** Créer / modifier un produit depuis la caisse (y compris hors-ligne, avec un id généré localement) */
@@ -135,13 +135,15 @@ export class CatalogQueryDto {
   /** Synchro incrémentale : ne renvoyer que les produits modifiés depuis cette date ISO */
   @IsOptional() @IsString() updatedSince?: string;
   @IsOptional() @IsString() search?: string;
-  @IsOptional() @IsInt() @Min(1) page?: number;
-  @IsOptional() @IsInt() @Min(1) limit?: number;
+  /** Emplacement de la caisse : si fourni, le stock renvoyé ne porte que sur cet emplacement */
+  @IsOptional() @IsString() locationId?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) limit?: number;
 }
 
 export class SalesQueryDto {
   @IsOptional() @IsString() sessionId?: string;
   @IsOptional() @IsString() terminalId?: string;
-  @IsOptional() @IsInt() @Min(1) page?: number;
-  @IsOptional() @IsInt() @Min(1) limit?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) limit?: number;
 }

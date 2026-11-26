@@ -20,5 +20,6 @@
   "pos.payment_already_recorded": "تم تسجيل الدفعة مسبقًا.",
   "pos.product_name_required": "اسم المنتج مطلوب.",
   "pos.product_recorded": "تم حفظ المنتج.",
-  "pos.product_not_found": "المنتج غير موجود أو يتبع شركة أخرى."
+  "pos.product_not_found": "المنتج غير موجود أو يتبع شركة أخرى.",
+  "pos.invalid_updated_since": "تاريخ « updatedSince » غير صالح: يجب استخدام صيغة ISO (مثال 2026-11-27T10:00:00Z)."
 }

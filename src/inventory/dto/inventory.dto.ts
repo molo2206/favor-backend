@@ -1,3 +1,4 @@
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsDateString,
@@ -65,13 +66,16 @@ export class TransferStockDto {
 export class StockQueryDto {
   @IsOptional() @IsString() locationId?: string;
   @IsOptional() @IsString() productId?: string;
-  @IsOptional() @IsBoolean() lowStockOnly?: boolean;
-  @IsOptional() @IsInt() @Min(1) page?: number;
-  @IsOptional() @IsInt() @Min(1) limit?: number;
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1' || value === 1)
+  @IsBoolean()
+  lowStockOnly?: boolean;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) limit?: number;
 }
 
 export class ExpiringQueryDto {
   /** Fenêtre en jours (défaut 30) : lots périmant d'ici N jours */
-  @IsOptional() @IsInt() @Min(1) days?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) days?: number;
   @IsOptional() @IsString() locationId?: string;
 }

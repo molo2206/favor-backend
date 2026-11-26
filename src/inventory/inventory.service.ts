@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { I18nService } from 'src/libs/common/src';
 import { CompanyCapabilitiesService } from './capabilities/company-capabilities.service';
 import { CompanyCapabilities } from './capabilities/company-capabilities';
@@ -9,6 +9,7 @@ import { StockItem } from './entities/stock-item.entity';
 import { StockLot } from './entities/stock-lot.entity';
 import { StockMovement } from './entities/stock-movement.entity';
 import { ProductPharmaMeta } from './entities/product-pharma-meta.entity';
+import { Product } from 'src/products/entities/product.entity';
 import { StockLocationType, StockLotStatus, StockMovementSource, StockMovementType } from './enums/inventory.enum';
 import { AdjustStockDto, ConsumeStockDto, CreateLocationDto, ExpiringQueryDto, ReceiveStockDto, StockQueryDto, TransferStockDto } from './dto/inventory.dto';
 
@@ -47,7 +48,7 @@ export class InventoryService {
   /** Vérifie que l'entreprise gère l'inventaire, sinon 403 */
   async assertInventory(companyId: string, lang: string): Promise<CompanyCapabilities> {
     const caps = await this.capabilities.forCompany(companyId);
-    if (!caps.hasInventory) throw new ForbiddenException(this.t('inventory.not_enabled_for_type', lang));
+    if (!caps.hasInventory) throw new ForbiddenException({ code: 'inventory.not_enabled_for_type', message: this.t('inventory.not_enabled_for_type', lang) });
     return caps;
   }
 
@@ -94,12 +95,12 @@ export class InventoryService {
   /** Cœur de la réception (utilisable dans une transaction externe : POS, synchro) */
   async receiveInTx(m: EntityManager, companyId: string, dto: ReceiveStockDto, caps: CompanyCapabilities, lang: string, opts: ReceiveOptions = {}) {
     const qty = r3(dto.quantity);
-    if (qty <= 0) throw new BadRequestException(this.t('inventory.invalid_quantity', lang));
+    if (qty <= 0) throw new BadRequestException({ code: 'inventory.invalid_quantity', message: this.t('inventory.invalid_quantity', lang) });
     await this.ensureLocation(m, companyId, dto.locationId, lang);
 
     let lotId: string | null = null;
     if (caps.tracksLots) {
-      if (caps.tracksExpiry && !dto.expiryDate) throw new BadRequestException(this.t('inventory.expiry_required', lang));
+      if (caps.tracksExpiry && !dto.expiryDate) throw new BadRequestException({ code: 'inventory.expiry_required', message: this.t('inventory.expiry_required', lang) });
       const lotRepo = m.getRepository(StockLot);
       const lotNumber = (dto.lotNumber || '').trim() || `LOT-${Date.now()}`;
       let lot = await lotRepo.findOne({ where: { companyId, locationId: dto.locationId, productId: dto.productId, lotNumber } });
@@ -138,13 +139,13 @@ export class InventoryService {
   /** Cœur de la sortie (utilisable dans une transaction externe : POS, synchro) */
   async consumeInTx(m: EntityManager, companyId: string, dto: ConsumeStockDto, caps: CompanyCapabilities, lang: string, opts: ConsumeOptions = {}) {
     const qty = r3(dto.quantity);
-    if (qty <= 0) throw new BadRequestException(this.t('inventory.invalid_quantity', lang));
+    if (qty <= 0) throw new BadRequestException({ code: 'inventory.invalid_quantity', message: this.t('inventory.invalid_quantity', lang) });
 
     // Ordonnance : si le type l'exige ET que le produit est sur ordonnance
     if (caps.requiresPrescription) {
       const meta = await m.getRepository(ProductPharmaMeta).findOne({ where: { productId: dto.productId } });
       if (meta?.requiresPrescription && !(opts.hasPrescription ?? dto.hasPrescription)) {
-        throw new BadRequestException(this.t('inventory.prescription_required', lang));
+        throw new BadRequestException({ code: 'inventory.prescription_required', message: this.t('inventory.prescription_required', lang) });
       }
     }
 
@@ -171,7 +172,7 @@ export class InventoryService {
         consumedLots.push({ lotId: lot.id, quantity: r3(take) });
         remaining = r3(remaining - take);
       }
-      if (remaining > 0 && !caps.allowNegativeStock) throw new BadRequestException(this.t('inventory.insufficient_stock', lang));
+      if (remaining > 0 && !caps.allowNegativeStock) throw new BadRequestException({ code: 'inventory.insufficient_stock', message: this.t('inventory.insufficient_stock', lang) });
     }
 
     const balance = await this.bumpStockItem(m, companyId, dto.locationId, dto.productId, -qty, caps.allowNegativeStock, lang);
@@ -202,7 +203,7 @@ export class InventoryService {
   async adjust(companyId: string, dto: AdjustStockDto, lang: string, performedById?: string) {
     await this.assertInventory(companyId, lang);
     const counted = r3(dto.countedQuantity);
-    if (counted < 0) throw new BadRequestException(this.t('inventory.invalid_quantity', lang));
+    if (counted < 0) throw new BadRequestException({ code: 'inventory.invalid_quantity', message: this.t('inventory.invalid_quantity', lang) });
 
     return this.dataSource.transaction(async (m) => {
       const item = await m.getRepository(StockItem).findOne({ where: { companyId, locationId: dto.locationId, productId: dto.productId } });
@@ -224,8 +225,8 @@ export class InventoryService {
   async transfer(companyId: string, dto: TransferStockDto, lang: string, performedById?: string) {
     const caps = await this.assertInventory(companyId, lang);
     const qty = r3(dto.quantity);
-    if (qty <= 0) throw new BadRequestException(this.t('inventory.invalid_quantity', lang));
-    if (dto.fromLocationId === dto.toLocationId) throw new BadRequestException(this.t('inventory.same_location', lang));
+    if (qty <= 0) throw new BadRequestException({ code: 'inventory.invalid_quantity', message: this.t('inventory.invalid_quantity', lang) });
+    if (dto.fromLocationId === dto.toLocationId) throw new BadRequestException({ code: 'inventory.same_location', message: this.t('inventory.same_location', lang) });
 
     return this.dataSource.transaction(async (m) => {
       await this.ensureLocation(m, companyId, dto.toLocationId, lang);
@@ -258,15 +259,16 @@ export class InventoryService {
     if (query.productId) qb.andWhere('s.productId = :productId', { productId: query.productId });
     if (query.lowStockOnly) qb.andWhere('s.minQuantity > 0 AND s.quantity <= s.minQuantity');
     qb.orderBy('s.updatedAt', 'DESC').skip((page - 1) * limit).take(limit);
-    const [data, total] = await qb.getManyAndCount();
-    return { data, total, page, limit };
+    const [rows, total] = await qb.getManyAndCount();
+    return { data: await this.withNames(rows), total, page, limit };
   }
 
   async lowStock(companyId: string, lang: string) {
     await this.assertInventory(companyId, lang);
-    return this.dataSource.getRepository(StockItem).createQueryBuilder('s')
+    const rows = await this.dataSource.getRepository(StockItem).createQueryBuilder('s')
       .where('s.companyId = :companyId AND s.minQuantity > 0 AND s.quantity <= s.minQuantity', { companyId })
       .orderBy('s.quantity', 'ASC').getMany();
+    return this.withNames(rows);
   }
 
   /** Lots périmant d'ici `days` jours (pharmacie / denrées) */
@@ -279,7 +281,54 @@ export class InventoryService {
       .andWhere('l.expiryDate IS NOT NULL AND l.expiryDate <= DATE_ADD(CURDATE(), INTERVAL :days DAY)', { days });
     if (query.locationId) qb.andWhere('l.locationId = :locationId', { locationId: query.locationId });
     qb.orderBy('l.expiryDate', 'ASC');
-    return { data: await qb.getMany(), days };
+    return { data: await this.withNames(await qb.getMany()), days };
+  }
+
+  /**
+   * ✅ Ajoute aux lignes de stock / lots le nom du produit et de l'emplacement
+   *    (2 requêtes IN, quel que soit le nombre de lignes) : les écrans n'affichent plus des identifiants.
+   */
+  private async withNames<T extends { productId: string; locationId: string }>(rows: T[]) {
+    if (!rows.length) return [] as Array<T & Record<string, any>>;
+    const productIds = [...new Set(rows.map((r) => r.productId).filter(Boolean))];
+    const locationIds = [...new Set(rows.map((r) => r.locationId).filter(Boolean))];
+
+    const [products, locations] = await Promise.all([
+      productIds.length
+        ? this.dataSource.getRepository(Product).find({
+            where: { id: In(productIds) } as any,
+            select: ['id', 'name', 'image', 'price', 'detail'] as any,
+          })
+        : Promise.resolve([] as Product[]),
+      locationIds.length
+        ? this.dataSource.getRepository(StockLocation).find({
+            where: { id: In(locationIds) },
+            select: ['id', 'name', 'type'],
+          })
+        : Promise.resolve([] as StockLocation[]),
+    ]);
+    const productById = new Map<string, any>(products.map((p: any) => [p.id, p] as [string, any]));
+    const locationById = new Map<string, StockLocation>(locations.map((l: StockLocation) => [l.id, l] as [string, StockLocation]));
+
+    return rows.map((r) => {
+      const p: any = productById.get(r.productId);
+      const l = locationById.get(r.locationId);
+      return {
+        ...r,
+        productName: p?.name ?? null,
+        locationName: l?.name ?? null,
+        product: p
+          ? {
+              id: p.id,
+              name: p.name,
+              image: p.image ?? null,
+              price: p.price != null ? Number(p.price) : null,
+              detailPrice: p.detail != null ? Number(p.detail) : null,
+            }
+          : null,
+        location: l ? { id: l.id, name: l.name, type: l.type } : null,
+      };
+    });
   }
 
   // ============================================================
@@ -287,7 +336,7 @@ export class InventoryService {
   // ============================================================
   private async ensureLocation(m: EntityManager, companyId: string, locationId: string, lang: string) {
     const loc = await m.getRepository(StockLocation).findOne({ where: { id: locationId, companyId } });
-    if (!loc) throw new NotFoundException(this.t('inventory.location_not_found', lang));
+    if (!loc) throw new NotFoundException({ code: 'inventory.location_not_found', message: this.t('inventory.location_not_found', lang) });
     return loc;
   }
 
@@ -298,7 +347,7 @@ export class InventoryService {
       .setLock('pessimistic_write').getOne();
     if (!item) item = repo.create({ companyId, locationId, productId, quantity: 0, reserved: 0, minQuantity: 0 });
     const next = r3((item.quantity || 0) + delta);
-    if (next < 0 && !allowNegative) throw new BadRequestException(this.t('inventory.insufficient_stock', lang));
+    if (next < 0 && !allowNegative) throw new BadRequestException({ code: 'inventory.insufficient_stock', message: this.t('inventory.insufficient_stock', lang) });
     item.quantity = next;
     await repo.save(item);
     return next;

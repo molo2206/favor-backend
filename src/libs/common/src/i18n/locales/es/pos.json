@@ -20,5 +20,6 @@
   "pos.payment_already_recorded": "El pago ya fue registrado.",
   "pos.product_name_required": "El nombre del producto es obligatorio.",
   "pos.product_recorded": "Producto guardado.",
-  "pos.product_not_found": "Producto no encontrado o pertenece a otra empresa."
+  "pos.product_not_found": "Producto no encontrado o pertenece a otra empresa.",
+  "pos.invalid_updated_since": "Fecha « updatedSince » no válida: se espera el formato ISO (ej. 2026-11-27T10:00:00Z)."
 }

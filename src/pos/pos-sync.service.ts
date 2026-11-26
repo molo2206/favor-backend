@@ -38,7 +38,7 @@ export class PosSyncService {
 
   async applyBatch(companyId: string, dto: SyncBatchDto, userId: string, lang: string) {
     const caps = await this.capabilities.forCompany(companyId);
-    if (!caps.hasPOS) throw new ForbiddenException(this.t('pos.not_enabled_for_type', lang));
+    if (!caps.hasPOS) throw new ForbiddenException({ code: 'pos.not_enabled_for_type', message: this.t('pos.not_enabled_for_type', lang) });
     const term = await this.pos.getTerminal(companyId, dto.terminalId, lang);
 
     const opsRepo = this.dataSource.getRepository(PosSyncOperation);
@@ -60,8 +60,8 @@ export class PosSyncService {
       // Autorisation hors-ligne selon le type d'entreprise
       const guard = this.offlineGuard(op, caps);
       if (!guard.allowed) {
-        const rec = await this.record(companyId, term.id, op, SyncOpStatus.REJECTED, { reason: guard.reason });
-        results.push({ clientOpId: op.clientOpId, seq: Number(op.seq), status: SyncOpStatus.REJECTED, error: guard.reason });
+        const rec = await this.record(companyId, term.id, op, SyncOpStatus.REJECTED, { reason: guard.reason, code: guard.reason });
+        results.push({ clientOpId: op.clientOpId, seq: Number(op.seq), status: SyncOpStatus.REJECTED, code: guard.reason, error: guard.reason });
         maxSeq = Math.max(maxSeq, Number(op.seq));
         void rec;
         continue;
@@ -71,6 +71,8 @@ export class PosSyncService {
       let status: SyncOpStatus = SyncOpStatus.APPLIED;
       let data: any = null;
       let error: string | null = null;
+      // ✅ Code exploitable par la caisse (ex. inventory.insufficient_stock, pos.session_not_open)
+      let code: string | null = null;
       try {
         data = await this.applyOne(companyId, op, userId, lang);
       } catch (e: any) {
@@ -78,15 +80,24 @@ export class PosSyncService {
           // Stock insuffisant / ordonnance → conflit métier (la caisse devra réconcilier)
           status = SyncOpStatus.CONFLICT;
           error = this.errMessage(e);
+          code = this.errCode(e);
         } else {
           status = SyncOpStatus.FAILED;
           error = this.errMessage(e);
+          code = this.errCode(e);
           this.logger.error(`Synchro op ${op.clientOpId} échouée : ${error}`);
         }
       }
 
-      await this.record(companyId, term.id, op, status, status === SyncOpStatus.APPLIED ? data : { error });
-      results.push({ clientOpId: op.clientOpId, seq: Number(op.seq), status, data: status === SyncOpStatus.APPLIED ? data : undefined, error: error ?? undefined });
+      await this.record(companyId, term.id, op, status, status === SyncOpStatus.APPLIED ? data : { error, code });
+      results.push({
+        clientOpId: op.clientOpId,
+        seq: Number(op.seq),
+        status,
+        data: status === SyncOpStatus.APPLIED ? data : undefined,
+        code: code ?? undefined,
+        error: error ?? undefined,
+      });
       maxSeq = Math.max(maxSeq, Number(op.seq));
     }
 
@@ -153,7 +164,7 @@ export class PosSyncService {
       const res = await this.inventory.consume(companyId, p as any, lang, { source: StockMovementSource.SYNC, performedById: userId, reference: op.clientOpId, hasPrescription: p?.hasPrescription });
       return { balance: (res as any)?.balance ?? null };
     }
-    throw new BadRequestException(this.t('pos.sync_unknown_op', lang));
+    throw new BadRequestException({ code: 'pos.sync_unknown_op', message: this.t('pos.sync_unknown_op', lang) });
   }
 
   private async record(companyId: string, terminalId: string, op: SyncOperationDto, status: SyncOpStatus, result: any) {
@@ -169,6 +180,12 @@ export class PosSyncService {
       }
       throw e;
     }
+  }
+
+  /** Code métier de l'erreur (clé i18n passée dans l'exception), sinon null */
+  private errCode(e: any): string | null {
+    const r = e?.response;
+    return r && typeof r === 'object' && typeof r.code === 'string' ? r.code : null;
   }
 
   private errMessage(e: any): string {

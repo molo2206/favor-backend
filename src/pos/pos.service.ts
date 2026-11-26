@@ -1,11 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import * as crypto from 'crypto';
 import { I18nService } from 'src/libs/common/src';
 import { InventoryService } from 'src/inventory/inventory.service';
 import { CompanyCapabilitiesService } from 'src/inventory/capabilities/company-capabilities.service';
 import { StockItem } from 'src/inventory/entities/stock-item.entity';
+import { StockLocation } from 'src/inventory/entities/stock-location.entity';
 import { ProductPharmaMeta } from 'src/inventory/entities/product-pharma-meta.entity';
 import { StockMovementSource } from 'src/inventory/enums/inventory.enum';
 import { Product } from 'src/products/entities/product.entity';
@@ -42,7 +43,7 @@ export class PosService {
 
   private async assertPos(companyId: string, lang: string) {
     const caps = await this.capabilities.forCompany(companyId);
-    if (!caps.hasPOS) throw new ForbiddenException(this.t('pos.not_enabled_for_type', lang));
+    if (!caps.hasPOS) throw new ForbiddenException({ code: 'pos.not_enabled_for_type', message: this.t('pos.not_enabled_for_type', lang) });
     return caps;
   }
 
@@ -52,7 +53,7 @@ export class PosService {
   async createTerminal(companyId: string, dto: CreateTerminalDto, lang: string) {
     await this.assertPos(companyId, lang);
     const repo = this.dataSource.getRepository(PosTerminal);
-    if (await repo.findOne({ where: { companyId, code: dto.code } })) throw new BadRequestException(this.t('pos.terminal_code_taken', lang));
+    if (await repo.findOne({ where: { companyId, code: dto.code } })) throw new BadRequestException({ code: 'pos.terminal_code_taken', message: this.t('pos.terminal_code_taken', lang) });
     return repo.save(repo.create({
       companyId, branchId: dto.branchId ?? null,
       locationId: dto.locationId ?? (await this.inventory.defaultSaleLocationId(companyId)),
@@ -64,7 +65,7 @@ export class PosService {
   async updateTerminal(companyId: string, terminalId: string, dto: UpdateTerminalConfigDto, lang: string) {
     const repo = this.dataSource.getRepository(PosTerminal);
     const term = await repo.findOne({ where: { id: terminalId, companyId } });
-    if (!term) throw new NotFoundException(this.t('pos.terminal_not_found', lang));
+    if (!term) throw new NotFoundException({ code: 'pos.terminal_not_found', message: this.t('pos.terminal_not_found', lang) });
     if (dto.name !== undefined) term.name = dto.name;
     if (dto.locationId !== undefined) term.locationId = dto.locationId;
     if (dto.offlineEnabled !== undefined) term.offlineEnabled = dto.offlineEnabled;
@@ -73,9 +74,41 @@ export class PosService {
     return repo.save(term);
   }
 
+  /**
+   * ✅ Chaque caisse avec sa session ouverte (pour la reprendre au lieu d'en rouvrir une)
+   *    et son emplacement de stock (nom affiché dans les applis).
+   */
   async listTerminals(companyId: string, lang: string) {
     await this.assertPos(companyId, lang);
-    return this.dataSource.getRepository(PosTerminal).find({ where: { companyId }, order: { name: 'ASC' } });
+    const terminals = await this.dataSource.getRepository(PosTerminal).find({ where: { companyId }, order: { name: 'ASC' } });
+    if (!terminals.length) return [];
+
+    const termIds = terminals.map((t) => t.id);
+    const openSessions = await this.dataSource.getRepository(PosSession).find({
+      where: { companyId, terminalId: In(termIds), status: PosSessionStatus.OPEN },
+      order: { openedAt: 'DESC' },
+    });
+    const sessionByTerminal = new Map<string, PosSession>();
+    for (const sess of openSessions) if (!sessionByTerminal.has(sess.terminalId)) sessionByTerminal.set(sess.terminalId, sess);
+
+    const locIds = [...new Set(terminals.map((t) => t.locationId).filter((x): x is string => !!x))];
+    const locations = locIds.length
+      ? await this.dataSource.getRepository(StockLocation).find({ where: { id: In(locIds), companyId } })
+      : [];
+    const locById = new Map<string, StockLocation>(locations.map((l: StockLocation) => [l.id, l] as [string, StockLocation]));
+
+    return terminals.map((t) => {
+      const sess = sessionByTerminal.get(t.id);
+      const loc = t.locationId ? locById.get(t.locationId) : undefined;
+      return {
+        ...t,
+        openSessionId: sess?.id ?? null,
+        openSession: sess
+          ? { id: sess.id, openedAt: sess.openedAt, openingCash: Number(sess.openingCash) || 0, openedById: sess.openedById }
+          : null,
+        location: loc ? { id: loc.id, name: loc.name } : null,
+      };
+    });
   }
 
   // ============================================================
@@ -85,8 +118,8 @@ export class PosService {
     await this.assertPos(companyId, lang);
     const repo = this.dataSource.getRepository(PosSession);
     const term = await this.dataSource.getRepository(PosTerminal).findOne({ where: { id: dto.terminalId, companyId } });
-    if (!term) throw new NotFoundException(this.t('pos.terminal_not_found', lang));
-    if (await repo.findOne({ where: { terminalId: dto.terminalId, status: PosSessionStatus.OPEN } })) throw new BadRequestException(this.t('pos.session_already_open', lang));
+    if (!term) throw new NotFoundException({ code: 'pos.terminal_not_found', message: this.t('pos.terminal_not_found', lang) });
+    if (await repo.findOne({ where: { terminalId: dto.terminalId, status: PosSessionStatus.OPEN } })) throw new BadRequestException({ code: 'pos.session_already_open', message: this.t('pos.session_already_open', lang) });
     return repo.save(repo.create({
       companyId, terminalId: dto.terminalId, status: PosSessionStatus.OPEN,
       openedById: userId, openingCash: r2(dto.openingCash || 0), currency: dto.currency || 'USD', totalSales: 0, salesCount: 0,
@@ -96,8 +129,8 @@ export class PosService {
   async closeSession(companyId: string, sessionId: string, dto: CloseSessionDto, userId: string, lang: string) {
     const repo = this.dataSource.getRepository(PosSession);
     const session = await repo.findOne({ where: { id: sessionId, companyId } });
-    if (!session) throw new NotFoundException(this.t('pos.session_not_found', lang));
-    if (session.status === PosSessionStatus.CLOSED) throw new BadRequestException(this.t('pos.session_already_closed', lang));
+    if (!session) throw new NotFoundException({ code: 'pos.session_not_found', message: this.t('pos.session_not_found', lang) });
+    if (session.status === PosSessionStatus.CLOSED) throw new BadRequestException({ code: 'pos.session_already_closed', message: this.t('pos.session_already_closed', lang) });
 
     // Théorique = fond + RÈGLEMENTS espèces encaissés durant la session
     const cashRow = await this.dataSource.getRepository(PosSalePayment).createQueryBuilder('p')
@@ -117,7 +150,7 @@ export class PosService {
 
   async sessionSummary(companyId: string, sessionId: string, lang: string) {
     const session = await this.dataSource.getRepository(PosSession).findOne({ where: { id: sessionId, companyId } });
-    if (!session) throw new NotFoundException(this.t('pos.session_not_found', lang));
+    if (!session) throw new NotFoundException({ code: 'pos.session_not_found', message: this.t('pos.session_not_found', lang) });
     const byMethod = await this.dataSource.getRepository(PosSalePayment).createQueryBuilder('p')
       .innerJoin(PosSale, 's', 's.id = p.saleId')
       .select('p.method', 'method').addSelect('COUNT(*)', 'count').addSelect('COALESCE(SUM(p.amount),0)', 'total')
@@ -127,7 +160,19 @@ export class PosService {
       .select('COALESCE(SUM(s.amountDue),0)', 'due')
       .where('s.sessionId = :sessionId AND s.status = :paid AND s.amountDue > 0', { sessionId, paid: PosSaleStatus.PAID })
       .getRawOne();
-    return { session, byMethod, creditOutstanding: Number(credit?.due || 0) };
+    // ✅ Totaux au premier niveau et nombres convertis (le SQL brut renvoie des chaînes)
+    return {
+      session,
+      byMethod: byMethod.map((b: any) => ({ method: b.method, count: Number(b.count) || 0, total: Number(b.total) || 0 })),
+      creditOutstanding: Number(credit?.due || 0),
+      totalSales: Number(session.totalSales) || 0,
+      salesCount: Number(session.salesCount) || 0,
+      openingCash: Number(session.openingCash) || 0,
+      expectedCash: session.expectedCash != null ? Number(session.expectedCash) : null,
+      countedCash: session.countedCash != null ? Number(session.countedCash) : null,
+      cashDifference: session.cashDifference != null ? Number(session.cashDifference) : null,
+      status: session.status,
+    };
   }
 
   // ============================================================
@@ -147,10 +192,10 @@ export class PosService {
 
     return this.dataSource.transaction(async (m) => {
       const session = await m.getRepository(PosSession).findOne({ where: { id: dto.sessionId, companyId } });
-      if (!session) throw new NotFoundException(this.t('pos.session_not_found', lang));
-      if (session.status !== PosSessionStatus.OPEN) throw new BadRequestException(this.t('pos.session_not_open', lang));
+      if (!session) throw new NotFoundException({ code: 'pos.session_not_found', message: this.t('pos.session_not_found', lang) });
+      if (session.status !== PosSessionStatus.OPEN) throw new BadRequestException({ code: 'pos.session_not_open', message: this.t('pos.session_not_open', lang) });
       const term = await m.getRepository(PosTerminal).findOne({ where: { id: session.terminalId, companyId } });
-      if (!term) throw new NotFoundException(this.t('pos.terminal_not_found', lang));
+      if (!term) throw new NotFoundException({ code: 'pos.terminal_not_found', message: this.t('pos.terminal_not_found', lang) });
 
       // Totaux
       let subtotal = 0;
@@ -158,7 +203,7 @@ export class PosService {
       const discount = r2(dto.discount || 0);
       const tax = r2(dto.tax || 0);
       const total = r2(subtotal - discount + tax);
-      if (total < 0) throw new BadRequestException(this.t('pos.invalid_total', lang));
+      if (total < 0) throw new BadRequestException({ code: 'pos.invalid_total', message: this.t('pos.invalid_total', lang) });
 
       // Règlements
       const payments = (dto.payments?.length ? dto.payments : (dto.onCredit ? [] : [{ method: dto.paymentMethod ?? PosPaymentMethod.CASH, amount: total }]));
@@ -171,7 +216,7 @@ export class PosService {
         (dto.onCredit ? PosPaymentStatus.CREDIT : PosPaymentStatus.UNPAID);
       // Un reste dû impose un client identifié
       if (paymentStatus !== PosPaymentStatus.PAID && !(dto.customerId || dto.customerName || dto.customerPhone)) {
-        throw new BadRequestException(this.t('pos.customer_required_for_credit', lang));
+        throw new BadRequestException({ code: 'pos.customer_required_for_credit', message: this.t('pos.customer_required_for_credit', lang) });
       }
       const primaryMethod = payments.length === 1 ? payments[0].method : (payments.length ? PosPaymentMethod.OTHER : PosPaymentMethod.OTHER);
 
@@ -189,7 +234,7 @@ export class PosService {
       // Lignes + sorties de stock (même transaction)
       for (const it of dto.items) {
         const locationId = it.locationId || term.locationId || (await this.inventory.defaultSaleLocationId(companyId));
-        if (!locationId) throw new BadRequestException(this.t('pos.no_location', lang));
+        if (!locationId) throw new BadRequestException({ code: 'pos.no_location', message: this.t('pos.no_location', lang) });
         await m.getRepository(PosSaleItem).save(m.getRepository(PosSaleItem).create({
           saleId: sale.id, productId: it.productId, locationId,
           productName: it.productName || it.productId, unitPrice: r2(it.unitPrice),
@@ -239,12 +284,12 @@ export class PosService {
       const sale = await m.getRepository(PosSale).createQueryBuilder('s')
         .where('s.id = :saleId AND s.companyId = :companyId', { saleId, companyId })
         .setLock('pessimistic_write').getOne();
-      if (!sale) throw new NotFoundException(this.t('pos.sale_not_found', lang));
-      if (sale.status === PosSaleStatus.VOID) throw new BadRequestException(this.t('pos.sale_void', lang));
-      if (Number(sale.amountDue) <= 0) throw new BadRequestException(this.t('pos.already_settled', lang));
+      if (!sale) throw new NotFoundException({ code: 'pos.sale_not_found', message: this.t('pos.sale_not_found', lang) });
+      if (sale.status === PosSaleStatus.VOID) throw new BadRequestException({ code: 'pos.sale_void', message: this.t('pos.sale_void', lang) });
+      if (Number(sale.amountDue) <= 0) throw new BadRequestException({ code: 'pos.already_settled', message: this.t('pos.already_settled', lang) });
 
       const amount = Math.min(r2(dto.amount), Number(sale.amountDue));
-      if (amount <= 0) throw new BadRequestException(this.t('pos.invalid_amount', lang));
+      if (amount <= 0) throw new BadRequestException({ code: 'pos.invalid_amount', message: this.t('pos.invalid_amount', lang) });
 
       await m.getRepository(PosSalePayment).save(m.getRepository(PosSalePayment).create({
         companyId, saleId: sale.id, method: dto.method, amount, reference: dto.reference ?? null,
@@ -295,12 +340,24 @@ export class PosService {
   // CATALOGUE PRODUITS (pour la caisse hors-ligne)
   // ============================================================
   async catalog(companyId: string, query: CatalogQueryDto, lang: string) {
+    // ✅ Pris AVANT les lectures : un changement fait pendant la requête sera revu au prochain updatedSince
+    const serverTime = new Date().toISOString();
     await this.assertPos(companyId, lang);
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(500, Math.max(1, Number(query.limit) || 200));
     const qb = this.dataSource.getRepository(Product).createQueryBuilder('p')
       .where('p.companyId = :companyId AND p.listingType = :lt', { companyId, lt: ListingType.PRODUCT });
-    if (query.updatedSince) qb.andWhere('p.updatedAt > :since', { since: new Date(query.updatedSince) });
+    if (query.updatedSince) {
+      const since = new Date(query.updatedSince);
+      if (isNaN(since.getTime())) {
+        throw new BadRequestException({ code: 'pos.invalid_updated_since', message: this.t('pos.invalid_updated_since', lang) });
+      }
+      // ✅ Produit modifié OU stock modifié (vente, réception…) depuis la dernière synchro
+      qb.andWhere(
+        '(p.updatedAt > :since OR p.id IN (SELECT si.productId COLLATE utf8mb4_unicode_ci FROM stock_items si WHERE si.companyId = :companyId AND si.updatedAt > :since))',
+        { since, companyId },
+      );
+    }
     if (query.search) qb.andWhere('p.name LIKE :s', { s: `%${query.search}%` });
     qb.orderBy('p.updatedAt', 'DESC').skip((page - 1) * limit).take(limit);
     const [rows, total] = await qb.getManyAndCount();
@@ -312,6 +369,8 @@ export class PosService {
       const stocks = await this.dataSource.getRepository(StockItem).createQueryBuilder('s')
         .select('s.productId', 'productId').addSelect('COALESCE(SUM(s.quantity),0)', 'qty')
         .where('s.companyId = :companyId AND s.productId IN (:...ids)', { companyId, ids })
+        // ✅ Emplacement de la caisse si fourni, sinon total toutes zones
+        .andWhere(query.locationId ? 's.locationId = :locationId' : '1=1', query.locationId ? { locationId: query.locationId } : {})
         .groupBy('s.productId').getRawMany();
       for (const s of stocks) stockMap.set(s.productId, Number(s.qty));
       const metas = await this.dataSource.getRepository(ProductPharmaMeta).createQueryBuilder('m')
@@ -325,7 +384,7 @@ export class PosService {
         id: p.id,
         name: p.name,
         price: Number(p.price) || 0,
-        detailPrice: p.detail_price != null ? Number(p.detail_price) : null,
+        detailPrice: p.detail != null ? Number(p.detail) : null,
         image: p.image ?? null,
         status: p.status,
         stock: stockMap.get(p.id) ?? 0,
@@ -338,7 +397,6 @@ export class PosService {
       };
     });
     // La caisse garde ce timestamp et le renvoie en `updatedSince` à la prochaine synchro
-    const serverTime = new Date().toISOString();
     return { data, total, page, limit, serverTime };
   }
 
@@ -347,7 +405,7 @@ export class PosService {
   // ============================================================
   async upsertProduct(companyId: string, dto: UpsertProductDto, userId: string, lang: string) {
     const caps = await this.assertPos(companyId, lang);
-    if (!dto.name || !dto.name.trim()) throw new BadRequestException(this.t('pos.product_name_required', lang));
+    if (!dto.name || !dto.name.trim()) throw new BadRequestException({ code: 'pos.product_name_required', message: this.t('pos.product_name_required', lang) });
     const repo = this.dataSource.getRepository(Product);
     const id = (dto.id || '').trim() || crypto.randomUUID();
 
@@ -355,7 +413,7 @@ export class PosService {
     const owned = await repo.createQueryBuilder('p').where('p.id = :id AND p.companyId = :companyId', { id, companyId }).getOne();
     if (!owned) {
       const usedElsewhere = await repo.createQueryBuilder('p').where('p.id = :id', { id }).getCount();
-      if (usedElsewhere) throw new BadRequestException(this.t('pos.product_not_found', lang)); // id déjà pris par une autre société
+      if (usedElsewhere) throw new BadRequestException({ code: 'pos.product_not_found', message: this.t('pos.product_not_found', lang) }); // id déjà pris par une autre société
     }
     const isNew = !owned;
     const product: any = owned || repo.create({ id });
@@ -396,7 +454,7 @@ export class PosService {
 
   async getTerminal(companyId: string, terminalId: string, lang: string): Promise<PosTerminal> {
     const term = await this.dataSource.getRepository(PosTerminal).findOne({ where: { id: terminalId, companyId } });
-    if (!term) throw new NotFoundException(this.t('pos.terminal_not_found', lang));
+    if (!term) throw new NotFoundException({ code: 'pos.terminal_not_found', message: this.t('pos.terminal_not_found', lang) });
     return term;
   }
 }
