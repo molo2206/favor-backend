@@ -13,7 +13,7 @@ import {
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { CompanyEntity, CompanyPlatform, FeeBasis, FeeType } from './entities/company.entity';
-import { DataSource, In, Repository } from 'typeorm';
+import { Brackets, DataSource, In, Repository } from 'typeorm';
 import { UserHasCompanyEntity } from 'src/user_has_company/entities/user_has_company.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { RoleUser } from 'src/role_user/entities/role_user.entity';
@@ -1373,6 +1373,10 @@ export class CompanyService {
   }
 
   // ======================== FIND BY TYPE ========================
+  // ✅ Filtres + pagination faits par MySQL (avant : TOUTES les entreprises chargées avec 10 jointures
+  //    à chaque appel, puis filtrées en JavaScript → requête de 1,5 s qui bloquait le serveur).
+  //    Étape 1 : identifiants de la page (requête légère, sans jointure).
+  //    Étape 2 : relations chargées UNIQUEMENT pour ces entreprises. Réponse identique à avant.
   async findByType(
     type?: string,
     search?: string,
@@ -1383,63 +1387,68 @@ export class CompanyService {
     message: string;
     data: PaginatedResponseDto<CompanyEntity>;
   }> {
-    // ============================================================
-    // 1. Charger TOUTES les companies (sans pagination, sans filtre)
-    // ============================================================
-    const query = this.companyRepository
+    const currentPage = Math.max(1, Number(page) || 1);
+    const currentLimit = Math.min(1000, Math.max(1, Number(limit) || 10));
+    const skip = (currentPage - 1) * currentLimit;
+
+    // 1. Filtres en SQL (mêmes règles qu'avant)
+    const filtered = this.companyRepository
       .createQueryBuilder('company')
-      .leftJoinAndSelect('company.userHasCompany', 'userHasCompany')
-      .leftJoinAndSelect('userHasCompany.user', 'user')
-      .leftJoinAndSelect('userHasCompany.role', 'role')
-      .leftJoinAndSelect('company.companyResources', 'companyResources')
-      .leftJoinAndSelect('companyResources.resource', 'resource')
-      .leftJoinAndSelect('company.country', 'country')
-      .leftJoinAndSelect('company.city', 'city')
-      .leftJoinAndSelect('company.category', 'category')
-      .leftJoinAndSelect('company.branches', 'branches')
-      .leftJoinAndSelect('company.settings', 'settings')
-      .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
-      .orderBy('company.createdAt', 'DESC');
-
-    let companies = await query.getMany();
-
-    // ============================================================
-    // 2. Filtrer en mémoire (typePlatform, typeCompany, search)
-    // ============================================================
-    companies = companies.filter((c) => c.typePlatform !== CompanyPlatform.FAVOR_GROUP);
+      .where('(company.typePlatform IS NULL OR company.typePlatform <> :favorGroup)', {
+        favorGroup: CompanyPlatform.FAVOR_GROUP,
+      });
 
     if (type && type.trim()) {
-      const t = type.trim();
-      companies = companies.filter((c) => c.typeCompany === t);
+      filtered.andWhere('company.typeCompany = :type', { type: type.trim() });
     }
 
     if (search && search.trim()) {
-      const kw = search.trim().toLowerCase();
-      companies = companies.filter((c) => {
-        const fields = [
-          c.companyName,
-          c.email,
-          c.phone,
-          c.companyAddress,
-          c.address,
-          c.website,
-        ];
-        return fields.some(
-          (v) => v != null && String(v).toLowerCase().includes(kw),
-        );
-      });
+      const kw = `%${search.trim().toLowerCase().replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+      filtered.andWhere(
+        new Brackets((qb) => {
+          for (const col of ['companyName', 'email', 'phone', 'companyAddress', 'address', 'website']) {
+            qb.orWhere(`LOWER(company.${col}) LIKE :kw`, { kw });
+          }
+        }),
+      );
     }
 
-    // ============================================================
-    // 3. Compter + paginer en mémoire
-    // ============================================================
-    const total = companies.length;
+    // 2. Total + identifiants de la page demandée
+    const [total, idRows] = await Promise.all([
+      filtered.clone().getCount(),
+      filtered
+        .clone()
+        .select('company.id', 'id')
+        .orderBy('company.createdAt', 'DESC')
+        .addOrderBy('company.id', 'DESC')
+        .offset(skip)
+        .limit(currentLimit)
+        .getRawMany<{ id: string }>(),
+    ]);
+    const ids = idRows.map((r) => r.id);
 
-    const currentPage = Math.max(1, Number(page) || 1);
-    const currentLimit = Math.max(1, Number(limit) || 10);
-    const skip = (currentPage - 1) * currentLimit;
-
-    const paginated = companies.slice(skip, skip + currentLimit);
+    // 3. Relations chargées seulement pour les entreprises de la page
+    let paginated: CompanyEntity[] = [];
+    if (ids.length) {
+      const rows = await this.companyRepository
+        .createQueryBuilder('company')
+        .leftJoinAndSelect('company.userHasCompany', 'userHasCompany')
+        .leftJoinAndSelect('userHasCompany.user', 'user')
+        .leftJoinAndSelect('userHasCompany.role', 'role')
+        .leftJoinAndSelect('company.companyResources', 'companyResources')
+        .leftJoinAndSelect('companyResources.resource', 'resource')
+        .leftJoinAndSelect('company.country', 'country')
+        .leftJoinAndSelect('company.city', 'city')
+        .leftJoinAndSelect('company.category', 'category')
+        .leftJoinAndSelect('company.branches', 'branches')
+        .leftJoinAndSelect('company.settings', 'settings')
+        .leftJoinAndSelect('company.invoiceConfiguration', 'invoiceConfiguration')
+        .where('company.id IN (:...ids)', { ids })
+        .getMany();
+      // Même ordre que la page (createdAt DESC)
+      const byId = new Map(rows.map((c) => [c.id, c]));
+      paginated = ids.map((id) => byId.get(id)).filter((c): c is CompanyEntity => !!c);
+    }
 
     return {
       message: await this.i18n.translate('companies_fetched', lang),

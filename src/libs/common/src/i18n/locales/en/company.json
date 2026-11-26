@@ -65,5 +65,6 @@
   "company_collaborator_not_found": "Collaborator not found.",
   "company_collaborator_removed": "Collaborator removed successfully.",
   "company_cannot_remove_owner": "The company owner cannot be removed.",
-  "company_cannot_remove_self": "You cannot remove yourself."
+  "company_cannot_remove_self": "You cannot remove yourself.",
+  "companies_fetched": "Companies retrieved successfully."
 }

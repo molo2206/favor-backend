@@ -65,5 +65,6 @@
   "company_collaborator_not_found": "لم يتم العثور على المتعاون.",
   "company_collaborator_removed": "تمت إزالة المتعاون بنجاح.",
   "company_cannot_remove_owner": "لا يمكن إزالة مالك الشركة.",
-  "company_cannot_remove_self": "لا يمكنك إزالة نفسك."
+  "company_cannot_remove_self": "لا يمكنك إزالة نفسك.",
+  "companies_fetched": "تم جلب الشركات بنجاح."
 }

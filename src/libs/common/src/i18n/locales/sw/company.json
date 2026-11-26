@@ -65,5 +65,6 @@
   "company_collaborator_not_found": "Mshirika hakupatikana.",
   "company_collaborator_removed": "Mshirika ameondolewa.",
   "company_cannot_remove_owner": "Mmiliki wa kampuni hawezi kuondolewa.",
-  "company_cannot_remove_self": "Huwezi kujiondoa mwenyewe."
+  "company_cannot_remove_self": "Huwezi kujiondoa mwenyewe.",
+  "companies_fetched": "Kampuni zimepatikana kwa mafanikio."
 }
