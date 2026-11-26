@@ -1,0 +1,20 @@
+<%#
+  Code OTP (inscription, connexion, mot de passe oublié, dépôt FPay)
+  Variables : otpCode, lang, translations { title, description, label, expiry,
+              footerCopyright, footerSecurity, legalNote, support?, contact? }
+  Mise en page commune : src/email/email-layout.ts (même apparence que la facture)
+%>
+<% const tr = translations || {}; %>
+<%- emailLayout({
+  preheader: (tr.title || t('email.otp.title')) + ' : ' + otpCode,
+  title: tr.title || t('email.otp.title'),
+  reference: formatDate(new Date(), true),
+  paragraphs: [ tr.description || t('email.otp.description') ],
+  highlight: {
+    label: tr.label || t('email.otp.label'),
+    value: String(otpCode),
+    hint: tr.expiry || t('email.otp.expiry'),
+    tone: 'info'
+  },
+  notes: { lines: [ t('email.otp.never_share'), t('email.otp.ignore_if_not_you') ] }
+}) %>

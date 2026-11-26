@@ -1,0 +1,13 @@
+{
+  "employee_signature.fetched": "Firma obtenida.",
+  "employee_signature.saved": "Firma guardada.",
+  "employee_signature.deleted": "Firma eliminada.",
+  "employee_signature.not_found": "No hay firma guardada para este empleado.",
+  "employee_signature.forbidden": "No puede gestionar la firma de este empleado.",
+  "employee_signature.invalid_type": "Formato no aceptado: envíe una imagen PNG, JPG o WEBP.",
+  "employee_signature.invalid_image": "Imagen de firma ilegible.",
+  "employee_signature.file_required": "Añada la imagen de la firma (archivo o firma dibujada).",
+  "employee_signature.too_large": "Imagen demasiado pesada (máximo {{max}} MB).",
+  "employee_signature.no_employee": "Ninguna ficha de empleado está vinculada a su cuenta en esta empresa: pida a RR. HH. que la cree.",
+  "employee_signature.employee_not_found": "Empleado no encontrado."
+}

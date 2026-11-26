@@ -1,0 +1,26 @@
+<%#
+  Création d'entreprise / changement de statut d'une entreprise
+  Variables : companyName, status, lang, translations { title, headerTitle, description,
+              supportText, contactUs, footerCopyright, legalNote }
+  Mise en page commune : src/email/email-layout.ts
+%>
+<%
+  const tr = translations || {};
+  const s = String(status || '').toLowerCase();
+  const tone = /attente|pending|pendiente|inasubiri|subiri|انتظار|قيد/.test(s) ? 'warning'
+    : /approuv|approved|validée|validé|validated|activ|aprob|imeidhinishwa|موافق|مقبول/.test(s) ? 'success'
+    : /rejet|reject|rechaz|kataliwa|رفض/.test(s) ? 'danger'
+    : /suspend|معلق/.test(s) ? 'danger'
+    : 'warning';
+%>
+<%- emailLayout({
+  preheader: (tr.headerTitle || t('company_email_header_title')) + ' — ' + companyName,
+  title: tr.headerTitle || t('company_email_header_title'),
+  reference: companyName,
+  date: formatDate(new Date()),
+  badge: { text: status, tone: tone },
+  paragraphs: [ (tr.description || t('company_email_description')) + ' « ' + companyName + ' » :' ],
+  highlight: { label: tr.title || t('company_email_status_title'), value: String(status || ''), tone: tone === 'warning' ? 'warning' : tone, monospace: false },
+
+  boxes: tone === 'warning' ? [ { lines: [ t('email.company.next_steps') ] } ] : []
+}) %>

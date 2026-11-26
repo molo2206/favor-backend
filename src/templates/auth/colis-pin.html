@@ -1,0 +1,29 @@
+<%#
+  Code PIN de réception d'un colis (shipment)
+  Variables : clientName, pinCode, trackingNumber, shipmentReference, weight, dimensions,
+              packageType, totalPrice, user?
+  Mise en page commune : src/email/email-layout.ts
+%>
+<% const u = (typeof user !== 'undefined' && user) ? user : {}; %>
+<%- emailLayout({
+  preheader: t('email.colis_pin.title') + ' : ' + pinCode,
+  title: t('email.colis_pin.title'),
+  reference: trackingNumber ? (t('email.colis_pin.tracking') + ' : ' + trackingNumber) : undefined,
+  date: formatDate(new Date()),
+  recipient: { name: clientName || u.fullName, lines: [ u.email, u.phone ] },
+  greeting: t('order.email.greeting', { name: clientName || u.fullName || '' }),
+  paragraphs: [ t('email.colis_pin.intro') ],
+  highlight: { label: t('email.colis_pin.pin_label'), value: String(pinCode || ''), hint: t('email.colis_pin.pin_hint') },
+  details: {
+    title: t('email.colis_pin.details_title'),
+    items: [
+      { label: t('email.colis_pin.tracking'), value: trackingNumber },
+      { label: t('email.colis_pin.reference'), value: shipmentReference },
+      { label: t('email.colis_pin.package_type'), value: packageType },
+      { label: t('email.colis_pin.weight'), value: weight },
+      { label: t('email.colis_pin.dimensions'), value: dimensions },
+      { label: t('email.colis_pin.total'), value: totalPrice }
+    ]
+  },
+  notes: { lines: [ t('email.colis_pin.keep_secret') ] }
+}) %>

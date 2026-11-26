@@ -1,0 +1,37 @@
+<%#
+  Changement de statut d'une réservation de voyage / véhicule (e-mail)
+  Variables : reservation, user, oldStatus, newStatus, statusText, statusClass,
+              departureCity, arrivalCity, reservationRef, totalAmount, currency
+  Mise en page commune : src/email/email-layout.ts
+%>
+<%
+  const r = (typeof reservation !== 'undefined' && reservation) ? reservation : {};
+  const u = (typeof user !== 'undefined' && user) ? user : {};
+  const ref = (typeof reservationRef !== 'undefined' && reservationRef) ? reservationRef : String(r.id || '').slice(0, 8).toUpperCase();
+  const st = (typeof statusText !== 'undefined' && statusText) ? statusText : ((typeof newStatus !== 'undefined' && newStatus) ? newStatus : r.status);
+  const cls = String((typeof statusClass !== 'undefined' && statusClass) || (typeof newStatus !== 'undefined' && newStatus) || r.status || '').toLowerCase();
+  const tone = /cancel|reject|expir|annul/.test(cls) ? 'danger' : /confirm|paid|valid|complet/.test(cls) ? 'success' : 'warning';
+  const from = (typeof departureCity !== 'undefined' && departureCity) ? departureCity : '';
+  const to = (typeof arrivalCity !== 'undefined' && arrivalCity) ? arrivalCity : '';
+  const cur = (typeof currency !== 'undefined' && currency) ? currency : 'USD';
+  const amount = (typeof totalAmount !== 'undefined') ? totalAmount : r.total_amount;
+%>
+<%- emailLayout({
+  preheader: t('email.trip.status_title') + ' — ' + st,
+  title: t('email.trip.status_title'),
+  reference: 'N° ' + ref,
+  date: formatDate(r.createdAt || new Date()),
+  badge: { text: st, tone: tone },
+  recipient: { name: u.fullName, lines: [ u.email, u.phone ] },
+  greeting: t('order.email.greeting', { name: u.fullName || '' }),
+  paragraphs: [ t('email.trip.status_intro', { ref: ref, status: st }) ],
+  details: {
+    items: [
+      { label: t('email.trip.route'), value: [from, to].filter(Boolean).join(' → ') },
+      { label: t('email.trip.previous_status'), value: (typeof oldStatus !== 'undefined') ? oldStatus : '' },
+      { label: t('email.layout.status'), value: st },
+      { label: t('email.layout.reference'), value: ref }
+    ]
+  },
+  totals: (amount !== undefined && amount !== null) ? [ { label: t('order.email.total_amount'), value: formatMoney(amount, cur), strong: true } ] : undefined
+}) %>

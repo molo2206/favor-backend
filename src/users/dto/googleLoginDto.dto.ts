@@ -1,0 +1,27 @@
+import { IsString, IsNotEmpty, IsEmail, IsOptional, IsIn } from 'class-validator';
+
+export class GoogleLoginDto {
+  @IsEmail()
+  email: string;
+
+  @IsNotEmpty()
+  fullName: string;
+
+  @IsOptional()
+  @IsString()
+  image?: string;
+
+  @IsOptional()
+  @IsString()
+  fcmToken?: string;
+
+  @IsOptional()
+  @IsIn(['ios', 'android', 'web', 'admin', 'group', 'driver'], {
+    message: 'La plateforme doit être ios, android, web, admin ou group',
+  })
+  platform?: 'ios' | 'android' | 'web' | 'admin' | 'group' | 'driver';
+
+  @IsOptional()
+  @IsString()
+  provider?: string;
+}

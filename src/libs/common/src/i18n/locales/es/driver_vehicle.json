@@ -1,0 +1,8 @@
+{
+  "driver_vehicle.notif.kyc_approved.title": "Documentos validados ✅",
+  "driver_vehicle.notif.kyc_approved.body": "Su vehículo {{model}} ({{plate}}) está validado. Ya puede recibir viajes.",
+  "driver_vehicle.notif.kyc_rejected.title": "Documentos rechazados",
+  "driver_vehicle.notif.kyc_rejected.body": "Vehículo {{model}} ({{plate}}): {{reason}}. Corrija y reenvíe sus documentos.",
+  "driver_vehicle.notif.updated.title": "Vehículo actualizado",
+  "driver_vehicle.notif.updated.body": "La administración modificó su vehículo {{model}} ({{plate}})."
+}
