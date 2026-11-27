@@ -12,4 +12,5 @@ export enum CompanyType {
   TAXI = 'TAXI',
   // ✅ Nouveau : pharmacie (gestion par lots, péremption FEFO, ordonnance…)
   PHARMACIE = 'PHARMACIE',
+  SYSTEM = 'SYSTEM',
 }
