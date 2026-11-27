@@ -20,6 +20,9 @@
   "pos.payment_already_recorded": "Malipo tayari yamerekodiwa.",
   "pos.product_name_required": "Jina la bidhaa linahitajika.",
   "pos.product_recorded": "Bidhaa imehifadhiwa.",
+  "pos.customer_name_required": "Jina la mteja linahitajika.",
+  "pos.customer_saved": "Mteja amehifadhiwa.",
+  "pos.customer_not_found": "Mteja hajapatikana.",
   "pos.product_not_found": "Bidhaa haijapatikana au ni ya kampuni nyingine.",
   "pos.invalid_updated_since": "Tarehe ya « updatedSince » si sahihi: muundo wa ISO unahitajika (mf. 2026-11-27T10:00:00Z)."
 }

@@ -7,9 +7,12 @@ import { PosSale } from './entities/pos-sale.entity';
 import { PosSaleItem } from './entities/pos-sale-item.entity';
 import { PosSalePayment } from './entities/pos-sale-payment.entity';
 import { PosSyncOperation } from './entities/pos-sync-operation.entity';
+import { PosCustomer } from './entities/pos-customer.entity';
 import { PosService } from './pos.service';
 import { PosSyncService } from './pos-sync.service';
+import { PosCustomerService } from './pos-customer.service';
 import { PosController } from './pos.controller';
+import { PosCustomerController } from './pos-customer.controller';
 
 /**
  * Point de vente (caisse) + synchro offline.
@@ -19,10 +22,10 @@ import { PosController } from './pos.controller';
 @Module({
   imports: [
     InventoryModule,
-    TypeOrmModule.forFeature([PosTerminal, PosSession, PosSale, PosSaleItem, PosSalePayment, PosSyncOperation]),
+    TypeOrmModule.forFeature([PosTerminal, PosSession, PosSale, PosSaleItem, PosSalePayment, PosSyncOperation, PosCustomer]),
   ],
-  controllers: [PosController],
-  providers: [PosService, PosSyncService],
-  exports: [PosService, PosSyncService],
+  controllers: [PosController, PosCustomerController],
+  providers: [PosService, PosSyncService, PosCustomerService],
+  exports: [PosService, PosSyncService, PosCustomerService],
 })
 export class PosModule {}

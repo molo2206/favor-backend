@@ -20,6 +20,9 @@
   "pos.payment_already_recorded": "Payment already recorded.",
   "pos.product_name_required": "Product name is required.",
   "pos.product_recorded": "Product saved.",
+  "pos.customer_name_required": "Customer name is required.",
+  "pos.customer_saved": "Customer saved.",
+  "pos.customer_not_found": "Customer not found.",
   "pos.product_not_found": "Product not found or belongs to another company.",
   "pos.invalid_updated_since": "Invalid « updatedSince » date: ISO format expected (e.g. 2026-11-27T10:00:00Z)."
 }
