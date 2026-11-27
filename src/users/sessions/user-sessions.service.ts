@@ -65,6 +65,11 @@ export class UserSessionsService {
   private get cacheMs(): number {
     return num(process.env.SESSION_CACHE_SECONDS, 30) * 1000;
   }
+  /** Fenêtre pendant laquelle l'ANCIEN refresh token reste accepté après rotation
+   *  (évite les déconnexions intempestives sur double refresh / réseau instable). Défaut 5 min. */
+  private get refreshGraceMs(): number {
+    return num(process.env.SESSION_REFRESH_GRACE_SECONDS, 300) * 1000;
+  }
 
   private method(path?: string | null): string {
     const p = String(path ?? '');
@@ -195,13 +200,23 @@ export class UserSessionsService {
     }
     const h = sha256(refreshToken);
     if (s.refreshTokenHash && h !== s.refreshTokenHash) {
-      const grace =
-        s.previousRefreshHash === h && !!s.refreshRotatedAt && Date.now() - new Date(s.refreshRotatedAt).getTime() < 60000;
-      if (!grace) {
-        await this.revoke(s.id, SessionRevokeReason.TOKEN_REUSE);
-        this.logger.warn(`⚠️ Refresh token réutilisé : session ${s.id} (utilisateur ${s.userId}) fermée`);
-        throw new BadRequestException(this.t('user.session_token_reused', lang));
+      const isPrevious = s.previousRefreshHash === h;
+      const withinGrace =
+        isPrevious && !!s.refreshRotatedAt && Date.now() - new Date(s.refreshRotatedAt).getTime() < this.refreshGraceMs;
+
+      if (withinGrace) {
+        // ✅ Double refresh quasi simultané / renvoi réseau : l'ancien jeton (une génération) est toléré.
+        return s.id;
       }
+      if (isPrevious) {
+        // ✅ Ancien jeton connu mais hors fenêtre de grâce : on refuse CE refresh SANS fermer la session.
+        //    Le jeton courant reste valide → l'utilisateur n'est PAS déconnecté (il réessaie avec le bon jeton).
+        throw new BadRequestException(this.t('user.session_refresh_stale', lang));
+      }
+      // ❌ Jeton totalement inconnu (ni courant ni précédent) → vol probable : on ferme la session.
+      await this.revoke(s.id, SessionRevokeReason.TOKEN_REUSE);
+      this.logger.warn(`⚠️ Refresh token inconnu : session ${s.id} (utilisateur ${s.userId}) fermée`);
+      throw new BadRequestException(this.t('user.session_token_reused', lang));
     }
     return s.id;
   }

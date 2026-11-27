@@ -193,6 +193,7 @@
   "user.session_revoked": "Cette session a été fermée : reconnectez-vous.",
   "user.session_expired": "Session expirée : reconnectez-vous.",
   "user.session_token_reused": "Jeton déjà utilisé : par sécurité la session a été fermée. Reconnectez-vous.",
+  "user.session_refresh_stale": "Jeton de rafraîchissement périmé. Réessayez.",
   "user.session_list": "Sessions de connexion",
   "user.session_not_found": "Session introuvable.",
   "user.session_closed": "Session fermée : l'appareil est déconnecté.",

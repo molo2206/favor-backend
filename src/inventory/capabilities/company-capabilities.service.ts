@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { CompanyEntity } from 'src/company/entities/company.entity';
+import { CompanyType } from 'src/company/enum/type.company.enum';
 import {
   BOOLEAN_CAPABILITY_KEYS,
   CompanyCapabilities,
@@ -61,6 +62,82 @@ export class CompanyCapabilitiesService {
   invalidate(companyType?: string) {
     if (companyType) this.cache.delete(String(companyType).toUpperCase());
     else this.cache.clear();
+  }
+
+  // ============================================================
+  // ADMINISTRATION (configuration dynamique par type)
+  // ============================================================
+
+  /** Liste tous les types avec leurs capacités effectives (défaut + surcharge) */
+  async listAll() {
+    const rows = await this.dataSource.getRepository(TypeCompanyConfig).find();
+    const overrides = new Map(rows.map((r) => [r.companyType.toUpperCase(), r]));
+    const types = Object.values(CompanyType);
+    const out: any[] = [];
+    for (const type of types) {
+      out.push({
+        companyType: type,
+        effective: await this.forType(type),
+        hasOverride: overrides.has(String(type).toUpperCase()),
+      });
+    }
+    return out;
+  }
+
+  /** Détail d'un type : défauts du code + surcharge en base + capacités effectives */
+  async getOne(companyType: string) {
+    const key = this.assertType(companyType);
+    const override = await this.dataSource.getRepository(TypeCompanyConfig).findOne({ where: { companyType: key } });
+    return {
+      companyType: key,
+      defaults: defaultCapabilities(key),
+      override: override ?? null,
+      effective: await this.forType(key),
+    };
+  }
+
+  /** Crée/met à jour la surcharge d'un type. Les champs absents ne sont pas touchés. Invalide le cache. */
+  async updateConfig(companyType: string, dto: Record<string, any>) {
+    const key = this.assertType(companyType);
+    const repo = this.dataSource.getRepository(TypeCompanyConfig);
+    let row = await repo.findOne({ where: { companyType: key } });
+    if (!row) row = repo.create({ companyType: key });
+
+    for (const k of BOOLEAN_CAPABILITY_KEYS) {
+      if (dto[k] !== undefined && dto[k] !== null) (row as any)[k] = !!dto[k] ? 1 : 0;
+    }
+    if (dto.offlineAllowedOps !== undefined) {
+      if (dto.offlineAllowedOps === null) {
+        row.offlineAllowedOps = null;
+      } else if (Array.isArray(dto.offlineAllowedOps)) {
+        const valid = Object.values(OfflineOp) as string[];
+        row.offlineAllowedOps = dto.offlineAllowedOps
+          .map((o: any) => String(o).toUpperCase())
+          .filter((o: string) => valid.includes(o));
+      } else {
+        throw new BadRequestException('offlineAllowedOps doit être un tableau ou null');
+      }
+    }
+
+    const saved = await repo.save(row);
+    this.invalidate(key); // effet immédiat (pas d'attente du cache)
+    return { companyType: key, override: saved, effective: await this.forType(key) };
+  }
+
+  /** Supprime la surcharge d'un type → retour aux défauts du code */
+  async resetConfig(companyType: string) {
+    const key = this.assertType(companyType);
+    await this.dataSource.getRepository(TypeCompanyConfig).delete({ companyType: key });
+    this.invalidate(key);
+    return { companyType: key, effective: await this.forType(key) };
+  }
+
+  private assertType(companyType: string): string {
+    const key = String(companyType || '').toUpperCase();
+    if (!(Object.values(CompanyType) as string[]).includes(key)) {
+      throw new BadRequestException(`Type d'entreprise inconnu : ${companyType}`);
+    }
+    return key;
   }
 
   private applyOverride(caps: CompanyCapabilities, row: TypeCompanyConfig) {

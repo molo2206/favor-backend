@@ -1821,7 +1821,7 @@ export class CompanyService {
     };
   }
   // ======================== FIND ALL BY USER ========================
-  async findAllByUser(userId: string, lang: string = 'fr'): Promise<Record<string, any>> {
+  async findAllByUser(userId: string, lang: string = 'fr', platform?: string): Promise<Record<string, any>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: [
@@ -1843,8 +1843,20 @@ export class CompanyService {
 
     if (!user) throw new NotFoundException(await this.i18n.translate('company_not_found', lang));
 
+    // ✅ Filtre par plateforme (x-platform) : sur « group » → uniquement les entreprises FavorGroup ;
+    //    sinon (admin / web / mobile) → uniquement les entreprises FavorHelp (typePlatform NULL = FavorHelp).
+    const wantGroup = String(platform || '').toLowerCase() === 'group';
+    const platformOf = (uhc: any): CompanyPlatform => {
+      const raw: any = uhc?.company?.typePlatform;
+      const val = raw && typeof raw === 'object' ? raw.typePlatform : raw;
+      return (val as CompanyPlatform) ?? CompanyPlatform.FAVOR_HELP;
+    };
+    const visibleUhc = (user.userHasCompany || []).filter((uhc: any) =>
+      wantGroup ? platformOf(uhc) === CompanyPlatform.FAVOR_GROUP : platformOf(uhc) !== CompanyPlatform.FAVOR_GROUP,
+    );
+
     const companies =
-      user.userHasCompany?.map((uhc) => ({
+      visibleUhc.map((uhc) => ({
         ...uhc.company,
         country: uhc.company.country,
         city: uhc.company.city,

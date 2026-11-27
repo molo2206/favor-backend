@@ -193,6 +193,7 @@
   "user.session_revoked": "This session has been closed: please sign in again.",
   "user.session_expired": "Session expired: please sign in again.",
   "user.session_token_reused": "Token already used: for security the session has been closed. Please sign in again.",
+  "user.session_refresh_stale": "Stale refresh token. Please retry.",
   "user.session_list": "Sign-in sessions",
   "user.session_not_found": "Session not found.",
   "user.session_closed": "Session closed: the device is signed out.",

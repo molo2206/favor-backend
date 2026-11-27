@@ -7,6 +7,7 @@ import { StockMovement } from './entities/stock-movement.entity';
 import { ProductPharmaMeta } from './entities/product-pharma-meta.entity';
 import { TypeCompanyConfig } from './capabilities/type-company-config.entity';
 import { CompanyCapabilitiesService } from './capabilities/company-capabilities.service';
+import { TypeCapabilitiesController } from './capabilities/type-capabilities.controller';
 import { InventoryService } from './inventory.service';
 import { InventoryController } from './inventory.controller';
 
@@ -25,7 +26,7 @@ import { InventoryController } from './inventory.controller';
       TypeCompanyConfig,
     ]),
   ],
-  controllers: [InventoryController],
+  controllers: [InventoryController, TypeCapabilitiesController],
   providers: [InventoryService, CompanyCapabilitiesService],
   // Exportés pour le futur module POS et le module de synchro offline
   exports: [InventoryService, CompanyCapabilitiesService],

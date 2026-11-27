@@ -193,6 +193,7 @@
   "user.session_revoked": "Kipindi hiki kimefungwa: ingia tena.",
   "user.session_expired": "Kipindi kimeisha: ingia tena.",
   "user.session_token_reused": "Tokeni imeshatumika: kwa usalama kipindi kimefungwa. Ingia tena.",
+  "user.session_refresh_stale": "Tokeni ya kuonyesha upya imepitwa na wakati. Jaribu tena.",
   "user.session_list": "Vipindi vya kuingia",
   "user.session_not_found": "Kipindi hakipatikani.",
   "user.session_closed": "Kipindi kimefungwa: kifaa kimetolewa.",

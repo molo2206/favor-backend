@@ -334,7 +334,11 @@ export class CompanyController {
     @CurrentUser() user: UserEntity,
   ) {
     const lang = this.extractLanguage(req);
-    const companies = await this.companyService.findAllByUser(user.id, lang);
+    // ✅ Plateforme (x-platform) : « group » → entreprises FavorGroup ; sinon → FavorHelp
+    const platform = String(
+      req.headers['x-platform'] || req.headers['platform'] || req.headers['x-platform-type'] || '',
+    ).toLowerCase();
+    const companies = await this.companyService.findAllByUser(user.id, lang, platform);
     return { data: companies };
   }
 

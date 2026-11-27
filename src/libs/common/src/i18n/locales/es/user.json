@@ -193,6 +193,7 @@
   "user.session_revoked": "Esta sesión se ha cerrado: vuelva a iniciar sesión.",
   "user.session_expired": "Sesión caducada: vuelva a iniciar sesión.",
   "user.session_token_reused": "Token ya utilizado: por seguridad se ha cerrado la sesión. Vuelva a iniciar sesión.",
+  "user.session_refresh_stale": "Token de actualización caducado. Vuelva a intentarlo.",
   "user.session_list": "Sesiones de conexión",
   "user.session_not_found": "Sesión no encontrada.",
   "user.session_closed": "Sesión cerrada: el dispositivo está desconectado.",
