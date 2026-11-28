@@ -792,6 +792,76 @@ export class ProductService {
     });
   }
 
+  /**
+   * ✅ Création d'un produit depuis le POINT DE VENTE (caisse).
+   *    Suit la MÊME logique que la création normale : slug unique, `type` = type d'entreprise,
+   *    `companyActivity`, `min_quantity`, validation catégorie/marque/mesure.
+   *    Différences assumées pour la caisse : image par URL (pas de fichier obligatoire) et
+   *    statut PUBLISHED (immédiatement vendable). Un `id` peut être fourni (création hors-ligne).
+   */
+  async createForPos(
+    companyId: string,
+    dto: {
+      id?: string;
+      name: string;
+      price?: number;
+      detailPrice?: number;
+      image?: string | null;
+      description?: string | null;
+      categoryId?: string;
+      brandId?: string;
+      measureId?: string;
+      min_quantity?: number;
+    },
+    lang = 'fr',
+  ): Promise<Product> {
+    const name = (dto.name || '').trim();
+    if (!name) throw new BadRequestException(await this.i18n.translate('pos.product_name_required', lang));
+
+    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    if (!company) throw new NotFoundException(await this.i18n.translate('company_not_found', lang));
+
+    let category: CategoryEntity | null = null;
+    if (dto.categoryId) {
+      category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
+      if (!category) throw new NotFoundException(await this.i18n.translate('category_not_found', lang));
+    }
+    let brand: Brand | null = null;
+    if (dto.brandId) {
+      brand = await this.brandRepository.findOne({ where: { id: dto.brandId } });
+      if (!brand) throw new NotFoundException(await this.i18n.translate('brand_not_found', lang));
+    }
+    let measure: MeasureEntity | null = null;
+    if (dto.measureId) {
+      measure = await this.measureRepo.findOne({ where: { id: dto.measureId } });
+      if (!measure) throw new NotFoundException(await this.i18n.translate('measure_not_found', lang));
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const baseSlug = this.generateSlug(name);
+      const uniqueSlug = await this.generateUniqueSlug(baseSlug, null, manager);
+      const product = manager.create(Product, {
+        ...(dto.id ? { id: dto.id } : {}),
+        name,
+        price: dto.price ?? 0,
+        detail: dto.detailPrice ?? undefined,
+        description: dto.description ?? undefined,
+        image: dto.image ?? undefined,
+        slug: uniqueSlug,
+        min_quantity: dto.min_quantity ?? 0,
+        company,
+        category,
+        brand,
+        measure,
+        type: company.typeCompany,
+        status: ProductStatus.PUBLISHED, // vendable immédiatement en caisse
+        companyActivity: company.companyActivity,
+        listingType: ListingType.PRODUCT,
+      } as DeepPartial<Product>);
+      return manager.save(product);
+    });
+  }
+
   async createProduct(
     createProductAdminDto: CreateProductAdminDto,
     files: Express.Multer.File[],

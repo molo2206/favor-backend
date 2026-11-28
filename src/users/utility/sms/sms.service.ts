@@ -175,6 +175,21 @@ export class SmsService implements OnModuleInit {
     try {
       const prefix = country.prefix;
 
+      // ✅ BÉNIN (229) : depuis 2020, les numéros ont 10 chiffres préfixés « 01 »
+      //    (229 + 01 + 8 chiffres). Si le « 01 » manque, on l'insère APRÈS le 229.
+      //    Idempotent : on n'ajoute rien si le local commence déjà par « 01 ».
+      if (prefix === '229') {
+        // Local = ce qui suit 229 (ou le numéro tel quel s'il n'a pas le préfixe).
+        // ⚠️ On ne retire PAS le 0 initial ici : au Bénin le local commence légitimement par « 01 ».
+        let local = phoneNumber.startsWith(prefix)
+          ? phoneNumber.substring(prefix.length)
+          : phoneNumber;
+        if (!local.startsWith('01') && local.length === 8) {
+          local = `01${local}`;
+        }
+        return `${prefix}${local}`;
+      }
+
       if (phoneNumber.startsWith(prefix)) {
         return phoneNumber;
       }

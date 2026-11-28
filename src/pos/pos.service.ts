@@ -12,6 +12,7 @@ import { StockMovementSource } from 'src/inventory/enums/inventory.enum';
 import { Product } from 'src/products/entities/product.entity';
 import { ListingType } from 'src/products/enum/listing-type.enum';
 import { ProductStatus } from 'src/products/enum/product.status.enum';
+import { ProductService } from 'src/products/products.service';
 import { PosTerminal } from './entities/pos-terminal.entity';
 import { PosSession } from './entities/pos-session.entity';
 import { PosSale } from './entities/pos-sale.entity';
@@ -35,6 +36,7 @@ export class PosService {
     private readonly i18n: I18nService,
     private readonly inventory: InventoryService,
     private readonly capabilities: CompanyCapabilitiesService,
+    private readonly products: ProductService,
   ) {}
 
   private t(key: string, lang: string, args?: any) {
@@ -416,19 +418,39 @@ export class PosService {
       if (usedElsewhere) throw new BadRequestException({ code: 'pos.product_not_found', message: this.t('pos.product_not_found', lang) }); // id déjà pris par une autre société
     }
     const isNew = !owned;
-    const product: any = owned || repo.create({ id });
+    let saved: Product;
 
-    product.name = dto.name.trim();
-    if (dto.price != null) product.price = dto.price;
-    if (dto.detailPrice != null) product.detail = dto.detailPrice;
-    if (dto.image !== undefined) product.image = dto.image ?? null;
-    if (dto.description !== undefined) product.description = dto.description ?? null;
-    product.listingType = ListingType.PRODUCT;
-    if (isNew) product.status = ProductStatus.PUBLISHED; // immédiatement vendable en caisse
-    product.company = { id: companyId };
-    if (dto.categoryId) product.category = { id: dto.categoryId };
-    if (dto.brandId) product.brand = { id: dto.brandId };
-    const saved = await repo.save(product);
+    if (isNew) {
+      // ✅ Création : on suit la MÊME logique que la création normale (slug, type d'entreprise,
+      //    companyActivity, min_quantity, catégorie/marque) via ProductService.createForPos.
+      saved = await this.products.createForPos(
+        companyId,
+        {
+          id,
+          name: dto.name,
+          price: dto.price ?? undefined,
+          detailPrice: dto.detailPrice ?? undefined,
+          image: dto.image ?? undefined,
+          description: dto.description ?? undefined,
+          categoryId: dto.categoryId,
+          brandId: dto.brandId,
+          min_quantity: (dto as any).min_quantity,
+        },
+        lang,
+      );
+    } else {
+      // ✅ Mise à jour d'un produit existant de l'entreprise
+      const product: any = owned;
+      product.name = dto.name.trim();
+      if (dto.price != null) product.price = dto.price;
+      if (dto.detailPrice != null) product.detail = dto.detailPrice;
+      if (dto.image !== undefined) product.image = dto.image ?? null;
+      if (dto.description !== undefined) product.description = dto.description ?? null;
+      product.listingType = ListingType.PRODUCT;
+      if (dto.categoryId) product.category = { id: dto.categoryId };
+      if (dto.brandId) product.brand = { id: dto.brandId };
+      saved = await repo.save(product);
+    }
 
     // Métadonnées pharmacie
     if (dto.requiresPrescription != null || dto.isControlled != null || dto.dci !== undefined || dto.dosage !== undefined || dto.unitsPerPack !== undefined) {

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { InventoryModule } from 'src/inventory/inventory.module';
+import { ProductModule } from 'src/products/products.module';
 import { PosTerminal } from './entities/pos-terminal.entity';
 import { PosSession } from './entities/pos-session.entity';
 import { PosSale } from './entities/pos-sale.entity';
@@ -22,6 +23,7 @@ import { PosCustomerController } from './pos-customer.controller';
 @Module({
   imports: [
     InventoryModule,
+    ProductModule,
     TypeOrmModule.forFeature([PosTerminal, PosSession, PosSale, PosSaleItem, PosSalePayment, PosSyncOperation, PosCustomer]),
   ],
   controllers: [PosController, PosCustomerController],
