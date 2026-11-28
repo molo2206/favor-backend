@@ -1727,6 +1727,7 @@ export class GoogleService {
     input: string,
     saveToDatabase: boolean = true,
     options?: {
+      ville?: string;
       language?: string;
       components?: string;
       types?: string;
@@ -1738,14 +1739,22 @@ export class GoogleService {
       sessiontoken?: string;
     },
   ) {
-    this.logger.log(`Searching in database for autocomplete: "${input}"`);
-    const dbResults = await this.addressService.searchAddressesByInput(input);
+    // ✅ Filtre « ville » : Google Autocomplete n'a pas de param ville natif,
+    //    on l'ajoute au texte recherché pour garder les suggestions dans cette ville.
+    const ville = options?.ville?.trim();
+    const effectiveInput =
+      ville && !input.toLowerCase().includes(ville.toLowerCase())
+        ? `${input}, ${ville}`
+        : input;
+
+    this.logger.log(`Searching in database for autocomplete: "${effectiveInput}"`);
+    const dbResults = await this.addressService.searchAddressesByInput(effectiveInput);
 
     let results: any[] = [];
 
     if (dbResults && dbResults.length > 0) {
       this.logger.log(
-        `Found ${dbResults.length} addresses in database for "${input}"`,
+        `Found ${dbResults.length} addresses in database for "${effectiveInput}"`,
       );
       results = dbResults.slice(0, 5).map((address: any) => ({
         description: address.formatted_address,

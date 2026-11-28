@@ -13,4 +13,6 @@ export enum CompanyType {
   // ✅ Nouveau : pharmacie (gestion par lots, péremption FEFO, ordonnance…)
   PHARMACIE = 'PHARMACIE',
   SYSTEM = 'SYSTEM',
+  // ✅ Nouveau : atelier de couture (fabrication SUR COMMANDE / sur-mesure, prix par taille, commission plateforme)
+  ATELIER_COUTURE = 'ATELIER_COUTURE',
 }

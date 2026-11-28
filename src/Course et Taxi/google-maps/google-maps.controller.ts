@@ -24,21 +24,40 @@ export class GoogleMapsController {
     return { message: 'Statistiques du cache Google Maps', data: await this.mapsCache.stats() };
   }
 
+  /**
+   * ✅ Normalise le paramètre de type pour Google.
+   *  - cities | (cities) | locality  → renvoyé sous la forme attendue par Google « (cities) »
+   *  - toute autre valeur             → renvoyée telle quelle
+   *  - vide / absent                  → undefined
+   * Permet d'accepter indifféremment ?types=(cities), ?types=cities ou ?type=cities.
+   */
+  private normalizeTypes(raw?: string): string | undefined {
+    if (!raw) return undefined;
+    const cleaned = raw.replace(/[()]/g, '').trim().toLowerCase();
+    if (!cleaned) return undefined;
+    if (cleaned === 'cities' || cleaned === 'locality') return '(cities)';
+    return raw;
+  }
+
   @Get('autocomplete')
   async autocomplete(
     @Query('input') input: string,
     @Query('language') language?: string,
     @Query('components') components?: string,
     @Query('types') types?: string,
+    @Query('type') type?: string, // ✅ alias singulier : type=cities marche aussi
     @Query('radius') radius?: string,
     @Query('location') location?: string,
   ) {
     if (!input) throw new BadRequestException('Le paramètre input est requis');
 
+    // ✅ On accepte indifféremment ?types=(cities), ?types=cities ou ?type=cities
+    const effectiveTypes = this.normalizeTypes(types || type);
+
     const data = await this.googleService.autocomplete(input, true, {
       language,
       components,
-      types,
+      types: effectiveTypes,
       radius: radius ? parseInt(radius) : undefined,
       location,
     });
@@ -119,13 +138,15 @@ export class GoogleMapsController {
     @Query('radius') radius?: number,
     @Query('region') region?: string,
     @Query('save') save?: string,
-    @Query('types') types?: string,          // ✅ nouveau paramètre
+    @Query('types') types?: string,          // ✅ ex. types=(cities)
+    @Query('type') type?: string,            // ✅ alias singulier : type=cities marche aussi
     @Query('language') language?: string,
   ) {
     if (!query) throw new BadRequestException('Le paramètre query est requis');
 
     const clientIp = this.getClientIp(request);
-    const effectiveType = types ;   // priorité à 'types'
+    // ✅ On accepte indifféremment types ou type, avec ou sans parenthèses
+    const effectiveType = this.normalizeTypes(types || type);
 
     const results = await this.googleService.searchPlaces(query, {
       location,

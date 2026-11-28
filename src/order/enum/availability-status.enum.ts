@@ -1,3 +1,5 @@
+import { defaultCapabilities } from '../../inventory/capabilities/company-capabilities';
+
 /**
  * ✅ Disponibilité d'un produit dans une commande, confirmée par son propriétaire (order_items.availabilityStatus)
  *    PENDING     → en attente de confirmation
@@ -26,12 +28,19 @@ export enum OrderAvailabilitySummary {
 }
 
 /**
- * Seulement les commandes RESTAURANT (les autres types : rien ne change).
+ * Confirmation « disponibilité » exigée pour :
+ *   - les commandes RESTAURANT (le propriétaire confirme que le plat est dispo), et
+ *   - les types en FABRICATION SUR COMMANDE (madeToOrder : atelier de couture…),
+ *     où l'entreprise doit ACCEPTER la commande (et au besoin le prix) avant confection.
  * ORDER_AVAILABILITY_CHECK=false dans le .env désactive la confirmation (fonctionnement d'avant).
  */
 export function availabilityRequiredFor(orderType?: string | null): boolean {
   if (String(process.env.ORDER_AVAILABILITY_CHECK ?? 'true').trim().toLowerCase() === 'false') return false;
-  return String(orderType || '').toUpperCase() === 'RESTAURANT';
+  const t = String(orderType || '').toUpperCase();
+  if (t === 'RESTAURANT') return true;
+  // Pas de code en dur par type : on lit la capacité "madeToOrder" des défauts du type.
+  if (defaultCapabilities(t)?.madeToOrder) return true;
+  return false;
 }
 
 /** Résumé d'une liste de statuts de produits */

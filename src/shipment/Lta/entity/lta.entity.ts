@@ -142,4 +142,18 @@ export class LtaEntity {
 
   @Column({ default: false })
   sub_lta: boolean;
+
+  // ============================================================
+  // ✅ Disponibilisation au SERVICE CLIENT
+  //    Quand une LTA est « disponibilisée », ses clients (propriétaires de colis)
+  //    apparaissent au service client pour être contactés.
+  // ============================================================
+  @Column({ default: false })
+  availableToServiceClient: boolean;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  releasedToServiceClientById?: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  releasedToServiceClientAt?: Date | null;
 }

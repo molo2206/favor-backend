@@ -22,6 +22,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { classToPlain } from 'class-transformer';
 import { UsersService } from './users.service';
+import { ServiceClientContactsService } from 'src/backOffice/service-client/contacts/contacts.service';
 import { UserEntity } from './entities/user.entity';
 import { LoginUserDto } from './dto/login-user.dto';
 import { UpdateUserDto } from './dto/update-profile';
@@ -96,7 +97,38 @@ export class UsersController {
     private readonly mailService: MailService,
     @InjectRepository(BranchEntity)
     private readonly branchRepo: Repository<BranchEntity>,
+    private readonly serviceClientContacts: ServiceClientContactsService,
   ) { }
+
+  /**
+   * ✅ Attache l'état « contacté + note » du service client à chaque client d'une réponse by-destination.
+   *    Enrichit la liste principale ET les blocs clients « sans activité / sans commande / sans colis ».
+   */
+  private async enrichWithContactStatus(result: any): Promise<any> {
+    try {
+      const buckets: any[][] = [
+        result?.data?.data,
+        result?.clientsWithoutActivity?.items,
+        result?.clientsWithoutOrder?.items,
+        result?.clientsWithoutShipment?.items,
+      ].filter(Array.isArray);
+      const ids = [...new Set(buckets.flat().map((c: any) => c?.id).filter(Boolean))];
+      if (!ids.length) return result;
+      const status = await this.serviceClientContacts.statusForClients({ clientUserIds: ids });
+      for (const bucket of buckets) {
+        for (const c of bucket) {
+          const s = status[c?.id];
+          c.contacted = s?.contacted ?? false;
+          c.contactNote = s?.note ?? null;
+          c.contactedAt = s?.contactedAt ?? null;
+          c.contactedById = s?.contactedById ?? null;
+        }
+      }
+    } catch {
+      /* enrichissement best-effort : jamais bloquant */
+    }
+    return result;
+  }
 
   // Extrait la langue de l'en-tête Accept-Language (préférée)
   private extractLanguage(req: Request): string {

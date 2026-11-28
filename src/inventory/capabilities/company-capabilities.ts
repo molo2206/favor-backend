@@ -29,6 +29,12 @@ export interface CompanyCapabilities {
   sellByFraction: boolean;
   /** Autoriser un stock NÉGATIF (vente même sans stock enregistré) */
   allowNegativeStock: boolean;
+  /**
+   * Fabrication SUR COMMANDE (sur-mesure) : le client commande un modèle à confectionner.
+   * → pas de décrément du stock « produit », étape de confirmation par l'entreprise avant confection,
+   *   prix ajustable selon la taille (voir module atelier).
+   */
+  madeToOrder: boolean;
   /** Opérations autorisées HORS-LIGNE (si offlineEnabled). Les autres sont refusées offline. */
   offlineAllowedOps: OfflineOp[];
 }
@@ -54,6 +60,7 @@ const NONE: CompanyCapabilities = {
   controlledRegister: false,
   sellByFraction: false,
   allowNegativeStock: false,
+  madeToOrder: false,
   offlineAllowedOps: [],
 };
 
@@ -95,7 +102,19 @@ export const CAPABILITIES_BY_TYPE: Record<string, CompanyCapabilities> = {
     controlledRegister: true,
     sellByFraction: true,
     allowNegativeStock: false,
+    madeToOrder: false,
     offlineAllowedOps: [OfflineOp.SALE, OfflineOp.STOCK_OUT, OfflineOp.PRICE_LOOKUP, OfflineOp.PRODUCT_MANAGE],
+  },
+
+  // 🧵 ATELIER DE COUTURE : fabrication SUR COMMANDE (sur-mesure).
+  //    - madeToOrder : le modèle est confectionné après commande (pas de décrément de stock produit)
+  //    - allowNegativeStock : on accepte la commande même sans stock du modèle
+  //    - hasInventory/hasPOS : désactivés par défaut (gestion des tissus / boutique → à activer
+  //      par entreprise via type_company_config si besoin)
+  [CompanyType.ATELIER_COUTURE]: {
+    ...NONE,
+    madeToOrder: true,
+    allowNegativeStock: true,
   },
 };
 
@@ -116,4 +135,5 @@ export const BOOLEAN_CAPABILITY_KEYS: (keyof CompanyCapabilities)[] = [
   'controlledRegister',
   'sellByFraction',
   'allowNegativeStock',
+  'madeToOrder',
 ];

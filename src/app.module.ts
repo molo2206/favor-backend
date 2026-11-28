@@ -121,6 +121,7 @@ import { ClassifiedsModule } from './classifieds/classifieds.module';
 import { VehicleRegistrationModule } from './vehicle-registration/vehicle-registration.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { PosModule } from './pos/pos.module';
+import { AtelierModule } from './atelier/atelier.module';
 // import { WhatsAppModule } from './users/utility/helpers/whatsapp.module';
 
 @Module({
@@ -283,6 +284,7 @@ import { PosModule } from './pos/pos.module';
     VehicleRegistrationModule, // ✅ enregistrement des véhicules (propriétaire + commissionnaire)
     InventoryModule, // ✅ Inventaire avancé + capacités par type (socle POS & synchro offline)
     PosModule, // ✅ Point de vente (caisse) + synchro offline par lots
+    AtelierModule, // ✅ Atelier de couture : prix par taille (paliers) + commission plateforme
   ],
   controllers: [AppController],
   exports: [FilesService],
