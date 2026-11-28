@@ -499,10 +499,17 @@ export class UsersService {
       );
     }
 
-    if (hasPhone && !validator.isMobilePhone(phone, 'any')) {
-      throw new BadRequestException(
-        await this.i18n.translate('user.valid_phone', lang),
-      );
+    if (hasPhone) {
+      // ✅ Validation souple par NOMBRE DE CHIFFRES (8 à 15, format E.164), indicatif + facultatif.
+      //    isMobilePhone(phone,'any') ne connaît pas encore le nouveau format béninois (229 + 01 + 8
+      //    chiffres = 13) et rejetait des numéros valides. La normalisation pays se fait à l'envoi du SMS.
+      const phoneDigits = String(phone).replace(/[^0-9]/g, '');
+      const phoneOk = phoneDigits.length >= 8 && phoneDigits.length <= 15;
+      if (!phoneOk) {
+        throw new BadRequestException(
+          await this.i18n.translate('user.valid_phone', lang),
+        );
+      }
     }
 
     const destination = email || phone;
