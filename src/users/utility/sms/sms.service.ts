@@ -348,13 +348,13 @@ export class SmsService implements OnModuleInit {
         return false;
       }
 
-      // 2. Valider la longueur selon le pays détecté
+      // 2. (Logique fpay) ON NE BLOQUE JAMAIS sur la validation : on avertit seulement,
+      //    puis on envoie quand même (l'opérateur rejettera si le numéro est réellement invalide).
       const validation = this.isValidPhone(cleanPhone, countryCode);
       if (!validation.valid) {
-        this.logger.error(
-          `❌ Numero invalide: ${cleanPhone} - ${validation.message}`,
+        this.logger.warn(
+          `⚠️ Numéro possiblement invalide (${validation.message}) — envoi tenté quand même : ${cleanPhone}`,
         );
-        return false;
       }
 
       this.logger.log(`📤 Numero normalise: ${cleanPhone}`);
@@ -424,7 +424,7 @@ export class SmsService implements OnModuleInit {
     otpCode: string,
     countryCode?: string,
   ): Promise<boolean> {
-    const message = `Votre code F-Pay est : ${otpCode}`;
+    const message = `Votre code Favor Help est : ${otpCode}`;
     return this.sendSms(phoneNumber, message, countryCode);
   }
 
@@ -434,7 +434,7 @@ export class SmsService implements OnModuleInit {
     accountNumber: string,
     countryCode?: string,
   ): Promise<boolean> {
-    const message = `Bienvenue sur F-Pay, ${fullName} ! Votre compte ${accountNumber} a ete cree avec succes.`;
+    const message = `Bienvenue sur Favor Help, ${fullName} ! Votre compte ${accountNumber} a ete cree avec succes.`;
     return this.sendSms(phoneNumber, message, countryCode);
   }
 
